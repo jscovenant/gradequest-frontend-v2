@@ -2,7 +2,7 @@
 import axios from "axios";
 import { getToken, logout } from "./token";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "VITE_API_URL=https://gradequest-backend-upgrade-v2-main-xb8ubk.free.laravel.cloud";
 
 // Public instance (no auth)
 export const publicApi = axios.create({
