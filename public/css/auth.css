@@ -1,0 +1,84 @@
+  
+.login-wrapper {
+      min-height: 100vh;
+    }
+
+    .login-image {
+      background: linear-gradient(135deg, #0d6efd, #6610f2);
+      color: #fff;
+      padding: 60px;
+    }
+
+    .login-image img {
+      max-width: 100%;
+      animation: float 6s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-15px); }
+    }
+
+    .login-card {
+      border: none;
+      border-radius: 18px;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.08);
+    }
+
+    .form-control {
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+
+    .btn-primary {
+      border-radius: 50px;
+      padding: 12px;
+      font-weight: 600;
+    }
+
+    .brand {
+      font-weight: 800;
+      color: #0d6efd;
+    }
+ 
+       .signup-wrapper {
+      min-height: 100vh;
+    }
+
+    .signup-image {
+      background: linear-gradient(135deg, #0d6efd, #6610f2);
+      color: #fff;
+      padding: 60px;
+    }
+
+    .signup-image img {
+      max-width: 100%;
+      animation: float 6s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-15px); }
+    }
+
+    .signup-card {
+      border: none;
+      border-radius: 18px;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.08);
+    }
+
+    .form-control {
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+
+    .btn-primary {
+      border-radius: 50px;
+      padding: 12px;
+      font-weight: 600;
+    }
+
+    .brand {
+      font-weight: 800;
+      color: #0d6efd;
+    }
