@@ -255,6 +255,104 @@ function PriceCard({ plan, index }: { plan: Plan; index: number }) {
   );
 }
 
+function GlobeIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M3 12h18" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="M12 3c2.5 2.5 4 5.8 4 9s-1.5 6.5-4 9c-2.5-2.5-4-5.8-4-9s1.5-6.5 4-9z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+    </svg>
+  );
+}
+
+const CUSTOM_DOMAIN_FEATURES = [
+  "Your own domain (e.g. yourschool.com)",
+  "Fully branded school website",
+  "Custom design to match your school's identity",
+  "Dedicated setup & onboarding support",
+  "Tailored pricing for your school's needs",
+];
+
+function CustomDomainCard({ index }: { index: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useReveal(ref, 120 + index * 120);
+
+  const color = "rgb(211,0,176)";
+  const colorBg = "rgba(211,0,176,0.12)";
+
+  return (
+    <div
+      ref={ref}
+      className="pr-card"
+      data-pr-reveal=""
+      style={{ "--c": color, "--c-bg": colorBg } as React.CSSProperties}
+    >
+      <div className="pr-card-head mb-4">
+        <div className="pr-plan-icon mb-3">
+          <GlobeIcon />
+        </div>
+        <h3 className="pr-plan-name mb-1">Custom Domain &amp; Website</h3>
+        <p className="pr-plan-tagline mb-0">
+          Want your own domain and a fully branded website for your school? Let's build it together.
+        </p>
+      </div>
+
+      <div className="d-flex align-items-baseline gap-2 mb-3">
+        <span className="pr-price pr-price--talk">Let's Talk</span>
+      </div>
+
+      <div className="pr-meta-wrap mb-4">
+        <span className="pr-meta-pill">Tailored to your school</span>
+      </div>
+
+      <a
+        href="#contact"
+        className="btn pr-cta w-100 d-flex align-items-center justify-content-center gap-2 mb-4 pr-cta--primary"
+      >
+        Let's Talk
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path
+            d="M1 7h12M7 1l6 6-6 6"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </a>
+
+      <hr className="pr-rule mb-4" />
+
+      <div className="pr-feature-head mb-3">
+        <span className="pr-feature-headline">What's included</span>
+      </div>
+
+      <ul className="pr-features d-flex flex-column gap-3">
+        {CUSTOM_DOMAIN_FEATURES.map((text, i) => (
+          <li key={i} className="pr-feature d-flex align-items-start gap-2">
+            <span className="pr-feature-check flex-shrink-0">
+              <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+                <path
+                  d="M1.5 5l2.5 2.5 4.5-4"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
+            <span className="pr-feature-text">{text}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function Pricing() {
   const headerRef = useRef<HTMLDivElement>(null);
   const footerRef = useRef<HTMLDivElement>(null);
@@ -424,6 +522,7 @@ export default function Pricing() {
         .pr-card--popular .pr-price { color: var(--pr-dark); }
         .pr-period { font-size:13px; font-weight:300; color:var(--pr-slate); }
         .pr-card--popular .pr-period { color:rgba(5,0,8,0.45); }
+        .pr-price--talk { font-size:28px; }
 
         .pr-meta-wrap {
           display: flex;
@@ -649,42 +748,60 @@ export default function Pricing() {
           </div>
 
           {loading ? (
-            <div className="row g-4 align-items-start">
-              {[0, 1, 2].map((i) => (
+            <div className="row g-4 align-items-start justify-content-center">
+              {[0, 1].map((i) => (
                 <div key={i} className="col-12 col-md-6 col-lg-4">
                   <SkeletonCard />
                 </div>
               ))}
             </div>
           ) : error ? (
-            <div className="pr-error-state">
-              <div className="pr-error-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
-                  <path d="M12 7v5M12 15.5v.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
-              </div>
-              <p className="pr-error-title">Could not load plans</p>
-              <p className="pr-error-msg">{error}</p>
-              <button className="pr-retry-btn" onClick={fetchPlans}>
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                  <path d="M14 8A6 6 0 112 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                  <path d="M14 4v4h-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                Try again
-              </button>
-            </div>
-          ) : plans.length === 0 ? (
-            <p className="pr-empty-state">
-              No plans are currently available. Please check back soon.
-            </p>
-          ) : (
-            <div className="row g-4 align-items-start">
-              {plans.map((plan, i) => (
-                <div key={plan.id} className="col-12 col-md-6 col-lg-4">
-                  <PriceCard plan={plan} index={i} />
+            <div className="row g-4 align-items-start justify-content-center">
+              <div className="col-12 col-md-6 col-lg-4">
+                <div className="pr-card pr-visible h-100 d-flex align-items-center">
+                  <div className="pr-error-state mx-auto">
+                    <div className="pr-error-icon">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
+                        <path d="M12 7v5M12 15.5v.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                      </svg>
+                    </div>
+                    <p className="pr-error-title">Could not load plans</p>
+                    <p className="pr-error-msg">{error}</p>
+                    <button className="pr-retry-btn" onClick={fetchPlans}>
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                        <path d="M14 8A6 6 0 112 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                        <path d="M14 4v4h-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      Try again
+                    </button>
+                  </div>
                 </div>
-              ))}
+              </div>
+              <div className="col-12 col-md-6 col-lg-4">
+                <CustomDomainCard index={1} />
+              </div>
+            </div>
+          ) : (
+            <div className="row g-4 align-items-start justify-content-center">
+              {plans.length === 0 ? (
+                <div className="col-12 col-md-6 col-lg-4">
+                  <div className="pr-card pr-visible h-100 d-flex align-items-center">
+                    <p className="pr-empty-state mb-0 mx-auto">
+                      No plans are currently available. Please check back soon.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                plans.map((plan, i) => (
+                  <div key={plan.id} className="col-12 col-md-6 col-lg-4">
+                    <PriceCard plan={plan} index={i} />
+                  </div>
+                ))
+              )}
+              <div className="col-12 col-md-6 col-lg-4">
+                <CustomDomainCard index={plans.length} />
+              </div>
             </div>
           )}
 

@@ -21,6 +21,8 @@ type StudentSearchItem = {
   level_id?: number | null;
 };
 
+type FeeStatus = "paid" | "partial" | "unpaid";
+
 type StudentFeeDetails = {
   student: {
     id: number;
@@ -38,6 +40,7 @@ type StudentFeeDetails = {
     total_amount: number;
     amount_paid: number;
     balance: number;
+    status?: FeeStatus;
     fee_type?: { id: number; name: string; amount: number };
     session?: { id: number; name: string };
     term?: { id: number; name: string };
@@ -46,6 +49,42 @@ type StudentFeeDetails = {
 
 type Option = { id: number; name: string };
 type FeeType = { id: number; name: string; amount: number };
+
+/* =========================
+   PAYSTACK INLINE (loaded once, reused across the app)
+========================= */
+declare global {
+  interface Window {
+    PaystackPop?: new () => {
+      resumeTransaction: (
+        accessCode: string,
+        handlers: {
+          onSuccess?: (transaction: { reference: string }) => void;
+          onCancel?: () => void;
+          onError?: (error: { message: string }) => void;
+        }
+      ) => void;
+    };
+  }
+}
+
+let paystackScriptPromise: Promise<void> | null = null;
+
+function loadPaystackInline(): Promise<void> {
+  if (window.PaystackPop) return Promise.resolve();
+  if (paystackScriptPromise) return paystackScriptPromise;
+
+  paystackScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://js.paystack.co/v2/inline.js";
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Could not load the Paystack checkout."));
+    document.body.appendChild(script);
+  });
+
+  return paystackScriptPromise;
+}
 
 /* =========================
    HELPERS
@@ -69,6 +108,12 @@ function getErrorMessage(err: any): string {
 function naira(n: number | null | undefined) {
   const v = Number(n ?? 0);
   return v.toLocaleString("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 });
+}
+
+function statusPillStyle(status?: FeeStatus) {
+  if (status === "paid") return { background: "rgba(6,95,70,0.08)", color: "#065f46", borderColor: "rgba(6,95,70,0.12)" };
+  if (status === "partial") return { background: "rgba(180,83,9,0.08)", color: "#b45309", borderColor: "rgba(180,83,9,0.14)" };
+  return { background: "rgba(220,38,38,0.08)", color: "#b91c1c", borderColor: "rgba(220,38,38,0.14)" };
 }
 
 /* =========================
@@ -110,6 +155,13 @@ export default function FeeMethodsPage() {
   // busy key
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const isBusy = (k: string) => busyKey === k;
+
+  // online payment collection
+  const [collectTarget, setCollectTarget] = useState<{ id: number; label: string; balance: number } | null>(null);
+  const [collectAmount, setCollectAmount] = useState("");
+  const [collectEmail, setCollectEmail] = useState("");
+  const [collecting, setCollecting] = useState(false);
+  const [collectError, setCollectError] = useState<string | null>(null);
 
   useEffect(() => {
     const t = window.setTimeout(() => setLoadingPage(false), 120);
@@ -176,7 +228,6 @@ export default function FeeMethodsPage() {
     try {
       setSearchingStudent(true);
 
-      // If your backend uses q or reg_no, change `query` below.
       const res = await authApi.get("/students/search", { params: { query: q } });
 
       const list = res.data?.data ?? res.data ?? [];
@@ -338,6 +389,87 @@ export default function FeeMethodsPage() {
   }
 
   /* =========================
+     COLLECT ONLINE PAYMENT
+========================= */
+  function openCollectModal(fee: StudentFeeDetails["fees"][number]) {
+    setCollectTarget({
+      id: fee.id,
+      label: fee.fee_type?.name ?? `Fee #${fee.id}`,
+      balance: fee.balance,
+    });
+    setCollectAmount(String(fee.balance));
+    setCollectEmail("");
+    setCollectError(null);
+  }
+
+  function closeCollectModal() {
+    if (collecting) return; // don't let the admin dismiss mid-flight
+    setCollectTarget(null);
+  }
+
+  async function handleCollectPayment() {
+    if (!collectTarget) return;
+
+    const amount = Number(collectAmount);
+
+    if (!amount || amount < 100) {
+      setCollectError("Enter an amount of at least ₦100.");
+      return;
+    }
+    if (amount > collectTarget.balance) {
+      setCollectError(`Amount can't exceed the balance of ${naira(collectTarget.balance)}.`);
+      return;
+    }
+    if (!collectEmail.trim()) {
+      setCollectError("Enter the parent's email — Paystack sends the receipt there.");
+      return;
+    }
+
+    setCollectError(null);
+    setCollecting(true);
+
+    try {
+      const { data } = await authApi.post("/fees/online/initialize", {
+        student_fee_id: collectTarget.id,
+        amount,
+        email: collectEmail.trim(),
+      });
+
+      await loadPaystackInline();
+
+      // Hand off to Paystack's own secure popup — close ours so they don't stack.
+      setCollectTarget(null);
+
+      const popup = new window.PaystackPop!();
+      popup.resumeTransaction(data.access_code, {
+        onSuccess: async (transaction) => {
+          try {
+            await authApi.get(`/fees/online/verify/${transaction.reference}`);
+            showSuccess("Payment confirmed — ledger updated.");
+          } catch {
+            showWarning("Payment went through, but confirmation is still processing. Refresh the ledger shortly.");
+          } finally {
+            setCollecting(false);
+            await loadStudentFeeDetails();
+          }
+        },
+        onCancel: () => {
+          setCollecting(false);
+          showWarning("Payment was cancelled.");
+        },
+        onError: (err) => {
+          setCollecting(false);
+          showError(err?.message || "Payment could not be completed.");
+        },
+      });
+    } catch (e: any) {
+      console.error(e);
+      setCollecting(false);
+      setCollectError(getErrorMessage(e));
+    }
+  }
+
+  /* =========================
      DERIVED
 ========================= */
   const canFetchFeeTypes = !!studentPick?.id && !!sectionId && !!sessionId && !!termId;
@@ -355,7 +487,7 @@ export default function FeeMethodsPage() {
 ========================= */
   return (
     <>
-      {/* Same template CSS from AdminDashboard / FeeStructurePage */}
+      {/* Same template CSS from AdminDashboard / FeeStructurePage, plus the collect-payment modal */}
       <style>{`
         .db-main {
           background: var(--bs-body-bg, #f5f1eb);
@@ -676,6 +808,45 @@ export default function FeeMethodsPage() {
           .db-hero-stat-card { min-width: 0; width: 100%; }
         }
 
+        /* Collect-payment modal */
+        .db-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.55);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1050;
+          padding: 16px;
+        }
+        .db-modal {
+          background: #fff;
+          border-radius: 16px;
+          width: 100%;
+          max-width: 420px;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+          overflow: hidden;
+        }
+        .db-modal-head {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          padding: 18px 20px;
+          border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+          gap: 12px;
+        }
+        .db-modal-body { padding: 20px; }
+        .db-modal-close {
+          border: none;
+          background: transparent;
+          font-size: 22px;
+          line-height: 1;
+          color: #9a8a7a;
+          cursor: pointer;
+          padding: 0 4px;
+        }
+        .db-modal-close:disabled { opacity: 0.4; cursor: not-allowed; }
+
         @keyframes dbSpin { to { transform: rotate(360deg); } }
       `}</style>
 
@@ -698,7 +869,7 @@ export default function FeeMethodsPage() {
                 <div>
                   <div className="db-session-badge">
                     <span className="db-session-dot" />
-                    Fees • Assignment & Ledger
+                    Fees • Assignment, Collection & Ledger
                   </div>
 
                   <h1 className="db-greeting">
@@ -707,7 +878,8 @@ export default function FeeMethodsPage() {
 
                   <p className="db-hero-sub">
                     Search a student by <b>Reg No</b>, choose <b>Section</b>, <b>Session</b>, <b>Term</b>, load fee types,
-                    then assign multiple fees in one action. You can also review the student fee ledger.
+                    then assign multiple fees in one action. From the ledger, you can also collect payment online
+                    directly through Paystack.
                   </p>
 
                   <div className="db-hero-btns">
@@ -1225,7 +1397,7 @@ export default function FeeMethodsPage() {
                               <th style={{ textAlign: "right", width: 110 }}>Total</th>
                               <th style={{ textAlign: "right", width: 110 }}>Paid</th>
                               <th style={{ textAlign: "right", width: 110 }}>Bal</th>
-                              <th style={{ textAlign: "right", width: 90 }}>Action</th>
+                              <th style={{ textAlign: "right", width: 170 }}>Action</th>
                             </tr>
                           </thead>
 
@@ -1239,32 +1411,57 @@ export default function FeeMethodsPage() {
                                       <div style={{ fontWeight: 600, color: "#1a1a2e" }}>
                                         {f.fee_type?.name ?? `FeeType #${f.fee_type_id}`}
                                       </div>
-                                      <div style={{ fontSize: 12, color: "#9a8a7a" }}>
-                                        {f.session?.name ?? `Session #${f.session_id}`} • {f.term?.name ?? `Term #${f.term_id}`}
+                                      <div style={{ fontSize: 12, color: "#9a8a7a", display: "flex", gap: 6, alignItems: "center", marginTop: 2, flexWrap: "wrap" }}>
+                                        <span>
+                                          {f.session?.name ?? `Session #${f.session_id}`} • {f.term?.name ?? `Term #${f.term_id}`}
+                                        </span>
+                                        {f.status && (
+                                          <span className="db-pill" style={{ fontSize: 10.5, padding: "1px 8px", ...statusPillStyle(f.status) }}>
+                                            {f.status}
+                                          </span>
+                                        )}
                                       </div>
                                     </td>
                                     <td style={{ textAlign: "right" }}>{naira(f.total_amount)}</td>
                                     <td style={{ textAlign: "right" }}>{naira(f.amount_paid)}</td>
                                     <td style={{ textAlign: "right", fontWeight: 700 }}>{naira(f.balance)}</td>
                                     <td style={{ textAlign: "right" }}>
-                                      <button
-                                        className="db-page-btn"
-                                        onClick={() => removeAssignedFee(f.id)}
-                                        disabled={busyKey !== null}
-                                        title="Remove assignment (only if unpaid)"
-                                        style={{
-                                          padding: "6px 10px",
-                                          background: "rgba(220,38,38,0.08)",
-                                          borderColor: "rgba(220,38,38,0.18)",
-                                          color: "#b91c1c",
-                                        }}
-                                      >
-                                        {removing ? (
-                                          <span className="spinner-border spinner-border-sm" style={{ width: 14, height: 14 }} />
-                                        ) : (
-                                          "Remove"
+                                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                                        {f.balance > 0 && (
+                                          <button
+                                            className="db-page-btn"
+                                            onClick={() => openCollectModal(f)}
+                                            disabled={busyKey !== null || collecting}
+                                            title="Collect this balance online via Paystack"
+                                            style={{
+                                              padding: "6px 10px",
+                                              background: "rgba(201,168,76,0.14)",
+                                              borderColor: "rgba(201,168,76,0.26)",
+                                              color: "#92710f",
+                                            }}
+                                          >
+                                            Collect
+                                          </button>
                                         )}
-                                      </button>
+                                        <button
+                                          className="db-page-btn"
+                                          onClick={() => removeAssignedFee(f.id)}
+                                          disabled={busyKey !== null || collecting}
+                                          title="Remove assignment (only if unpaid)"
+                                          style={{
+                                            padding: "6px 10px",
+                                            background: "rgba(220,38,38,0.08)",
+                                            borderColor: "rgba(220,38,38,0.18)",
+                                            color: "#b91c1c",
+                                          }}
+                                        >
+                                          {removing ? (
+                                            <span className="spinner-border spinner-border-sm" style={{ width: 14, height: 14 }} />
+                                          ) : (
+                                            "Remove"
+                                          )}
+                                        </button>
+                                      </div>
                                     </td>
                                   </tr>
                                 );
@@ -1295,6 +1492,70 @@ export default function FeeMethodsPage() {
           </main>
         </div>
       </div>
+
+      {/* COLLECT ONLINE PAYMENT MODAL */}
+      {collectTarget && (
+        <div className="db-modal-overlay" onClick={closeCollectModal}>
+          <div className="db-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="db-modal-head">
+              <div>
+                <p className="db-panel-title" style={{ fontSize: 15, marginBottom: 2 }}>
+                  Collect online payment
+                </p>
+                <p className="db-panel-sub">
+                  {collectTarget.label} • Balance {naira(collectTarget.balance)}
+                </p>
+              </div>
+              <button className="db-modal-close" onClick={closeCollectModal} disabled={collecting} aria-label="Close">
+                ×
+              </button>
+            </div>
+
+            <div className="db-modal-body">
+              <label className="form-label small fw-semibold mb-1">Amount to collect (₦)</label>
+              <input
+                type="number"
+                className="form-control mb-3"
+                value={collectAmount}
+                onChange={(e) => setCollectAmount(e.target.value)}
+                min={100}
+                max={collectTarget.balance}
+                disabled={collecting}
+              />
+
+              <label className="form-label small fw-semibold mb-1">Parent's email</label>
+              <input
+                type="email"
+                className="form-control mb-1"
+                placeholder="parent@email.com"
+                value={collectEmail}
+                onChange={(e) => setCollectEmail(e.target.value)}
+                disabled={collecting}
+              />
+              <div className="mb-3" style={{ fontSize: 11.5, color: "#9a8a7a" }}>
+                Paystack sends the payment receipt to this address.
+              </div>
+
+              {collectError && <div className="alert alert-danger small">{collectError}</div>}
+
+              <button
+                className="db-btn-gold w-100 justify-content-center"
+                onClick={handleCollectPayment}
+                disabled={collecting}
+              >
+                {collecting ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm" style={{ width: 14, height: 14 }} />
+                    Opening secure checkout…
+                  </>
+                ) : (
+                  "Open Paystack Checkout"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -1302,7 +1563,7 @@ export default function FeeMethodsPage() {
 /**
  * NOTES:
  * 1) Student search params:
- *    - I used: GET /students/search?query=REGNO
+ *    - GET /students/search?query=REGNO
  *    If your backend uses ?q or ?reg_no, change it in searchStudentByReg().
  *
  * 2) Meta endpoints:
@@ -1315,4 +1576,13 @@ export default function FeeMethodsPage() {
  *
  * 4) Ledger:
  *    - GET /fees/student/details?reg_no=...&session_id=...&term_id=...
+ *      (now also expects `status` in each fee row — see backend note below)
+ *
+ * 5) Online collection (new):
+ *    - POST /fees/online/initialize { student_fee_id, amount, email } → { access_code, reference }
+ *    - GET  /fees/online/verify/{reference}
+ *    Paystack's inline.js is lazy-loaded the first time "Collect" is clicked.
+ *    If you add online payments to another admin page later, move the
+ *    `declare global { interface Window { PaystackPop... } }` block and
+ *    loadPaystackInline() into a shared file instead of duplicating it.
  */

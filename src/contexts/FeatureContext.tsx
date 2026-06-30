@@ -20,7 +20,7 @@ export function FeatureProvider({ children }: { children: React.ReactNode }) {
   const [features, setFeatures] = useState<string[]>([]);
 
   const load = async () => {
-    const token = getToken?.(); // must return null/undefined when not logged in
+    const token = getToken?.(); 
     const isPublic = PUBLIC_PATHS.has(location.pathname);
 
     if (!token || isPublic) {

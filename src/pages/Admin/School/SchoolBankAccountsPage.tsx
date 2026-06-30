@@ -70,10 +70,17 @@ export default function SchoolBankAccountsPage() {
   const [editing, setEditing] = useState<SchoolBankAccount | null>(null);
 
   // form
-  const [bankName, setBankName] = useState("");
-  const [bankCode, setBankCode] = useState("");
-  const [accountName, setAccountName] = useState("");
-  const [accountNumber, setAccountNumber] = useState("");
+  const [banks, setBanks] = useState<any[]>([]);
+
+const [bankCode, setBankCode] = useState("");
+const [bankName, setBankName] = useState("");
+
+const [accountNumber, setAccountNumber] = useState("");
+const [accountName, setAccountName] = useState("");
+
+const [verifying, setVerifying] = useState(false);
+const [verified, setVerified] = useState(false);
+
   const [currency, setCurrency] = useState("NGN");
   const [isActive, setIsActive] = useState(true);
   const [sortOrder, setSortOrder] = useState<number>(0);
@@ -122,8 +129,80 @@ export default function SchoolBankAccountsPage() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadBanks();
   }, []);
+
+  const loadBanks = async () => {
+    try {
+        const res = await authApi.get("/banks");
+
+        setBanks(res.data);
+
+    } catch (err) {
+        console.error(err);
+    }
+};
+
+useEffect(() => {
+
+    if (accountNumber.length !== 10 || !bankCode) {
+
+        setVerified(false);
+        setAccountName("");
+
+        return;
+    }
+
+    const timer = setTimeout(() => {
+
+        verifyAccount();
+
+    }, 500);
+
+    return () => clearTimeout(timer);
+
+}, [accountNumber, bankCode]);
+
+
+
+const verifyAccount = async () => {
+
+    try {
+
+        setVerifying(true);
+
+        const res = await authApi.get("/bank-account/verify", {
+
+            params: {
+
+                bank_code: bankCode,
+                account_number: accountNumber
+
+            }
+
+        });
+
+        setAccountName(res.data.account_name);
+
+        setVerified(true);
+       
+
+    } catch {
+
+        setVerified(false);
+
+        setAccountName("");
+       
+
+
+    } finally {
+
+        setVerifying(false);
+
+    }
+
+};
+
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -807,17 +886,44 @@ export default function SchoolBankAccountsPage() {
                       </div>
                     ) : (
                       <div className="row g-3">
-                        <div className="col-12">
-                          <label className="form-label fw-semibold small mb-1">Bank name</label>
-                          <input
-                            className="form-control"
-                            value={bankName}
-                            onChange={(e) => setBankName(e.target.value)}
-                            placeholder="e.g. GTBank"
-                            style={{ borderRadius: 12 }}
-                            disabled={saving}
-                          />
-                        </div>
+                       <div className="col-12">
+
+                      <label className="form-label fw-semibold">
+
+                      Bank
+
+                      </label>
+
+                      <select
+                          className="form-select"
+                          value={bankCode}
+                          onChange={(e)=>{
+
+                              const bank = banks.find(x=>x.code===e.target.value);
+
+                              setBankCode(bank.code);
+
+                              setBankName(bank.name);
+
+                          }}
+                      >
+
+                      <option value="">Select Bank</option>
+
+                      {banks.map(bank=>(
+                      <option
+                      key={bank.code}
+                      value={bank.code}
+                      >
+
+                      {bank.name}
+
+                      </option>
+                      ))}
+
+                      </select>
+
+                      </div>
 
                         <div className="col-12 col-md-6">
                           <label className="form-label fw-semibold small mb-1">Bank code</label>
@@ -843,18 +949,7 @@ export default function SchoolBankAccountsPage() {
                           />
                         </div>
 
-                        <div className="col-12">
-                          <label className="form-label fw-semibold small mb-1">Account name</label>
-                          <input
-                            className="form-control"
-                            value={accountName}
-                            onChange={(e) => setAccountName(e.target.value)}
-                            placeholder="Account holder name"
-                            style={{ borderRadius: 12 }}
-                            disabled={saving}
-                          />
-                        </div>
-
+                        
                         <div className="col-12">
                           <label className="form-label fw-semibold small mb-1">Account number</label>
                           <input
@@ -869,6 +964,57 @@ export default function SchoolBankAccountsPage() {
                             Preview masked: <code>{maskAcct(accountNumber)}</code>
                           </div>
                         </div>
+
+
+
+                        <div className="col-12">
+                          <label className="form-label fw-semibold small mb-1">Account name</label>
+                          <input
+                            className="form-control"
+                            value={accountName}
+                            readOnly
+                            style={{
+                            background:"#f8f9fa"
+                            }}
+                            />
+                        </div>
+
+                        {verifying && (
+
+                          <div className="text-primary small mt-2">
+
+                          <span className="spinner-border spinner-border-sm me-2"/>
+
+                          Verifying account...
+
+                          </div>
+
+                          )}
+
+                          {verified && (
+
+                            <div className="text-success small mt-2">
+
+                            <i className="bi bi-check-circle-fill me-2"/>
+
+                            Verified account
+
+                            </div>
+
+                            )}
+
+                            {!verified && accountNumber.length===10 && !verifying && (
+
+                              <div className="text-danger small mt-2">
+
+                              <i className="bi bi-x-circle-fill me-2"/>
+
+                              Invalid account details
+
+                              </div>
+
+                              )}
+
 
                         <div className="col-12 col-md-6">
                           <label className="form-label fw-semibold small mb-1">Sort order</label>
@@ -928,8 +1074,11 @@ export default function SchoolBankAccountsPage() {
                             type="button"
                             className="db-btn-gold ms-auto"
                             onClick={save}
-                            disabled={saving}
                             style={{ borderRadius: 12, padding: "10px 14px" }}
+                            disabled={
+                            saving ||
+                            !verified
+                            }
                           >
                             {saving ? (
                               <>

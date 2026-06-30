@@ -12,7 +12,7 @@ interface MenuChild {
   label: string;
   href: string;
   roles?: string[];
-  featureKey?: string; // ✅ gate child
+  featureKey?: string; 
 }
 
 interface MenuItem {
@@ -25,8 +25,8 @@ interface MenuItem {
   badge?: string;
 
   // ✅ Feature gating
-  featureKey?: string; // gate whole group/item
-  lockIfNoFeature?: boolean; // show but locked (Upgrade badge)
+  featureKey?: string; 
+  lockIfNoFeature?: boolean; 
 
   // Existing
   disabled?: boolean;
@@ -39,6 +39,13 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
   const { loading: featuresLoading, can } = useFeatures();
 
   if (!user) return null;
+
+  // ✅ We're not tracking per-feature subscription access for these roles
+  // right now, so skip feature gating entirely for them. Other roles
+  // (Super-Admin, Parent, Bursar) keep the normal feature-gated behavior.
+  const skipFeatureGating = ["Admin", "Teacher", "Student"].includes(user.role);
+  const canFeature = (key?: string) => (skipFeatureGating ? true : can(key));
+  const effectiveFeaturesLoading = skipFeatureGating ? false : featuresLoading;
 
   const getSchoolInitials = (name?: string) => {
     if (!name) return "S";
@@ -61,7 +68,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
   };
 
   const isLockedByPlan = (item: MenuItem) =>
-    !!item.lockIfNoFeature && !!item.featureKey && !can(item.featureKey);
+    !!item.lockIfNoFeature && !!item.featureKey && !canFeature(item.featureKey);
 
   const ComingSoonBadge = () => (
     <span
@@ -116,11 +123,11 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       label: "Students",
       icon: "people",
       collapseId: "studentsMenu",
-      // featureKey: "students", lockIfNoFeature: true, // optional if you monetize it
+    
       children: [
-        { label: "All Students", href: "/students" },
+        { label: "All Students", href: "/students", roles: ["Admin"],},
         { label: "Mark Attendance", href: "/students/attendance" },
-        { label: "Promote Students", href: "/students/promote" },
+        { label: "Promote Students", href: "/students/promote", roles: ["Admin"], },
       ],
       roles: ["Admin", "Teacher"],
       featureKey: "support_student_management",
@@ -164,6 +171,21 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       ],
       roles: ["Admin"],
     },
+
+    //  {
+    //   label: "CBT Management",
+    //   icon: "laptop",
+    //   collapseId: "cbtMenu",
+    //   children: [
+    //     { label: "CBT Integration", href: "/cbt-integration" },
+    //      { label: "Question Sync", href: "/cbt-question-sync" },
+    //     { label: "Results Inbox", href: "/cbt-results-inbox" },
+    //     { label: "Student Sync", href: "/cbt-student-sync" },
+    //      { label: "Sync Health", href: "/cbt-sync-health" },
+    
+    //   ],
+    //   roles: ["Admin"],
+    // },
 
     {
       label: "Fees",
@@ -260,7 +282,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       children: [
         { label: "Prepare Term Results", href: "/students/results/batch", roles: ["Admin"], },
         { label: "Enter Student Scores", href: "/students/results/add", roles: ["Admin", "Teacher"], },
-
+        { label: "Monitor Results", href: "/result/monitor", roles: ["Admin"], },
         { label: "Generate PIN", href: "/results/pins", roles: ["Admin"], },
       ],
       roles: ["Admin", "Teacher"],
@@ -293,11 +315,11 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
    
 
     {
-      label: "Subscriptions & Billing",
+      label: "Wallet & Billing",
       icon: "receipt-cutoff",
       collapseId: "billingMenu_admin",
       children: [
-        { label: "Billing", href: "/billing" },
+        
         { label: "Wallet", href: "/wallet" },
       ],
       roles: ["Admin"],
@@ -311,6 +333,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
         { label: "School Profile", href: "/school/settings" },
         { label: "Bank Accounts", href: "/school/bank-account-setting" },
           { label: "Result Deadline Setting", href: "/results/deadlines" },
+          {label: "WhatsApp Notification Settings", href: "/settings/whatsapp"}
 
         
         
@@ -371,8 +394,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       roles: ["Parent"],
 
       children: [
-        { label: "Payment History", href: "/parent/payments", featureKey: "support_fee_management" },
-        { label: "Upload Receipt", href: "/parent/upload-receipt", featureKey: "support_fee_management" },
+        { label: "Payment History", href: "/parent/payments", },
+        { label: "Upload Receipt", href: "/parent/upload-receipt", },
       ],
     },
 
@@ -586,10 +609,10 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
                 .filter((item) => item.roles.includes(user.role))
                 .map((item) => {
                   const lockedByPlan = isLockedByPlan(item);
-                  const disabled = item.disabled || lockedByPlan || featuresLoading;
+                  const disabled = item.disabled || lockedByPlan || effectiveFeaturesLoading;
 
                   // If it’s a single link and gated, hide it
-                  if (!item.children && item.featureKey && !can(item.featureKey)) {
+                  if (!item.children && item.featureKey && !canFeature(item.featureKey)) {
                     return null;
                   }
 
@@ -667,7 +690,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
                               <div className="mt-1 mb-2">
                                 {item.children
                                   .filter((child) => !child.roles || child.roles.includes(user.role))
-                                  .filter((child) => can(child.featureKey))
+                                  .filter((child) => canFeature(child.featureKey))
                                   .map((child) => (
                                     <NavLink
                                       key={child.label}

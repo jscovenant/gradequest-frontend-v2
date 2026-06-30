@@ -174,10 +174,11 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
     <nav
       className="navbar bg-white shadow-sm px-3 d-flex justify-content-between align-items-center"
       style={{
-        position: "sticky",
+        position: "fixed",
         top: 0,
         zIndex: 1030,
         height: "64px",
+        width: "100%",
         borderBottom: "1px solid #e5e7eb",
       }}
     >

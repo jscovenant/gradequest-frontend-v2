@@ -149,12 +149,46 @@ export default function Navbar() {
 
         /* ── Logo ── */
         .nb-logo {
-          display: inline-flex;
-          align-items: center;
-          gap: 10px;
-          text-decoration: none;
-          flex-shrink: 0;
-        }
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+          }
+            /* Logo container (this is the upgrade) */
+            .nb-logo-wrap {
+              width: 48px;
+              height: 48px;
+              border-radius: 14px;
+              background: rgba(255, 255, 255, 0.08); /* subtle glass effect */
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              backdrop-filter: blur(6px);
+              box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            }
+              /* Logo image */
+.nb-logo-img {
+  width: 70%;
+  height: 70%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+/* AI badge */
+.nb-logo-pill {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #00c6ff, #0072ff);
+  color: #fff;
+}
+
+/* Hover effect */
+.nb-logo:hover .nb-logo-wrap {
+  transform: translateY(-2px) scale(1.05);
+  transition: 0.25s ease;
+}
         .nb-logo-mark {
           width: 34px; height: 34px;
           border-radius: 9px;
@@ -177,20 +211,7 @@ export default function Navbar() {
           line-height: 1;
         }
 
-        /* "AI" pill — amber tint, consistent with logo-mark colour */
-        .nb-logo-pill {
-          font-size: 9.5px;
-          font-weight: 500;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          color: var(--nb-accent);
-          background: var(--nb-accent-dim);
-          border: 1px solid var(--nb-accent-border);
-          border-radius: 100px;
-          padding: 2px 7px;
-          line-height: 1.4;
-        }
-
+     
         /* ── Desktop nav links ── */
         .nb-links {
           display: flex;
@@ -479,20 +500,19 @@ export default function Navbar() {
         <div className="nb-inner">
 
           {/* Logo */}
-          <a href="#" className="nb-logo" aria-label="GradeQuest home">
-            <span className="nb-logo-mark" aria-hidden="true">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
-                <polygon points="12,2 22,19 2,19"
-                  stroke="var(--nb-dark)" strokeWidth="2"
-                  strokeLinejoin="round" fill="none"/>
-                <path d="M12 8v5M12 15.5v.5"
-                  stroke="var(--nb-dark)" strokeWidth="2.2"
-                  strokeLinecap="round"/>
-              </svg>
-            </span>
-            <span className="nb-logo-name">GradeQuest</span>
-            <span className="nb-logo-pill">AI</span>
-          </a>
+         <a href="/" className="nb-logo" aria-label="GradeQuest home">
+
+              <div className="nb-logo-wrap">
+                <img 
+                  src="/media/logo/gradequest-logo.png" 
+                  alt="GradeQuest logo" 
+                  className="nb-logo-img"
+                />
+              </div>
+
+              <span className="nb-logo-pill">AI</span>
+
+            </a>
 
           {/* Desktop links */}
           <ul className="nb-links" role="list">

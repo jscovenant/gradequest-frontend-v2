@@ -759,6 +759,26 @@ export default function BookDemo() {
           margin: 0;
           text-align: center;
         }
+
+        /* Hover effect */
+.ft-logo:hover .ft-logo-wrap {
+  transform: scale(1.05);
+  transition: 0.25s ease;
+}/* Logo image */
+.ft-logo-img {
+  width: 10%;
+  height: 10%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+
+
+/* Hover effect */
+.ft-logo:hover .ft-logo-wrap {
+  transform: scale(1.05);
+  transition: 0.25s ease;
+}
       `}</style>
 
       <div className="bd-page">
@@ -780,26 +800,15 @@ export default function BookDemo() {
                 Back to site
               </a>
 
-              <a href="/" className="bd-panel-logo">
-                <span className="bd-panel-logo-mark">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <polygon
-                      points="12,2 22,19 2,19"
-                      stroke="var(--bd-dark)"
-                      strokeWidth="2"
-                      strokeLinejoin="round"
-                      fill="none"
-                    />
-                    <path
-                      d="M12 8v5M12 15.5v.5"
-                      stroke="var(--bd-dark)"
-                      strokeWidth="2.2"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </span>
-                <span className="bd-panel-logo-name">GradeQuest</span>
-              </a>
+        <a href="/" className="ft-logo" aria-label="GradeQuest home">     
+        <div className="ft-logo-wrap">
+          <img
+            src="/media/logo/gradequest-logo.png"
+            alt="GradeQuest logo"
+            className="ft-logo-img"
+          />
+        </div>
+      </a>
 
               <p className="bd-panel-eyebrow">Book your session</p>
               <h1 className="bd-panel-title">

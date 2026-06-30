@@ -306,9 +306,9 @@ export default function Hero() {
               </h1>
 
               <p className="hero-desc mb-4">
-                A unified platform for Nigerian schools — from student records and
-                result computation to parent portals and compliance reporting.
-                Built for administrators who mean business.
+               A unified school operating system for Nigerian schools —
+                combining academic management, financial control, and parent 
+               communication into one platform. Built for administrators focused on growth and sustainability.
               </p>
 
               <div className="hero-ctas d-flex flex-wrap gap-3">

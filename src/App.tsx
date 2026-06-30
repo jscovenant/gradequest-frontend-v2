@@ -71,6 +71,9 @@ import ResetPasswordPage from "./pages/Resetpasswordpage";
 import ResultSubmissionDeadlinePage from "./pages/Admin/StudentResult/ResultSubmissionDeadlinePage";
 import SchoolWhatsappSettingsPage from "./pages/Admin/School/SchoolWhatsappSettingsPage";
 import ParentWhatsappVerificationPage from "./pages/Admin/Parent/ParentWhatsappVerificationPage";
+import ResultMonitoringPage from "./pages/Admin/StudentResult/Resultmonitoringpage";
+import WhatsAppSettingsPage from "./pages/Admin/School/WhatsAppSettingsPage";
+import OnlinePayFeesPage from "./pages/Admin/Billing/OnlinePayFeesPage";
 
 function App() {
   return (
@@ -249,6 +252,17 @@ function App() {
               <RequireAuth roles={["Admin", "Teacher"]}>
                 <OnboardingGuard>
                   <ResultBatchSetupPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+             <Route
+            path="/result/monitor"
+            element={
+              <RequireAuth roles={["Admin"]}>
+                <OnboardingGuard>
+                  <ResultMonitoringPage />
                 </OnboardingGuard>
               </RequireAuth>
             }
@@ -435,12 +449,23 @@ function App() {
             }
           />
 
-          <Route
-            path="/results/pins"
+            <Route
+            path="/school/settings"
             element={
               <RequireAuth roles={["Admin"]}>
                 <OnboardingGuard>
-                  <ResultPinsPage />
+                  <SettingsPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/settings/whatsapp"
+            element={
+              <RequireAuth roles={["Admin"]}>
+                <OnboardingGuard>
+                  <WhatsAppSettingsPage />
                 </OnboardingGuard>
               </RequireAuth>
             }
@@ -589,6 +614,19 @@ function App() {
             }
           />
 
+          
+          <Route
+            path="/payonline"
+            element={
+              <RequireAuth roles={["Admin"]}>
+                <OnboardingGuard>
+                  <OnlinePayFeesPage studentFeeId={123} studentName="John Doe" termLabel="First Term, 2025/2026" balanceDue={5000} />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+
           <Route
             path="/wallet"
             element={
@@ -715,7 +753,13 @@ function App() {
               </RequireAuth>
             }
           />
+
+
+     
+
         </Routes>
+
+        
       </FeatureProvider>
     </BrowserRouter>
   );

@@ -241,6 +241,26 @@ export default function ForgotPasswordPage() {
           display: none; align-items: center; gap: 9px; margin-bottom: 32px;
         }
         @media (max-width: 900px) { .fp-mobile-logo { display: flex; } }
+
+  /* Hover effect */
+.ft-logo:hover .ft-logo-wrap {
+  transform: scale(1.05);
+  transition: 0.25s ease;
+}/* Logo image */
+.ft-logo-img {
+  width: 10%;
+  height: 10%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+
+
+/* Hover effect */
+.ft-logo:hover .ft-logo-wrap {
+  transform: scale(1.05);
+  transition: 0.25s ease;
+}
       `}</style>
     <PageTitle title="Forgot Password" />
       <div className="fp-root">
@@ -250,12 +270,15 @@ export default function ForgotPasswordPage() {
           <div className="fp-left-glow2" aria-hidden="true" />
 
           <div className="fp-logo">
-            <div className="fp-logo-mark">
-              <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                <path d="M10 2L17 6v8l-7 4-7-4V6l7-4z" stroke="#0f172a" strokeWidth="1.6" strokeLinejoin="round"/>
-                <path d="M10 10l7-4M10 10v8M10 10L3 6" stroke="#0f172a" strokeWidth="1.4" strokeLinecap="round"/>
-              </svg>
-            </div>
+              <a href="/" className="ft-logo" aria-label="GradeQuest home">     
+        <div className="ft-logo-wrap">
+          <img
+            src="/media/logo/gradequest-logo.png"
+            alt="GradeQuest logo"
+            className="ft-logo-img"
+          />
+        </div>
+      </a>
             <span className="fp-logo-name">Grade<span>Quest</span></span>
           </div>
 

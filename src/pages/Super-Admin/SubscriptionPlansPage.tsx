@@ -244,7 +244,7 @@ export default function SubscriptionPlansPage() {
     setEditing(p);
     setForm({
       name: p.name || "",
-      price: typeof p.price === "number" ? p.price : Number(p.price || 0),
+      price: typeof p.price === "number" ? p.price : Number(p.price ?? 0),
       paystack_plan_code: p.paystack_plan_code || "",
       currency: p.currency || "NGN",
       duration_in_days: p.duration_in_days ?? "",
@@ -304,9 +304,16 @@ export default function SubscriptionPlansPage() {
 
   const validateForm = () => {
     if (!form.name.trim()) return "Plan name is required.";
-    if (form.price === "" || Number.isNaN(Number(form.price))) return "Price is required.";
+
+    if (form.price === "" || Number.isNaN(Number(form.price))) {
+      return "Price is required (enter 0 to make this a free plan).";
+    }
+    if (Number(form.price) < 0) return "Price cannot be negative.";
+
     if (!form.currency.trim()) return "Currency is required.";
-    if (form.duration_in_days === "" || Number(form.duration_in_days) < 1) return "Duration must be at least 1 day.";
+    if (form.duration_in_days === "" || Number.isNaN(Number(form.duration_in_days)) || Number(form.duration_in_days) < 0) {
+      return "Duration must be 0 or greater (use 0 for a plan that doesn't expire).";
+    }
 
     const keys = form.features.map((f) => (f.feature_key || "").trim()).filter(Boolean);
     const dupe = keys.find((k, i) => keys.findIndex((x) => x.toLowerCase() === k.toLowerCase()) !== i);
@@ -318,10 +325,10 @@ export default function SubscriptionPlansPage() {
   const buildPayload = () => {
     return {
       name: form.name.trim(),
-      price: Number(form.price || 0),
+      price: form.price === "" ? 0 : Number(form.price),
       paystack_plan_code: form.paystack_plan_code.trim() || null,
       currency: form.currency.trim(),
-      duration_in_days: Number(form.duration_in_days || 0),
+      duration_in_days: form.duration_in_days === "" ? 0 : Number(form.duration_in_days),
       max_teachers: form.max_teachers === "" ? null : Number(form.max_teachers),
       max_students: form.max_students === "" ? null : Number(form.max_students),
       description: form.description.trim() || null,
@@ -704,6 +711,7 @@ export default function SubscriptionPlansPage() {
                             onChange={(e) => setForm((p) => ({ ...p, price: e.target.value === "" ? "" : Number(e.target.value) }))}
                             placeholder="0"
                           />
+                          <div className="text-muted small mt-1">Enter 0 to make this a free plan.</div>
                         </div>
 
                         <div className="col-md-3">
@@ -721,11 +729,12 @@ export default function SubscriptionPlansPage() {
                           <input
                             className="form-control"
                             type="number"
-                            min={1}
+                            min={0}
                             value={form.duration_in_days}
                             onChange={(e) => setForm((p) => ({ ...p, duration_in_days: e.target.value === "" ? "" : Number(e.target.value) }))}
                             placeholder="90"
                           />
+                          <div className="text-muted small mt-1">Use 0 for a plan that doesn't expire.</div>
                         </div>
 
                         <div className="col-md-6">

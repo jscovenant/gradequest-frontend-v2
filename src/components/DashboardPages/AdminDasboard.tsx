@@ -31,7 +31,8 @@ type SubmissionMonitor = {
 };
 
 type AlertSummaryResponse = {
-  data: AlertItem[]; submission_monitors: SubmissionMonitor[];
+  data: AlertItem[];
+  submission_monitors: SubmissionMonitor[];
   counts: { open_total: number; high: number; medium: number; low: number; submission_open_total: number; submission_overdue_total: number };
 };
 
@@ -64,113 +65,8 @@ function getAlertConfig(severity: AlertItem["severity"]) {
     icon:<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4"/><path d="M8 7.5v3M8 6h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> };
 }
 
-function getMonitorConfig(status: SubmissionMonitor["status"]) {
-  if (status==="overdue") return { color:"rgb(239,68,68)", bg:"rgba(239,68,68,0.06)", border:"rgba(239,68,68,0.14)", barTrack:"rgba(239,68,68,0.12)", barFill:"#ef4444", label:"Overdue", labelColor:"#dc2626", labelBg:"rgba(239,68,68,0.10)" };
-  if (status==="partial") return { color:"rgb(245,158,11)", bg:"rgba(245,158,11,0.06)", border:"rgba(245,158,11,0.16)", barTrack:"rgba(245,158,11,0.12)", barFill:"#f59e0b", label:"Partial", labelColor:"rgb(146,64,14)", labelBg:"rgba(245,158,11,0.12)" };
-  if (status==="complete") return { color:"rgb(34,197,94)", bg:"rgba(34,197,94,0.06)", border:"rgba(34,197,94,0.14)", barTrack:"rgba(34,197,94,0.12)", barFill:"#22c55e", label:"Complete", labelColor:"rgb(21,128,61)", labelBg:"rgba(34,197,94,0.10)" };
-  return { color:"rgb(59,130,246)", bg:"rgba(59,130,246,0.06)", border:"rgba(59,130,246,0.14)", barTrack:"rgba(59,130,246,0.12)", barFill:"#3b82f6", label:"Pending", labelColor:"rgb(29,78,216)", labelBg:"rgba(59,130,246,0.10)" };
-}
-
 function formatAlertMeta(a: AlertItem) { return [a.class_name,a.subject_name,a.student_name].filter(Boolean).join(" · ") || "Academic monitoring"; }
 function formatRelativeTime(d?: string|null): string { if(!d)return""; const diff=Date.now()-new Date(d).getTime(); const m=Math.floor(diff/60000); if(m<1)return"just now"; if(m<60)return`${m}m ago`; const h=Math.floor(m/60); if(h<24)return`${h}h ago`; return`${Math.floor(h/24)}d ago`; }
-
-/* ─── ResultMonitoringSection ─── */
-function ResultMonitoringSection({ monitors, loading, onRefresh, alertsLoading }: {
-  monitors: SubmissionMonitor[]; loading: boolean;
-  onRefresh: ()=>void; alertsLoading: boolean;
-}) {
-  const overdue  = monitors.filter(m=>m.status==="overdue").length;
-  const partial  = monitors.filter(m=>m.status==="partial").length;
-  const complete = monitors.filter(m=>m.status==="complete").length;
-  const pending  = monitors.filter(m=>m.status==="pending").length;
-
-  return (
-    <div className="rm-panel">
-      <div className="rm-head">
-        <div className="rm-head-left">
-          <div className="rm-head-iconbox">
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-              <path d="M4 16V11M7 16V7M10 16V9M13 16V5M16 16V8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-              <circle cx="4" cy="9" r="1.5" fill="currentColor"/><circle cx="7" cy="5.5" r="1.5" fill="currentColor"/>
-              <circle cx="10" cy="7.5" r="1.5" fill="currentColor"/><circle cx="13" cy="3.5" r="1.5" fill="currentColor"/>
-            </svg>
-          </div>
-          <div>
-            <h3 className="rm-head-title">Result Submission Monitoring</h3>
-            <p className="rm-head-sub">Live upload status across all classes this term</p>
-          </div>
-        </div>
-        <div className="rm-head-right">
-          {!loading && (
-            <div className="rm-summary-pills">
-              {overdue>0  && <span className="rm-spill rm-spill--danger"><span className="rm-spill-dot" style={{background:"#ef4444"}}/>{overdue} overdue</span>}
-              {partial>0  && <span className="rm-spill rm-spill--warn"><span className="rm-spill-dot" style={{background:"#f59e0b"}}/>{partial} partial</span>}
-              {pending>0  && <span className="rm-spill rm-spill--info"><span className="rm-spill-dot" style={{background:"#3b82f6"}}/>{pending} pending</span>}
-              {complete>0 && <span className="rm-spill rm-spill--ok"><span className="rm-spill-dot" style={{background:"#22c55e"}}/>{complete} complete</span>}
-            </div>
-          )}
-          <button className="rm-refresh-btn" onClick={onRefresh} disabled={alertsLoading}>
-            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style={{animation:alertsLoading?"dbSpin 0.8s linear infinite":"none"}}>
-              <path d="M12 7A5 5 0 112 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-              <path d="M12 3v4h-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            {alertsLoading?"Loading…":"Refresh"}
-          </button>
-        </div>
-      </div>
-
-      <div className="rm-body">
-        {loading ? (
-          <div className="rm-grid">
-            {[0,1,2,3,4,5].map(i=>(
-              <div key={i} className="rm-skeleton-card">
-                <div className="rm-skel rm-skel--title mb-2"/><div className="rm-skel rm-skel--sub mb-3"/>
-                <div className="rm-skel rm-skel--bar mb-2"/>
-                <div style={{display:"flex",justifyContent:"space-between"}}>
-                  <div className="rm-skel" style={{width:50,height:10,borderRadius:4}}/><div className="rm-skel" style={{width:40,height:10,borderRadius:4}}/>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : monitors.length === 0 ? (
-          <div className="rm-empty">
-            <div className="rm-empty-icon">
-              <svg width="28" height="28" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="14" stroke="currentColor" strokeWidth="1.5"/><path d="M10 16l4 4 8-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </div>
-            <p className="rm-empty-title">All caught up!</p>
-            <p className="rm-empty-sub">No incomplete result submissions right now.</p>
-          </div>
-        ) : (
-          <div className="rm-grid">
-            {monitors.map((m,idx)=>{
-              const cfg = getMonitorConfig(m.status);
-              const pct = m.expected_students_count>0 ? Math.round((m.completed_students_count/m.expected_students_count)*100) : 0;
-              return (
-                <div key={m.id} className="rm-card" style={{"--rmc-bg":cfg.bg,"--rmc-border":cfg.border,"--rmc-color":cfg.color,"--rmc-bar":cfg.barFill,"--rmc-track":cfg.barTrack,animationDelay:`${idx*60}ms`} as React.CSSProperties}>
-                  <div className="rm-card-top">
-                    <div className="rm-card-info">
-                      <p className="rm-card-class">{m.class_name}</p>
-                      {m.teacher_name&&<p className="rm-card-teacher"><svg width="10" height="10" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="4" r="2.5" stroke="currentColor" strokeWidth="1.2"/><path d="M1 11c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>{m.teacher_name}</p>}
-                    </div>
-                    <span className="rm-status-badge" style={{color:cfg.labelColor,background:cfg.labelBg}}>{cfg.label}</span>
-                  </div>
-                  <div className="rm-bar-wrap">
-                    <div className="rm-bar-track"><div className="rm-bar-fill" style={{width:`${pct}%`,background:cfg.barFill}}/></div>
-                    <div className="rm-bar-labels"><span className="rm-bar-pct">{pct}%</span><span className="rm-bar-count">{m.completed_students_count}/{m.expected_students_count} students</span></div>
-                  </div>
-                  <div className="rm-card-footer">
-                    {m.submission_deadline&&<span className="rm-meta-chip rm-meta-chip--deadline"><svg width="10" height="10" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.2"/><path d="M6 3v3l2 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>{m.submission_deadline}</span>}
-                    {m.pending_students_count>0&&<span className="rm-meta-chip rm-meta-chip--pending"><svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M6 2v4l3 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.1"/></svg>{m.pending_students_count} pending</span>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 /* ─── AcademicAlertSection ─── */
 function AcademicAlertSection({ alerts, loading, error, counts, onRefresh, alertsLoading, onViewAll }: {
@@ -314,7 +210,6 @@ export default function AdminDashboard() {
   const [totalUsers,setTotalUsers]=useState(0);
   const [stats,setStats]=useState<StatCard[]>([{title:"Total Students",value:0,icon:"students"},{title:"Teachers",value:0,icon:"teachers"},{title:"Total Parents",value:0,icon:"parents"},{title:"Results Uploaded",value:"0%",icon:"results"}]);
   const [alerts,setAlerts]=useState<AlertItem[]>([]);
-  const [submissionMonitors,setSubmissionMonitors]=useState<SubmissionMonitor[]>([]);
   const [alertCounts,setAlertCounts]=useState({open_total:0,high:0,medium:0,low:0,submission_open_total:0,submission_overdue_total:0});
   const [alertsLoading,setAlertsLoading]=useState(false);
   const [alertsError,setAlertsError]=useState<string|null>(null);
@@ -331,9 +226,9 @@ export default function AdminDashboard() {
   const totalPages=useMemo(()=>!topMeta?1:Math.max(1,Math.ceil(topMeta.total/topLimit)),[topMeta]);
 
   const fetchTop=async(page:number)=>{setTopLoading(true);setTopError(null);try{const res=await authApi.get<TopStudentsResponse>("/top-performing-students",{params:{limit:topLimit,page}});setTopStudents(res.data.data||[]);setTopMeta({total:res.data.total??0,session_used:res.data.session_used??"",term_used:res.data.term_used??""});}catch(e:any){setTopStudents([]);setTopMeta(null);setTopError(e?.response?.data?.message||"Unable to load top students.");}finally{setTopLoading(false);}};
-  const fetchAlerts=async()=>{setAlertsLoading(true);setAlertsError(null);try{const res=await authApi.get<AlertSummaryResponse>("/admin/academic-alerts/summary");setAlerts(res.data.data||[]);setSubmissionMonitors(res.data.submission_monitors||[]);setAlertCounts(res.data.counts||{open_total:0,high:0,medium:0,low:0,submission_open_total:0,submission_overdue_total:0});}catch(e:any){setAlerts([]);setSubmissionMonitors([]);setAlertCounts({open_total:0,high:0,medium:0,low:0,submission_open_total:0,submission_overdue_total:0});setAlertsError(e?.response?.data?.message||"Unable to load academic alerts.");}finally{setAlertsLoading(false);}};
+  const fetchAlerts=async()=>{setAlertsLoading(true);setAlertsError(null);try{const res=await authApi.get<AlertSummaryResponse>("/admin/academic-alerts/summary");setAlerts(res.data.data||[]);setAlertCounts(res.data.counts||{open_total:0,high:0,medium:0,low:0,submission_open_total:0,submission_overdue_total:0});}catch(e:any){setAlerts([]);setAlertCounts({open_total:0,high:0,medium:0,low:0,submission_open_total:0,submission_overdue_total:0});setAlertsError(e?.response?.data?.message||"Unable to load academic alerts.");}finally{setAlertsLoading(false);}};
 
-  useEffect(()=>{setLoading(true);Promise.all([authApi.get("/current-session-term"),authApi.get("/dashboard/counts"),authApi.get("/performance-stats"),authApi.get<AlertSummaryResponse>("/admin/academic-alerts/summary")]).then(([sess,counts,perf,alertRes])=>{setAcademicSession(sess.data.session??"");setCurrentTerm(sess.data.term??"");const c=counts.data??{};setTotalUsers(Number(c.total_users??(Number(c.students??0)+Number(c.teachers??0)+Number(c.parents??0))));setStats([{title:"Total Students",value:Number(c.students??0),icon:"students"},{title:"Teachers",value:Number(c.teachers??0),icon:"teachers"},{title:"Total Parents",value:Number(c.parents??0),icon:"parents"},{title:"Results Uploaded",value:c.results_uploaded??"0%",icon:"results"}]);const pts:PerformancePoint[]=perf.data.data||[];setPerfLabels(pts.map(d=>d.term));setPerfData(pts.map(d=>d.average));setAlerts(alertRes.data.data||[]);setSubmissionMonitors(alertRes.data.submission_monitors||[]);setAlertCounts(alertRes.data.counts||{open_total:0,high:0,medium:0,low:0,submission_open_total:0,submission_overdue_total:0});}).catch(e=>{console.error(e);setAlertsError("Some dashboard sections could not be loaded.");}).finally(()=>{setLoading(false);fetchTop(1);});},[]);
+  useEffect(()=>{setLoading(true);Promise.all([authApi.get("/current-session-term"),authApi.get("/dashboard/counts"),authApi.get("/performance-stats"),authApi.get<AlertSummaryResponse>("/admin/academic-alerts/summary")]).then(([sess,counts,perf,alertRes])=>{setAcademicSession(sess.data.session??"");setCurrentTerm(sess.data.term??"");const c=counts.data??{};setTotalUsers(Number(c.total_users??(Number(c.students??0)+Number(c.teachers??0)+Number(c.parents??0))));setStats([{title:"Total Students",value:Number(c.students??0),icon:"students"},{title:"Teachers",value:Number(c.teachers??0),icon:"teachers"},{title:"Total Parents",value:Number(c.parents??0),icon:"parents"},{title:"Results Uploaded",value:c.results_uploaded??"0%",icon:"results"}]);const pts:PerformancePoint[]=perf.data.data||[];setPerfLabels(pts.map(d=>d.term));setPerfData(pts.map(d=>d.average));setAlerts(alertRes.data.data||[]);setAlertCounts(alertRes.data.counts||{open_total:0,high:0,medium:0,low:0,submission_open_total:0,submission_overdue_total:0});}).catch(e=>{console.error(e);setAlertsError("Some dashboard sections could not be loaded.");}).finally(()=>{setLoading(false);fetchTop(1);});},[]);
   useEffect(()=>{fetchTop(topPage);},[topPage]);
   useEffect(()=>{if(!chartRef.current)return;const ctx=chartRef.current.getContext("2d");if(!ctx)return;chartInst.current?.destroy();chartInst.current=new Chart(ctx,{type:"bar",data:{labels:perfLabels,datasets:[{label:"Average Score",data:perfData,backgroundColor:(context)=>{const g=context.chart.ctx.createLinearGradient(0,0,0,260);g.addColorStop(0,"rgba(255,200,87,0.88)");g.addColorStop(1,"rgba(255,200,87,0.20)");return g;},borderRadius:6,barThickness:32}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:"#050008",padding:12,cornerRadius:8,titleColor:"rgb(255,200,87)",bodyColor:"#94a3b8",titleFont:{size:13,weight:"bold" as const},bodyFont:{size:12}}},scales:{x:{grid:{display:false},ticks:{font:{size:11},color:"#9a8a7a"},border:{display:false}},y:{beginAtZero:true,grid:{color:"rgba(0,0,0,0.04)"},ticks:{font:{size:11},color:"#9a8a7a"},border:{display:false}}}}});return()=>{chartInst.current?.destroy();};},[perfLabels,perfData]);
 
@@ -420,50 +315,8 @@ export default function AdminDashboard() {
         .db-skeleton{height:14px;border-radius:7px;background:linear-gradient(90deg,#f0ebe3 25%,#e8e0d5 50%,#f0ebe3 75%);background-size:200% 100%;animation:dbSkeleton 1.4s ease infinite}
         @keyframes dbSkeleton{from{background-position:200% 0}to{background-position:-200% 0}}
         @keyframes dbSpin{to{transform:rotate(360deg)}}
-
-        /* ═══ RESULT MONITORING ═══ */
-        .rm-panel{background:#fff;border:1px solid var(--db-border);border-radius:var(--db-radius);overflow:hidden;margin-bottom:24px}
-        .rm-head{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid rgba(0,0,0,0.06);gap:16px;flex-wrap:wrap}
-        .rm-head-left{display:flex;align-items:center;gap:14px}
-        .rm-head-iconbox{width:42px;height:42px;border-radius:11px;background:rgba(255,200,87,0.10);color:rgb(180,83,9);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-        .rm-head-title{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--db-dark);margin:0 0 3px}
-        .rm-head-sub{font-size:12px;font-weight:300;color:#9a8a7a;margin:0}
-        .rm-head-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-        .rm-summary-pills{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-        .rm-spill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:500}
-        .rm-spill-dot{width:6px;height:6px;border-radius:50%}
-        .rm-spill--danger{background:rgba(239,68,68,0.09);color:#dc2626;border:1px solid rgba(239,68,68,0.18)}
-        .rm-spill--warn{background:rgba(245,158,11,0.09);color:rgb(146,64,14);border:1px solid rgba(245,158,11,0.18)}
-        .rm-spill--info{background:rgba(59,130,246,0.09);color:rgb(29,78,216);border:1px solid rgba(59,130,246,0.18)}
-        .rm-spill--ok{background:rgba(34,197,94,0.09);color:rgb(21,128,61);border:1px solid rgba(34,197,94,0.18)}
-        .rm-body{padding:20px}
-        .rm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
-        .rm-card{background:var(--rmc-bg);border:1px solid var(--rmc-border);border-radius:12px;padding:16px;animation:rmCardIn .4s ease both;transition:box-shadow .2s,transform .2s}
-        .rm-card:hover{box-shadow:0 4px 18px rgba(0,0,0,0.07);transform:translateY(-2px)}
-        @keyframes rmCardIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-        .rm-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:14px}
-        .rm-card-info{}
-        .rm-card-class{font-size:14px;font-weight:600;color:var(--db-dark);margin:0 0 4px}
-        .rm-card-teacher{display:flex;align-items:center;gap:5px;font-size:11.5px;color:#9a8a7a;margin:0}
-        .rm-status-badge{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:3px 10px;border-radius:999px;white-space:nowrap;flex-shrink:0}
-        .rm-bar-wrap{margin-bottom:12px}
-        .rm-bar-track{height:6px;border-radius:999px;background:var(--rmc-track);overflow:hidden;margin-bottom:6px}
-        .rm-bar-fill{height:100%;border-radius:999px;transition:width .6s cubic-bezier(.34,1.2,.64,1)}
-        .rm-bar-labels{display:flex;justify-content:space-between;align-items:center}
-        .rm-bar-pct{font-size:12px;font-weight:600;color:var(--rmc-color)}
-        .rm-bar-count{font-size:11px;font-weight:300;color:#9a8a7a}
-        .rm-card-footer{display:flex;flex-wrap:wrap;gap:6px;padding-top:10px;border-top:1px solid rgba(0,0,0,0.05)}
-        .rm-meta-chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:6px}
-        .rm-meta-chip--deadline{background:rgba(0,0,0,0.04);color:#7a6a5a}
-        .rm-meta-chip--pending{background:rgba(245,158,11,0.08);color:rgb(146,64,14)}
-        .rm-skeleton-card{background:rgba(0,0,0,0.02);border:1px solid var(--db-border);border-radius:12px;padding:16px}
         .rm-skel{display:block;border-radius:6px;background:linear-gradient(90deg,#f0ebe3 25%,#e8e0d5 50%,#f0ebe3 75%);background-size:200% 100%;animation:dbSkeleton 1.4s ease infinite}
-        .rm-skel--title{height:14px;width:55%}.rm-skel--sub{height:11px;width:70%}.rm-skel--bar{height:6px;border-radius:999px}
-        .rm-empty{display:flex;flex-direction:column;align-items:center;gap:10px;padding:48px 24px;text-align:center}
-        .rm-empty-icon{width:56px;height:56px;border-radius:50%;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.18);display:flex;align-items:center;justify-content:center;color:rgb(34,197,94)}
-        .rm-empty-title{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--db-dark);margin:0}
-        .rm-empty-sub{font-size:13px;color:#9a8a7a;margin:0}
-
+        .rm-skel--title{height:14px;width:55%}.rm-skel--sub{height:11px;width:70%}
         /* ═══ ACADEMIC ALERTS ═══ */
         .aa-wrap{display:grid;grid-template-columns:1fr 300px;gap:20px;margin-bottom:24px;align-items:start}
         @media(max-width:991.98px){.aa-wrap{grid-template-columns:1fr}}
@@ -540,6 +393,7 @@ export default function AdminDashboard() {
                   <div className="d-flex flex-wrap gap-2">
                     <button className="db-btn-gold" onClick={()=>navigate("/results/pins")}><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="7" width="12" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M5 7V5.5a3 3 0 016 0V7" stroke="currentColor" strokeWidth="1.3"/><circle cx="8" cy="10.5" r="1" fill="currentColor"/></svg>Generate PINs</button>
                     <button className="db-btn-outline"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 1v9M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 11v2a1 1 0 001 1h10a1 1 0 001-1v-2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>Export Report</button>
+                    <button className="db-btn-outline" onClick={()=>navigate("/admin/result-monitoring")}><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 12V8M5 12V5M8 12V7M11 12V3M14 12V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>Result Monitoring</button>
                   </div>
                 </div>
                 <div className="db-hero-stat-card d-none d-md-block">
@@ -557,10 +411,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* ── UPGRADED: Result Submission Monitoring ── */}
-            <ResultMonitoringSection monitors={submissionMonitors} loading={alertsLoading&&submissionMonitors.length===0} onRefresh={fetchAlerts} alertsLoading={alertsLoading}/>
-
-            {/* ── UPGRADED: Academic Alerts ── */}
+            {/* ── Academic Alerts ── */}
             <AcademicAlertSection alerts={alerts} loading={alertsLoading&&alerts.length===0} error={alertsError} counts={{open_total:alertCounts.open_total,high:alertCounts.high,medium:alertCounts.medium,low:alertCounts.low}} onRefresh={fetchAlerts} alertsLoading={alertsLoading} onViewAll={()=>navigate("/admin/academic-alerts")}/>
 
             {/* Stats */}

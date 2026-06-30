@@ -2,7 +2,11 @@
 import axios from "axios";
 import { getToken, logout } from "./token";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api"|| "https://gradequest.com.ng/api";
+
+// const BASE_URL = import.meta.env.VITE_API_URL 
+//   ? import.meta.env.VITE_API_URL + "/api"
+//   : "http://localhost:8000/api";
 
 // Public instance (no auth)
 export const publicApi = axios.create({

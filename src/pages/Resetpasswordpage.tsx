@@ -481,6 +481,28 @@ export default function ResetPasswordPage() {
           background:#f5f1eb; border-radius:8px; padding:10px 14px;
           width:100%; justify-content:center; margin-bottom:28px;
         }
+
+
+          /* Hover effect */
+.ft-logo:hover .ft-logo-wrap {
+  transform: scale(1.05);
+  transition: 0.25s ease;
+}/* Logo image */
+.ft-logo-img {
+  width: 10%;
+  height: 10%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+
+
+/* Hover effect */
+.ft-logo:hover .ft-logo-wrap {
+  transform: scale(1.05);
+  transition: 0.25s ease;
+}
+  
       `}</style>
         <PageTitle title="Reset Password" />
       <div className="rp-root">
@@ -490,13 +512,15 @@ export default function ResetPasswordPage() {
           <div className="rp-glow2" aria-hidden="true" />
 
           <div className="rp-logo">
-            <div className="rp-logo-mark">
-              <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                <path d="M10 2L17 6v8l-7 4-7-4V6l7-4z" stroke="#0f172a" strokeWidth="1.6" strokeLinejoin="round"/>
-                <path d="M10 10l7-4M10 10v8M10 10L3 6" stroke="#0f172a" strokeWidth="1.4" strokeLinecap="round"/>
-              </svg>
-            </div>
-            <span className="rp-logo-name">Grade<span>Quest</span></span>
+      <a href="/" className="ft-logo" aria-label="GradeQuest home">     
+        <div className="ft-logo-wrap">
+          <img
+            src="/media/logo/gradequest-logo.png"
+            alt="GradeQuest logo"
+            className="ft-logo-img"
+          />
+        </div>
+      </a>
           </div>
 
           <div className="rp-left-body">

@@ -53,18 +53,16 @@ export default function FrontendLoader() {
 
           {/* Logo */}
           <div className="ld-logo">
-            <span className="ld-logo-mark" aria-hidden="true">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                <polygon points="12,2 22,19 2,19"
-                  stroke="#0a0f1e" strokeWidth="2"
-                  strokeLinejoin="round" fill="none"/>
-                <path d="M12 8v5M12 15.5v.5"
-                  stroke="#0a0f1e" strokeWidth="2.2"
-                  strokeLinecap="round"/>
-              </svg>
-            </span>
-            <span className="ld-logo-name">GradeQuest</span>
-            <span className="ld-logo-pill">AI</span>
+                <a href="/" className="ft-logo" aria-label="GradeQuest home">     
+        <div className="ft-logo-wrap">
+          <img
+            src="/media/logo/gradequest-logo.png"
+            alt="GradeQuest logo"
+            width={32} height={32}
+            className="ft-logo-img"
+          />
+        </div>
+      </a>
           </div>
 
           {/* Animated SVG dashboard */}

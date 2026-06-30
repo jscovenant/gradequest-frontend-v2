@@ -578,6 +578,36 @@ export default function Signup() {
           from { opacity:0; transform: translateX(16px); }
           to   { opacity:1; transform: translateX(0); }
         }
+
+        /* Logo image */
+.ft-logo-img {
+  width: 10%;
+  height: 10%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+
+
+/* Hover effect */
+.ft-logo:hover .ft-logo-wrap {
+  transform: scale(1.05);
+  transition: 0.25s ease;
+}/* Logo image */
+.ft-logo-img {
+  width: 10%;
+  height: 10%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+
+
+/* Hover effect */
+.ft-logo:hover .ft-logo-wrap {
+  transform: scale(1.05);
+  transition: 0.25s ease;
+}
       `}</style>
   <PageTitle title="Signup" />
      <div className="sg-page">
@@ -589,17 +619,15 @@ export default function Signup() {
               <div className="sg-orbit" />
     
               {/* Logo */}
-              <a href="/" className="sg-left-logo">
-                <span className="sg-mark">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <polygon points="12,2 22,19 2,19" stroke="#0a0f1e" strokeWidth="2"
-                      strokeLinejoin="round" fill="none"/>
-                    <path d="M12 8v5M12 15.5v.5" stroke="#0a0f1e" strokeWidth="2.2" strokeLinecap="round"/>
-                  </svg>
-                </span>
-                <span className="sg-mark-name">GradeQuest</span>
-                <span className="sg-mark-pill">AI</span>
-              </a>
+                <a href="/" className="ft-logo" aria-label="GradeQuest home">     
+        <div className="ft-logo-wrap">
+          <img
+            src="/media/logo/gradequest-logo.png"
+            alt="GradeQuest logo"
+            className="ft-logo-img"
+          />
+        </div>
+      </a>
     
               {/* Body */}
               <div className="sg-left-body">
@@ -657,16 +685,15 @@ export default function Signup() {
               <div className="sg-form-wrap">
     
                 {/* Mobile logo */}
-                <a href="/" className="sg-mobile-logo">
-                  <span className="sg-mark" style={{ width: 34, height: 34, borderRadius: 9 }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <polygon points="12,2 22,19 2,19" stroke="#0a0f1e" strokeWidth="2"
-                        strokeLinejoin="round" fill="none"/>
-                      <path d="M12 8v5M12 15.5v.5" stroke="#0a0f1e" strokeWidth="2.2" strokeLinecap="round"/>
-                    </svg>
-                  </span>
-                  <span style={{ fontFamily: "'Lora',serif", fontSize: 18, fontWeight: 700, color: "#1a1a2e" }}>GradeQuest</span>
-                </a>
+        <a href="/" className="ft-logo" aria-label="GradeQuest home">     
+        <div className="ft-logo-wrap">
+          <img
+            src="/media/logo/gradequest-logo.png"
+            alt="GradeQuest logo"
+            className="ft-logo-img"
+          />
+        </div>
+      </a>
     
                 {/* Step indicator dots */}
                 <div className="sg-dots">

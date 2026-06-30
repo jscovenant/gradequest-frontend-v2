@@ -118,6 +118,15 @@ export default function StudentsPage() {
   const [performanceLabels, setPerformanceLabels] = useState<string[]>([]);
   const [performanceData, setPerformanceData]     = useState<number[]>([]);
 
+  /*withdraw student */
+  const [withdrawingStudent, setWithdrawingStudent] = useState<Student | null>(null);
+const [confirmWithdrawText, setConfirmWithdrawText] = useState("");
+const [processingWithdraw, setProcessingWithdraw] = useState(false);
+
+
+
+
+
   /* Ratings */
   const [affectiveDomains, setAffectiveDomains]     = useState<any[]>([]);
   const [psychomotorDomains, setPsychomotorDomains] = useState<any[]>([]);
@@ -313,6 +322,26 @@ export default function StudentsPage() {
     finally { setSavingRatings(false); }
   };
 
+  const withdrawStudent = async () => {
+  if (!withdrawingStudent) return;
+  setProcessingWithdraw(true);
+  try {
+    const res = await authApi.post(`/student/delete/${withdrawingStudent.id}`);
+    showSuccess(res.data.message || "Student withdrawn successfully.");
+    setStudents(students.filter(s => s.id !== withdrawingStudent.id));
+    // Invalidate cache
+    delete profileCache.current[withdrawingStudent.id];
+    // Close profile modal if open
+    if (selectedStudent?.id === withdrawingStudent.id) closeModal();
+    setWithdrawingStudent(null);
+    setConfirmWithdrawText("");
+  } catch (err: any) {
+    showError(err?.response?.data?.message || "Failed to withdraw student.");
+  } finally {
+    setProcessingWithdraw(false);
+  }
+};
+
   /* ─── Derived stats ─── */
   const activeCount = useMemo(() => students.filter(s => s.status === 1).length, [students]);
   const maleCount   = useMemo(() => students.filter(s => (s.sex ?? "").toLowerCase() === "male").length, [students]);
@@ -480,6 +509,36 @@ export default function StudentsPage() {
 
         /* View button — amber tint, $secondary at low opacity */
         .db-view-btn { display:inline-flex; align-items:center; gap:5px; padding:6px 13px; font-size:12.5px; font-weight:400; color:rgb(180,83,9); background:var(--sp-accent-dim); border:1px solid var(--sp-accent-border); border-radius:7px; cursor:pointer; transition:background .2s,border-color .2s; white-space:nowrap; }
+        /* Withdraw button — danger tint */
+.db-withdraw-btn { display:inline-flex; align-items:center; gap:5px; padding:6px 13px; font-size:12.5px; font-weight:400; color:rgb(185,28,28); background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.22); border-radius:7px; cursor:pointer; transition:background .2s,border-color .2s; white-space:nowrap; }
+.db-withdraw-btn:hover { background:rgba(239,68,68,0.15); border-color:rgba(239,68,68,0.38); }
+
+/* Withdraw confirmation modal */
+.wd-overlay { position:fixed; inset:0; background:rgba(0,0,0,.65); backdrop-filter:blur(10px); z-index:1400; display:flex; align-items:center; justify-content:center; padding:16px; }
+.wd-card { width:min(480px,94vw); border-radius:16px; overflow:hidden; background:#fff; box-shadow:0 24px 64px rgba(0,0,0,.35); animation:spCardIn .25s cubic-bezier(.34,1.2,.64,1) both; }
+.wd-header { background:var(--sp-dark); padding:24px 24px 20px; position:relative; overflow:hidden; }
+.wd-header::before { content:''; position:absolute; inset:0; background-image:radial-gradient(circle,rgba(239,68,68,.08) 1px,transparent 1px); background-size:20px 20px; pointer-events:none; }
+.wd-header-glow { position:absolute; top:-30px; right:-30px; width:180px; height:180px; border-radius:50%; background:radial-gradient(circle,rgba(239,68,68,.15) 0%,transparent 65%); pointer-events:none; }
+.wd-icon-wrap { position:relative; z-index:1; width:48px; height:48px; border-radius:12px; background:rgba(239,68,68,.15); border:1px solid rgba(239,68,68,.3); display:flex; align-items:center; justify-content:center; margin-bottom:14px; }
+.wd-title { position:relative; z-index:1; font-family:'Playfair Display',serif; font-size:18px; font-weight:700; color:#fff; margin-bottom:4px; }
+.wd-subtitle { position:relative; z-index:1; font-size:12.5px; font-weight:300; color:rgba(255,255,255,.4); }
+.wd-body { padding:22px 24px; }
+.wd-warning-box { background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.2); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.wd-warning-title { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:rgb(185,28,28); margin-bottom:8px; }
+.wd-warning-list { margin:0; padding-left:18px; }
+.wd-warning-list li { font-size:12.5px; color:rgb(153,27,27); line-height:1.7; }
+.wd-confirm-label { font-size:12.5px; font-weight:500; color:#4a4a5a; margin-bottom:8px; }
+.wd-confirm-label strong { color:var(--sp-dark); }
+.wd-confirm-input { width:100%; background:var(--sp-light); border:1.5px solid var(--sp-border); border-radius:8px; padding:10px 14px; font-family:'DM Sans',sans-serif; font-size:13px; color:var(--sp-dark); outline:none; transition:border-color .2s,box-shadow .2s; box-sizing:border-box; }
+.wd-confirm-input:focus { border-color:rgba(239,68,68,0.4); box-shadow:0 0 0 3px rgba(239,68,68,0.08); background:#fff; }
+.wd-confirm-input::placeholder { color:#bdb3a8; }
+.wd-footer { display:flex; align-items:center; justify-content:flex-end; gap:8px; padding:14px 24px; border-top:1px solid var(--sp-border); background:var(--sp-light); }
+.wd-btn-cancel { display:inline-flex; align-items:center; gap:6px; padding:9px 18px; font-size:13px; font-weight:400; color:#7a6a5a; background:#fff; border:1px solid var(--sp-border); border-radius:8px; cursor:pointer; transition:background .2s; }
+.wd-btn-cancel:hover { background:#ede8e0; }
+.wd-btn-cancel:disabled { opacity:.5; cursor:not-allowed; }
+.wd-btn-confirm { display:inline-flex; align-items:center; gap:7px; padding:9px 18px; font-size:13px; font-weight:500; color:#fff; background:rgb(220,38,38); border:none; border-radius:8px; cursor:pointer; transition:background .2s,opacity .2s; }
+.wd-btn-confirm:hover:not(:disabled) { background:rgb(185,28,28); }
+.wd-btn-confirm:disabled { opacity:.45; cursor:not-allowed; }
         .db-view-btn:hover { background:rgba(255,200,87,0.18); border-color:rgba(255,200,87,0.4); }
 
         /* ── Pagination ── */
@@ -847,10 +906,18 @@ export default function StudentsPage() {
                             </span>
                           </td>
                           <td style={{ textAlign: "right" }}>
-                            <button className="db-view-btn" onClick={() => openStudent(s)}>
-                              <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="4" stroke="currentColor" strokeWidth="1.3"/><circle cx="7" cy="7" r="1.5" fill="currentColor"/></svg>
-                              View
-                            </button>
+                            <div className="d-flex align-items-center justify-content-end gap-2">
+                              <button className="db-view-btn" onClick={() => openStudent(s)}>
+                                <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="4" stroke="currentColor" strokeWidth="1.3"/><circle cx="7" cy="7" r="1.5" fill="currentColor"/></svg>
+                                View
+                              </button>
+                              <button
+                                className="db-withdraw-btn"
+                                onClick={() => { setWithdrawingStudent(s); setConfirmWithdrawText(""); }}>
+                                <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 7h7M6 4l3 3-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M10 2h2a1 1 0 011 1v8a1 1 0 01-1 1h-2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+                                Withdraw
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1336,6 +1403,74 @@ export default function StudentsPage() {
           </div>
         </div>
       )}
+
+      {/* ══════════════════════════════════════
+    WITHDRAW CONFIRMATION MODAL
+══════════════════════════════════════ */}
+{withdrawingStudent && (
+  <div className="wd-overlay" onMouseDown={() => { if (!processingWithdraw) { setWithdrawingStudent(null); setConfirmWithdrawText(""); } }}>
+    <div className="wd-card" onMouseDown={e => e.stopPropagation()}>
+
+      <div className="wd-header">
+        <div className="wd-header-glow" aria-hidden="true" />
+        <div className="wd-icon-wrap">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M12 9v4M12 17h.01" stroke="rgb(239,68,68)" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="rgb(239,68,68)" strokeWidth="1.8" strokeLinejoin="round"/>
+          </svg>
+        </div>
+        <div className="wd-title">Withdraw Student</div>
+        <div className="wd-subtitle">
+          {[withdrawingStudent.firstname, withdrawingStudent.third_name, withdrawingStudent.surname].filter(Boolean).map(n => n?.charAt(0).toUpperCase()! + n?.slice(1).toLowerCase()!).join(" ")} · {withdrawingStudent.reg_no}
+        </div>
+      </div>
+
+      <div className="wd-body">
+        <div className="wd-warning-box">
+          <div className="wd-warning-title">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2L14 14H2L8 2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><path d="M8 7v3M8 12v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            This action is irreversible. The following will be permanently deleted:
+          </div>
+          <ul className="wd-warning-list">
+            <li>All academic results and term scores</li>
+            <li>Session enrollment history</li>
+            <li>Affective and psychomotor ratings</li>
+            <li>Login credentials and account access</li>
+            <li>All other records associated with this student</li>
+          </ul>
+        </div>
+
+        <p className="wd-confirm-label">
+          Type <strong>WITHDRAW</strong> below to confirm:
+        </p>
+        <input
+          className="wd-confirm-input"
+          placeholder="Type WITHDRAW to confirm…"
+          value={confirmWithdrawText}
+          onChange={e => setConfirmWithdrawText(e.target.value)}
+          disabled={processingWithdraw}
+          autoFocus
+        />
+      </div>
+
+      <div className="wd-footer">
+        <button className="wd-btn-cancel"
+          onClick={() => { setWithdrawingStudent(null); setConfirmWithdrawText(""); }}
+          disabled={processingWithdraw}>
+          Cancel
+        </button>
+        <button className="wd-btn-confirm"
+          onClick={withdrawStudent}
+          disabled={confirmWithdrawText !== "WITHDRAW" || processingWithdraw}>
+          {processingWithdraw
+            ? <><span className="sp-spinner" />Withdrawing…</>
+            : <><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 7h7M6 4l3 3-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M10 2h2a1 1 0 011 1v8a1 1 0 01-1 1h-2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>Withdraw Student</>
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </>
   );
 }

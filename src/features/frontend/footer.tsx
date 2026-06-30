@@ -228,13 +228,7 @@ export default function Footer() {
           justify-content: center;
           flex-shrink: 0;
         }
-        .ft-logo-text {
-          font-family: 'Playfair Display', serif;
-          font-size: 20px;
-          font-weight: 700;
-          color: #ffffff;
-          letter-spacing: -0.01em;
-        }
+    
 
         .ft-tagline {
           font-size: 14px;
@@ -389,6 +383,48 @@ export default function Footer() {
           font-weight: 400;
           color: var(--ft-muted);
         }
+
+        /* Footer logo layout */
+.ft-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+/* Logo container */
+.ft-logo-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+}
+
+/* Logo image */
+.ft-logo-img {
+  width: 70%;
+  height: 70%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+/* Brand text */
+.ft-logo-text {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ft-dark);
+}
+
+/* Hover effect */
+.ft-logo:hover .ft-logo-wrap {
+  transform: scale(1.05);
+  transition: 0.25s ease;
+}
       `}</style>
 
       {/* Wave from FAQ linen section */}
@@ -408,38 +444,40 @@ export default function Footer() {
           <div className="ft-top py-5">
             <div className="row g-5">
 
-              {/* Brand column */}
-              <div className="col-12 col-lg-3">
-                <div className="d-flex flex-column h-100">
-                  <a href="#" className="ft-logo mb-4" aria-label="GradeQuest home">
-                    <span className="ft-logo-mark" aria-hidden="true">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                        <polygon points="12,2 22,19 2,19"
-                          stroke="var(--ft-dark)" strokeWidth="1.8"
-                          strokeLinejoin="round" fill="none"/>
-                        <path d="M12 8v5M12 15.5v.5"
-                          stroke="var(--ft-dark)" strokeWidth="2" strokeLinecap="round"/>
-                      </svg>
-                    </span>
-                    <span className="ft-logo-text">GradeQuest</span>
-                  </a>
+             {/* Brand column */}
+<div className="col-12 col-lg-3">
+  <div className="d-flex flex-column h-100">
 
-                  <p className="ft-tagline mb-4">
-                    The school management platform built for Nigerian institutions —
-                    from results to fees to analytics.
-                  </p>
+    <a href="/" className="ft-logo mb-4" aria-label="GradeQuest home">
+      
+      <div className="ft-logo-wrap">
+        
+<img 
+          src="/media/logo/gradequest-logo.png" 
+          alt="GradeQuest logo" 
+          className="ft-logo-img"
+        />
+      </div>
+      <span className="ft-logo-text">GradeQuest</span>
 
-                  {/* Socials — Bootstrap gap utility */}
-                  <div className="d-flex gap-2 mt-auto">
-                    {SOCIALS.map(s => (
-                      <a key={s.label} href={s.href}
-                        className="ft-social-btn" aria-label={s.label}>
-                        {s.icon}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              </div>
+    </a>
+
+    <p className="ft-tagline mb-4">
+      The school management platform built for Nigerian institutions —
+      from results to fees to analytics.
+    </p>
+
+    <div className="d-flex gap-2 mt-auto">
+      {SOCIALS.map(s => (
+        <a key={s.label} href={s.href}
+          className="ft-social-btn" aria-label={s.label}>
+          {s.icon}
+        </a>
+      ))}
+    </div>
+
+  </div>
+</div>
 
               {/* Nav columns — Bootstrap grid */}
               <div className="col-12 col-lg-9">

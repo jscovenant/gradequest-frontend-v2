@@ -618,6 +618,23 @@ export default function Login() {
         }
 
         .lg-right-footer a:hover { color: #7a6a5a; }
+
+        
+/* Logo image */
+.ft-logo-img {
+  width: 10%;
+  height: 10%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+
+
+/* Hover effect */
+.ft-logo:hover .ft-logo-wrap {
+  transform: scale(1.05);
+  transition: 0.25s ease;
+}
       `}</style>
       <PageTitle title="Login" />
       <div className="lg-page">
@@ -629,17 +646,17 @@ export default function Login() {
           <div className="lg-orbit" />
 
           {/* Logo */}
-          <a href="/" className="lg-left-logo">
-            <span className="lg-left-mark">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <polygon points="12,2 22,19 2,19" stroke="#0a0f1e" strokeWidth="2"
-                  strokeLinejoin="round" fill="none"/>
-                <path d="M12 8v5M12 15.5v.5" stroke="#0a0f1e" strokeWidth="2.2" strokeLinecap="round"/>
-              </svg>
-            </span>
-            <span className="lg-left-name">GradeQuest</span>
-            <span className="lg-left-pill">AI</span>
+    <a href="/" className="ft-logo" aria-label="GradeQuest home">     
+            <div className="ft-logo-wrap">
+              <img
+                src="/media/logo/gradequest-logo.png"
+                alt="GradeQuest logo"
+                className="ft-logo-img"
+              />
+            </div>
           </a>
+
+     
 
           {/* Main copy */}
           <div className="lg-left-content">
@@ -854,7 +871,7 @@ export default function Login() {
             {/* Signup */}
             <p className="lg-signup">
               New school on GradeQuest?{" "}
-              <Link to="/register">Request access →</Link>
+              <Link to="/book-demo">Book a demo →</Link>
             </p>
           </div>
 
