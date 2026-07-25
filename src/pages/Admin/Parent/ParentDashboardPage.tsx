@@ -53,6 +53,58 @@ interface StatCard {
 const money = (n: number) =>
   new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(n || 0);
 
+const emptyDashboard: DashboardResponse = {
+  parent: { id: 0, name: "Parent" },
+  stats: {
+    children: 0,
+    total_fees: 0,
+    total_paid: 0,
+    total_balance: 0,
+    unread_notifications: 0,
+  },
+  selected_child_id: 0,
+  children: [],
+  charts: {
+    fee_balance_by_child: { labels: [], data: [] },
+    attendance_weekly: { labels: [], data: [] },
+  },
+  recent_notifications: [],
+};
+
+function normalizeDashboardPayload(rawPayload: any): DashboardResponse {
+  const payload: Partial<DashboardResponse> | null | undefined = rawPayload?.data ?? rawPayload;
+  const children = Array.isArray(payload?.children) ? payload.children : [];
+  const firstChildId = children[0]?.id ?? 0;
+  const stats = payload?.stats || {};
+
+  return {
+    ...emptyDashboard,
+    ...payload,
+    parent: {
+      ...emptyDashboard.parent,
+      ...(payload?.parent || {}),
+    },
+    stats: {
+      ...emptyDashboard.stats,
+      ...stats,
+      children: Number((stats as any).children ?? children.length ?? 0),
+    },
+    selected_child_id: Number(payload?.selected_child_id || firstChildId || 0),
+    children,
+    charts: {
+      fee_balance_by_child: {
+        labels: Array.isArray(payload?.charts?.fee_balance_by_child?.labels) ? payload.charts.fee_balance_by_child.labels : [],
+        data: Array.isArray(payload?.charts?.fee_balance_by_child?.data) ? payload.charts.fee_balance_by_child.data : [],
+      },
+      attendance_weekly: {
+        labels: Array.isArray(payload?.charts?.attendance_weekly?.labels) ? payload.charts.attendance_weekly.labels : [],
+        data: Array.isArray(payload?.charts?.attendance_weekly?.data) ? payload.charts.attendance_weekly.data : [],
+      },
+    },
+    recent_notifications: Array.isArray(payload?.recent_notifications) ? payload.recent_notifications : [],
+  };
+}
+
 export default function ParentDashboardPage() {
   const navigate = useNavigate();
 
@@ -65,6 +117,7 @@ export default function ParentDashboardPage() {
   // ===== API Data =====
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [selectedChildId, setSelectedChildId] = useState<number | null>(null);
+  const [paymentLinkCopied, setPaymentLinkCopied] = useState(false);
 
   // ===== Stats cards =====
   const [stats, setStats] = useState<StatCard[]>([
@@ -81,11 +134,11 @@ export default function ParentDashboardPage() {
   const feesChartInstance = useRef<Chart | null>(null);
 
   // ===== Derived chart data =====
-  const weeklyLabels = useMemo(() => data?.charts.attendance_weekly.labels ?? [], [data]);
-  const weeklyData = useMemo(() => data?.charts.attendance_weekly.data ?? [], [data]);
+  const weeklyLabels = useMemo(() => data?.charts?.attendance_weekly?.labels ?? [], [data]);
+  const weeklyData = useMemo(() => data?.charts?.attendance_weekly?.data ?? [], [data]);
 
-  const feeLabels = useMemo(() => data?.charts.fee_balance_by_child.labels ?? [], [data]);
-  const feeData = useMemo(() => data?.charts.fee_balance_by_child.data ?? [], [data]);
+  const feeLabels = useMemo(() => data?.charts?.fee_balance_by_child?.labels ?? [], [data]);
+  const feeData = useMemo(() => data?.charts?.fee_balance_by_child?.data ?? [], [data]);
 
   // ===== Fetch dashboard =====
   const fetchDashboard = (childId?: number) => {
@@ -95,7 +148,7 @@ export default function ParentDashboardPage() {
     authApi
       .get(url)
       .then((res) => {
-        const payload: DashboardResponse = res.data;
+        const payload = normalizeDashboardPayload(res.data);
         setData(payload);
         setSelectedChildId(payload.selected_child_id);
 
@@ -240,6 +293,17 @@ export default function ParentDashboardPage() {
 
   const parentName = data?.parent?.name ?? "Parent";
   const children = data?.children ?? [];
+  const selectedChild = children.find((child) => child.id === selectedChildId) || children[0];
+  const paymentLink = `${window.location.origin}/pay-school-fee${selectedChild?.reg_no ? `?student_reg_no=${encodeURIComponent(selectedChild.reg_no)}` : ""}`;
+  const copyPaymentLink = async () => {
+    try {
+      await navigator.clipboard.writeText(paymentLink);
+      setPaymentLinkCopied(true);
+      window.setTimeout(() => setPaymentLinkCopied(false), 1800);
+    } catch {
+      window.prompt("Copy payment link", paymentLink);
+    }
+  };
 
   return (
     <>
@@ -248,7 +312,7 @@ export default function ParentDashboardPage() {
 
       <div className="container-fluid">
         <div className="row">
-          <Sidebar sidebarOpen={sidebarOpen} />
+          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
           <main className="col-md-9 col-lg-10 ms-auto px-4 d-flex flex-column min-vh-100" style={{ backgroundColor: "#f8f9fa" }}>
             {loading && <Loader message="Loading dashboard..." />}
@@ -475,6 +539,51 @@ export default function ParentDashboardPage() {
                   </div>
                 );
               })}
+            </div>
+
+            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
+              <div className="card-body p-4">
+                <div className="d-flex align-items-center justify-content-between gap-3 flex-wrap">
+                  <div className="d-flex align-items-start gap-3">
+                    <div
+                      className="d-flex align-items-center justify-content-center"
+                      style={{
+                        width: 46,
+                        height: 46,
+                        borderRadius: 12,
+                        background: "rgba(211, 0, 176, 0.08)",
+                        color: "rgb(211, 0, 176)",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <i className="bi bi-credit-card-2-front fs-5" />
+                    </div>
+                    <div>
+                      <h6 className="fw-bold mb-1" style={{ color: "#1e293b" }}>
+                        Pay School Fees Online
+                      </h6>
+                      <div className="text-muted small">
+                        Open the public payment page, enter the school code and your child admission number, then pay securely.
+                      </div>
+                      {selectedChild?.reg_no && (
+                        <div className="mt-2 small text-muted">
+                          Selected admission no: <b>{selectedChild.reg_no}</b>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="d-flex align-items-center gap-2 flex-wrap">
+                    <button className="btn btn-primary" style={{ borderRadius: 10, fontWeight: 700 }} onClick={() => window.open(paymentLink, "_blank")}>
+                      <i className="bi bi-box-arrow-up-right me-1" />
+                      Open Payment Link
+                    </button>
+                    <button className="btn btn-outline-secondary" style={{ borderRadius: 10, fontWeight: 700 }} onClick={copyPaymentLink}>
+                      <i className="bi bi-clipboard me-1" />
+                      {paymentLinkCopied ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Charts */}

@@ -1,13 +1,9 @@
 export default function Footer() {
   return (
-    <footer
-      className="fixed-bottom text-center text-muted py-2 bg-light"
-      style={{
-        zIndex: 1000,
-      }}
-    >
-      © {new Date().getFullYear()} <strong>GradeQuest</strong> — Smart
-      School Management System
+    <footer className="gq-footer d-flex align-items-center justify-content-center">
+      <span>
+        (c) {new Date().getFullYear()} <strong>GradeQuest</strong> - Smart School Management System
+      </span>
     </footer>
   );
 }

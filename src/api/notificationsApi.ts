@@ -9,14 +9,19 @@ export type SystemNote = {
   read_at?: string | null; // only on /notifications/all
 };
 
+function unwrapList(data: any): SystemNote[] {
+  const value = data?.data ?? data?.notifications ?? data;
+  return Array.isArray(value) ? value : [];
+}
+
 export async function getUnreadNotifications(): Promise<SystemNote[]> {
-  const res = await authApi.get<SystemNote[]>("/notifications");
-  return res.data;
+  const res = await authApi.get("/notifications");
+  return unwrapList(res.data);
 }
 
 export async function getAllNotifications(): Promise<SystemNote[]> {
-  const res = await authApi.get<SystemNote[]>("/notifications/all");
-  return res.data;
+  const res = await authApi.get("/notifications/all");
+  return unwrapList(res.data);
 }
 
 export async function markNotificationRead(id: string) {

@@ -474,45 +474,18 @@ export default function SuperAdminDashboard() {
 
       <div className="container-fluid">
         <div className="row">
-          <Sidebar sidebarOpen={sidebarOpen} />
+          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-          <main className="col-md-9 col-lg-10 ms-auto px-4 d-flex flex-column min-vh-100" style={{ backgroundColor: "#f8f9fa" }}>
+          <main className="col-md-9 col-lg-10 ms-auto px-4 d-flex flex-column min-vh-100 sa-main">
             {loading && <Loader message="Loading Super Admin dashboard..." />}
 
             {/* HERO */}
             <div
-              className="mt-4 p-4 position-relative overflow-hidden"
+              className="mt-4 p-4 position-relative overflow-hidden sa-hero"
               style={{
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                 borderRadius: 16,
-                boxShadow: "0 10px 30px rgba(102, 126, 234, 0.3)",
               }}
             >
-              <div
-                style={{
-                  position: "absolute",
-                  top: "-50px",
-                  right: "-50px",
-                  width: 220,
-                  height: 220,
-                  background: "rgba(255, 255, 255, 0.10)",
-                  borderRadius: "50%",
-                  filter: "blur(40px)",
-                }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "-30px",
-                  left: "-30px",
-                  width: 160,
-                  height: 160,
-                  background: "rgba(255, 255, 255, 0.10)",
-                  borderRadius: "50%",
-                  filter: "blur(40px)",
-                }}
-              />
-
               <div className="row align-items-center position-relative g-3">
                 <div className="col-lg-8">
                   <div className="d-flex flex-wrap gap-2 align-items-center mb-2">
@@ -624,10 +597,10 @@ export default function SuperAdminDashboard() {
             <div className="row g-3 my-3">
               {stats.map((s, idx) => {
                 const colors = [
-                  { gradient: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", icon: "#667eea", bg: "#f0edff" },
-                  { gradient: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)", icon: "#f5576c", bg: "#fff0f3" },
-                  { gradient: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)", icon: "#00f2fe", bg: "#e6f9ff" },
-                  { gradient: "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)", icon: "#38f9d7", bg: "#e6fff9" },
+                  { gradient: "linear-gradient(135deg, var(--gq-primary) 0%, #f05ed4 100%)", icon: "var(--gq-primary)", bg: "rgba(211, 0, 176, 0.08)" },
+                  { gradient: "linear-gradient(135deg, var(--gq-secondary) 0%, #ffe08c 100%)", icon: "#a66a00", bg: "rgba(255, 200, 87, 0.18)" },
+                  { gradient: "linear-gradient(135deg, #0ea5e9 0%, #7dd3fc 100%)", icon: "#0284c7", bg: "rgba(14, 165, 233, 0.1)" },
+                  { gradient: "linear-gradient(135deg, #10b981 0%, #86efac 100%)", icon: "#059669", bg: "rgba(16, 185, 129, 0.1)" },
                 ];
 
                 return (

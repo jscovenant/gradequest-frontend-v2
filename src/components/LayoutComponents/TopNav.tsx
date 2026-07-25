@@ -39,6 +39,9 @@ function isExternalUrl(url: string) {
   return /^https?:\/\//i.test(url);
 }
 
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? value : [];
+}
 
 
 export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSidebar, title }: TopNavProps) {
@@ -47,7 +50,8 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
     // invoice notifications
   const [invLoading, setInvLoading] = useState(false);
   const [invNotes, setInvNotes] = useState<InvoiceNote[]>([]);
-  const invUnreadCount = useMemo(() => invNotes.length, [invNotes]);
+  const safeInvNotes = useMemo(() => asArray<InvoiceNote>(invNotes), [invNotes]);
+  const invUnreadCount = useMemo(() => safeInvNotes.length, [safeInvNotes]);
 
   
   const loadUnreadInvoiceNotifications = async () => {
@@ -55,7 +59,7 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
   setInvLoading(true);
   try {
     const data = await getUnreadInvoiceNotifications();
-    setInvNotes(data);
+    setInvNotes(asArray<InvoiceNote>(data));
   } catch {
     setInvNotes([]);
   } finally {
@@ -70,12 +74,12 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
 
     const handleOpenInvoiceNotification = async (note: InvoiceNote) => {
     // optimistic remove
-    setInvNotes((prev) => prev.filter((n) => n.id !== note.id));
+    setInvNotes((prev) => asArray<InvoiceNote>(prev).filter((n) => n.id !== note.id));
 
     try {
       await markInvoiceNotificationRead(note.id);
     } catch {
-      setInvNotes((prev) => [note, ...prev].slice(0, 10));
+      setInvNotes((prev) => [note, ...asArray<InvoiceNote>(prev)].slice(0, 10));
       return;
     }
 
@@ -104,7 +108,8 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
   // notifications
   const [notesLoading, setNotesLoading] = useState(false);
   const [notes, setNotes] = useState<SystemNote[]>([]);
-  const unreadCount = useMemo(() => notes.length, [notes]);
+  const safeNotes = useMemo(() => asArray<SystemNote>(notes), [notes]);
+  const unreadCount = useMemo(() => safeNotes.length, [safeNotes]);
 
   useEffect(() => {
     const currentUser = getUser();
@@ -134,7 +139,7 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
     setNotesLoading(true);
     try {
       const data = await getUnreadNotifications(); // unread (10)
-      setNotes(data);
+      setNotes(asArray<SystemNote>(data));
     } catch {
       // do not toast here to avoid noisy UX on every nav render
       setNotes([]);
@@ -150,13 +155,13 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
 
   const handleOpenNotification = async (note: SystemNote) => {
     // optimistic: remove instantly
-    setNotes((prev) => prev.filter((n) => n.id !== note.id));
+    setNotes((prev) => asArray<SystemNote>(prev).filter((n) => n.id !== note.id));
 
     try {
       await markNotificationRead(note.id);
     } catch {
       // rollback if it fails
-      setNotes((prev) => [note, ...prev].slice(0, 10));
+      setNotes((prev) => [note, ...asArray<SystemNote>(prev)].slice(0, 10));
       return;
     }
 
@@ -171,48 +176,25 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
   };
 
   return (
-    <nav
-      className="navbar bg-white shadow-sm px-3 d-flex justify-content-between align-items-center"
-      style={{
-        position: "fixed",
-        top: 0,
-        zIndex: 1030,
-        height: "64px",
-        width: "100%",
-        borderBottom: "1px solid #e5e7eb",
-      }}
-    >
+    <nav className="navbar gq-topnav d-flex justify-content-between align-items-center">
       {/* LEFT: Toggle + Title */}
       <div className="d-flex align-items-center gap-3">
         <button
-          className="btn btn-light d-md-none border-0"
+          className="gq-icon-btn d-md-none"
           onClick={() => {
             if (toggleSidebar) return toggleSidebar();
             if (setSidebarOpen) return setSidebarOpen(!sidebarOpen);
           }}
-          style={{
-            width: "40px",
-            height: "40px",
-            borderRadius: "8px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            transition: "all 0.2s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "#f3f4f6";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "#f9fafb";
-          }}
+          type="button"
         >
           <i className="bi bi-list fs-5"></i>
         </button>
 
         <div className="d-none d-md-block">
-          <h5 className="mb-0 fw-bold" style={{ color: "#1e293b" }}>
+          <h5 className="gq-topnav__title">
             {title ?? "Dashboard"}
           </h5>
+          <div className="gq-topnav__subtitle">GradeQuest workspace</div>
         </div>
       </div>
 
@@ -223,39 +205,17 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
         {/* Notifications */}
         <div className="dropdown">
           <button
-            className="btn btn-light border-0 position-relative"
+            className="gq-icon-btn position-relative"
             data-bs-toggle="dropdown"
             onClick={() => loadUnreadNotifications()}
-            style={{
-              width: "40px",
-              height: "40px",
-              borderRadius: "8px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "#f3f4f6";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "#f9fafb";
-            }}
+            type="button"
             aria-label="Notifications"
           >
             <i className="bi bi-bell" style={{ fontSize: "1.1rem" }}></i>
 
             {unreadCount > 0 && (
               <span
-                className="position-absolute badge rounded-pill"
-                style={{
-                  top: "6px",
-                  right: "6px",
-                  background: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
-                  fontSize: "0.65rem",
-                  padding: "2px 5px",
-                  border: "2px solid #fff",
-                }}
+                className="gq-badge-dot"
               >
                 {unreadCount > 99 ? "99+" : unreadCount}
               </span>
@@ -263,7 +223,7 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
           </button>
 
           <ul
-            className="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2"
+            className="dropdown-menu dropdown-menu-end gq-dropdown mt-2"
             style={{
               borderRadius: "12px",
               minWidth: "320px",
@@ -272,7 +232,7 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
             }}
           >
             {/* Header */}
-            <li className="px-3 py-2" style={{ borderBottom: "1px solid #f3f4f6" }}>
+            <li className="gq-dropdown__header">
               <div className="d-flex justify-content-between align-items-center">
                 <h6 className="mb-0 fw-semibold" style={{ fontSize: "0.9rem" }}>
                   Notifications
@@ -296,18 +256,18 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
               <li className="px-3 py-3 text-muted" style={{ fontSize: "0.85rem" }}>
                 Loading...
               </li>
-            ) : notes.length === 0 ? (
+            ) : safeNotes.length === 0 ? (
               <li className="px-3 py-3 text-muted" style={{ fontSize: "0.85rem" }}>
                 You have no unread notifications.
               </li>
             ) : (
-              notes.map((note) => {
+              safeNotes.map((note) => {
                 const st = badgeStyle(note.type);
                 return (
                   <li key={note.id}>
                     <button
                       type="button"
-                      className="dropdown-item py-3"
+                      className="dropdown-item py-3 gq-dropdown__item"
                       style={{
                         borderBottom: "1px solid #f3f4f6",
                         transition: "background 0.2s ease",
@@ -370,20 +330,10 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
                 {isParent && (
                   <div className="dropdown">
           <button
-            className="btn btn-light border-0 position-relative"
+            className="gq-icon-btn position-relative"
             data-bs-toggle="dropdown"
             onClick={() => loadUnreadInvoiceNotifications()}
-            style={{
-              width: "40px",
-              height: "40px",
-              borderRadius: "8px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "#f3f4f6")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "#f9fafb")}
+            type="button"
             aria-label="Invoice notifications"
             title="Invoices"
           >
@@ -391,15 +341,8 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
 
             {invUnreadCount > 0 && (
               <span
-                className="position-absolute badge rounded-pill"
-                style={{
-                  top: "6px",
-                  right: "6px",
-                  background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                  fontSize: "0.65rem",
-                  padding: "2px 5px",
-                  border: "2px solid #fff",
-                }}
+                className="gq-badge-dot"
+                style={{ background: "var(--gq-warning)" }}
               >
                 {invUnreadCount > 99 ? "99+" : invUnreadCount}
               </span>
@@ -407,7 +350,7 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
           </button>
 
           <ul
-            className="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2"
+            className="dropdown-menu dropdown-menu-end gq-dropdown mt-2"
             style={{
               borderRadius: "12px",
               minWidth: "340px",
@@ -415,7 +358,7 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
               overflowY: "auto",
             }}
           >
-            <li className="px-3 py-2" style={{ borderBottom: "1px solid #f3f4f6" }}>
+            <li className="gq-dropdown__header">
               <div className="d-flex justify-content-between align-items-center">
                 <h6 className="mb-0 fw-semibold" style={{ fontSize: "0.9rem" }}>
                   Invoices
@@ -438,12 +381,12 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
               <li className="px-3 py-3 text-muted" style={{ fontSize: "0.85rem" }}>
                 Loading...
               </li>
-            ) : invNotes.length === 0 ? (
+            ) : safeInvNotes.length === 0 ? (
               <li className="px-3 py-3 text-muted" style={{ fontSize: "0.85rem" }}>
                 No new invoice notifications.
               </li>
             ) : (
-              invNotes.map((note) => {
+              safeInvNotes.map((note) => {
                 const inv = resolveInvoiceFromNote(note);
                 const st = invoiceBadgeStyle(inv?.status);
                 const amount = inv?.amount != null ? `${inv?.currency || "₦"}${inv.amount}` : "";
@@ -453,7 +396,7 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
                   <li key={note.id}>
                     <button
                       type="button"
-                      className="dropdown-item py-3"
+                      className="dropdown-item py-3 gq-dropdown__item"
                       style={{
                         borderBottom: "1px solid #f3f4f6",
                         transition: "background 0.2s ease",
@@ -515,39 +458,21 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
         {/* Profile */}
         <div className="dropdown">
           <button
-            className="btn btn-light border-0 d-flex align-items-center gap-2 px-2 px-md-3"
+            className="gq-profile-btn d-flex align-items-center gap-2 px-2 px-md-3"
             data-bs-toggle="dropdown"
-            style={{
-              height: "40px",
-              borderRadius: "8px",
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "#f3f4f6";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "#f9fafb";
-            }}
+            type="button"
           >
             {user?.photo_url && !imageError ? (
               <img
                 src={user.photo_url}
                 alt={user.firstname}
-                className="rounded-circle"
+                className="gq-avatar"
                 style={{ width: 32, height: 32, objectFit: "cover" }}
                 onError={handleImageError}
               />
             ) : (
               <div
-                className="rounded-circle d-flex align-items-center justify-content-center"
-                style={{
-                  width: 32,
-                  height: 32,
-                  fontSize: 14,
-                  fontWeight: 600,
-                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                  color: "#fff",
-                }}
+                className="gq-avatar"
               >
                 {user ? getInitials(user.firstname) : "U"}
               </div>
@@ -558,8 +483,8 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
             <i className="bi bi-chevron-down d-none d-md-inline" style={{ fontSize: "0.75rem" }}></i>
           </button>
 
-          <ul className="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2" style={{ borderRadius: "12px", minWidth: "240px" }}>
-            <li className="px-3 py-2" style={{ borderBottom: "1px solid #f3f4f6" }}>
+          <ul className="dropdown-menu dropdown-menu-end gq-dropdown mt-2" style={{ minWidth: "240px" }}>
+            <li className="gq-dropdown__header">
               <div>
                 <p className="mb-0 fw-semibold" style={{ fontSize: "0.9rem" }}>
                   {user?.firstname || "User"}

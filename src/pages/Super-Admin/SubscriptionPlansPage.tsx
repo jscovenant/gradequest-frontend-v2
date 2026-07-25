@@ -25,7 +25,9 @@ type Plan = {
   name: string;
   paystack_plan_code?: string | null;
   price: number;
+  price_per_student?: number | string | null;
   duration_in_days: number;
+  billing_interval?: string | null;
   description?: string | null;
   features?: string | PlanFeature[] | null;
   max_teachers?: number | null;
@@ -45,6 +47,7 @@ type FeatureDraft = {
 type PlanForm = {
   name: string;
   price: number | "";
+  billing_interval: string;
   paystack_plan_code: string;
   currency: string;
   duration_in_days: number | "";
@@ -158,6 +161,7 @@ export default function SubscriptionPlansPage() {
   const emptyForm: PlanForm = {
     name: "",
     price: "",
+    billing_interval: "term",
     paystack_plan_code: "",
     currency: "NGN",
     duration_in_days: "",
@@ -244,7 +248,8 @@ export default function SubscriptionPlansPage() {
     setEditing(p);
     setForm({
       name: p.name || "",
-      price: typeof p.price === "number" ? p.price : Number(p.price ?? 0),
+      price: Number(p.price_per_student ?? p.price ?? 0),
+      billing_interval: p.billing_interval || "term",
       paystack_plan_code: p.paystack_plan_code || "",
       currency: p.currency || "NGN",
       duration_in_days: p.duration_in_days ?? "",
@@ -306,9 +311,9 @@ export default function SubscriptionPlansPage() {
     if (!form.name.trim()) return "Plan name is required.";
 
     if (form.price === "" || Number.isNaN(Number(form.price))) {
-      return "Price is required (enter 0 to make this a free plan).";
+      return "Price per student is required.";
     }
-    if (Number(form.price) < 0) return "Price cannot be negative.";
+    if (Number(form.price) < 0) return "Price per student cannot be negative.";
 
     if (!form.currency.trim()) return "Currency is required.";
     if (form.duration_in_days === "" || Number.isNaN(Number(form.duration_in_days)) || Number(form.duration_in_days) < 0) {
@@ -326,11 +331,13 @@ export default function SubscriptionPlansPage() {
     return {
       name: form.name.trim(),
       price: form.price === "" ? 0 : Number(form.price),
+      price_per_student: form.price === "" ? 0 : Number(form.price),
       paystack_plan_code: form.paystack_plan_code.trim() || null,
       currency: form.currency.trim(),
       duration_in_days: form.duration_in_days === "" ? 0 : Number(form.duration_in_days),
+      billing_interval: form.billing_interval || "term",
       max_teachers: form.max_teachers === "" ? null : Number(form.max_teachers),
-      max_students: form.max_students === "" ? null : Number(form.max_students),
+      max_students: form.max_students === "" ? 0 : Number(form.max_students),
       description: form.description.trim() || null,
       is_active: Boolean(form.is_active),
       features: form.features.map((f) => ({
@@ -393,18 +400,16 @@ export default function SubscriptionPlansPage() {
 
       <div className="container-fluid">
         <div className="row">
-          <Sidebar sidebarOpen={sidebarOpen} />
+          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-          <main className="col-md-9 col-lg-10 ms-auto px-4 d-flex flex-column min-vh-100" style={{ backgroundColor: "#f8f9fa" }}>
+          <main className="col-md-9 col-lg-10 ms-auto px-4 d-flex flex-column min-vh-100 sa-main">
             {(loading || saving) && <Loader message={saving ? "Saving changes..." : "Loading plans..."} />}
 
             {/* HERO */}
             <div
-              className="mt-4 p-4 position-relative overflow-hidden"
+              className="mt-4 p-4 position-relative overflow-hidden sa-hero"
               style={{
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                 borderRadius: 16,
-                boxShadow: "0 10px 30px rgba(102, 126, 234, 0.3)",
               }}
             >
               <div className="row align-items-center g-3 position-relative">
@@ -580,7 +585,10 @@ export default function SubscriptionPlansPage() {
                                 Features: <b>{safeParseFeatures(p.features).length}</b>
                               </div>
                             </td>
-                            <td className="fw-bold">{fmtMoney(Number(p.price || 0), p.currency)}</td>
+                            <td>
+                              <div className="fw-bold">{fmtMoney(Number(p.price_per_student ?? p.price ?? 0), p.currency)}</div>
+                              <div className="text-muted small">per student</div>
+                            </td>
                             <td className="text-muted">{p.duration_in_days ? `${p.duration_in_days} days` : "—"}</td>
                             <td className="text-muted">
                               <div>
@@ -702,7 +710,7 @@ export default function SubscriptionPlansPage() {
                         </div>
 
                         <div className="col-md-3">
-                          <label className="form-label small text-muted">Price</label>
+                          <label className="form-label small text-muted">Price Per Student</label>
                           <input
                             className="form-control"
                             type="number"
@@ -711,7 +719,7 @@ export default function SubscriptionPlansPage() {
                             onChange={(e) => setForm((p) => ({ ...p, price: e.target.value === "" ? "" : Number(e.target.value) }))}
                             placeholder="0"
                           />
-                          <div className="text-muted small mt-1">Enter 0 to make this a free plan.</div>
+                          <div className="text-muted small mt-1">Every active student is billed at this amount.</div>
                         </div>
 
                         <div className="col-md-3">
@@ -738,6 +746,20 @@ export default function SubscriptionPlansPage() {
                         </div>
 
                         <div className="col-md-6">
+                          <label className="form-label small text-muted">Billing Interval</label>
+                          <select
+                            className="form-select"
+                            value={form.billing_interval}
+                            onChange={(e) => setForm((p) => ({ ...p, billing_interval: e.target.value }))}
+                          >
+                            <option value="term">Per Term</option>
+                            <option value="month">Monthly</option>
+                            <option value="year">Yearly</option>
+                            <option value="custom">Custom</option>
+                          </select>
+                        </div>
+
+                        <div className="col-md-6">
                           <label className="form-label small text-muted">Max Teachers (optional)</label>
                           <input
                             className="form-control"
@@ -750,7 +772,7 @@ export default function SubscriptionPlansPage() {
                         </div>
 
                         <div className="col-md-6">
-                          <label className="form-label small text-muted">Max Students (optional)</label>
+                          <label className="form-label small text-muted">Student Limit</label>
                           <input
                             className="form-control"
                             type="number"
@@ -759,6 +781,7 @@ export default function SubscriptionPlansPage() {
                             onChange={(e) => setForm((p) => ({ ...p, max_students: e.target.value === "" ? "" : Number(e.target.value) }))}
                             placeholder="0"
                           />
+                          <div className="text-muted small mt-1">Use 0 for unlimited students. Students are still billed.</div>
                         </div>
 
                         <div className="col-md-12">

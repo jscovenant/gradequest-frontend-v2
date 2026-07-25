@@ -2,9 +2,14 @@
 import axios from "axios";
 import { getToken, logout } from "./token";
 
-const BASE_URL = import.meta.env.PROD 
-  ? "https://gradequest.com.ng/api" 
-  : (import.meta.env.VITE_API_URL || "http://localhost:8000/api");
+const rawBaseUrl =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD ? "https://gradequest.com.ng" : "http://localhost:8000");
+
+const normalizedBaseUrl = rawBaseUrl.replace(/\/+$/, "");
+const BASE_URL = normalizedBaseUrl.endsWith("/api")
+  ? normalizedBaseUrl
+  : `${normalizedBaseUrl}/api`;
 
 
 // const BASE_URL = import.meta.env.VITE_API_URL 

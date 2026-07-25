@@ -16,6 +16,8 @@ type TermStatus = "Active" | "Inactive" | string;
 interface Term {
   id: number;
   name: string;
+  start_date?: string | null;
+  end_date?: string | null;
   status?: TermStatus;
   created_at?: string;
   updated_at?: string;
@@ -111,8 +113,12 @@ export default function AcademicCalendarPage() {
 
   // ===== Term forms =====
   const [createTermName, setCreateTermName] = useState("");
+  const [createTermStartDate, setCreateTermStartDate] = useState("");
+  const [createTermEndDate, setCreateTermEndDate] = useState("");
   const [editTermId, setEditTermId] = useState<number | null>(null);
   const [editTermName, setEditTermName] = useState("");
+  const [editTermStartDate, setEditTermStartDate] = useState("");
+  const [editTermEndDate, setEditTermEndDate] = useState("");
 
   // ===== Session forms =====
   const [createSession, setCreateSession] = useState({
@@ -226,12 +232,21 @@ export default function AcademicCalendarPage() {
   async function createTerm() {
     const name = createTermName.trim();
     if (!name) return showError("Please enter a term name.");
+    if (createTermStartDate && createTermEndDate && createTermEndDate < createTermStartDate) {
+      return showError("Term end date cannot be before start date.");
+    }
 
     try {
       setBusyKey("term:create");
-      const res = await authApi.post("/terms", { name });
+      const res = await authApi.post("/terms", {
+        name,
+        start_date: createTermStartDate || null,
+        end_date: createTermEndDate || null,
+      });
       showSuccess(res.data?.message ?? "Term created.");
       setCreateTermName("");
+      setCreateTermStartDate("");
+      setCreateTermEndDate("");
       setShowCreateTerm(false);
       await fetchTerms();
     } catch (err: any) {
@@ -244,6 +259,8 @@ export default function AcademicCalendarPage() {
   function openEditTerm(term: Term) {
     setEditTermId(term.id);
     setEditTermName(term.name ?? "");
+    setEditTermStartDate(term.start_date ?? "");
+    setEditTermEndDate(term.end_date ?? "");
     setShowEditTerm(true);
   }
 
@@ -251,14 +268,23 @@ export default function AcademicCalendarPage() {
     if (!editTermId) return;
     const name = editTermName.trim();
     if (!name) return showError("Please enter a term name.");
+    if (editTermStartDate && editTermEndDate && editTermEndDate < editTermStartDate) {
+      return showError("Term end date cannot be before start date.");
+    }
 
     try {
       setBusyKey(`term:update:${editTermId}`);
-      const res = await authApi.put(`/terms/${editTermId}`, { name });
+      const res = await authApi.put(`/terms/${editTermId}`, {
+        name,
+        start_date: editTermStartDate || null,
+        end_date: editTermEndDate || null,
+      });
       showSuccess(res.data?.message ?? "Term updated.");
       setShowEditTerm(false);
       setEditTermId(null);
       setEditTermName("");
+      setEditTermStartDate("");
+      setEditTermEndDate("");
       await fetchTerms();
     } catch (err: any) {
       showError(getErrorMessage(err));
@@ -1200,6 +1226,8 @@ export default function AcademicCalendarPage() {
                       <tr>
                         <th style={{ width: 70 }}>#</th>
                         <th>Term</th>
+                        <th style={{ width: 150 }}>Start</th>
+                        <th style={{ width: 150 }}>End</th>
                         <th style={{ width: 140 }}>Status</th>
                         <th style={{ width: 260, textAlign: "right" }}>Actions</th>
                       </tr>
@@ -1291,13 +1319,13 @@ export default function AcademicCalendarPage() {
                       )
                     ) : loadingTerms ? (
                       <tr>
-                        <td colSpan={4} style={{ padding: 28, textAlign: "center", color: "#9a8a7a" }}>
+                        <td colSpan={6} style={{ padding: 28, textAlign: "center", color: "#9a8a7a" }}>
                           <span className="spinner-border spinner-border-sm" /> <span style={{ marginLeft: 8 }}>Loading terms…</span>
                         </td>
                       </tr>
                     ) : pageRows.length === 0 ? (
                       <tr>
-                        <td colSpan={4} style={{ padding: 34, textAlign: "center", color: "#9a8a7a" }}>
+                        <td colSpan={6} style={{ padding: 34, textAlign: "center", color: "#9a8a7a" }}>
                           <div style={{ fontWeight: 900, color: "#1a1a2e" }}>No terms found</div>
                           <div style={{ marginTop: 6 }}>Click “Add term” to create one.</div>
                         </td>
@@ -1316,6 +1344,9 @@ export default function AcademicCalendarPage() {
                               <div style={{ fontWeight: 800, color: "#1a1a2e" }}>{t.name}</div>
                               <div style={{ fontSize: 12, color: "#9a8a7a" }}>ID: {t.id}</div>
                             </td>
+
+                            <td>{fmtDate(t.start_date ?? undefined)}</td>
+                            <td>{fmtDate(t.end_date ?? undefined)}</td>
 
                             <td>
                               <span
@@ -1576,6 +1607,26 @@ export default function AcademicCalendarPage() {
                           />
                           <div className="db-help">Tip: Keep naming consistent across sessions.</div>
                         </div>
+
+                        <div className="db-field">
+                          <label>Start date</label>
+                          <input
+                            type="date"
+                            value={createTermStartDate}
+                            onChange={(e) => setCreateTermStartDate(e.target.value)}
+                            disabled={isBusy("term:create")}
+                          />
+                        </div>
+
+                        <div className="db-field">
+                          <label>End date</label>
+                          <input
+                            type="date"
+                            value={createTermEndDate}
+                            onChange={(e) => setCreateTermEndDate(e.target.value)}
+                            disabled={isBusy("term:create")}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1622,6 +1673,26 @@ export default function AcademicCalendarPage() {
                           <input
                             value={editTermName}
                             onChange={(e) => setEditTermName(e.target.value)}
+                            disabled={isBusy(`term:update:${editTermId}`)}
+                          />
+                        </div>
+
+                        <div className="db-field">
+                          <label>Start date</label>
+                          <input
+                            type="date"
+                            value={editTermStartDate}
+                            onChange={(e) => setEditTermStartDate(e.target.value)}
+                            disabled={isBusy(`term:update:${editTermId}`)}
+                          />
+                        </div>
+
+                        <div className="db-field">
+                          <label>End date</label>
+                          <input
+                            type="date"
+                            value={editTermEndDate}
+                            onChange={(e) => setEditTermEndDate(e.target.value)}
                             disabled={isBusy(`term:update:${editTermId}`)}
                           />
                         </div>

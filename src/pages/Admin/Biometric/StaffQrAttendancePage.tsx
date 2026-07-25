@@ -1,8 +1,10 @@
 // src/pages/Attendance/StaffQrAttendancePage.tsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Scanner } from "@yudiel/react-qr-scanner";
+import { QRCodeCanvas } from "qrcode.react";
 
 import { authApi } from "../../../utils/axios";
+import { getUser } from "../../../utils/token";
 import { useToast } from "../../../contexts/ToastContext";
 
 import TopNav from "../../../components/LayoutComponents/TopNav";
@@ -30,6 +32,9 @@ type AttendanceRecord = {
   att_date: string; // YYYY-MM-DD
   check_in_at: string | null;
   check_out_at: string | null;
+  location_verified?: boolean;
+  check_in_distance_meters?: number | null;
+  check_out_distance_meters?: number | null;
   status: "present" | "late" | "absent" | "on_leave" | string;
   source?: string | null;
   device_id?: string | null;
@@ -45,16 +50,38 @@ type MarkAttendanceResponse = {
   already_marked?: boolean;
   attendance?: AttendanceRecord;
   user?: StaffUser;
+  location_verified?: boolean;
+  distance_meters?: number | null;
+  allowed_radius_meters?: number | null;
 };
 
 type UiLog = {
   id: number;
   created_at: string;
-  biometric_code: string;
+  qr_value: string;
   status: "success" | "failed";
   note: string;
   action?: string;
   user?: StaffUser;
+  distance_meters?: number | null;
+};
+
+type LiveQrSession = {
+  token: string;
+  qr_payload: string;
+  mode: "auto" | "checkin" | "checkout";
+  expires_at: string;
+  ttl_seconds: number;
+  settings?: {
+    allowed_radius_meters?: number;
+    require_location_verification?: boolean;
+  };
+};
+
+type BrowserLocation = {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
 };
 
 function formatDateTime(dt?: string | null) {
@@ -77,15 +104,59 @@ function getGreeting() {
   return "Good evening";
 }
 
+function extractAttendanceToken(value: string) {
+  const raw = value.trim();
+  if (raw.startsWith("GQ_STAFF_ATTENDANCE:")) return raw.replace("GQ_STAFF_ATTENDANCE:", "").trim();
+
+  try {
+    const parsed = JSON.parse(raw);
+    return String(parsed?.attendance_token || parsed?.token || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+function getBrowserLocation(): Promise<BrowserLocation> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Location is not supported on this browser."));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) =>
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        }),
+      () => reject(new Error("Allow location access before marking attendance.")),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    );
+  });
+}
+
+function secondsLeft(expiresAt?: string | null) {
+  if (!expiresAt) return 0;
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  return Math.max(0, Math.ceil(ms / 1000));
+}
+
 export default function StaffQrAttendancePage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { showError, showSuccess, showWarning } = useToast();
+  const currentUser = useMemo(() => getUser(), []);
+  const currentRole = String(currentUser?.role || "").toLowerCase();
+  const canManageAttendanceQr = ["admin", "super-admin", "superadmin"].includes(currentRole);
 
   const [loading, setLoading] = useState(false);
 
   // scanner
   const [cameraOn, setCameraOn] = useState(true);
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
+  const [sessionMode, setSessionMode] = useState<"auto" | "checkin" | "checkout">("auto");
+  const [liveSession, setLiveSession] = useState<LiveQrSession | null>(null);
+  const [generatingSession, setGeneratingSession] = useState(false);
 
   // anti-duplicate
   const [lastScannedCode, setLastScannedCode] = useState("");
@@ -101,6 +172,8 @@ export default function StaffQrAttendancePage() {
   const [lastAction, setLastAction] = useState<string>("");
   const [lastMessage, setLastMessage] = useState<string>("");
   const [lastAt, setLastAt] = useState<string>("");
+  const [lastDistance, setLastDistance] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState(Date.now());
 
   // ui logs
   const [logs, setLogs] = useState<UiLog[]>([]);
@@ -126,8 +199,55 @@ export default function StaffQrAttendancePage() {
     return { bg: "#e2e8f0", fg: "#0f172a", text: (action || "NONE").toUpperCase() };
   };
 
-  const markAttendance = async (biometric_code: string, source: "camera" | "manual") => {
-    const code = biometric_code.trim();
+  const generateSession = async () => {
+    try {
+      setGeneratingSession(true);
+      const res = await authApi.post<{ success: boolean; message?: string } & LiveQrSession>("/staff-attendance/session", {
+        mode: sessionMode,
+      });
+
+      setLiveSession({
+        token: res.data.token,
+        qr_payload: res.data.qr_payload,
+        mode: res.data.mode,
+        expires_at: res.data.expires_at,
+        ttl_seconds: res.data.ttl_seconds,
+        settings: res.data.settings,
+      });
+      showSuccess?.(res.data?.message || "Attendance QR generated");
+    } catch (err: any) {
+      console.error(err);
+      showError?.(err?.response?.data?.message || "Failed to generate attendance QR");
+    } finally {
+      setGeneratingSession(false);
+    }
+  };
+
+  const loadCurrentSession = async () => {
+    if (!canManageAttendanceQr) return;
+
+    try {
+      const res = await authApi.get<{ success: boolean; data?: LiveQrSession | null }>("/staff-attendance/session");
+      if (res.data?.data) {
+        setLiveSession(res.data.data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    void loadCurrentSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const markAttendance = async (qrValue: string, source: "camera" | "manual") => {
+    const code = qrValue.trim();
     if (!code) return;
 
     // throttle: ignore same code within 4 seconds
@@ -146,9 +266,18 @@ export default function StaffQrAttendancePage() {
       setLastAttendance(null);
       setLastAction("");
       setLastMessage("");
+      setLastDistance(null);
+
+      const token = extractAttendanceToken(code) || code;
+      let location: BrowserLocation | null = null;
+
+      location = await getBrowserLocation();
 
       const res = await authApi.post<MarkAttendanceResponse>("/staff-attendance/mark", {
-        biometric_code: code,
+        attendance_token: token,
+        latitude: location?.latitude,
+        longitude: location?.longitude,
+        accuracy: Number.isFinite(location?.accuracy) ? location?.accuracy : undefined,
         source,
         mode: "auto",
       });
@@ -166,11 +295,12 @@ export default function StaffQrAttendancePage() {
           {
             id: now,
             created_at: new Date().toISOString(),
-            biometric_code: code,
+            qr_value: code,
             status: "failed",
             note: msg,
             action: data?.action,
             user: data?.user,
+            distance_meters: data?.distance_meters,
           },
           ...prev,
         ]);
@@ -184,16 +314,18 @@ export default function StaffQrAttendancePage() {
       setLastAttendance(data.attendance || null);
       setLastAction(String(data.action || ""));
       setLastMessage(msg);
+      setLastDistance(data.distance_meters ?? null);
 
       setLogs((prev) => [
         {
           id: now,
           created_at: new Date().toISOString(),
-          biometric_code: code,
+          qr_value: code,
           status: "success",
           note: msg,
           action: data?.action,
           user: data?.user,
+          distance_meters: data?.distance_meters,
         },
         ...prev,
       ]);
@@ -201,6 +333,7 @@ export default function StaffQrAttendancePage() {
       console.error(err);
       const apiMsg =
         err?.response?.data?.message ||
+        err?.message ||
         (err?.response?.status === 404
           ? "Attendance endpoint not found. Add POST /api/staff-attendance/mark in Laravel."
           : "Failed to mark attendance");
@@ -209,14 +342,16 @@ export default function StaffQrAttendancePage() {
 
       setLastMessage(apiMsg);
       setLastAction("none");
+      setLastUser(err?.response?.data?.user || currentUser || null);
 
       setLogs((prev) => [
         {
           id: now,
           created_at: new Date().toISOString(),
-          biometric_code: code,
+          qr_value: code,
           status: "failed",
           note: apiMsg,
+          user: err?.response?.data?.user || currentUser || undefined,
         },
         ...prev,
       ]);
@@ -227,14 +362,19 @@ export default function StaffQrAttendancePage() {
 
   const submitManual = async () => {
     const code = manualCode.trim();
-    if (!code) return showWarning?.("Enter biometric code");
+    if (!code) return showWarning?.("Enter live attendance QR value");
     await markAttendance(code, "manual");
     setManualCode("");
   };
 
+  const liveSessionSecondsLeft = useMemo(() => {
+    void nowTick;
+    return secondsLeft(liveSession?.expires_at);
+  }, [liveSession?.expires_at, nowTick]);
+
   /* =========================
      SAME TEMPLATE (INLINE CSS)
-     - matches the BiometricGeneratePage template you asked for
+     - attendance scanner page styles
   ========================= */
   const templateCss = `
     .db-main {
@@ -674,8 +814,8 @@ export default function StaffQrAttendancePage() {
                   </h1>
 
                   <p className="db-hero-sub">
-                    Scan a staff QR code to automatically <b>check-in</b>, then scan again to <b>check-out</b> (auto
-                    mode). Manual entry is available if camera permissions fail.
+                    Generate a school attendance QR code, then staff scan it from their own logged-in device. The system
+                    identifies the staff account and confirms the scan location before check-in or check-out.
                   </p>
 
                   <div className="db-hero-btns">
@@ -729,6 +869,100 @@ export default function StaffQrAttendancePage() {
                     <div style={{ fontSize: 12, color: "#cbd5e1", lineHeight: 1.6 }}>
                       Auto mode uses a single endpoint: <b>POST /staff-attendance/mark</b>.
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {canManageAttendanceQr && (
+            <div className="db-panel" style={{ marginBottom: 18 }}>
+              <div className="db-panel-head">
+                <div>
+                  <p className="db-panel-title">School live QR</p>
+                  <p className="db-panel-sub">Generate a short-lived QR for staff to scan on arrival or departure</p>
+                </div>
+
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <select
+                    className="db-input"
+                    style={{ width: 150 }}
+                    value={sessionMode}
+                    onChange={(e) => setSessionMode(e.target.value as "auto" | "checkin" | "checkout")}
+                    disabled={generatingSession || loading}
+                  >
+                    <option value="auto">Auto</option>
+                    <option value="checkin">Check-in only</option>
+                    <option value="checkout">Check-out only</option>
+                  </select>
+
+                  <button className="db-btn-gold" onClick={generateSession} disabled={generatingSession || loading}>
+                    <i className="bi bi-qr-code" />
+                    {generatingSession ? "Generating..." : "Generate QR"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="db-card-body">
+                {liveSession ? (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 18, alignItems: "center" }}>
+                    <div
+                      style={{
+                        background: "#fff",
+                        border: "1px solid #ede8e0",
+                        borderRadius: 16,
+                        padding: 16,
+                        display: "flex",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <QRCodeCanvas value={liveSession.qr_payload} size={190} includeMargin level="H" />
+                    </div>
+
+                    <div style={{ display: "grid", gap: 10 }}>
+                      <div className="db-strong">Display this QR at the school gate or staff room.</div>
+                      <div className="db-muted" style={{ fontSize: 12.5, lineHeight: 1.6 }}>
+                        Expires at <b>{formatDateTime(liveSession.expires_at)}</b>. Radius:{" "}
+                        <b>{liveSession.settings?.allowed_radius_meters ?? "configured"} meters</b>. Mode:{" "}
+                        <b>{liveSession.mode}</b>.
+                      </div>
+                      <div
+                        className="db-pill"
+                        style={{
+                          width: "fit-content",
+                          background: liveSessionSecondsLeft > 0 ? "#dcfce7" : "#fee2e2",
+                          color: liveSessionSecondsLeft > 0 ? "#166534" : "#991b1b",
+                          borderColor: "transparent",
+                        }}
+                      >
+                        {liveSessionSecondsLeft > 0 ? `${liveSessionSecondsLeft}s remaining` : "Expired - generate a new QR"}
+                      </div>
+                      <div className="db-codeBox">
+                        <span style={{ fontWeight: 900 }}>{maskCode(liveSession.token)}</span>
+                        <button className="db-miniBtn" onClick={() => copy(liveSession.qr_payload)}>
+                          <i className="bi bi-clipboard" /> Copy QR value
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ padding: 18, color: "#9a8a7a", textAlign: "center" }}>
+                    No live QR yet. Generate one when staff are ready to mark attendance.
+                  </div>
+                )}
+              </div>
+            </div>
+            )}
+
+            <div className="db-panel" style={{ marginBottom: 18 }}>
+              <div className="db-card-body" style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                <div className="miniCardIcon">
+                  <i className="bi bi-geo-alt" />
+                </div>
+                <div style={{ display: "grid", gap: 4 }}>
+                  <div className="db-strong" style={{ fontSize: 13.5 }}>Location permission</div>
+                  <div className="db-muted" style={{ fontSize: 12.5, lineHeight: 1.6 }}>
+                    When your browser asks for location access, choose <b>Allow</b>. If you already blocked it, click the
+                    lock or site settings icon beside the address bar, allow <b>Location</b>, then refresh this page.
                   </div>
                 </div>
               </div>
@@ -805,7 +1039,7 @@ export default function StaffQrAttendancePage() {
                       <input
                         className="db-input"
                         style={{ flex: 1, minWidth: 240 }}
-                        placeholder="Paste biometric code here..."
+                        placeholder="Paste live attendance QR value..."
                         value={manualCode}
                         onChange={(e) => setManualCode(e.target.value)}
                         onKeyDown={(e) => {
@@ -821,7 +1055,7 @@ export default function StaffQrAttendancePage() {
                     </div>
 
                     <div style={{ marginTop: 8, fontSize: 12, color: "#9a8a7a" }}>
-                      If camera permission fails, paste the code and mark attendance.
+                      If camera permission fails, paste the live QR value and mark attendance.
                     </div>
                   </div>
                 </div>
@@ -900,6 +1134,13 @@ export default function StaffQrAttendancePage() {
                           Time: <b>{lastAt ? formatDateTime(lastAt) : "—"}</b>
                         </div>
 
+                        {lastDistance !== null && (
+                          <div style={{ marginTop: 8, fontSize: 12.5, color: "#1a1a2e", lineHeight: 1.5 }}>
+                            <i className="bi bi-geo-alt" style={{ marginRight: 6, color: "#16a34a" }} />
+                            Location checked: about <b>{lastDistance}m</b> from the configured school point.
+                          </div>
+                        )}
+
                         {lastMessage && (
                           <div style={{ marginTop: 8, fontSize: 12.5, color: "#1a1a2e", lineHeight: 1.5 }}>
                             <i className="bi bi-info-circle" style={{ marginRight: 6, color: "#64748b" }} />
@@ -939,6 +1180,7 @@ export default function StaffQrAttendancePage() {
                               setLastAction("");
                               setLastMessage("");
                               setLastAt("");
+                              setLastDistance(null);
                               setReveal(false);
                             }}
                             disabled={loading}
@@ -960,6 +1202,7 @@ export default function StaffQrAttendancePage() {
                                 `Check-in: ${lastAttendance?.check_in_at ?? "-"}`,
                                 `Check-out: ${lastAttendance?.check_out_at ?? "-"}`,
                                 `Message: ${lastMessage || "-"}`,
+                                `Distance: ${lastDistance !== null ? `${lastDistance}m` : "-"}`,
                                 `Code: ${lastCode || "-"}`,
                               ].join("\n");
                               void copy(details);
@@ -1058,10 +1301,10 @@ export default function StaffQrAttendancePage() {
                                     letterSpacing: "0.06em",
                                   }}
                                 >
-                                  {maskCode(l.biometric_code)}
+                                  {maskCode(l.qr_value)}
                                 </div>
 
-                                <button className="db-refresh-btn" onClick={() => void copy(l.biometric_code)}>
+                                <button className="db-refresh-btn" onClick={() => void copy(l.qr_value)}>
                                   <i className="bi bi-clipboard" />
                                   Copy
                                 </button>
@@ -1101,7 +1344,7 @@ export default function StaffQrAttendancePage() {
  *
  * Backend endpoint used (single request flow):
  *   POST /staff-attendance/mark
- *   body: { biometric_code, source, mode: "auto" }
+ *   body: { attendance_token, latitude, longitude, source, mode: "auto" }
  *
  * Expected response:
  *   { success, message, action, attendance, user }

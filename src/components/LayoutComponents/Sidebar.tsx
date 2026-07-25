@@ -1,7 +1,10 @@
-import { useState } from "react";
+
+
+
+
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { getUser } from "../../utils/token";
-import { useFeatures } from "../../contexts/FeatureContext";
 
 interface SidebarProps {
   sidebarOpen: boolean;
@@ -36,16 +39,18 @@ interface MenuItem {
 export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
   const user = getUser();
   const [openMenus, setOpenMenus] = useState<string[]>([]);
-  const { loading: featuresLoading, can } = useFeatures();
+  const [desktopCollapsed, setDesktopCollapsed] = useState(() => localStorage.getItem("gq_sidebar_collapsed") === "1");
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("gq-sidebar-collapsed", desktopCollapsed);
+    localStorage.setItem("gq_sidebar_collapsed", desktopCollapsed ? "1" : "0");
+
+    return () => {
+      document.documentElement.classList.remove("gq-sidebar-collapsed");
+    };
+  }, [desktopCollapsed]);
 
   if (!user) return null;
-
-  // ✅ We're not tracking per-feature subscription access for these roles
-  // right now, so skip feature gating entirely for them. Other roles
-  // (Super-Admin, Parent, Bursar) keep the normal feature-gated behavior.
-  const skipFeatureGating = ["Admin", "Teacher", "Student"].includes(user.role);
-  const canFeature = (key?: string) => (skipFeatureGating ? true : can(key));
-  const effectiveFeaturesLoading = skipFeatureGating ? false : featuresLoading;
 
   const getSchoolInitials = (name?: string) => {
     if (!name) return "S";
@@ -67,8 +72,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
     }
   };
 
-  const isLockedByPlan = (item: MenuItem) =>
-    !!item.lockIfNoFeature && !!item.featureKey && !canFeature(item.featureKey);
+  const isLockedByPlan = (_item: MenuItem) => false;
 
   const ComingSoonBadge = () => (
     <span
@@ -223,12 +227,11 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       featureKey: "support_staff_attendance",
       lockIfNoFeature: true,
       children: [
-        { label: "Qrcode Registration", href: "/qr-code" },
-        { label: "Staff Attendance", href: "/scan-qr" },
-        { label: "Staff Attendance Logs", href: "/attendance/logs" },
-        { label: "Attendance Settings", href: "/attendance/settings" },
+        { label: "Staff Attendance", href: "/scan-qr", roles: ["Admin", "Teacher"] },
+        { label: "Staff Attendance Logs", href: "/attendance/logs", roles: ["Admin"] },
+        { label: "Attendance Settings", href: "/attendance/settings", roles: ["Admin"] },
       ],
-      roles: ["Admin"],
+      roles: ["Admin", "Teacher"],
     },
 
     // Super-Admin
@@ -237,6 +240,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       icon: "cash",
       collapseId: "billingMenu",
       children: [{ label: "Subscribers", href: "/superadmin/subscribers" },
+        { label: "Billing Policy", href: "/superadmin/billing-policy" },
         { label: "Bookings", href: "/demo-bookers" }
       ],
       
@@ -315,11 +319,11 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
    
 
     {
-      label: "Wallet & Billing",
+      label: "Subscriptions & Billing",
       icon: "receipt-cutoff",
       collapseId: "billingMenu_admin",
       children: [
-        
+        { label: "Billing", href: "/billing" },
         { label: "Wallet", href: "/wallet" },
       ],
       roles: ["Admin"],
@@ -394,8 +398,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       roles: ["Parent"],
 
       children: [
-        { label: "Payment History", href: "/parent/payments", },
-        { label: "Upload Receipt", href: "/parent/upload-receipt", },
+        { label: "Payment History", href: "/parent/payments", featureKey: "support_fee_management" },
+        { label: "Upload Receipt", href: "/parent/upload-receipt", featureKey: "support_fee_management" },
       ],
     },
 
@@ -449,7 +453,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
 
       {sidebarOpen && (
         <div
-          className="sidebar-overlay d-md-none"
+          className="gq-sidebar-overlay d-md-none"
           onClick={() => setSidebarOpen?.(false)}
           style={{
             position: "fixed",
@@ -457,7 +461,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
             zIndex: 1040,
             transition: "opacity 0.3s ease",
           }}
@@ -465,26 +468,34 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       )}
 
       <aside
-        className={`sidebar ${sidebarOpen ? "show" : ""}`}
+        className={`sidebar gq-sidebar ${sidebarOpen ? "show" : ""} ${desktopCollapsed ? "is-collapsed" : ""}`}
         style={{
-          background: "linear-gradient(180deg, #1e293b 0%, #0f172a 100%)",
           minHeight: "100vh",
           position: "fixed",
           top: 0,
           left: sidebarOpen ? 0 : "-100%",
           width: "280px",
           maxWidth: "80vw",
-          boxShadow: "4px 0 20px rgba(0, 0, 0, 0.1)",
           zIndex: 1050,
           transition: "left 0.3s ease",
           overflow: "hidden",
         }}
       >
-        <div className="sidebar-scroll">
-          <div className="p-4">
-            <div className="d-md-none d-flex justify-content-end mb-3">
+        <div className="sidebar-scroll gq-sidebar-scroll">
+          <div>
+            <div className="d-flex justify-content-between align-items-center mb-3">
               <button
-                className="btn btn-sm"
+                type="button"
+                className="gq-sidebar-collapse d-none d-md-inline-flex"
+                onClick={() => setDesktopCollapsed((value) => !value)}
+                title={desktopCollapsed ? "Open sidebar" : "Collapse sidebar"}
+                aria-label={desktopCollapsed ? "Open sidebar" : "Collapse sidebar"}
+              >
+                <i className={`bi bi-layout-sidebar${desktopCollapsed ? "-inset" : ""}`}></i>
+              </button>
+
+              <button
+                className="btn btn-sm d-md-none"
                 onClick={() => setSidebarOpen?.(false)}
                 style={{
                   background: "rgba(255, 255, 255, 0.1)",
@@ -499,20 +510,15 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
 
             {/* Logo & School Name */}
             <div
-              className="d-flex align-items-center mb-4 pb-3"
-              style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.1)" }}
+              className="gq-sidebar__brand d-flex align-items-center"
             >
               {user.school?.logo ? (
                 <img
                   src={user.school.logo}
                   alt={user.school.name}
-                  className="me-3 rounded-3"
+                  className="gq-sidebar__logo me-3"
                   style={{
-                    width: 48,
-                    height: 48,
                     objectFit: "contain",
-                    background: "rgba(255, 255, 255, 0.1)",
-                    padding: "6px",
                   }}
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = "none";
@@ -520,15 +526,10 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
                 />
               ) : (
                 <div
-                  className="me-3 rounded-3 d-flex align-items-center justify-content-center"
+                  className="gq-sidebar__logo gq-sidebar__initials me-3 d-flex align-items-center justify-content-center"
                   style={{
-                    width: 48,
-                    height: 48,
-                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                     fontWeight: 700,
                     fontSize: 18,
-                    color: "#fff",
-                    boxShadow: "0 4px 12px rgba(102, 126, 234, 0.4)",
                   }}
                 >
                   {getSchoolInitials(user.school?.name)}
@@ -554,23 +555,13 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
 
             {/* User Profile Card */}
             <div
-              className="mb-4 p-3 rounded-3 position-relative overflow-hidden"
-              style={{
-                background: "rgba(255, 255, 255, 0.05)",
-                backdropFilter: "blur(10px)",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-              }}
+              className="gq-sidebar__user position-relative overflow-hidden"
             >
               <div className="d-flex align-items-center">
                 <div
-                  className="rounded-circle d-flex align-items-center justify-content-center me-3"
+                  className="gq-avatar me-3"
                   style={{
-                    width: 40,
-                    height: 40,
-                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                    color: "#fff",
-                    fontWeight: 600,
-                    fontSize: "0.9rem",
+                    flex: "0 0 auto",
                   }}
                 >
                   {user.name?.charAt(0).toUpperCase() || "U"}
@@ -592,12 +583,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
             {/* Navigation Label */}
             <div className="mb-3">
               <small
-                className="text-uppercase fw-semibold"
-                style={{
-                  color: "rgba(255, 255, 255, 0.5)",
-                  fontSize: "0.7rem",
-                  letterSpacing: "0.05em",
-                }}
+                className="gq-sidebar__label"
               >
                 Navigation
               </small>
@@ -609,49 +595,30 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
                 .filter((item) => item.roles.includes(user.role))
                 .map((item) => {
                   const lockedByPlan = isLockedByPlan(item);
-                  const disabled = item.disabled || lockedByPlan || effectiveFeaturesLoading;
+                  const disabled = item.disabled;
 
                   // If it’s a single link and gated, hide it
-                  if (!item.children && item.featureKey && !canFeature(item.featureKey)) {
-                    return null;
-                  }
-
                   return (
                     <li key={item.label}>
                       {item.children ? (
                         <>
                           <button
-                            className="nav-link btn text-start w-100 d-flex align-items-center justify-content-between p-0"
+                            className="gq-nav-btn nav-link btn text-start justify-content-between"
                             onClick={() => toggleMenu(item.collapseId!, disabled)}
                             disabled={disabled}
+                            title={desktopCollapsed ? item.label : undefined}
                             style={{
-                              background: "transparent",
                               border: "none",
                               color: disabled ? "rgba(255, 255, 255, 0.45)" : "rgba(255, 255, 255, 0.8)",
-                              fontSize: "0.875rem",
-                              fontWeight: 500,
-                              padding: "0.65rem 0.75rem",
-                              borderRadius: "8px",
-                              transition: "all 0.2s ease",
                               cursor: disabled ? "not-allowed" : "pointer",
                               opacity: disabled ? 0.9 : 1,
                             }}
-                            onMouseEnter={(e) => {
-                              if (disabled) return;
-                              e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
-                              e.currentTarget.style.color = "#fff";
-                            }}
-                            onMouseLeave={(e) => {
-                              if (disabled) return;
-                              if (!openMenus.includes(item.collapseId!)) {
-                                e.currentTarget.style.background = "transparent";
-                                e.currentTarget.style.color = "rgba(255, 255, 255, 0.8)";
-                              }
-                            }}
                           >
                             <span className="d-flex align-items-center gap-2">
-                              <i className={`bi bi-${item.icon}`} style={{ fontSize: "1rem" }}></i>
-                              <span>{item.label}</span>
+                              <span className="gq-nav-icon">
+                                <i className={`bi bi-${item.icon}`}></i>
+                              </span>
+                              <span className="gq-nav-text">{item.label}</span>
 
                               {item.comingSoon && <ComingSoonBadge />}
                               {lockedByPlan && !item.comingSoon && <UpgradeBadge />}
@@ -670,7 +637,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
                               )}
                             </span>
 
-                            {!disabled && (
+                            {!disabled && !desktopCollapsed && (
                               <i
                                 className={`bi bi-chevron-${openMenus.includes(item.collapseId!) ? "down" : "right"}`}
                                 style={{ fontSize: "0.75rem", transition: "transform 0.2s ease" }}
@@ -680,50 +647,19 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
 
                           {!disabled && (
                             <div
-                              className="submenu"
-                              style={{
-                                maxHeight: openMenus.includes(item.collapseId!) ? "500px" : "0",
-                                overflow: "hidden",
-                                transition: "max-height 0.3s ease",
-                              }}
+                              className={`gq-submenu ${openMenus.includes(item.collapseId!) ? "is-open" : ""}`}
                             >
                               <div className="mt-1 mb-2">
                                 {item.children
                                   .filter((child) => !child.roles || child.roles.includes(user.role))
-                                  .filter((child) => canFeature(child.featureKey))
                                   .map((child) => (
                                     <NavLink
                                       key={child.label}
                                       to={child.href}
                                       onClick={handleLinkClick}
                                       className={({ isActive }) =>
-                                        `nav-link d-flex align-items-center gap-2 ${isActive ? "active" : ""}`
+                                        `gq-submenu-link nav-link ${isActive ? "active" : ""}`
                                       }
-                                      style={({ isActive }) => ({
-                                        color: isActive ? "#fff" : "rgba(255, 255, 255, 0.7)",
-                                        fontSize: "0.8rem",
-                                        padding: "0.5rem 0.75rem 0.5rem 2.75rem",
-                                        borderRadius: "6px",
-                                        background: isActive
-                                          ? "linear-gradient(90deg, rgba(102, 126, 234, 0.2) 0%, transparent 100%)"
-                                          : "transparent",
-                                        borderLeft: isActive ? "3px solid #667eea" : "3px solid transparent",
-                                        marginLeft: "0.5rem",
-                                        transition: "all 0.2s ease",
-                                        fontWeight: isActive ? 600 : 400,
-                                      })}
-                                      onMouseEnter={(e) => {
-                                        if (!e.currentTarget.classList.contains("active")) {
-                                          e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
-                                          e.currentTarget.style.color = "#fff";
-                                        }
-                                      }}
-                                      onMouseLeave={(e) => {
-                                        if (!e.currentTarget.classList.contains("active")) {
-                                          e.currentTarget.style.background = "transparent";
-                                          e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)";
-                                        }
-                                      }}
                                     >
                                       <span
                                         style={{
@@ -745,37 +681,16 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
                         <NavLink
                           to={item.href!}
                           onClick={handleLinkClick}
-                          className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
+                          className={({ isActive }) => `gq-nav-link nav-link ${isActive ? "active" : ""}`}
+                          title={desktopCollapsed ? item.label : undefined}
                           style={({ isActive }) => ({
-                            color: isActive ? "#fff" : "rgba(255, 255, 255, 0.8)",
-                            fontSize: "0.875rem",
                             fontWeight: isActive ? 600 : 500,
-                            padding: "0.65rem 0.75rem",
-                            borderRadius: "8px",
-                            background: isActive
-                              ? "linear-gradient(90deg, rgba(102, 126, 234, 0.3) 0%, rgba(102, 126, 234, 0.1) 100%)"
-                              : "transparent",
-                            borderLeft: isActive ? "3px solid #667eea" : "3px solid transparent",
-                            transition: "all 0.2s ease",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.5rem",
                           })}
-                          onMouseEnter={(e) => {
-                            if (!e.currentTarget.classList.contains("active")) {
-                              e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
-                              e.currentTarget.style.color = "#fff";
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!e.currentTarget.classList.contains("active")) {
-                              e.currentTarget.style.background = "transparent";
-                              e.currentTarget.style.color = "rgba(255, 255, 255, 0.8)";
-                            }
-                          }}
                         >
-                          <i className={`bi bi-${item.icon}`} style={{ fontSize: "1rem" }}></i>
-                          <span>{item.label}</span>
+                          <span className="gq-nav-icon">
+                            <i className={`bi bi-${item.icon}`}></i>
+                          </span>
+                          <span className="gq-nav-text">{item.label}</span>
                           {item.badge && (
                             <span
                               className="badge ms-auto"

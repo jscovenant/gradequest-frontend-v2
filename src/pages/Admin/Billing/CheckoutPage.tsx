@@ -13,7 +13,14 @@ type Plan = {
   id: number;
   name: string;
   price: number;
+  price_per_student?: number;
+  active_students?: number;
+  billable_students?: number;
+  current_amount?: number;
+  billing_interval?: string;
+  limit_exceeded?: boolean;
   duration_in_days: number;
+  max_students?: number | null;
 };
 
 type SubDetails = {
@@ -86,15 +93,58 @@ export default function CheckoutPage() {
 
   const [paymentMethod, setPaymentMethod] = useState<"card" | "wallet">("card");
   const [autoRenew, setAutoRenew] = useState<boolean>(false);
+  const [yearlyBilling, setYearlyBilling] = useState<boolean>(false);
 
   const selectedPlan = useMemo(() => {
     const id = Number(selectedPlanId);
     return plans.find((p) => p.id === id) || null;
   }, [plans, selectedPlanId]);
 
+  // Yearly billing only makes sense for plans shorter than a year
+  const yearlyEligible = !!selectedPlan && selectedPlan.duration_in_days > 0 && selectedPlan.duration_in_days < 365;
+
+  // How many of the plan's billing cycles fit into ~365 days
+  const yearlyCycles = useMemo(() => {
+    if (!selectedPlan || !selectedPlan.duration_in_days) return 1;
+    return Math.max(1, Math.floor(365 / selectedPlan.duration_in_days));
+  }, [selectedPlan]);
+
+  const billingCycles = yearlyBilling && yearlyEligible ? yearlyCycles : 1;
+
+  const YEARLY_DISCOUNT_RATE = 0.1;
+
+  const subtotal = useMemo(() => {
+    if (!selectedPlan) return 0;
+    return Number(selectedPlan.current_amount ?? selectedPlan.price ?? 0) * billingCycles;
+  }, [selectedPlan, billingCycles]);
+
+  const discountAmount = useMemo(() => {
+    if (!yearlyBilling || !yearlyEligible) return 0;
+    return subtotal * YEARLY_DISCOUNT_RATE;
+  }, [subtotal, yearlyBilling, yearlyEligible]);
+
+  const totalAmount = useMemo(() => subtotal - discountAmount, [subtotal, discountAmount]);
+
+  const totalDurationDays = useMemo(() => {
+    if (!selectedPlan) return 0;
+    return selectedPlan.duration_in_days * billingCycles;
+  }, [selectedPlan, billingCycles]);
+
+  const expiryDate = useMemo(() => {
+    if (!totalDurationDays) return null;
+    const d = new Date();
+    d.setDate(d.getDate() + totalDurationDays);
+    return d;
+  }, [totalDurationDays]);
+
   const referenceFromQuery = useMemo(() => {
     const params = new URLSearchParams(location.search);
     return params.get("reference");
+  }, [location.search]);
+
+  const planFromQuery = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get("plan");
   }, [location.search]);
 
   const subPill = useMemo(() => statusPillFrom(subDetails?.status), [subDetails?.status]);
@@ -127,6 +177,15 @@ export default function CheckoutPage() {
 
         const fetchedPlans = Array.isArray(plansRes.data) ? plansRes.data : [];
         setPlans(fetchedPlans);
+
+        if (planFromQuery && fetchedPlans.length) {
+          const normalizedQueryPlan = planFromQuery.toLowerCase().replace(/[^a-z0-9]+/g, "");
+          const queryMatch = fetchedPlans.find((p: Plan) => p.name.toLowerCase().replace(/[^a-z0-9]+/g, "") === normalizedQueryPlan);
+          if (queryMatch) {
+            setSelectedPlanId(String(queryMatch.id));
+            return;
+          }
+        }
 
         const currentPlanName = detailsRes?.data?.subscription_type;
         if (currentPlanName && fetchedPlans.length) {
@@ -177,6 +236,10 @@ export default function CheckoutPage() {
     }
   }, [paymentMethod, autoRenew]);
 
+  useEffect(() => {
+    setYearlyBilling(false);
+  }, [selectedPlanId]);
+
   const updateRenewalSource = async (source: "wallet" | "paystack") => {
     try {
       await authApi.post("/subscription/renewal-source", { source });
@@ -207,6 +270,7 @@ export default function CheckoutPage() {
 
         const res = await authApi.post("/payment/wallet-charge", {
           subscription_plan_id: selectedPlan.id,
+          cycles: billingCycles,
           auto_renew: autoRenew,
           auto_renew_source: "wallet",
         });
@@ -226,6 +290,7 @@ export default function CheckoutPage() {
 
       const res = await authApi.post("/subscription/initialize", {
         plan_id: selectedPlan.id,
+        cycles: billingCycles,
         email: userEmail,
       });
 
@@ -772,11 +837,15 @@ export default function CheckoutPage() {
                                     color: "#1a1a2e",
                                   }}
                                 >
-                                  {fmtNaira(p.price)}
+                                  {fmtNaira(Number(p.price_per_student ?? p.price ?? 0))}
                                 </div>
                                 <div className="db-muted" style={{ fontSize: 12 }}>
-                                  / {p.duration_in_days} days
+                                  per student / {p.billing_interval || `${p.duration_in_days} days`}
                                 </div>
+                              </div>
+
+                              <div className="db-muted" style={{ fontSize: 12, marginTop: 4 }}>
+                                {Number(p.billable_students ?? p.active_students ?? 0).toLocaleString()} billable students = {fmtNaira(Number(p.current_amount ?? 0))}
                               </div>
 
                               <div
@@ -784,12 +853,32 @@ export default function CheckoutPage() {
                                   marginTop: 12,
                                   paddingTop: 10,
                                   borderTop: "1px solid rgba(0,0,0,0.06)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  flexWrap: "wrap",
+                                  gap: 6,
                                 }}
                               >
                                 <span className="db-muted" style={{ fontSize: 12 }}>
                                   <i className="bi bi-shield-lock-fill me-1" />
                                   Secure renewal
                                 </span>
+
+                                {Number(p.max_students ?? 0) > 0 ? (
+                                  <span
+                                    className="db-pill"
+                                    style={{ background: p.limit_exceeded ? "rgba(239,68,68,0.12)" : "rgba(15,23,42,0.05)", color: p.limit_exceeded ? "#dc2626" : "#1a1a2e" }}
+                                  >
+                                    <i className="bi bi-people-fill me-1" />
+                                    Up to {p.max_students.toLocaleString()} students
+                                  </span>
+                                ) : (
+                                  <span className="db-pill" style={{ background: "rgba(15,23,42,0.05)", color: "#1a1a2e" }}>
+                                    <i className="bi bi-infinity me-1" />
+                                    Unlimited students
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -848,17 +937,104 @@ export default function CheckoutPage() {
                       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 10 }}>
                         <span className="db-muted" style={{ fontSize: 12 }}>Duration</span>
                         <span className="db-strong" style={{ fontWeight: 800 }}>
-                          {selectedPlan ? `${selectedPlan.duration_in_days} days` : "—"}
+                          {selectedPlan
+                            ? `${totalDurationDays} days${yearlyBilling && yearlyEligible ? ` (${billingCycles} cycles)` : ""}`
+                            : "—"}
                         </span>
                       </div>
 
                       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 10 }}>
-                        <span className="db-muted" style={{ fontSize: 12 }}>Amount</span>
-                        <span className="db-strong" style={{ fontFamily: "Lora, serif", fontSize: 18 }}>
-                          {selectedPlan ? fmtNaira(selectedPlan.price) : "—"}
+                        <span className="db-muted" style={{ fontSize: 12 }}>Max students</span>
+                        <span className="db-strong" style={{ fontWeight: 800 }}>
+                          {selectedPlan?.max_students ? selectedPlan.max_students.toLocaleString() : "—"}
                         </span>
                       </div>
+
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 10 }}>
+                        <span className="db-muted" style={{ fontSize: 12 }}>Billable students</span>
+                        <span className="db-strong" style={{ fontWeight: 800 }}>
+                          {Number(selectedPlan?.billable_students ?? selectedPlan?.active_students ?? 0).toLocaleString()}
+                        </span>
+                      </div>
+
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 10 }}>
+                        <span className="db-muted" style={{ fontSize: 12 }}>Price per student</span>
+                        <span className="db-strong" style={{ fontWeight: 800 }}>
+                          {selectedPlan ? fmtNaira(Number(selectedPlan.price_per_student ?? selectedPlan.price ?? 0)) : "—"}
+                        </span>
+                      </div>
+
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 10 }}>
+                        <span className="db-muted" style={{ fontSize: 12 }}>Expires on</span>
+                        <span className="db-strong" style={{ fontWeight: 800 }}>
+                          {expiryDate ? fmtDate(expiryDate.toISOString()) : "—"}
+                        </span>
+                      </div>
+
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 10,
+                          marginTop: 10,
+                          paddingTop: 10,
+                          borderTop: "1px solid rgba(0,0,0,0.06)",
+                        }}
+                      >
+                        <span className="db-muted" style={{ fontSize: 12 }}>Amount</span>
+                        <span style={{ textAlign: "right" }}>
+                          {discountAmount > 0 && (
+                            <div className="db-muted" style={{ fontSize: 11.5, textDecoration: "line-through" }}>
+                              {fmtNaira(subtotal)}
+                            </div>
+                          )}
+                          <span className="db-strong" style={{ fontFamily: "Lora, serif", fontSize: 18 }}>
+                            {selectedPlan ? fmtNaira(totalAmount) : "—"}
+                          </span>
+                        </span>
+                      </div>
+
+                      {discountAmount > 0 && (
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 6 }}>
+                          <span className="db-muted" style={{ fontSize: 12 }}>Yearly discount (10%)</span>
+                          <span style={{ fontWeight: 800, color: "#16a34a", fontSize: 12.5 }}>
+                            − {fmtNaira(discountAmount)}
+                          </span>
+                        </div>
+                      )}
                     </div>
+
+                    {selectedPlan && yearlyEligible && (
+                      <div
+                        style={{
+                          marginTop: 12,
+                          padding: 14,
+                          borderRadius: 14,
+                          border: "1px solid rgba(0,0,0,0.06)",
+                          background: "#fff",
+                        }}
+                      >
+                        <div className="form-check form-switch" style={{ marginBottom: 0 }}>
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            checked={yearlyBilling}
+                            onChange={(e) => setYearlyBilling(e.target.checked)}
+                            id="yearlyBillingSwitch"
+                            disabled={processing}
+                          />
+                          <label className="form-check-label fw-semibold" htmlFor="yearlyBillingSwitch">
+                            Pay for a full year <span style={{ color: "#16a34a" }}>(save 10%)</span>
+                          </label>
+                        </div>
+
+                        <div className="db-muted" style={{ fontSize: 12, marginTop: 6 }}>
+                          {yearlyBilling
+                            ? `Covers ${yearlyCycles} × ${selectedPlan.duration_in_days}-day cycles (${totalDurationDays} days). ${fmtNaira(subtotal)} − 10% (${fmtNaira(discountAmount)}) = ${fmtNaira(totalAmount)}.`
+                            : `Switch on to cover ${yearlyCycles} cycles upfront (${selectedPlan.duration_in_days * yearlyCycles} days) and get 10% off, instead of renewing every ${selectedPlan.duration_in_days} days.`}
+                        </div>
+                      </div>
+                    )}
 
                     <div style={{ marginTop: 14 }}>
                       <label className="form-label fw-semibold small mb-2">Payment method</label>
@@ -949,7 +1125,9 @@ export default function CheckoutPage() {
                         ) : (
                           <>
                             <i className="bi bi-lock-fill" />
-                            {paymentMethod === "wallet" ? "Pay with Wallet" : "Pay with Paystack"}
+                            {paymentMethod === "wallet"
+                              ? `Pay ${selectedPlan ? fmtNaira(totalAmount) : ""} with Wallet`
+                              : `Pay ${selectedPlan ? fmtNaira(totalAmount) : ""} with Paystack`}
                           </>
                         )}
                       </button>

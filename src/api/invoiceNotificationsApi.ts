@@ -40,14 +40,19 @@ function unwrap<T>(data: any): T {
   return (data?.data ?? data?.notifications ?? data) as T;
 }
 
+function unwrapList(data: any): InvoiceNote[] {
+  const value = data?.data ?? data?.notifications ?? data;
+  return Array.isArray(value) ? value : [];
+}
+
 export async function getUnreadInvoiceNotifications(): Promise<InvoiceNote[]> {
   const res = await authApi.get("/invoice-notifications/unread");
-  return unwrap<InvoiceNote[]>(res.data) || [];
+  return unwrapList(res.data);
 }
 
 export async function getAllInvoiceNotifications(): Promise<InvoiceNote[]> {
   const res = await authApi.get("/invoice-notifications");
-  return unwrap<InvoiceNote[]>(res.data) || [];
+  return unwrapList(res.data);
 }
 
 export async function getInvoiceNotification(id: number): Promise<InvoiceNote> {

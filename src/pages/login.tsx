@@ -27,6 +27,8 @@ export default function Login() {
     setButtonLoading(true);
     try {
       const response = await api.post("/login", { identifier: email, password });
+      console.log(response);
+console.log(response.data);
       const { access_token, user } = response.data;
       setToken(access_token);
       setUser(user);
@@ -36,12 +38,14 @@ export default function Login() {
           navigate("/dashboard"); break;
         default: navigate("/unauthorized");
       }
-    } catch (err: any) {
+    } 
+    catch (err: any) {
       setError(err?.response?.data?.message || "Login failed. Please try again.");
-    } finally {
-      setButtonLoading(false);
-    }
-  };
+   
+  } finally {
+    setButtonLoading(false);
+  }
+};
 
   return (
     <>

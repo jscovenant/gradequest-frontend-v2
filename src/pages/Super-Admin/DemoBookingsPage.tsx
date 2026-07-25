@@ -520,9 +520,9 @@ export default function DemoBookingsPage() {
 
       <div className="container-fluid">
         <div className="row">
-          <Sidebar sidebarOpen={sidebarOpen} />
+          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-          <main className="col-md-9 col-lg-10 ms-auto db-main">
+          <main className="col-md-9 col-lg-10 ms-auto db-main sa-main">
             {loading && <Loader message="Loading demo bookings…" />}
 
             <div className="db-hero">

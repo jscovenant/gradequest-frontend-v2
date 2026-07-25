@@ -31,14 +31,15 @@ import SettingsPage from "./pages/Admin/School/SettingsPage";
 import PromoteStudentsPage from "./pages/Admin/students/PromoteStudentsPage";
 import BillingPage from "./pages/Admin/Billing/BillingPage";
 import CheckoutPage from "./pages/Admin/Billing/CheckoutPage";
+import GradequestInvoicePaymentPage from "./pages/Admin/Billing/GradequestInvoicePaymentPage";
 import WalletPage from "./pages/Admin/Wallet/WalletPage";
 import AdminUserDetailsPage from "./pages/Super-Admin/AdminUserDetailsPage";
 import SubscribersManagementPage from "./pages/Super-Admin/SubscribersManagementPage";
 import MarketingEmailPage from "./pages/Super-Admin/MarketingEmailPage";
 import SubscriptionPlansPage from "./pages/Super-Admin/SubscriptionPlansPage";
+import BillingPolicyPage from "./pages/Super-Admin/BillingPolicyPage";
 import BlogsPage from "./pages/Super-Admin/BlogsPage";
 import TestimonialsPage from "./pages/Super-Admin/TestimonialsPage";
-import BiometricGeneratePage from "./pages/Admin/Biometric/BiometricGeneratePage";
 import StaffQrAttendancePage from "./pages/Admin/Biometric/StaffQrAttendancePage";
 import StaffAttendanceLogsPage from "./pages/Admin/Biometric/StaffAttendanceLogsPage";
 import StaffAttendanceSettingsPage from "./pages/Admin/Biometric/AttendanceSettingsPage";
@@ -74,6 +75,7 @@ import ParentWhatsappVerificationPage from "./pages/Admin/Parent/ParentWhatsappV
 import ResultMonitoringPage from "./pages/Admin/StudentResult/Resultmonitoringpage";
 import WhatsAppSettingsPage from "./pages/Admin/School/WhatsAppSettingsPage";
 import OnlinePayFeesPage from "./pages/Admin/Billing/OnlinePayFeesPage";
+import PublicFeePaymentPage from "./pages/PublicFeePaymentPage";
 
 function App() {
   return (
@@ -87,6 +89,7 @@ function App() {
           <Route path="/check-result" element={<CheckResultPage />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
           <Route path="/payment-instructions/" element={<PaymentInstructionsPage />} />
+          <Route path="/pay-school-fee" element={<PublicFeePaymentPage />} />
           <Route path="/book-demo" element={<BookDemo />} />
            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -483,20 +486,9 @@ function App() {
           />
 
           <Route
-            path="/qr-code"
-            element={
-              <RequireAuth roles={["Admin"]}>
-                <OnboardingGuard>
-                  <BiometricGeneratePage />
-                </OnboardingGuard>
-              </RequireAuth>
-            }
-          />
-
-          <Route
             path="/scan-qr"
             element={
-              <RequireAuth roles={["Admin"]}>
+              <RequireAuth roles={["Admin", "Teacher"]}>
                 <OnboardingGuard>
                   <StaffQrAttendancePage />
                 </OnboardingGuard>
@@ -614,6 +606,17 @@ function App() {
             }
           />
 
+          <Route
+            path="/billing/invoice-payment/:invoiceId"
+            element={
+              <RequireAuth roles={["Admin"]}>
+                <OnboardingGuard>
+                  <GradequestInvoicePaymentPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
           
           <Route
             path="/payonline"
@@ -686,6 +689,16 @@ function App() {
               <RequireAuth roles={["Super-Admin"]}>
                 <OnboardingGuard>
                   <SubscriptionPlansPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/superadmin/billing-policy"
+            element={
+              <RequireAuth roles={["Super-Admin"]}>
+                <OnboardingGuard>
+                  <BillingPolicyPage />
                 </OnboardingGuard>
               </RequireAuth>
             }

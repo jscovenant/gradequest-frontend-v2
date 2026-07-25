@@ -7,6 +7,7 @@ import Footer from "../LayoutComponents/Footer";
 import Loader from "../ui/dashboardLoader";
 import { useNavigate } from "react-router-dom";
 import PageTitle from "../PageTitle";
+import { getUser } from "../../utils/token";
 
 interface StatCard { title: string; value: string | number; icon: string; }
 type PerformancePoint = { term: string; average: number };
@@ -34,6 +35,13 @@ type AlertSummaryResponse = {
   data: AlertItem[];
   submission_monitors: SubmissionMonitor[];
   counts: { open_total: number; high: number; medium: number; low: number; submission_open_total: number; submission_overdue_total: number };
+};
+
+type BillingDashboardResponse = {
+  package?: {
+    name?: string | null;
+  } | null;
+  revenue_model?: string | null;
 };
 
 const STAT_META = [
@@ -222,13 +230,18 @@ export default function AdminDashboard() {
   const [topLoading,setTopLoading]=useState(false);
   const [topError,setTopError]=useState<string|null>(null);
   const [topPage,setTopPage]=useState(1);
+  const [paymentLinkCopied,setPaymentLinkCopied]=useState(false);
+  const [currentPackage,setCurrentPackage]=useState("Core");
   const topLimit=5;
   const totalPages=useMemo(()=>!topMeta?1:Math.max(1,Math.ceil(topMeta.total/topLimit)),[topMeta]);
+  const adminUser = getUser();
+  const paymentLink = `${window.location.origin}/pay-school-fee${adminUser?.reg_no ? `?school_code=${encodeURIComponent(adminUser.reg_no)}` : ""}`;
+  const copyPaymentLink=async()=>{try{await navigator.clipboard.writeText(paymentLink);setPaymentLinkCopied(true);window.setTimeout(()=>setPaymentLinkCopied(false),1800);}catch{window.prompt("Copy payment link",paymentLink);}};
 
-  const fetchTop=async(page:number)=>{setTopLoading(true);setTopError(null);try{const res=await authApi.get<TopStudentsResponse>("/top-performing-students",{params:{limit:topLimit,page}});setTopStudents(res.data.data||[]);setTopMeta({total:res.data.total??0,session_used:res.data.session_used??"",term_used:res.data.term_used??""});}catch(e:any){setTopStudents([]);setTopMeta(null);setTopError(e?.response?.data?.message||"Unable to load top students.");}finally{setTopLoading(false);}};
+  const fetchTop=async(page:number)=>{setTopLoading(true);setTopError(null);try{const res=await authApi.get<TopStudentsResponse>("/top-performing-students",{params:{limit:topLimit,page}});setTopStudents(Array.isArray(res.data.data)?res.data.data:[]);setTopMeta({total:res.data.total??0,session_used:res.data.session_used??"",term_used:res.data.term_used??""});}catch(e:any){setTopStudents([]);setTopMeta(null);setTopError(e?.response?.data?.message||"Unable to load top students.");}finally{setTopLoading(false);}};
   const fetchAlerts=async()=>{setAlertsLoading(true);setAlertsError(null);try{const res=await authApi.get<AlertSummaryResponse>("/admin/academic-alerts/summary");setAlerts(res.data.data||[]);setAlertCounts(res.data.counts||{open_total:0,high:0,medium:0,low:0,submission_open_total:0,submission_overdue_total:0});}catch(e:any){setAlerts([]);setAlertCounts({open_total:0,high:0,medium:0,low:0,submission_open_total:0,submission_overdue_total:0});setAlertsError(e?.response?.data?.message||"Unable to load academic alerts.");}finally{setAlertsLoading(false);}};
 
-  useEffect(()=>{setLoading(true);Promise.all([authApi.get("/current-session-term"),authApi.get("/dashboard/counts"),authApi.get("/performance-stats"),authApi.get<AlertSummaryResponse>("/admin/academic-alerts/summary")]).then(([sess,counts,perf,alertRes])=>{setAcademicSession(sess.data.session??"");setCurrentTerm(sess.data.term??"");const c=counts.data??{};setTotalUsers(Number(c.total_users??(Number(c.students??0)+Number(c.teachers??0)+Number(c.parents??0))));setStats([{title:"Total Students",value:Number(c.students??0),icon:"students"},{title:"Teachers",value:Number(c.teachers??0),icon:"teachers"},{title:"Total Parents",value:Number(c.parents??0),icon:"parents"},{title:"Results Uploaded",value:c.results_uploaded??"0%",icon:"results"}]);const pts:PerformancePoint[]=perf.data.data||[];setPerfLabels(pts.map(d=>d.term));setPerfData(pts.map(d=>d.average));setAlerts(alertRes.data.data||[]);setAlertCounts(alertRes.data.counts||{open_total:0,high:0,medium:0,low:0,submission_open_total:0,submission_overdue_total:0});}).catch(e=>{console.error(e);setAlertsError("Some dashboard sections could not be loaded.");}).finally(()=>{setLoading(false);fetchTop(1);});},[]);
+  useEffect(()=>{setLoading(true);Promise.allSettled([authApi.get("/current-session-term"),authApi.get("/dashboard/counts"),authApi.get("/performance-stats"),authApi.get<AlertSummaryResponse>("/admin/academic-alerts/summary"),authApi.get<BillingDashboardResponse>("/school/billing/dashboard")]).then(([sessRes,countsRes,perfRes,alertRes,billingRes])=>{if(sessRes.status==="fulfilled"){setAcademicSession(sessRes.value.data.session??"");setCurrentTerm(sessRes.value.data.term??"");} if(countsRes.status==="fulfilled"){const c=countsRes.value.data??{};setTotalUsers(Number(c.total_users??(Number(c.students??0)+Number(c.teachers??0)+Number(c.parents??0))));setStats([{title:"Total Students",value:Number(c.students??0),icon:"students"},{title:"Teachers",value:Number(c.teachers??0),icon:"teachers"},{title:"Total Parents",value:Number(c.parents??0),icon:"parents"},{title:"Results Uploaded",value:c.results_uploaded??"0%",icon:"results"}]);} if(perfRes.status==="fulfilled"){const pts:PerformancePoint[]=Array.isArray(perfRes.value.data.data)?perfRes.value.data.data:[];setPerfLabels(pts.map(d=>d.term));setPerfData(pts.map(d=>d.average));} if(alertRes.status==="fulfilled"){setAlerts(Array.isArray(alertRes.value.data.data)?alertRes.value.data.data:[]);setAlertCounts(alertRes.value.data.counts||{open_total:0,high:0,medium:0,low:0,submission_open_total:0,submission_overdue_total:0});} if(billingRes.status==="fulfilled"){setCurrentPackage(billingRes.value.data?.package?.name||"Core");} if([sessRes,countsRes,perfRes,alertRes].some(r=>r.status==="rejected")){setAlertsError("Some dashboard sections could not be loaded.");}}).finally(()=>{setLoading(false);fetchTop(1);});},[]);
   useEffect(()=>{fetchTop(topPage);},[topPage]);
   useEffect(()=>{if(!chartRef.current)return;const ctx=chartRef.current.getContext("2d");if(!ctx)return;chartInst.current?.destroy();chartInst.current=new Chart(ctx,{type:"bar",data:{labels:perfLabels,datasets:[{label:"Average Score",data:perfData,backgroundColor:(context)=>{const g=context.chart.ctx.createLinearGradient(0,0,0,260);g.addColorStop(0,"rgba(255,200,87,0.88)");g.addColorStop(1,"rgba(255,200,87,0.20)");return g;},borderRadius:6,barThickness:32}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:"#050008",padding:12,cornerRadius:8,titleColor:"rgb(255,200,87)",bodyColor:"#94a3b8",titleFont:{size:13,weight:"bold" as const},bodyFont:{size:12}}},scales:{x:{grid:{display:false},ticks:{font:{size:11},color:"#9a8a7a"},border:{display:false}},y:{beginAtZero:true,grid:{color:"rgba(0,0,0,0.04)"},ticks:{font:{size:11},color:"#9a8a7a"},border:{display:false}}}}});return()=>{chartInst.current?.destroy();};},[perfLabels,perfData]);
 
@@ -237,8 +250,8 @@ export default function AdminDashboard() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500&display=swap');
         :root{--db-light:var(--bs-light,#fcf8f8);--db-dark:var(--bs-dark,#050008);--db-accent:var(--bs-secondary,rgb(255,200,87));--db-magenta:var(--bs-primary,rgb(211,0,176));--db-success:var(--bs-success,rgb(34,197,94));--db-danger:var(--bs-danger,rgb(239,68,68));--db-border:var(--bs-border-color,#ede8e0);--db-radius:var(--bs-border-radius-lg,14px);--db-accent-dim:rgba(255,200,87,0.10);--db-accent-border:rgba(255,200,87,0.22);--db-magenta-dim:rgba(211,0,176,0.08)}
-        .db-main{background:var(--db-light);min-height:100vh;font-family:'DM Sans',sans-serif;padding:28px 28px 0}
-        .db-hero{background:var(--db-dark);border-radius:var(--db-radius);padding:32px 36px;position:relative;overflow:hidden;margin-bottom:28px}
+        .db-main{background:linear-gradient(180deg,rgba(211,0,176,0.035),transparent 240px),var(--db-light);min-height:100vh;font-family:'DM Sans',sans-serif;padding:28px 28px 0;overflow-x:hidden}
+        .db-hero{background:linear-gradient(135deg,var(--db-dark),#16081d);border-radius:var(--db-radius);padding:30px 34px;position:relative;overflow:hidden;margin-bottom:24px;border:1px solid rgba(255,255,255,0.08);box-shadow:0 18px 44px rgba(5,0,8,0.10)}
         .db-hero::before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle,rgba(255,255,255,0.045) 1px,transparent 1px);background-size:24px 24px;pointer-events:none}
         .db-hero-glow{position:absolute;top:-60px;right:-60px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(255,200,87,0.10) 0%,transparent 65%);pointer-events:none}
         .db-hero-glow2{position:absolute;bottom:-40px;left:30%;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(211,0,176,0.06) 0%,transparent 70%);pointer-events:none}
@@ -258,26 +271,27 @@ export default function AdminDashboard() {
         .db-hero-stat-label{font-size:12px;font-weight:300;color:rgba(255,255,255,0.28)}
         .db-hero-stat-val{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--db-accent)}
         .db-hero-stat-sep{height:1px;background:rgba(255,255,255,0.06)}
-        .db-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
-        @media(max-width:1199.98px){.db-stats{grid-template-columns:repeat(2,1fr)}}
+        .db-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:24px}
+        @media(max-width:1199.98px){.db-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
         @media(max-width:575.98px){.db-stats{grid-template-columns:1fr}}
-        .db-stat{background:#fff;border:1px solid var(--db-border);border-radius:var(--db-radius);padding:24px 22px;position:relative;overflow:hidden;cursor:default;transition:box-shadow .25s,transform .25s;animation:dbFadeUp .5s ease both}
+        .db-stat{background:#fff;border:1px solid rgba(5,0,8,0.08);border-radius:var(--db-radius);padding:22px 20px;position:relative;overflow:hidden;cursor:default;transition:box-shadow .25s,transform .25s,border-color .25s;animation:dbFadeUp .5s ease both;box-shadow:0 10px 28px rgba(5,0,8,0.045)}
+        .db-stat::after{content:'';position:absolute;right:-44px;top:-44px;width:132px;height:132px;border-radius:50%;background:rgba(211,0,176,0.055);pointer-events:none}
         .db-stat:nth-child(1){animation-delay:.05s}.db-stat:nth-child(2){animation-delay:.10s}.db-stat:nth-child(3){animation-delay:.15s}.db-stat:nth-child(4){animation-delay:.20s}
         @keyframes dbFadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
-        .db-stat:hover{box-shadow:0 8px 28px rgba(0,0,0,0.08);transform:translateY(-3px)}
-        .db-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--sc);transform:scaleX(0);transform-origin:left;transition:transform .3s ease}
+        .db-stat:hover{box-shadow:0 16px 36px rgba(5,0,8,0.08);transform:translateY(-3px);border-color:rgba(211,0,176,0.18)}
+        .db-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--db-magenta),var(--db-accent));transform:scaleX(0);transform-origin:left;transition:transform .3s ease}
         .db-stat:hover::before{transform:scaleX(1)}
-        .db-stat-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px}
-        .db-stat-icon{width:42px;height:42px;border-radius:10px;background:var(--si);color:var(--sc);display:flex;align-items:center;justify-content:center;transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
+        .db-stat-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;position:relative;z-index:1}
+        .db-stat-icon{width:42px;height:42px;border-radius:10px;background:rgba(211,0,176,0.08);color:var(--db-magenta);display:flex;align-items:center;justify-content:center;transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
         .db-stat:hover .db-stat-icon{transform:scale(1.1) rotate(-4deg)}
-        .db-stat-more{color:#c8bfb5;cursor:pointer;padding:2px}
-        .db-stat-label{font-size:12px;font-weight:400;color:#9a8a7a;margin-bottom:5px;letter-spacing:.03em}
-        .db-stat-val{font-family:'Playfair Display',Georgia,serif;font-size:30px;font-weight:700;color:var(--db-dark);line-height:1}
-        .db-stat-footer{display:flex;align-items:center;gap:5px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(0,0,0,0.06);font-size:12px;color:#9a8a7a}
-        .db-stat-trend{color:var(--db-success);font-weight:500}
-        .db-grid{display:grid;grid-template-columns:1fr 360px;gap:20px;margin-bottom:24px}
+        .db-stat-more{color:#c8bfb5;cursor:pointer;padding:2px;position:relative;z-index:1}
+        .db-stat-label{font-size:12px;font-weight:600;color:#8c7f8f;margin-bottom:5px;letter-spacing:.03em;position:relative;z-index:1}
+        .db-stat-val{font-family:'Playfair Display',Georgia,serif;font-size:30px;font-weight:700;color:var(--db-dark);line-height:1;position:relative;z-index:1}
+        .db-stat-footer{display:flex;align-items:center;gap:5px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(5,0,8,0.07);font-size:12px;color:#9a8a7a;position:relative;z-index:1}
+        .db-stat-trend{color:var(--db-success);font-weight:700}
+        .db-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,360px);gap:20px;margin-bottom:24px}
         @media(max-width:991.98px){.db-grid{grid-template-columns:1fr}}
-        .db-panel{background:#fff;border:1px solid var(--db-border);border-radius:var(--db-radius);overflow:hidden}
+        .db-panel{background:#fff;border:1px solid var(--db-border);border-radius:var(--db-radius);overflow:hidden;min-width:0;box-shadow:0 8px 24px rgba(5,0,8,0.04)}
         .db-panel-head{display:flex;align-items:center;justify-content:space-between;padding:22px 24px 18px;border-bottom:1px solid rgba(0,0,0,0.06);gap:12px}
         .db-panel-icon{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:var(--pi);color:var(--pc);flex-shrink:0}
         .db-panel-title{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--db-dark);margin:0}
@@ -303,15 +317,34 @@ export default function AdminDashboard() {
         .db-refresh-btn:hover,.rm-refresh-btn:hover{background:#ede8e0;border-color:var(--db-accent-border)}
         .db-refresh-btn:disabled,.rm-refresh-btn:disabled{opacity:.5;cursor:not-allowed}
         .db-chart-wrap{padding:20px;height:260px}
-        .db-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px}
-        @media(max-width:991.98px){.db-actions{grid-template-columns:repeat(2,1fr)}}
+        .db-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:28px}
+        @media(max-width:991.98px){.db-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
         @media(max-width:575.98px){.db-actions{grid-template-columns:1fr 1fr}}
-        .db-action{background:#fff;border:1px solid var(--db-border);border-radius:var(--db-radius);padding:22px 18px;cursor:pointer;display:flex;flex-direction:column;gap:10px;transition:box-shadow .25s,transform .25s,border-color .25s;text-decoration:none;color:inherit}
-        .db-action:hover{box-shadow:0 8px 24px rgba(0,0,0,0.08);transform:translateY(-4px);border-color:var(--db-accent-border)}
-        .db-action-icon{width:46px;height:46px;border-radius:12px;background:var(--ac-bg);color:var(--ac-color);display:flex;align-items:center;justify-content:center;transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
+        .db-action{background:#fff;border:1px solid rgba(5,0,8,0.08);border-radius:var(--db-radius);padding:20px 18px;cursor:pointer;display:flex;flex-direction:column;gap:10px;transition:box-shadow .25s,transform .25s,border-color .25s;text-decoration:none;color:inherit;box-shadow:0 8px 24px rgba(5,0,8,0.04);min-width:0}
+        .db-action:hover{box-shadow:0 14px 34px rgba(5,0,8,0.08);transform:translateY(-4px);border-color:rgba(211,0,176,0.18)}
+        .db-action-icon{width:46px;height:46px;border-radius:12px;background:rgba(211,0,176,0.08);color:var(--db-magenta);display:flex;align-items:center;justify-content:center;transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
         .db-action:hover .db-action-icon{transform:scale(1.1) rotate(-5deg)}
-        .db-action-label{font-size:13.5px;font-weight:500;color:var(--db-dark)}.db-action-desc{font-size:11.5px;font-weight:300;color:#9a8a7a}
+        .db-action-label{font-size:13.5px;font-weight:700;color:var(--db-dark)}.db-action-desc{font-size:11.5px;font-weight:400;color:#9a8a7a}
         .db-alert{display:flex;align-items:flex-start;gap:10px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:11px 14px;font-size:13px;color:var(--db-danger);margin:0 20px 16px}
+        .db-payment-card{background:#fff;border:1px solid rgba(5,0,8,0.08);border-radius:var(--db-radius);box-shadow:0 10px 28px rgba(5,0,8,0.045);padding:18px 20px;margin:-4px 0 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+        .db-payment-icon{width:46px;height:46px;border-radius:12px;background:rgba(211,0,176,0.08);color:var(--db-magenta);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .db-payment-title{font-weight:850;color:var(--db-dark);margin:0 0 3px}
+        .db-payment-sub{font-size:12.5px;color:#9a8a7a;margin:0;line-height:1.5}
+        .db-payment-url{font-size:12px;color:#6b5f55;background:var(--db-light);border:1px solid rgba(5,0,8,0.07);border-radius:10px;padding:9px 12px;max-width:min(100%,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .gq-plus-banner{background:linear-gradient(135deg,#fff,#fff7df);border:1px solid rgba(255,200,87,0.36);border-radius:var(--db-radius);box-shadow:0 16px 38px rgba(5,0,8,0.07);padding:18px 20px;margin:-8px 0 24px;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;position:relative;overflow:hidden}
+        .gq-plus-banner::before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle,rgba(211,0,176,0.07) 1px,transparent 1px);background-size:22px 22px;pointer-events:none}
+        .gq-plus-left,.gq-plus-actions{position:relative;z-index:1}
+        .gq-plus-left{display:flex;align-items:flex-start;gap:14px;min-width:260px;flex:1}
+        .gq-plus-icon{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,var(--db-magenta),#7c3aed);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 24px rgba(124,58,237,0.18);flex-shrink:0}
+        .gq-plus-eyebrow{font-size:11px;font-weight:800;letter-spacing:0;text-transform:uppercase;color:rgb(180,83,9);margin-bottom:3px}
+        .gq-plus-title{font-family:'Playfair Display',serif;font-size:22px;font-weight:900;color:var(--db-dark);margin:0}
+        .gq-plus-title em{color:var(--db-magenta);font-style:italic}
+        .gq-plus-sub{font-size:12.5px;color:#7a6a5a;line-height:1.55;margin:5px 0 0;max-width:760px}
+        .gq-plus-tags{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+        .gq-plus-tag{font-size:11px;font-weight:650;color:#5f4b10;background:rgba(255,200,87,0.22);border:1px solid rgba(255,200,87,0.28);border-radius:999px;padding:5px 9px}
+        .gq-plus-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+        .gq-plus-current{font-size:11.5px;color:#7a6a5a;background:#fff;border:1px solid rgba(5,0,8,0.08);border-radius:999px;padding:7px 10px}
+        @media(max-width:575.98px){.gq-plus-banner{padding:16px}.gq-plus-left{min-width:0}.gq-plus-title{font-size:19px}.gq-plus-actions{width:100%}.gq-plus-actions .db-btn-gold,.gq-plus-actions .db-btn-outline{width:100%;justify-content:center}}
         .db-skeleton{height:14px;border-radius:7px;background:linear-gradient(90deg,#f0ebe3 25%,#e8e0d5 50%,#f0ebe3 75%);background-size:200% 100%;animation:dbSkeleton 1.4s ease infinite}
         @keyframes dbSkeleton{from{background-position:200% 0}to{background-position:-200% 0}}
         @keyframes dbSpin{to{transform:rotate(360deg)}}
@@ -377,7 +410,7 @@ export default function AdminDashboard() {
 
       <div className="container-fluid">
         <div className="row">
-          <Sidebar sidebarOpen={sidebarOpen}/>
+          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}/>
           <main className="col-md-9 col-lg-10 ms-auto db-main">
             {loading&&<Loader message="Loading dashboard…"/>}
 
@@ -412,6 +445,38 @@ export default function AdminDashboard() {
             </div>
 
             {/* ── Academic Alerts ── */}
+            <div className="gq-plus-banner">
+              <div className="gq-plus-left">
+                <div className="gq-plus-icon">
+                  <i className="bi bi-stars fs-4" />
+                </div>
+                <div>
+                  <div className="gq-plus-eyebrow">Premium upgrade</div>
+                  <h2 className="gq-plus-title">Unlock <em>GradeQuestPlus</em></h2>
+                  <p className="gq-plus-sub">
+                    Upgrade for premium tools like WhatsApp notifications, CBT, AI student insights,
+                    custom domains, and advanced reports.
+                  </p>
+                  <div className="gq-plus-tags">
+                    <span className="gq-plus-tag">WhatsApp</span>
+                    <span className="gq-plus-tag">CBT</span>
+                    <span className="gq-plus-tag">AI insights</span>
+                    <span className="gq-plus-tag">Advanced reports</span>
+                  </div>
+                </div>
+              </div>
+              <div className="gq-plus-actions">
+                <span className="gq-plus-current">Current package: {currentPackage}</span>
+                <button className="db-btn-gold" onClick={()=>navigate("/checkout?plan=GradeQuestPlus")}>
+                  <i className="bi bi-arrow-up-circle" />
+                  Upgrade
+                </button>
+                <button className="db-btn-outline" style={{color:"var(--db-dark)",borderColor:"rgba(5,0,8,0.12)"}} onClick={()=>navigate("/billing")}>
+                  View Billing
+                </button>
+              </div>
+            </div>
+
             <AcademicAlertSection alerts={alerts} loading={alertsLoading&&alerts.length===0} error={alertsError} counts={{open_total:alertCounts.open_total,high:alertCounts.high,medium:alertCounts.medium,low:alertCounts.low}} onRefresh={fetchAlerts} alertsLoading={alertsLoading} onViewAll={()=>navigate("/admin/academic-alerts")}/>
 
             {/* Stats */}
@@ -433,6 +498,21 @@ export default function AdminDashboard() {
                   </div>
                 );
               })}
+            </div>
+
+            <div className="db-payment-card">
+              <div className="d-flex align-items-start gap-3">
+                <div className="db-payment-icon"><i className="bi bi-credit-card-2-front fs-5" /></div>
+                <div>
+                  <p className="db-payment-title">Parent school-fee payment link</p>
+                  <p className="db-payment-sub">Send this public link to parents. They can enter school code, admission number, and amount without logging in.</p>
+                </div>
+              </div>
+              <div className="d-flex align-items-center gap-2 flex-wrap">
+                <div className="db-payment-url">{paymentLink}</div>
+                <button className="db-btn-gold" onClick={copyPaymentLink}>{paymentLinkCopied ? "Copied" : "Copy Link"}</button>
+                <button className="db-btn-outline" style={{color:"var(--db-dark)",borderColor:"rgba(5,0,8,0.12)"}} onClick={()=>window.open(paymentLink,"_blank")}>Open</button>
+              </div>
             </div>
 
             {/* Chart + table */}

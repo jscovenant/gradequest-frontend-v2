@@ -582,7 +582,7 @@ export default function FeeMethodsPage() {
         .db-hero-sub {
           font-size: 13.5px;
           font-weight: 300;
-          color: #64748b;
+          color: rgba(255, 255, 255, 0.72);
           line-height: 1.65;
           max-width: 560px;
           margin-bottom: 16px;
@@ -797,15 +797,113 @@ export default function FeeMethodsPage() {
 
         .db-grid2 {
           display: grid;
-          grid-template-columns: 1fr 420px;
+          grid-template-columns: minmax(0, 1fr) minmax(360px, 440px);
           gap: 18px;
           margin-bottom: 22px;
+        }
+
+        .fee-workflow {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 12px;
+          margin-bottom: 18px;
+        }
+        .fee-step {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          background: #fff;
+          border: 1px solid #ede8e0;
+          border-radius: 14px;
+          padding: 14px;
+          min-width: 0;
+        }
+        .fee-step-num {
+          width: 30px;
+          height: 30px;
+          border-radius: 9px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: #0f172a;
+          color: #e8c97a;
+          font-weight: 800;
+          font-size: 12px;
+          flex-shrink: 0;
+        }
+        .fee-step-title {
+          margin: 0;
+          color: #1a1a2e;
+          font-weight: 800;
+          font-size: 13px;
+          line-height: 1.2;
+        }
+        .fee-step-sub {
+          margin: 3px 0 0;
+          color: #9a8a7a;
+          font-size: 11.5px;
+          line-height: 1.3;
+        }
+        .fee-context-action {
+          height: 100%;
+          min-height: 92px;
+          border: 1px dashed rgba(201, 168, 76, 0.55);
+          background: rgba(201, 168, 76, 0.08);
+          border-radius: 12px;
+          padding: 12px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          gap: 10px;
+        }
+        .fee-primary-action {
+          width: 100%;
+          justify-content: center;
+          padding: 10px 14px;
+          background: #0f172a;
+          border-color: #0f172a;
+          color: #fff;
+          font-weight: 700;
+        }
+        .fee-primary-action:hover:not(:disabled) {
+          background: #1a1a2e;
+          color: #fff;
+        }
+        .fee-action-hint {
+          color: #8a765f;
+          font-size: 11.5px;
+          line-height: 1.35;
+          margin: 0;
+        }
+        .fee-empty-state {
+          padding: 26px 18px;
+          text-align: center;
+          color: #8a765f;
+          background: linear-gradient(180deg, #fff, #faf8f5);
+        }
+        .fee-empty-title {
+          margin: 0 0 4px;
+          color: #1a1a2e;
+          font-weight: 800;
+          font-size: 14px;
+        }
+        .fee-empty-sub {
+          margin: 0;
+          color: #9a8a7a;
+          font-size: 12.5px;
         }
         @media (max-width: 991.98px) {
           .db-grid2 { grid-template-columns: 1fr; }
           .db-main { padding: 18px 14px 0; }
           .db-hero { padding: 24px 20px; }
           .db-hero-stat-card { min-width: 0; width: 100%; }
+          .fee-workflow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .db-panel[style*="sticky"] { position: static !important; }
+        }
+        @media (max-width: 575.98px) {
+          .fee-workflow { grid-template-columns: 1fr; }
+          .db-panel-head { align-items: flex-start; }
+          .db-panel-title-group { min-width: 0; }
         }
 
         /* Collect-payment modal */
@@ -877,9 +975,8 @@ export default function FeeMethodsPage() {
                   </h1>
 
                   <p className="db-hero-sub">
-                    Search a student by <b>Reg No</b>, choose <b>Section</b>, <b>Session</b>, <b>Term</b>, load fee types,
-                    then assign multiple fees in one action. From the ledger, you can also collect payment online
-                    directly through Paystack.
+                    Manage a student's fees from one simple workspace: find the student, choose the billing period,
+                    assign fees, and track payments from the ledger.
                   </p>
 
                   <div className="db-hero-btns">
@@ -955,6 +1052,37 @@ export default function FeeMethodsPage() {
               </div>
             </div>
 
+            <div className="fee-workflow">
+              <div className="fee-step">
+                <span className="fee-step-num">1</span>
+                <div>
+                  <p className="fee-step-title">Find Student</p>
+                  <p className="fee-step-sub">Use admission or registration number.</p>
+                </div>
+              </div>
+              <div className="fee-step">
+                <span className="fee-step-num">2</span>
+                <div>
+                  <p className="fee-step-title">Choose Period</p>
+                  <p className="fee-step-sub">Select section, session, and term.</p>
+                </div>
+              </div>
+              <div className="fee-step">
+                <span className="fee-step-num">3</span>
+                <div>
+                  <p className="fee-step-title">Load Fees</p>
+                  <p className="fee-step-sub">Show fees for the selected period.</p>
+                </div>
+              </div>
+              <div className="fee-step">
+                <span className="fee-step-num">4</span>
+                <div>
+                  <p className="fee-step-title">Assign & Collect</p>
+                  <p className="fee-step-sub">Assign fees and record payments.</p>
+                </div>
+              </div>
+            </div>
+
             {/* Meta loading */}
             {loadingMeta ? (
               <div className="db-panel">
@@ -1025,29 +1153,11 @@ export default function FeeMethodsPage() {
                           </svg>
                         </div>
                         <div>
-                          <p className="db-panel-title">Student & Context</p>
-                          <p className="db-panel-sub">Find student → pick Section/Session/Term → load fee types</p>
+                          <p className="db-panel-title">Student and Billing Period</p>
+                          <p className="db-panel-sub">Find the student, then choose the exact fee period.</p>
                         </div>
                       </div>
 
-                      <button
-                        className="db-refresh-btn"
-                        onClick={fetchFeeTypes}
-                        disabled={!canFetchFeeTypes || loadingFeeTypes || busyKey !== null}
-                        title={!canFetchFeeTypes ? "Select student + section + session + term" : ""}
-                      >
-                        <svg
-                          width="13"
-                          height="13"
-                          viewBox="0 0 14 14"
-                          fill="none"
-                          style={{ animation: loadingFeeTypes ? "dbSpin 0.8s linear infinite" : "none" }}
-                        >
-                          <path d="M12 7A5 5 0 112 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                          <path d="M12 3v4h-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                        </svg>
-                        {loadingFeeTypes ? "Loading…" : "Load Fee Types"}
-                      </button>
                     </div>
 
                     <div style={{ padding: 18 }}>
@@ -1138,8 +1248,8 @@ export default function FeeMethodsPage() {
 
                       <hr style={{ opacity: 0.08 }} />
 
-                      <div className="row g-3">
-                        <div className="col-12 col-md-4">
+                      <div className="row g-3 align-items-stretch">
+                        <div className="col-12 col-md-6 col-xl-3">
                           <label className="form-label fw-semibold small mb-1">Section</label>
                           <select
                             className="form-select"
@@ -1156,7 +1266,7 @@ export default function FeeMethodsPage() {
                           </select>
                         </div>
 
-                        <div className="col-12 col-md-4">
+                        <div className="col-12 col-md-6 col-xl-3">
                           <label className="form-label fw-semibold small mb-1">Session</label>
                           <select
                             className="form-select"
@@ -1173,7 +1283,7 @@ export default function FeeMethodsPage() {
                           </select>
                         </div>
 
-                        <div className="col-12 col-md-4">
+                        <div className="col-12 col-md-6 col-xl-3">
                           <label className="form-label fw-semibold small mb-1">Term</label>
                           <select
                             className="form-select"
@@ -1188,6 +1298,34 @@ export default function FeeMethodsPage() {
                               </option>
                             ))}
                           </select>
+                        </div>
+
+                        <div className="col-12 col-md-6 col-xl-3">
+                          <div className="fee-context-action">
+                            <p className="fee-action-hint">
+                              {canFetchFeeTypes
+                                ? "Ready to load the matching fee types."
+                                : "Select student, section, session, and term first."}
+                            </p>
+                            <button
+                              className="db-refresh-btn fee-primary-action"
+                              onClick={fetchFeeTypes}
+                              disabled={!canFetchFeeTypes || loadingFeeTypes || busyKey !== null}
+                              title={!canFetchFeeTypes ? "Select student, section, session, and term" : ""}
+                            >
+                              <svg
+                                width="13"
+                                height="13"
+                                viewBox="0 0 14 14"
+                                fill="none"
+                                style={{ animation: loadingFeeTypes ? "dbSpin 0.8s linear infinite" : "none" }}
+                              >
+                                <path d="M12 7A5 5 0 112 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                                <path d="M12 3v4h-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                              </svg>
+                              {loadingFeeTypes ? "Loading..." : "Load Fee Types"}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1259,8 +1397,9 @@ export default function FeeMethodsPage() {
                           ))}
                         </div>
                       ) : feeTypes.length === 0 ? (
-                        <div style={{ padding: 18, color: "#9a8a7a" }}>
-                          No fee types loaded yet. Select context and click <b>Load Fee Types</b>.
+                        <div className="fee-empty-state">
+                          <p className="fee-empty-title">No fee types loaded yet</p>
+                          <p className="fee-empty-sub">Choose the billing period above, then load fee types.</p>
                         </div>
                       ) : (
                         <div style={{ overflowX: "auto" }}>
@@ -1364,8 +1503,9 @@ export default function FeeMethodsPage() {
                       ))}
                     </div>
                   ) : !details ? (
-                    <div style={{ padding: 18, color: "#9a8a7a" }}>
-                      Enter Reg No and click <b>Load Ledger</b> to view assigned fees.
+                    <div className="fee-empty-state">
+                      <p className="fee-empty-title">No ledger loaded yet</p>
+                      <p className="fee-empty-sub">Enter a student registration number to view assigned fees.</p>
                     </div>
                   ) : (
                     <>

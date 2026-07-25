@@ -1,7 +1,6 @@
 // src/pages/Settings/SchoolBankAccountsPage.tsx
-import  { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { authApi } from "../../../utils/axios";
-
 import TopNav from "../../../components/LayoutComponents/TopNav";
 import Sidebar from "../../../components/LayoutComponents/Sidebar";
 import Footer from "../../../components/LayoutComponents/Footer";
@@ -17,12 +16,16 @@ type SchoolBankAccount = {
   account_number: string;
   currency?: string | null;
   is_active: number | boolean;
+  accepts_online_payment?: number | boolean;
+  online_payment_enabled?: number | boolean;
+  paystack_subaccount_code?: string | null;
   sort_order?: number | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
 
 const isTruthy = (v: any) => v === true || v === 1 || v === "1";
+const acceptsOnline = (row: SchoolBankAccount) => isTruthy(row.online_payment_enabled ?? row.accepts_online_payment);
 
 function maskAcct(acct: string) {
   const t = (acct || "").trim();
@@ -54,35 +57,29 @@ function fmtDateTime(val?: string | null) {
 
 export default function SchoolBankAccountsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-
   const [items, setItems] = useState<SchoolBankAccount[]>([]);
   const [error, setError] = useState<string>("");
 
   // UI state
   const [query, setQuery] = useState("");
+  const [modeFilter, setModeFilter] = useState<'all' | 'online' | 'offline'>('all'); // NEW
   const [showForm, setShowForm] = useState(false);
-
-  // editing
   const [editing, setEditing] = useState<SchoolBankAccount | null>(null);
 
   // form
   const [banks, setBanks] = useState<any[]>([]);
-
-const [bankCode, setBankCode] = useState("");
-const [bankName, setBankName] = useState("");
-
-const [accountNumber, setAccountNumber] = useState("");
-const [accountName, setAccountName] = useState("");
-
-const [verifying, setVerifying] = useState(false);
-const [verified, setVerified] = useState(false);
-
+  const [bankCode, setBankCode] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [accountName, setAccountName] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [verified, setVerified] = useState(false);
   const [currency, setCurrency] = useState("NGN");
   const [isActive, setIsActive] = useState(true);
+  const [acceptsOnlinePayment, setAcceptsOnlinePayment] = useState(false); // NEW
   const [sortOrder, setSortOrder] = useState<number>(0);
 
   const resetForm = () => {
@@ -93,7 +90,9 @@ const [verified, setVerified] = useState(false);
     setAccountNumber("");
     setCurrency("NGN");
     setIsActive(true);
+    setAcceptsOnlinePayment(false); // NEW
     setSortOrder(0);
+    setVerified(false);
   };
 
   const openCreate = () => {
@@ -109,7 +108,9 @@ const [verified, setVerified] = useState(false);
     setAccountNumber(row.account_number || "");
     setCurrency(row.currency || "NGN");
     setIsActive(isTruthy(row.is_active));
-    setSortOrder(Number(row.sort_order ?? 0));
+    setAcceptsOnlinePayment(acceptsOnline(row)); // NEW
+    setSortOrder(Number(row.sort_order?? 0));
+    setVerified(true); // assume verified if editing existing
     setShowForm(true);
   };
 
@@ -134,101 +135,76 @@ const [verified, setVerified] = useState(false);
 
   const loadBanks = async () => {
     try {
-        const res = await authApi.get("/banks");
-
-        setBanks(res.data);
-
+      const res = await authApi.get("/banks");
+      setBanks(res.data);
     } catch (err) {
-        console.error(err);
+      console.error(err);
     }
-};
+  };
 
-useEffect(() => {
-
-    if (accountNumber.length !== 10 || !bankCode) {
-
-        setVerified(false);
-        setAccountName("");
-
-        return;
+  useEffect(() => {
+    if (accountNumber.length!== 10 ||!bankCode) {
+      setVerified(false);
+      setAccountName("");
+      return;
     }
-
     const timer = setTimeout(() => {
-
-        verifyAccount();
-
+      verifyAccount();
     }, 500);
-
     return () => clearTimeout(timer);
+  }, [accountNumber, bankCode]);
 
-}, [accountNumber, bankCode]);
-
-
-
-const verifyAccount = async () => {
-
+  const verifyAccount = async () => {
     try {
-
-        setVerifying(true);
-
-        const res = await authApi.get("/bank-account/verify", {
-
-            params: {
-
-                bank_code: bankCode,
-                account_number: accountNumber
-
-            }
-
-        });
-
-        setAccountName(res.data.account_name);
-
-        setVerified(true);
-       
-
+      setVerifying(true);
+      const res = await authApi.get("/bank-account/verify", {
+        params: {
+          bank_code: bankCode,
+          account_number: accountNumber
+        }
+      });
+      setAccountName(res.data.account_name);
+      setVerified(true);
     } catch {
-
-        setVerified(false);
-
-        setAccountName("");
-       
-
-
+      setVerified(false);
+      setAccountName("");
     } finally {
-
-        setVerifying(false);
-
+      setVerifying(false);
     }
-
-};
-
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items;
+    let data = items;
 
-    return items.filter((x) => {
+    // NEW: Filter by payment mode
+    if (modeFilter === 'online') {
+      data = data.filter(x => acceptsOnline(x));
+    } else if (modeFilter === 'offline') {
+      data = data.filter(x =>!acceptsOnline(x));
+    }
+
+    if (!q) return data;
+    return data.filter((x) => {
       const hay = [x.bank_name, x.bank_code || "", x.account_name, x.account_number, x.currency || ""]
-        .join(" ")
-        .toLowerCase();
+       .join(" ")
+       .toLowerCase();
       return hay.includes(q);
     });
-  }, [items, query]);
+  }, [items, query, modeFilter]);
 
   const activeCount = useMemo(() => items.filter((x) => isTruthy(x.is_active)).length, [items]);
-  const inactiveCount = useMemo(() => items.filter((x) => !isTruthy(x.is_active)).length, [items]);
-
+  const inactiveCount = useMemo(() => items.filter((x) =>!isTruthy(x.is_active)).length, [items]);
+  const onlineCount = useMemo(() => items.filter((x) => acceptsOnline(x) && isTruthy(x.is_active)).length, [items]); // NEW
+  const offlineOnlyCount = useMemo(() => items.filter((x) =>!acceptsOnline(x) && isTruthy(x.is_active)).length, [items]); // NEW
   const validateForm = () => {
     const errs: string[] = [];
     if (!bankName.trim()) errs.push("Bank name is required.");
     if (!accountName.trim()) errs.push("Account name is required.");
     if (!accountNumber.trim()) errs.push("Account number is required.");
-
     const acc = accountNumber.trim();
     if (acc && (acc.length < 6 || acc.length > 20)) errs.push("Account number length looks invalid.");
     if (currency.trim().length < 3) errs.push("Currency is invalid.");
-
     if (errs.length) {
       setError(errs.join(" "));
       return false;
@@ -239,7 +215,6 @@ const verifyAccount = async () => {
   const save = async () => {
     setError("");
     if (!validateForm()) return;
-
     setSaving(true);
     try {
       const payload = {
@@ -249,15 +224,14 @@ const verifyAccount = async () => {
         account_number: accountNumber.trim(),
         currency: currency.trim() || "NGN",
         is_active: isActive,
-        sort_order: Number.isFinite(sortOrder) ? sortOrder : 0,
+        online_payment_enabled: acceptsOnlinePayment,
+        sort_order: Number.isFinite(sortOrder)? sortOrder : 0,
       };
-
       if (editing?.id) {
         await authApi.put(`/school/bank-accounts/${editing.id}`, payload);
       } else {
         await authApi.post(`/school/bank-accounts`, payload);
       }
-
       await load();
       setShowForm(false);
       resetForm();
@@ -272,7 +246,6 @@ const verifyAccount = async () => {
   const remove = async (row: SchoolBankAccount) => {
     const ok = window.confirm(`Delete this bank account?\n\n${row.bank_name} - ${row.account_number}`);
     if (!ok) return;
-
     setDeletingId(row.id);
     setError("");
     try {
@@ -290,7 +263,7 @@ const verifyAccount = async () => {
     setError("");
     try {
       await authApi.put(`/school/bank-accounts/${row.id}`, {
-        is_active: !isTruthy(row.is_active),
+        is_active:!isTruthy(row.is_active),
       });
       await load();
     } catch (e: any) {
@@ -299,17 +272,30 @@ const verifyAccount = async () => {
     }
   };
 
+  // NEW: Toggle online payment
+  const quickToggleOnline = async (row: SchoolBankAccount) => {
+    setError("");
+    try {
+      await authApi.put(`/school/bank-accounts/${row.id}`, {
+        online_payment_enabled: !acceptsOnline(row),
+      });
+      await load();
+    } catch (e: any) {
+      console.error(e);
+      setError(e?.response?.data?.message || "Unable to update payment mode.");
+    }
+  };
+
   return (
     <>
       <style>{`
-        .db-main {
+       .db-main {
           background: var(--bs-body-bg, #f5f1eb);
           min-height: 100vh;
           font-family: "DM Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
           padding: 28px 28px 0;
         }
-
-        .db-hero {
+       .db-hero {
           background: #0f172a;
           border-radius: var(--bs-border-radius-lg, 16px);
           padding: 32px 36px;
@@ -318,7 +304,7 @@ const verifyAccount = async () => {
           margin: 10px 0 18px;
           border: 1px solid rgba(255,255,255,0.06);
         }
-        .db-hero::before {
+       .db-hero::before {
           content: "";
           position: absolute;
           inset: 0;
@@ -326,7 +312,7 @@ const verifyAccount = async () => {
           background-size: 24px 24px;
           pointer-events: none;
         }
-        .db-hero-glow {
+       .db-hero-glow {
           position: absolute;
           top: -60px;
           right: -60px;
@@ -336,7 +322,7 @@ const verifyAccount = async () => {
           background: radial-gradient(circle, rgba(201, 168, 76, 0.10) 0%, transparent 65%);
           pointer-events: none;
         }
-        .db-hero-glow2 {
+       .db-hero-glow2 {
           position: absolute;
           bottom: -40px;
           left: 30%;
@@ -346,7 +332,7 @@ const verifyAccount = async () => {
           background: radial-gradient(circle, rgba(99, 102, 241, 0.07) 0%, transparent 70%);
           pointer-events: none;
         }
-        .db-hero-inner {
+       .db-hero-inner {
           position: relative;
           z-index: 1;
           display: flex;
@@ -355,9 +341,8 @@ const verifyAccount = async () => {
           gap: 32px;
           flex-wrap: wrap;
         }
-        @media (min-width: 768px) { .db-hero-inner { flex-wrap: nowrap; } }
-
-        .db-session-badge {
+        @media (min-width: 768px) {.db-hero-inner { flex-wrap: nowrap; } }
+       .db-session-badge {
           display: inline-flex;
           align-items: center;
           gap: 7px;
@@ -372,7 +357,7 @@ const verifyAccount = async () => {
           padding: 4px 12px;
           margin-bottom: 14px;
         }
-        .db-session-dot {
+       .db-session-dot {
           width: 6px;
           height: 6px;
           border-radius: 50%;
@@ -383,8 +368,7 @@ const verifyAccount = async () => {
           0%,100% { opacity: 1; transform: scale(1); }
           50% { opacity: 0.4; transform: scale(1.5); }
         }
-
-        .db-greeting {
+       .db-greeting {
           font-family: "Lora", Georgia, serif;
           font-size: clamp(22px, 2.5vw, 32px);
           font-weight: 700;
@@ -392,9 +376,8 @@ const verifyAccount = async () => {
           line-height: 1.1;
           margin-bottom: 8px;
         }
-        .db-greeting em { font-style: italic; color: #e8c97a; }
-
-        .db-hero-sub {
+       .db-greeting em { font-style: italic; color: #e8c97a; }
+       .db-hero-sub {
           font-size: 13.5px;
           font-weight: 300;
           color: #64748b;
@@ -402,10 +385,8 @@ const verifyAccount = async () => {
           max-width: 680px;
           margin-bottom: 18px;
         }
-
-        .db-hero-btns { display: flex; gap: 10px; flex-wrap: wrap; }
-
-        .db-btn-gold {
+       .db-hero-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+       .db-btn-gold {
           display: inline-flex;
           align-items: center;
           gap: 7px;
@@ -421,10 +402,9 @@ const verifyAccount = async () => {
           transition: background 0.2s, transform 0.2s;
           white-space: nowrap;
         }
-        .db-btn-gold:hover { background: #e8c97a; transform: translateY(-1px); }
-        .db-btn-gold:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
-
-        .db-btn-outline {
+       .db-btn-gold:hover { background: #e8c97a; transform: translateY(-1px); }
+       .db-btn-gold:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+       .db-btn-outline {
           display: inline-flex;
           align-items: center;
           gap: 7px;
@@ -440,10 +420,9 @@ const verifyAccount = async () => {
           transition: background 0.2s, border-color 0.2s, color 0.2s;
           white-space: nowrap;
         }
-        .db-btn-outline:hover { background: rgba(255, 255, 255, 0.06); color: #fff; border-color: rgba(255, 255, 255, 0.28); }
-        .db-btn-outline:disabled { opacity: 0.55; cursor: not-allowed; }
-
-        .db-hero-stat-card {
+       .db-btn-outline:hover { background: rgba(255, 255, 255, 0.06); color: #fff; border-color: rgba(255, 255, 255, 0.28); }
+       .db-btn-outline:disabled { opacity: 0.55; cursor: not-allowed; }
+       .db-hero-stat-card {
           background: rgba(255, 255, 255, 0.05);
           border: 1px solid rgba(255, 255, 255, 0.09);
           backdrop-filter: blur(8px);
@@ -453,12 +432,11 @@ const verifyAccount = async () => {
           margin-left: auto;
           align-self: flex-end;
         }
-        .db-hero-stat-row { display: flex; flex-direction: column; gap: 10px; }
-        .db-hero-stat-item { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-        .db-hero-stat-label { font-size: 12px; font-weight: 300; color: #64748b; }
-        .db-hero-stat-val { font-family: "Lora", serif; font-size: 22px; font-weight: 700; color: #fff; }
-
-        .db-panel {
+       .db-hero-stat-row { display: flex; flex-direction: column; gap: 10px; }
+       .db-hero-stat-item { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+       .db-hero-stat-label { font-size: 12px; font-weight: 300; color: #64748b; }
+       .db-hero-stat-val { font-family: "Lora", serif; font-size: 22px; font-weight: 700; color: #fff; }
+       .db-panel {
           background: #fff;
           border: 1px solid #ede8e0;
           border-radius: 14px;
@@ -466,8 +444,7 @@ const verifyAccount = async () => {
           box-shadow: 0 2px 10px rgba(15,23,42,0.04);
           margin-bottom: 18px;
         }
-
-        .db-panel-head {
+       .db-panel-head {
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -476,22 +453,20 @@ const verifyAccount = async () => {
           gap: 12px;
           flex-wrap: wrap;
         }
-
-        .db-panel-title {
+       .db-panel-title {
           font-family: "Lora", serif;
           font-size: 16px;
           font-weight: 700;
           color: #1a1a2e;
           margin: 0;
         }
-        .db-panel-sub {
+       .db-panel-sub {
           font-size: 11.5px;
           font-weight: 300;
           color: #9a8a7a;
           margin: 0;
         }
-
-        .db-refresh-btn {
+       .db-refresh-btn {
           display: inline-flex;
           align-items: center;
           gap: 6px;
@@ -506,10 +481,14 @@ const verifyAccount = async () => {
           transition: background 0.2s;
           white-space: nowrap;
         }
-        .db-refresh-btn:hover { background: #ede8e0; }
-        .db-refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        .db-pill {
+       .db-refresh-btn:hover { background: #ede8e0; }
+       .db-refresh-btn.active {
+          background: #0f172a;
+          border-color: #0f172a;
+          color: #fff;
+        }
+       .db-refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+       .db-pill {
           display: inline-flex;
           align-items: center;
           gap: 6px;
@@ -520,26 +499,22 @@ const verifyAccount = async () => {
           white-space: nowrap;
           border: 1px solid rgba(0,0,0,0.06);
         }
-
-        .db-muted { color: #9a8a7a; }
-        .db-strong { font-weight: 900; color: #1a1a2e; }
-
-        .db-card {
+       .db-muted { color: #9a8a7a; }
+       .db-strong { font-weight: 900; color: #1a1a2e; }
+       .db-card {
           border: 1px solid rgba(0,0,0,0.06);
           border-radius: 14px;
           background: #fff;
           box-shadow: 0 2px 10px rgba(15,23,42,0.04);
         }
-
-        .db-rowcard {
+       .db-rowcard {
           border: 1px solid rgba(0,0,0,0.06);
           border-radius: 14px;
           background: #fff;
           box-shadow: 0 2px 10px rgba(15,23,42,0.04);
           padding: 14px;
         }
-
-        .db-iconbox {
+       .db-iconbox {
           width: 40px;
           height: 40px;
           border-radius: 14px;
@@ -551,22 +526,51 @@ const verifyAccount = async () => {
           color: #c9a84c;
           flex: 0 0 auto;
         }
-
-        .db-mini {
+       .db-mini {
           font-size: 12px;
           color: #9a8a7a;
         }
-
-        @media (max-width: 991.98px) { .db-main { padding: 18px 14px 0; } }
+       .db-segmented {
+          display: inline-flex;
+          background: #f5f1eb;
+          border: 1px solid #e5ddd3;
+          border-radius: 10px;
+          padding: 4px;
+          gap: 4px;
+        }
+       .db-segmented button {
+          border: none;
+          background: transparent;
+          padding: 6px 14px;
+          border-radius: 8px;
+          font-size: 12px;
+          font-weight: 600;
+          color: #7a6a5a;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+       .db-segmented button.active {
+          background: #fff;
+          color: #1a1a2e;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+       .db-warning-banner {
+          background: rgba(245,158,11,0.08);
+          border: 1px solid rgba(245,158,11,0.2);
+          border-radius: 12px;
+          padding: 12px 16px;
+          display: flex;
+          gap: 12px;
+          align-items: start;
+          margin-bottom: 16px;
+        }
+        @media (max-width: 991.98px) {.db-main { padding: 18px 14px 0; } }
       `}</style>
-
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       <PageTitle title="Bank Details" />
-
       <div className="container-fluid">
         <div className="row">
           <Sidebar sidebarOpen={sidebarOpen} />
-
           <main className="col-md-9 col-lg-10 ms-auto db-main">
             {loading && <Loader message="Loading school bank accounts..." />}
 
@@ -574,57 +578,61 @@ const verifyAccount = async () => {
             <div className="db-hero">
               <div className="db-hero-glow" aria-hidden="true" />
               <div className="db-hero-glow2" aria-hidden="true" />
-
               <div className="db-hero-inner">
                 <div>
                   <div className="db-session-badge">
                     <span className="db-session-dot" />
                     Settings — Bank Transfer
                   </div>
-
                   <h1 className="db-greeting">
                     School <em>Bank Accounts</em>
                   </h1>
-
                   <p className="db-hero-sub">
-                    Add one or more bank accounts to show parents for manual transfer payments. Only <b>Active</b> accounts will be visible.
+                    Manage the bank accounts parents can use for school fee payments.
                   </p>
-
                   <div className="db-hero-btns">
                     <button className="db-btn-gold" type="button" onClick={openCreate} disabled={loading || saving}>
                       <i className="bi bi-plus-lg" />
                       Add bank account
                     </button>
-
                     <button className="db-btn-outline" type="button" onClick={load} disabled={loading}>
                       <i className="bi bi-arrow-clockwise" />
                       Refresh
                     </button>
                   </div>
                 </div>
-
                 <div className="db-hero-stat-card d-none d-md-block">
                   <div className="db-hero-stat-row">
                     <div className="db-hero-stat-item">
-                      <span className="db-hero-stat-label">Total</span>
-                      <span className="db-hero-stat-val">{items.length}</span>
-                    </div>
-                    <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
-                    <div className="db-hero-stat-item">
-                      <span className="db-hero-stat-label">Active</span>
+                      <span className="db-hero-stat-label">Total Active</span>
                       <span className="db-hero-stat-val">{activeCount}</span>
                     </div>
                     <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
                     <div className="db-hero-stat-item">
-                      <span className="db-hero-stat-label">Inactive</span>
-                      <span className="db-hero-stat-val">{inactiveCount}</span>
+                      <span className="db-hero-stat-label">Online Enabled</span>
+                      <span className="db-hero-stat-val">{onlineCount}</span>
+                    </div>
+                    <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
+                    <div className="db-hero-stat-item">
+                      <span className="db-hero-stat-label">Offline Only</span>
+                      <span className="db-hero-stat-val">{offlineOnlyCount}</span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Error */}
+            {/* NEW: Warning if no online payment enabled */}
+            {onlineCount === 0 && activeCount > 0 && (
+              <div className="db-warning-banner">
+                <i className="bi bi-exclamation-triangle" style={{ color: '#f59e0b', fontSize: 18 }} />
+                <div>
+                  <div className="db-strong" style={{ fontSize: 13, marginBottom: 2 }}>Online Payment Disabled</div>
+                  <div className="db-mini">Parents will only see bank transfer option at checkout. Enable online payment on at least one account to accept cards.</div>
+                </div>
+              </div>
+            )}
+
             {error && (
               <div className="alert alert-danger" role="alert" style={{ borderRadius: 14 }}>
                 <i className="bi bi-exclamation-triangle me-2" />
@@ -641,30 +649,39 @@ const verifyAccount = async () => {
                       <p className="db-panel-title">Accounts</p>
                       <p className="db-panel-sub">Search, toggle active, edit or delete.</p>
                     </div>
-
                     <div className="d-flex align-items-center gap-2 flex-wrap">
-                      <div className="input-group" style={{ width: 340 }}>
+                      {/* NEW: Mode filter */}
+                      <div className="db-segmented">
+                        <button
+                          className={modeFilter === 'all'? 'active' : ''}
+                          onClick={() => setModeFilter('all')}
+                        >All</button>
+                        <button
+                          className={modeFilter === 'online'? 'active' : ''}
+                          onClick={() => setModeFilter('online')}
+                        >Online</button>
+                        <button
+                          className={modeFilter === 'offline'? 'active' : ''}
+                          onClick={() => setModeFilter('offline')}
+                        >Offline</button>
+                      </div>
+
+                      <div className="input-group" style={{ width: 280 }}>
                         <span className="input-group-text bg-white" style={{ borderRadius: "10px 0 0 10px" }}>
                           <i className="bi bi-search" />
                         </span>
                         <input
                           className="form-control"
-                          placeholder="Search bank / account / number / currency..."
+                          placeholder="Search bank / account..."
                           value={query}
                           onChange={(e) => setQuery(e.target.value)}
                           style={{ borderRadius: "0 10px 10px 0" }}
                         />
                       </div>
-
-                      <button className="db-refresh-btn" type="button" onClick={load} disabled={loading}>
-                        <i className="bi bi-arrow-clockwise" />
-                        Refresh
-                      </button>
                     </div>
                   </div>
-
                   <div style={{ padding: 16 }}>
-                    {filtered.length === 0 ? (
+                    {filtered.length === 0? (
                       <div className="text-center py-5">
                         <div
                           className="mx-auto mb-3 d-flex align-items-center justify-content-center"
@@ -692,38 +709,48 @@ const verifyAccount = async () => {
                       <div className="d-flex flex-column gap-2">
                         {filtered.map((row) => {
                           const active = isTruthy(row.is_active);
-
+                          const online = acceptsOnline(row);
                           return (
                             <div key={row.id} className="db-rowcard">
                               <div className="d-flex justify-content-between gap-3 flex-wrap">
                                 <div className="d-flex gap-12" style={{ gap: 12, minWidth: 260 }}>
-                                  <div className="db-iconbox" style={{ background: active ? "rgba(34,197,94,0.14)" : "rgba(148,163,184,0.18)", color: active ? "#22c55e" : "#64748b" }}>
+                                  <div className="db-iconbox" style={{ background: active? "rgba(34,197,94,0.14)" : "rgba(148,163,184,0.18)", color: active? "#22c55e" : "#64748b" }}>
                                     <i className="bi bi-bank" />
                                   </div>
-
                                   <div>
-                                    <div className="db-strong" style={{ fontWeight: 900 }}>
-                                      {row.bank_name}
-                                      {row.bank_code ? <span className="db-mini"> • {row.bank_code}</span> : null}
+                                    <div className="d-flex align-items-center gap-2 flex-wrap">
+                                      <div className="db-strong" style={{ fontWeight: 900 }}>
+                                        {row.bank_name}
+                                        {row.bank_code? <span className="db-mini"> • {row.bank_code}</span> : null}
+                                      </div>
+                                      {/* NEW: Payment mode badge */}
+                                      <span
+                                        className="db-pill"
+                                        style={{
+                                          background: online? "rgba(99,102,241,0.14)" : "rgba(148,163,184,0.14)",
+                                          color: online? "#6366f1" : "#64748b",
+                                          fontSize: 10,
+                                          padding: "4px 8px"
+                                        }}
+                                      >
+                                        <i className={`bi ${online? "bi-lightning-charge" : "bi-cash"}`} />
+                                        {online? "ONLINE" : "OFFLINE"}
+                                      </span>
                                     </div>
-
                                     <div className="db-mini">
                                       Currency: <b style={{ color: "#1a1a2e" }}>{row.currency || "NGN"}</b> • Sort:{" "}
-                                      <b style={{ color: "#1a1a2e" }}>{row.sort_order ?? 0}</b>
+                                      <b style={{ color: "#1a1a2e" }}>{row.sort_order?? 0}</b>
                                     </div>
-
                                     <div style={{ marginTop: 10 }}>
                                       <div className="db-mini">Account name</div>
                                       <div className="db-strong" style={{ fontWeight: 800 }}>{row.account_name}</div>
                                     </div>
-
                                     <div style={{ marginTop: 8 }}>
                                       <div className="db-mini">Account number</div>
                                       <div className="d-flex align-items-center gap-2 flex-wrap">
                                         <code style={{ fontSize: 13, padding: "4px 8px", borderRadius: 10, background: "#f5f1eb", border: "1px solid #e5ddd3" }}>
                                           {row.account_number}
                                         </code>
-
                                         <button
                                           type="button"
                                           className="db-refresh-btn"
@@ -735,7 +762,6 @@ const verifyAccount = async () => {
                                           <i className="bi bi-clipboard" />
                                           Copy
                                         </button>
-
                                         <span className="db-mini">
                                           Masked: <code style={{ fontSize: 12 }}>{maskAcct(row.account_number)}</code>
                                         </span>
@@ -743,20 +769,35 @@ const verifyAccount = async () => {
                                     </div>
                                   </div>
                                 </div>
-
                                 <div className="ms-auto d-flex flex-column align-items-end gap-2">
                                   <span
                                     className="db-pill"
                                     style={{
-                                      background: active ? "rgba(34,197,94,0.14)" : "rgba(245,158,11,0.14)",
-                                      color: active ? "#22c55e" : "#f59e0b",
+                                      background: active? "rgba(34,197,94,0.14)" : "rgba(245,158,11,0.14)",
+                                      color: active? "#22c55e" : "#f59e0b",
                                     }}
                                   >
-                                    <i className={`bi ${active ? "bi-check-circle" : "bi-exclamation-circle"}`} />
-                                    {active ? "ACTIVE" : "INACTIVE"}
+                                    <i className={`bi ${active? "bi-check-circle" : "bi-exclamation-circle"}`} />
+                                    {active? "ACTIVE" : "INACTIVE"}
                                   </span>
-
                                   <div className="d-flex gap-2 flex-wrap justify-content-end">
+                                    {/* NEW: Toggle online button */}
+                                    <button
+                                      type="button"
+                                      className="db-refresh-btn"
+                                      onClick={() => quickToggleOnline(row)}
+                                      disabled={loading || saving || deletingId === row.id}
+                                      title="Toggle online payment"
+                                      style={{
+                                        borderColor: online? "rgba(99,102,241,0.25)" : "rgba(148,163,184,0.25)",
+                                        background: online ? "rgba(99,102,241,0.06)" : "rgba(148,163,184,0.06)",
+                                        color: online ? "#6366f1" : "#64748b"
+                                      }}
+                                    >
+                                      <i className={`bi ${online ? "bi-toggle-on" : "bi-toggle-off"}`} />
+                                      {online ? "Online" : "Offline"}
+                                    </button>
+
                                     <button
                                       type="button"
                                       className="db-refresh-btn"
@@ -798,7 +839,6 @@ const verifyAccount = async () => {
                                       )}
                                     </button>
                                   </div>
-
                                   <div className="db-mini text-end">
                                     Updated: <b style={{ color: "#1a1a2e" }}>{fmtDateTime(row.updated_at)}</b>
                                   </div>
@@ -807,6 +847,7 @@ const verifyAccount = async () => {
                             </div>
                           );
                         })}
+                
                       </div>
                     )}
                   </div>
@@ -819,7 +860,6 @@ const verifyAccount = async () => {
                       <p className="db-panel-sub">Optional guidance you can show on the payment page.</p>
                     </div>
                   </div>
-
                   <div style={{ padding: 16 }}>
                     <div className="db-card" style={{ padding: 14, background: "#faf8f5" }}>
                       <div className="d-flex align-items-start gap-3">
@@ -849,7 +889,6 @@ const verifyAccount = async () => {
                       <p className="db-panel-title">{editing ? "Edit bank account" : "Add bank account"}</p>
                       <p className="db-panel-sub">Only active accounts show to parents.</p>
                     </div>
-
                     <div className="d-flex gap-2 flex-wrap">
                       <button
                         type="button"
@@ -878,7 +917,6 @@ const verifyAccount = async () => {
                       </button>
                     </div>
                   </div>
-
                   <div style={{ padding: 16 }}>
                     {!showForm ? (
                       <div className="db-muted">
@@ -886,44 +924,27 @@ const verifyAccount = async () => {
                       </div>
                     ) : (
                       <div className="row g-3">
-                       <div className="col-12">
-
-                      <label className="form-label fw-semibold">
-
-                      Bank
-
-                      </label>
-
-                      <select
-                          className="form-select"
-                          value={bankCode}
-                          onChange={(e)=>{
-
-                              const bank = banks.find(x=>x.code===e.target.value);
-
-                              setBankCode(bank.code);
-
-                              setBankName(bank.name);
-
-                          }}
-                      >
-
-                      <option value="">Select Bank</option>
-
-                      {banks.map(bank=>(
-                      <option
-                      key={bank.code}
-                      value={bank.code}
-                      >
-
-                      {bank.name}
-
-                      </option>
-                      ))}
-
-                      </select>
-
-                      </div>
+                        <div className="col-12">
+                          <label className="form-label fw-semibold">Bank</label>
+                          <select
+                            className="form-select"
+                            value={bankCode}
+                            onChange={(e) => {
+                              const bank = banks.find(x => x.code === e.target.value);
+                              setBankCode(bank?.code || "");
+                              setBankName(bank?.name || "");
+                            }}
+                            style={{ borderRadius: 12 }}
+                            disabled={saving}
+                          >
+                            <option value="">Select Bank</option>
+                            {banks.map(bank => (
+                              <option key={bank.code} value={bank.code}>
+                                {bank.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
                         <div className="col-12 col-md-6">
                           <label className="form-label fw-semibold small mb-1">Bank code</label>
@@ -949,7 +970,6 @@ const verifyAccount = async () => {
                           />
                         </div>
 
-                        
                         <div className="col-12">
                           <label className="form-label fw-semibold small mb-1">Account number</label>
                           <input
@@ -965,56 +985,76 @@ const verifyAccount = async () => {
                           </div>
                         </div>
 
-
-
                         <div className="col-12">
                           <label className="form-label fw-semibold small mb-1">Account name</label>
                           <input
                             className="form-control"
                             value={accountName}
                             readOnly
-                            style={{
-                            background:"#f8f9fa"
-                            }}
-                            />
+                            style={{ background: "#f8f9fa" }}
+                          />
                         </div>
 
                         {verifying && (
-
                           <div className="text-primary small mt-2">
-
-                          <span className="spinner-border spinner-border-sm me-2"/>
-
-                          Verifying account...
-
+                            <span className="spinner-border spinner-border-sm me-2" />
+                            Verifying account...
                           </div>
-
-                          )}
-
-                          {verified && (
-
-                            <div className="text-success small mt-2">
-
-                            <i className="bi bi-check-circle-fill me-2"/>
-
+                        )}
+                        {verified && (
+                          <div className="text-success small mt-2">
+                            <i className="bi bi-check-circle-fill me-2" />
                             Verified account
+                          </div>
+                        )}
+                        {!verified && accountNumber.length === 10 && !verifying && (
+                          <div className="text-danger small mt-2">
+                            <i className="bi bi-x-circle-fill me-2" />
+                            Invalid account details
+                          </div>
+                        )}
 
-                            </div>
-
-                            )}
-
-                            {!verified && accountNumber.length===10 && !verifying && (
-
-                              <div className="text-danger small mt-2">
-
-                              <i className="bi bi-x-circle-fill me-2"/>
-
-                              Invalid account details
-
+                        {/* NEW: Payment Mode Toggle - Senior UX */}
+                        <div className="col-12">
+                          <label className="form-label fw-semibold small mb-1">Payment Mode</label>
+                          <div className="db-card" style={{ padding: 12, background: "#faf8f5" }}>
+                            <div className="d-flex justify-content-between align-items-start gap-3 mb-2">
+                              <div>
+                                <div className="fw-semibold" style={{ fontSize: 13, color: "#1a1a2e" }}>
+                                  Enable Online Payment
+                                </div>
+                                <div className="db-mini">
+                                  If enabled, parents can pay with card via Paystack to this account.
+                                </div>
                               </div>
-
-                              )}
-
+                              <div className="form-check form-switch m-0">
+                                <input
+                                  className="form-check-input"
+                                  type="checkbox"
+                                  role="switch"
+                                  checked={acceptsOnlinePayment}
+                                  onChange={(e) => setAcceptsOnlinePayment(e.target.checked)}
+                                  id="bankAcctOnlineSwitch"
+                                  disabled={saving}
+                                  style={{ width: 44, height: 24, cursor: 'pointer' }}
+                                />
+                              </div>
+                            </div>
+                            <div className="d-flex align-items-center gap-2" style={{ 
+                              background: acceptsOnlinePayment ? "rgba(99,102,241,0.08)" : "rgba(148,163,184,0.08)",
+                              borderRadius: 8,
+                              padding: "8px 12px"
+                            }}>
+                              <i className={`bi ${acceptsOnlinePayment ? "bi-lightning-charge-fill" : "bi-cash"}`} 
+                                 style={{ color: acceptsOnlinePayment ? "#6366f1" : "#64748b" }} />
+                              <span className="db-mini" style={{ color: "#1a1a2e" }}>
+                                {acceptsOnlinePayment 
+                                  ? "This account will accept online card payments" 
+                                  : "Bank transfer only - parents upload receipt manually"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
 
                         <div className="col-12 col-md-6">
                           <label className="form-label fw-semibold small mb-1">Sort order</label>
@@ -1028,6 +1068,7 @@ const verifyAccount = async () => {
                             style={{ borderRadius: 12 }}
                             disabled={saving}
                           />
+                        
                           <div className="db-mini" style={{ marginTop: 6 }}>
                             Lower values appear first.
                           </div>
@@ -1045,13 +1086,14 @@ const verifyAccount = async () => {
                                 onChange={(e) => setIsActive(e.target.checked)}
                                 id="bankAcctActiveSwitch"
                                 disabled={saving}
+                                style={{ width: 44, height: 24, cursor: 'pointer' }}
                               />
                               <label className="form-check-label fw-semibold" htmlFor="bankAcctActiveSwitch">
                                 Active (visible)
                               </label>
                             </div>
                             <div className="db-mini" style={{ marginTop: 6 }}>
-                              Inactive accounts won’t show to parents.
+                              Inactive accounts won't show to parents.
                             </div>
                           </div>
                         </div>
@@ -1069,16 +1111,12 @@ const verifyAccount = async () => {
                             <i className="bi bi-x-circle" />
                             Cancel
                           </button>
-
                           <button
                             type="button"
                             className="db-btn-gold ms-auto"
                             onClick={save}
                             style={{ borderRadius: 12, padding: "10px 14px" }}
-                            disabled={
-                            saving ||
-                            !verified
-                            }
+                            disabled={saving ||!verified}
                           >
                             {saving ? (
                               <>
@@ -1113,7 +1151,6 @@ const verifyAccount = async () => {
                       <p className="db-panel-sub">Avoid exposing sensitive details unnecessarily.</p>
                     </div>
                   </div>
-
                   <div style={{ padding: 16 }}>
                     <div className="db-card" style={{ padding: 14, background: "#faf8f5" }}>
                       <div className="db-muted" style={{ fontSize: 13 }}>
@@ -1131,6 +1168,7 @@ const verifyAccount = async () => {
           </main>
         </div>
       </div>
+      
     </>
   );
 }

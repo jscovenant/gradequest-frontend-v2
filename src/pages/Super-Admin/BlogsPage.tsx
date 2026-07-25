@@ -311,18 +311,16 @@ export default function BlogsPage() {
 
       <div className="container-fluid">
         <div className="row">
-          <Sidebar sidebarOpen={sidebarOpen} />
+          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-          <main className="col-md-9 col-lg-10 ms-auto px-4 d-flex flex-column min-vh-100" style={{ backgroundColor: "#f8f9fa" }}>
+          <main className="col-md-9 col-lg-10 ms-auto px-4 d-flex flex-column min-vh-100 sa-main">
             {(loading || saving) && <Loader message={saving ? "Saving changes..." : "Loading blogs..."} />}
 
             {/* HERO */}
             <div
-              className="mt-4 p-4 position-relative overflow-hidden"
+              className="mt-4 p-4 position-relative overflow-hidden sa-hero"
               style={{
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                 borderRadius: 16,
-                boxShadow: "0 10px 30px rgba(102, 126, 234, 0.3)",
               }}
             >
               <div className="row align-items-center g-3 position-relative">

@@ -16,6 +16,11 @@ type Settings = {
   grace_minutes: number;
   staff_checkout_time: string | null;
   absent_after_time: string | null;
+  school_latitude: string | number | null;
+  school_longitude: string | number | null;
+  allowed_radius_meters: number | null;
+  qr_expires_seconds: number | null;
+  require_location_verification: boolean;
   is_active: boolean;
 };
 
@@ -53,6 +58,11 @@ export default function AttendanceSettingsPage() {
     grace_minutes: 10,
     staff_checkout_time: "",
     absent_after_time: "",
+    school_latitude: "",
+    school_longitude: "",
+    allowed_radius_meters: 100,
+    qr_expires_seconds: 300,
+    require_location_verification: true,
     is_active: true,
   });
 
@@ -67,6 +77,11 @@ export default function AttendanceSettingsPage() {
         grace_minutes: s.grace_minutes ?? 10,
         staff_checkout_time: toHHMM(s.staff_checkout_time),
         absent_after_time: toHHMM(s.absent_after_time),
+        school_latitude: s.school_latitude ?? "",
+        school_longitude: s.school_longitude ?? "",
+        allowed_radius_meters: s.allowed_radius_meters ?? 100,
+        qr_expires_seconds: s.qr_expires_seconds ?? 60,
+        require_location_verification: s.require_location_verification ?? true,
         is_active: !!s.is_active,
       });
     } catch (err: any) {
@@ -89,12 +104,21 @@ export default function AttendanceSettingsPage() {
       if (!form.staff_checkin_time) return showError?.("Check-in time is required");
       if (Number(form.grace_minutes) < 0 || Number(form.grace_minutes) > 180)
         return showError?.("Grace minutes must be between 0 and 180");
+      if (Number(form.allowed_radius_meters) < 10 || Number(form.allowed_radius_meters) > 5000)
+        return showError?.("Allowed distance must be between 10 and 5000 meters");
+      if (Number(form.qr_expires_seconds) < 60 || Number(form.qr_expires_seconds) > 600)
+        return showError?.("QR expiry must be between 60 and 600 seconds");
 
       const payload = {
         staff_checkin_time: form.staff_checkin_time, // backend expects HH:MM
         grace_minutes: Number(form.grace_minutes),
         staff_checkout_time: form.staff_checkout_time || null,
         absent_after_time: form.absent_after_time || null,
+        school_latitude: form.school_latitude === "" ? null : Number(form.school_latitude),
+        school_longitude: form.school_longitude === "" ? null : Number(form.school_longitude),
+        allowed_radius_meters: Number(form.allowed_radius_meters),
+        qr_expires_seconds: Number(form.qr_expires_seconds),
+        require_location_verification: form.require_location_verification,
         is_active: form.is_active,
       };
 
@@ -107,6 +131,26 @@ export default function AttendanceSettingsPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const useCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      showError?.("Location is not supported on this browser");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setForm((p) => ({
+          ...p,
+          school_latitude: position.coords.latitude.toFixed(7),
+          school_longitude: position.coords.longitude.toFixed(7),
+        }));
+        showSuccess?.("School location captured");
+      },
+      () => showError?.("Please allow location access to capture the school location"),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    );
   };
 
   // ===== same template css (inline) =====
@@ -606,6 +650,118 @@ export default function AttendanceSettingsPage() {
                         For future automation: mark absent if no check-in by this time.
                       </div>
                     </div>
+                  </div>
+
+                  <div
+                    style={{
+                      borderRadius: 14,
+                      border: "1px solid #ede8e0",
+                      background: "#fff",
+                      padding: 14,
+                      display: "grid",
+                      gap: 12,
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                      <div>
+                        <div className="db-strong" style={{ fontSize: 13.5 }}>School location security</div>
+                        <div className="db-muted" style={{ fontSize: 12, lineHeight: 1.55 }}>
+                          Staff scans must happen close to this school location.
+                        </div>
+                      </div>
+
+                      <button className="db-refresh-btn" type="button" onClick={useCurrentLocation} disabled={loading || saving}>
+                        <i className="bi bi-geo-alt" /> Use current location
+                      </button>
+                    </div>
+
+                    <div
+                      style={{
+                        borderRadius: 12,
+                        border: "1px solid #e5ddd3",
+                        background: "#faf8f5",
+                        padding: 12,
+                        fontSize: 12.5,
+                        color: "#7a6a5a",
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      Use a computer or phone physically inside the school compound, click <b>Use current location</b>,
+                      then choose <b>Allow</b> when the browser asks. If location was blocked, click the lock or site
+                      settings icon beside the address bar, allow <b>Location</b>, and refresh the page.
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div>
+                        <div className="miniCardLabel" style={{ marginBottom: 6 }}>Latitude</div>
+                        <input
+                          type="number"
+                          step="0.0000001"
+                          className="db-input"
+                          value={form.school_latitude}
+                          onChange={(e) => setForm((p) => ({ ...p, school_latitude: e.target.value }))}
+                          disabled={loading || saving}
+                        />
+                      </div>
+
+                      <div>
+                        <div className="miniCardLabel" style={{ marginBottom: 6 }}>Longitude</div>
+                        <input
+                          type="number"
+                          step="0.0000001"
+                          className="db-input"
+                          value={form.school_longitude}
+                          onChange={(e) => setForm((p) => ({ ...p, school_longitude: e.target.value }))}
+                          disabled={loading || saving}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div>
+                        <div className="miniCardLabel" style={{ marginBottom: 6 }}>Allowed distance in meters</div>
+                        <input
+                          type="number"
+                          min={10}
+                          max={5000}
+                          className="db-input"
+                          value={form.allowed_radius_meters}
+                          onChange={(e) => setForm((p) => ({ ...p, allowed_radius_meters: Number(e.target.value) }))}
+                          disabled={loading || saving}
+                        />
+                        <div className="db-muted" style={{ fontSize: 12, marginTop: 6, lineHeight: 1.55 }}>
+                          Start with 100m. Increase only if the school compound is large.
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="miniCardLabel" style={{ marginBottom: 6 }}>QR expiry in seconds</div>
+                        <input
+                          type="number"
+                          min={60}
+                          max={600}
+                          className="db-input"
+                          value={form.qr_expires_seconds}
+                          onChange={(e) => setForm((p) => ({ ...p, qr_expires_seconds: Number(e.target.value) }))}
+                          disabled={loading || saving}
+                        />
+                        <div className="db-muted" style={{ fontSize: 12, marginTop: 6, lineHeight: 1.55 }}>
+                          Use 300 seconds for normal school use. Shorter expiry reduces QR sharing abuse.
+                        </div>
+                      </div>
+                    </div>
+
+                    <label style={{ display: "flex", gap: 10, alignItems: "center", margin: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={form.require_location_verification}
+                        onChange={(e) => setForm((p) => ({ ...p, require_location_verification: e.target.checked }))}
+                        disabled={loading || saving}
+                      />
+                      <span className="db-muted" style={{ fontSize: 12.5 }}>
+                        Require location verification before staff attendance is marked.
+                      </span>
+                    </label>
                   </div>
 
                   <div

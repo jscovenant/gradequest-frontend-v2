@@ -1,12 +1,20 @@
 // src/utils/api.ts
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:8000/api" ;
+const rawBaseUrl =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD ? "https://gradequest.com.ng" : "http://localhost:8000");
+
+const normalizedBaseUrl = rawBaseUrl.replace(/\/+$/, "");
+const API_BASE_URL = normalizedBaseUrl.endsWith("/api")
+  ? normalizedBaseUrl
+  : `${normalizedBaseUrl}/api`;
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
+    "Accept": "application/json",
   },
 });
 
