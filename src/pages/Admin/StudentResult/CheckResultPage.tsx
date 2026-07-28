@@ -1,5 +1,5 @@
 // src/pages/Public/CheckResultPage.tsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { publicApi } from "../../../utils/axios";
 import { useToast } from "../../../contexts/ToastContext";
 import Footer from "../../../components/LayoutComponents/Footer";
@@ -97,6 +97,7 @@ interface LegacyTermResult {
   ca: string | Record<string, any>;
   exam: number;
   total: number;
+  firstterm?: number;
   secondterm?: number;
   average?: number;
   grade?: string;
@@ -115,6 +116,43 @@ interface SchoolInfo {
   background_color?: string;
 }
 
+interface ResultTemplateSetting {
+  template_key?: string;
+  primary_color?: string;
+  secondary_color?: string;
+  background_color?: string;
+  font_family?: string;
+  display_options?: {
+    show_position?: boolean;
+    show_grade?: boolean;
+    show_remarks?: boolean;
+    show_attendance?: boolean;
+    show_domains?: boolean;
+    show_qr_code?: boolean;
+    show_signature?: boolean;
+    show_student_photo?: boolean;
+    show_watermark?: boolean;
+    report_column_rules?: ReportColumnRule[];
+  };
+}
+
+type ReportColumnOptions = {
+  show_position: boolean;
+  show_grade: boolean;
+  show_remarks: boolean;
+  show_first_term: boolean;
+  show_second_term: boolean;
+  show_cumulative_total: boolean;
+  show_cumulative_average: boolean;
+};
+
+type ReportColumnRule = {
+  id?: string;
+  section_id?: number | "all" | null;
+  section_name?: string;
+  term?: string;
+  columns?: Partial<ReportColumnOptions>;
+};
 interface AffectiveDomain {
   domain: string;
   rating: string;
@@ -132,12 +170,53 @@ interface ReportCardData {
   average: V2Average | LegacyAverage;
   term_result: (V2SubjectResult | LegacyTermResult)[];
   class_name: string;
+  class_section_id?: number | null;
+  class_section_name?: string | null;
   school_info: SchoolInfo;
+  result_template?: ResultTemplateSetting;
   affective_domains: AffectiveDomain[];
   psychomotor_domains: PsychomotorDomain[];
 }
 
 type SaveErrors = Record<string, string[] | string>;
+
+const performanceChartColors = ["#2563eb", "#16a34a", "#f59e0b", "#dc2626", "#7c3aed", "#0891b2"];
+const resultAnalyticColors = ["#0f766e", "#9333ea", "#ea580c", "#0284c7", "#be123c", "#4f46e5"];
+const defaultReportColumnOptions: ReportColumnOptions = {
+  show_position: true,
+  show_grade: true,
+  show_remarks: true,
+  show_first_term: false,
+  show_second_term: false,
+  show_cumulative_total: false,
+  show_cumulative_average: false,
+};
+
+function normalizeTerm(term: string | undefined) {
+  return (term || "all").trim().toLowerCase();
+}
+
+function resolveReportColumns(
+  rules: ReportColumnRule[] = [],
+  sectionId: number | null | undefined,
+  term: string
+): ReportColumnOptions {
+  const matched = rules
+    .map((rule) => {
+      const ruleSection = rule.section_id ?? "all";
+      const sectionMatches = ruleSection === "all" || Number(ruleSection) === Number(sectionId);
+      const termMatches = normalizeTerm(rule.term) === "all" || normalizeTerm(rule.term) === normalizeTerm(term);
+      const score = (ruleSection === "all" ? 0 : 2) + (normalizeTerm(rule.term) === "all" ? 0 : 1);
+      return { rule, score: sectionMatches && termMatches ? score : -1 };
+    })
+    .filter((item) => item.score >= 0)
+    .sort((a, b) => a.score - b.score);
+
+  return matched.reduce(
+    (columns, item) => ({ ...columns, ...(item.rule.columns || {}) }),
+    { ...defaultReportColumnOptions }
+  );
+}
 
 /** -----------------------------
  * Helpers (copied/adapted from ShowResult)
@@ -202,6 +281,24 @@ const getTextColor = (bg: string) => {
   const yiq = (r * 299 + g * 587 + b * 114) / 1000;
   return yiq >= 140 ? "#111827" : "#fff";
 };
+const hexToRgba = (color: string, alpha: number) => {
+  const hex = (color || "").replace("#", "");
+  if (hex.length !== 6) return `rgba(13, 71, 161, ${alpha})`;
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const mixHexWithWhite = (color: string, whitePercent = 82) => {
+  const hex = (color || "").replace("#", "");
+  if (hex.length !== 6) return "#f8fafc";
+  const ratio = Math.max(0, Math.min(100, whitePercent)) / 100;
+  const r = Math.round(parseInt(hex.substring(0, 2), 16) * (1 - ratio) + 255 * ratio);
+  const g = Math.round(parseInt(hex.substring(2, 4), 16) * (1 - ratio) + 255 * ratio);
+  const b = Math.round(parseInt(hex.substring(4, 6), 16) * (1 - ratio) + 255 * ratio);
+  return `rgb(${r}, ${g}, ${b})`;
+};
 
 /** -----------------------------
  * Component
@@ -218,6 +315,15 @@ export default function CheckResultPage() {
 
   const [data, setData] = useState<ReportCardData | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlRegNo = params.get("reg_no") || params.get("student_reg_no") || "";
+    const urlPin = params.get("pin") || "";
+
+    if (urlRegNo) setRegNo(urlRegNo);
+    if (urlPin) setPin(urlPin);
+  }, []);
 
   const parseBackendError = (err: any) => {
     const msg =
@@ -246,7 +352,7 @@ export default function CheckResultPage() {
 
       setData(res.data);
 
-      // ✅ QR Code (same style as ShowResult)
+      // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ QR Code (same style as ShowResult)
       const term = (res.data.average as any)?.term;
       const session = (res.data.average as any)?.session;
 
@@ -303,22 +409,53 @@ export default function CheckResultPage() {
   const term_result = data?.term_result || [];
   const summary = data?.average as any;
 
-  const themePrimary = school_info?.primary_color || "#0d47a1";
-  const themeSecondary = school_info?.secondary_color || "#ffc107";
-  const themeBg = school_info?.background_color || "#ffffff";
+  const affective_domains = data?.affective_domains || [];
+  const psychomotor_domains = data?.psychomotor_domains || [];
+  const class_name = data?.class_name || "N/A";
+  const resultTemplate = data?.result_template || {};
+  const displayOptions = {
+    show_position: true,
+    show_grade: true,
+    show_remarks: true,
+    show_attendance: true,
+    show_domains: true,
+    show_qr_code: true,
+    show_signature: true,
+    show_student_photo: true,
+    show_watermark: true,
+    ...(resultTemplate.display_options || {}),
+  };
+  const activeReportColumns = resolveReportColumns(
+    displayOptions.report_column_rules || [],
+    data?.class_section_id,
+    String(summary?.term || "")
+  );
+  const showResultPosition = displayOptions.show_position && activeReportColumns.show_position;
+  const showResultGrade = displayOptions.show_grade && activeReportColumns.show_grade;
+  const showResultRemarks = displayOptions.show_remarks && activeReportColumns.show_remarks;
+
+  const themePrimary = resultTemplate.primary_color || school_info?.primary_color || "#0d47a1";
+  const themeSecondary = resultTemplate.secondary_color || school_info?.secondary_color || "#ffc107";
+  const themeBg = resultTemplate.background_color || school_info?.background_color || "#ffffff";
+  const templateKey = resultTemplate.template_key || "classic_academic";
+  const resultFont = resultTemplate.font_family || "Arial";
+  const isModernTemplate = templateKey === "modern_scholar";
+  const isPremiumTemplate = templateKey === "premium_letterhead";
   const headerTextColor = getTextColor(themePrimary);
 
   const borderColor = themePrimary;
 
   const thStyle: React.CSSProperties = {
     border: `1px solid ${borderColor}`,
-    padding: "4px",
+    padding: "7px 5px",
     textAlign: "center",
+    background: themePrimary,
+    color: headerTextColor,
   };
 
   const tdStyle: React.CSSProperties = {
-    border: `1px solid ${borderColor}`,
-    padding: "4px",
+    border: `1px solid ${hexToRgba(borderColor, 0.55)}`,
+    padding: "6px 5px",
     textAlign: "center",
   };
 
@@ -328,7 +465,35 @@ export default function CheckResultPage() {
     border: `1px solid ${borderColor}`,
     fontSize: "11px",
   };
-
+  const resultLayoutStyle: React.CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: isModernTemplate ? "minmax(0, 1.25fr) minmax(245px, .75fr)" : "1fr",
+    gap: 12,
+    alignItems: "start",
+    borderTop: isPremiumTemplate ? `1px solid ${themePrimary}55` : undefined,
+    marginTop: isPremiumTemplate ? 12 : undefined,
+    paddingTop: isPremiumTemplate ? 2 : undefined,
+  };
+  const insightPanelStyle: React.CSSProperties = {
+    minWidth: 0,
+    marginTop: isModernTemplate ? 12 : 0,
+    display: isPremiumTemplate ? "grid" : undefined,
+    gridTemplateColumns: isPremiumTemplate ? "1.2fr .8fr" : undefined,
+    gap: isPremiumTemplate ? 10 : undefined,
+    alignItems: isPremiumTemplate ? "start" : undefined,
+  };
+  const analyticsGridStyle: React.CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: isModernTemplate ? "1fr" : "1.2fr .8fr",
+    gap: 10,
+    marginTop: 12,
+  };
+  const domainsGridStyle: React.CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: isModernTemplate ? "1fr" : "1fr 1fr",
+    marginTop: isPremiumTemplate ? 0 : 12,
+    gap: 10,
+  };
   // collect term names from carry_over.terms across all subjects
   const currentTermName = summary?.term || "";
 
@@ -370,39 +535,59 @@ export default function CheckResultPage() {
     return { maxCAColumns: max, caColumnValue: caColValue };
   }, [term_result]);
 
+  const visibleV2CarryTermNames = v2CarryTermNames.filter((termName) => {
+    const normalized = normalizeTerm(termName);
+    if (normalized.includes("first")) return activeReportColumns.show_first_term;
+    if (normalized.includes("second")) return activeReportColumns.show_second_term;
+    return true;
+  });
+  const selectedV2CarryTermNames = Array.from(new Set([
+    ...(activeReportColumns.show_first_term ? ["First Term"] : []),
+    ...(activeReportColumns.show_second_term ? ["Second Term"] : []),
+    ...visibleV2CarryTermNames,
+  ]));
+  const showCumulativeTotal = activeReportColumns.show_cumulative_total;
+  const showCumulativeAverage = activeReportColumns.show_cumulative_average;
+
   const hasLegacyColumns = !isV2 && term_result.length > 0;
+  const hideFirstTermLegacy = hasLegacyColumns
+    ? !activeReportColumns.show_first_term || (term_result as LegacyTermResult[]).every((s) => isEmpty((s as any).firstterm))
+    : true;
+  const hideSecondTerm = hasLegacyColumns
+    ? !activeReportColumns.show_second_term || (term_result as LegacyTermResult[]).every((s) => isEmpty(s.secondterm))
+    : true;
+  const hideCummAvgLegacy = hasLegacyColumns
+    ? !activeReportColumns.show_cumulative_average || (term_result as LegacyTermResult[]).every((s) => isEmpty(s.average))
+    : true;
 
-  const hideSecondTerm = useMemo(() => {
-    if (!hasLegacyColumns) return true;
-    return (term_result as LegacyTermResult[]).every((s) => isEmpty(s.secondterm));
-  }, [hasLegacyColumns, term_result]);
+  const hideGrade = term_result.every((s: any) => isEmpty(s.grade));
+  const hideRemark = term_result.every((s: any) => isEmpty(s.remark));
+  const performanceRows = term_result
+    .map((subject: any) => ({
+      name: getSubjectName(subject),
+      total: Math.max(0, Math.min(100, Number(subject.total) || 0)),
+      grade: String(subject.grade || "N/A").toUpperCase(),
+    }))
+    .sort((a, b) => b.total - a.total);
+  const topPerformanceRows = performanceRows.slice(0, 6);
+  const gradeCounts = performanceRows.reduce<Record<string, number>>((acc, row) => {
+    const key = row.grade && row.grade !== "N/A" ? row.grade.charAt(0) : "N/A";
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const attendancePercent = (() => {
+    const present = Number(summary?.no_present) || 0;
+    const open = Number(summary?.school_open) || 0;
+    return open > 0 ? Math.round((present / open) * 100) : 0;
+  })();
 
-  const hideCummAvgLegacy = useMemo(() => {
-    if (!hasLegacyColumns) return true;
-    return (term_result as LegacyTermResult[]).every((s) => isEmpty(s.average));
-  }, [hasLegacyColumns, term_result]);
-
-  const hideGrade = useMemo(() => term_result.every((s: any) => isEmpty(s.grade)), [term_result]);
-  const hideRemark = useMemo(() => term_result.every((s: any) => isEmpty(s.remark)), [term_result]);
-
-  const showV2CarryCols = useMemo(() => {
-    if (!isV2) return false;
-    const v2Rows = term_result as V2SubjectResult[];
-    return v2Rows.some((s) => {
-      const enabled = s.carry_over?.enabled || isCarryEnabled(s);
-      if (!enabled) return false;
-
-      const co = parseCarry(s.carry_over_json) ?? s.carry_over;
-      const hasTerms = !!co?.terms && Object.keys(co.terms).length > 0;
-      const hasCurrent = !!co?.current_term && Object.keys(co.current_term).length > 0;
-
-      const hasCumTotal = !isEmpty(s.cumulative_total) || !isEmpty(co?.cumulative_total);
-      const hasCumAvg = !isEmpty(s.cumulative_average) || !isEmpty(co?.cumulative_average);
-
-      return hasTerms || hasCurrent || hasCumTotal || hasCumAvg;
-    });
-  }, [isV2, term_result]);
-
+  const showV2CarryCols =
+    !!isV2 &&
+    (activeReportColumns.show_first_term ||
+      activeReportColumns.show_second_term ||
+      showCumulativeTotal ||
+      showCumulativeAverage ||
+      selectedV2CarryTermNames.length > 0);
   const studentFullName = useMemo(() => {
     if (!user) return "";
     return `${user.surname || ""} ${user.firstname || ""} ${user.third_name || ""}`.trim();
@@ -423,30 +608,6 @@ export default function CheckResultPage() {
       const imgWidth = 595.28;
       const pageHeight = 841.89;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      // watermark on pdf pages
-      if (school_info?.logo) {
-        const watermarkWidth = 150;
-        const watermarkHeight = 150;
-        const stepX = 200;
-        const stepY = 200;
-
-        for (let x = -100; x < imgWidth; x += stepX) {
-          for (let y = -100; y < pageHeight; y += stepY) {
-            pdf.addImage(
-              school_info.logo,
-              "PNG",
-              x,
-              y,
-              watermarkWidth,
-              watermarkHeight,
-              undefined,
-              "FAST"
-            );
-          }
-        }
-      }
-
       pdf.addImage(imgData, "PNG", 0, 0, imgWidth, Math.min(imgHeight, pageHeight));
       pdf.save(`Result_${user?.reg_no || regNo.trim() || "student"}.pdf`);
     } catch (error) {
@@ -665,25 +826,27 @@ export default function CheckResultPage() {
                   borderRadius: 12,
                 }}
               >
+                {/* Result Sheet */}
                 <div
                   id="result-sheet"
                   style={{
-                    width: "680px",
+                    width: "min(780px, 100%)",
                     margin: "auto",
-                    padding: "15px",
+                    padding: "18px",
                     background: themeBg,
-                    fontFamily: "Arial",
+                    fontFamily: resultFont,
                     fontSize: "12px",
                     border: `3px solid ${themePrimary}`,
-                    borderRadius: "8px",
+                    borderRadius: templateKey === "modern_scholar" ? "18px" : "8px",
+                    boxShadow: templateKey === "premium_letterhead" ? `inset 0 8px 0 ${themePrimary}` : undefined,
                     boxSizing: "border-box",
                     position: "relative",
-                    overflow: "hidden",
+                    overflow: "visible",
                     color: "#111827",
                   }}
                 >
                   {/* Watermark */}
-                  {school_info?.logo && (
+                  {displayOptions.show_watermark && school_info?.logo && (
                     <div
                       style={{
                         position: "absolute",
@@ -691,7 +854,7 @@ export default function CheckResultPage() {
                         left: 0,
                         width: "100%",
                         height: "100%",
-                        backgroundImage: `url(${school_info.logo})`,
+                        backgroundImage: `url(${school_info?.logo})`,
                         backgroundRepeat: "repeat",
                         backgroundSize: "150px 150px",
                         opacity: 0.05,
@@ -706,10 +869,12 @@ export default function CheckResultPage() {
                     {/* HEADER */}
                     <div
                       style={{
-                        display: "flex",
+                        display: "grid",
+                        gridTemplateColumns: displayOptions.show_student_photo ? "90px 1fr 90px" : "90px 1fr",
+                        gap: "12px",
                         alignItems: "center",
                         borderBottom: `2px solid ${themePrimary}`,
-                        paddingBottom: "8px",
+                        paddingBottom: "10px",
                       }}
                     >
                       <img
@@ -745,11 +910,11 @@ export default function CheckResultPage() {
                             border: `1px solid ${themeSecondary}`,
                           }}
                         >
-                          {summary?.term} REPORT SHEET
+                          {(summary as any).term} REPORT SHEET
                         </h2>
                       </div>
 
-                      {studentPhoto ? (
+                      {displayOptions.show_student_photo && studentPhoto ? (
                         <img
                           src={studentPhoto}
                           alt="student photo"
@@ -766,7 +931,7 @@ export default function CheckResultPage() {
                             border: `2px solid ${themeSecondary}`,
                           }}
                         />
-                      ) : (
+                      ) : displayOptions.show_student_photo ? (
                         <div
                           style={{
                             width: "90px",
@@ -783,147 +948,95 @@ export default function CheckResultPage() {
                         >
                           Student Photo
                         </div>
-                      )}
+                      ) : null}
                     </div>
 
                     {/* Student Info */}
-                    <div style={{ marginTop: "10px", border: `1px solid ${themePrimary}`, padding: "8px" }}>
-                      <h3 style={{ margin: "0 0 8px 0", textAlign: "center", color: themePrimary }}>
-                        STUDENT INFORMATION
-                      </h3>
-
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <div>
-                          <p>
-                            <strong style={{ color: themePrimary }}>Name:</strong>{" "}
-                            {studentFullName || "N/A"}
-                          </p>
-                          <p>
-                            <strong style={{ color: themePrimary }}>Gender:</strong>{" "}
-                            {getValue(user?.sex, "N/A")}
-                          </p>
-                          <p>
-                            <strong style={{ color: themePrimary }}>DOB:</strong>{" "}
-                            {getValue(user?.dob, "N/A")}
-                          </p>
-                        </div>
-
-                        <div>
-                          <p>
-                            <strong style={{ color: themePrimary }}>Admission No:</strong>{" "}
-                            {getValue(user?.reg_no, regNo.trim())}
-                          </p>
-                          <p>
-                            <strong style={{ color: themePrimary }}>Class:</strong>{" "}
-                            {getValue(data.class_name, "N/A")}
-                          </p>
-                          <p>
-                            <strong style={{ color: themePrimary }}>Session:</strong>{" "}
-                            {getValue(summary?.session, "N/A")}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Summary */}
                     <div
                       style={{
-                        marginTop: "10px",
-                        border: `1px solid ${themePrimary}`,
-                        display: "flex",
-                        padding: "8px",
-                        fontSize: "12px",
+                        display: "grid",
+                        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                        gap: 8,
+                        marginTop: 12,
                       }}
                     >
-                      <div style={{ flex: 1 }}>
-                        <p>
-                          <strong style={{ color: themePrimary }}>Term:</strong>{" "}
-                          {getValue(summary?.term, "N/A")}
-                        </p>
-                        <p>
-                          <strong style={{ color: themePrimary }}>Class Size:</strong>{" "}
-                          {getValue(summary?.class_size, "N/A")}
-                        </p>
-                        <p>
-                          <strong style={{ color: themePrimary }}>Position:</strong>{" "}
-                          {getValue(summary?.position, "N/A")}
-                        </p>
-                      </div>
-
-                      <div style={{ flex: 1 }}>
-                        <p>
-                          <strong style={{ color: themePrimary }}>Times Open:</strong>{" "}
-                          {getValue(summary?.school_open, "N/A")}{" "}
-                          {!isEmpty(summary?.school_open) ? "Days" : ""}
-                        </p>
-                        <p>
-                          <strong style={{ color: themePrimary }}>Present:</strong>{" "}
-                          {getValue(summary?.no_present, "N/A")}{" "}
-                          {!isEmpty(summary?.no_present) ? "Days" : ""}
-                        </p>
-                        <p>
-                          <strong style={{ color: themePrimary }}>Absent:</strong>{" "}
-                          {getValue(summary?.no_absent, "N/A")}{" "}
-                          {!isEmpty(summary?.no_absent) ? "Days" : ""}
-                        </p>
-                      </div>
-
-                      <div style={{ flex: 1 }}>
-                        <p>
-                          <strong style={{ color: themePrimary }}>Resumption Date:</strong>{" "}
-                          {summary?.resumption_date
-                            ? new Date(summary.resumption_date).toLocaleDateString("en-GB")
-                            : "N/A"}
-                        </p>
-                        <p>
-                          <strong style={{ color: themePrimary }}>Average:</strong>{" "}
-                          {getValue(summary?.total_average, "N/A")}
-                        </p>
-                        <p>
-                          <strong style={{ color: themePrimary }}>Grade:</strong>{" "}
-                          {getValue(summary?.total_grade, "N/A")}
-                        </p>
-                      </div>
+                      {[
+                        ["Name", `${user?.surname} ${user?.firstname} ${user?.third_name || ""}`.trim()],
+                        ["Admission No", user?.reg_no],
+                        ["Class", class_name],
+                        ["Session", (summary as any).session],
+                        ["Gender", user?.sex],
+                        ["DOB", user?.dob],
+                        ["Term", (summary as any).term],
+                        ["Class Size", getValue((summary as any).class_size, "N/A")],
+                        ...(showResultPosition
+                          ? [["Position", getValue((summary as any).position, "N/A")] as [string, any]]
+                          : []),
+                        ...(displayOptions.show_attendance
+                          ? [
+                              ["Present", `${getValue((summary as any).no_present, "N/A")} Days`] as [string, any],
+                              ["Times Open", `${getValue((summary as any).school_open, "N/A")} Days`] as [string, any],
+                            ]
+                          : []),
+                        [
+                          "Resumption Date",
+                          (summary as any).resumption_date
+                            ? new Date((summary as any).resumption_date).toLocaleDateString("en-GB")
+                            : "N/A",
+                        ],
+                      ].map(([label, value]) => (
+                        <div
+                          key={label}
+                          style={{
+                            border: `1px solid ${themePrimary}66`,
+                            borderLeft: `4px solid ${themePrimary}`,
+                            borderRadius: 9,
+                            padding: 8,
+                            fontSize: 11,
+                            background: mixHexWithWhite(themeSecondary, 82),
+                          }}
+                        >
+                          <strong style={{ color: themePrimary }}>{label}:</strong> {value}
+                        </div>
+                      ))}
                     </div>
 
-                    {/* Academic Performance */}
-                    <h3 style={{ textAlign: "center", marginTop: "12px", color: themePrimary }}>
-                      ACADEMIC PERFORMANCE
-                    </h3>
-
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
+                    <div style={resultLayoutStyle}>
+                      <section style={{ minWidth: 0 }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px", marginTop: 12 }}>
                       <thead>
                         <tr style={{ background: themePrimary, color: headerTextColor }}>
                           <th style={thStyle}>Subject</th>
 
                           {Array.from({ length: maxCAColumns }).map((_, i) => (
                             <th key={i} style={thStyle}>
-                              CA ({caColumnValue || 0})
+                              CA ({caColumnValue})
                             </th>
                           ))}
 
                           <th style={thStyle}>Exam (60)</th>
                           <th style={thStyle}>Total</th>
 
-                          {/* ✅ V2 carry columns */}
+                          {/* ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ V2 carry columns */}
                           {isV2 && showV2CarryCols && (
                             <>
-                              {v2CarryTermNames.map((t) => (
+                              {selectedV2CarryTermNames.map((t) => (
                                 <th key={t} style={thStyle}>
                                   {t}
                                 </th>
                               ))}
-                              <th style={thStyle}>Cum Total</th>
-                              <th style={thStyle}>Cum Avg</th>
+                              {showCumulativeTotal && <th style={thStyle}>Cum Total</th>}
+                              {showCumulativeAverage && <th style={thStyle}>Cum Avg</th>}
                             </>
                           )}
 
                           {/* Legacy columns */}
+                          {!hideFirstTermLegacy && <th style={thStyle}>First Term</th>}
                           {!hideSecondTerm && <th style={thStyle}>Second Term</th>}
                           {!hideCummAvgLegacy && <th style={thStyle}>Cumm Avg</th>}
 
-                          {!hideGrade && <th style={thStyle}>Grade</th>}
-                          {!hideRemark && <th style={thStyle}>Remark</th>}
+                          {showResultGrade && !hideGrade && <th style={thStyle}>Grade</th>}
+                          {showResultRemarks && !hideRemark && <th style={thStyle}>Remark</th>}
                         </tr>
                       </thead>
 
@@ -957,10 +1070,10 @@ export default function CheckResultPage() {
                               <td style={tdStyle}>{(subject as any).exam}</td>
                               <td style={tdStyle}>{(subject as any).total}</td>
 
-                              {/* ✅ V2 carry values */}
+                              {/* ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ V2 carry values */}
                               {isV2 && showV2CarryCols && (
                                 <>
-                                  {v2CarryTermNames.map((t) => {
+                                  {selectedV2CarryTermNames.map((t) => {
                                     const s = subject as V2SubjectResult;
                                     const enabled = s.carry_over?.enabled || isCarryEnabled(s);
                                     if (!enabled) return <td key={t} style={tdStyle}></td>;
@@ -975,58 +1088,192 @@ export default function CheckResultPage() {
                                     );
                                   })}
 
-                                  <td style={tdStyle}>
-                                    {getValue(
-                                      (subject as V2SubjectResult).cumulative_total ??
-                                        (parseCarry((subject as V2SubjectResult).carry_over_json)
-                                          ?.cumulative_total ??
-                                          (subject as V2SubjectResult).carry_over?.cumulative_total),
-                                      ""
-                                    )}
-                                  </td>
+                                  {showCumulativeTotal && (
+                                    <td style={tdStyle}>
+                                      {getValue(
+                                        (subject as V2SubjectResult).cumulative_total ??
+                                          (parseCarry((subject as V2SubjectResult).carry_over_json)?.cumulative_total ??
+                                            (subject as V2SubjectResult).carry_over?.cumulative_total),
+                                        ""
+                                      )}
+                                    </td>
+                                  )}
 
-                                  <td style={tdStyle}>
-                                    {getValue(
-                                      (subject as V2SubjectResult).cumulative_average ??
-                                        (parseCarry((subject as V2SubjectResult).carry_over_json)
-                                          ?.cumulative_average ??
-                                          (subject as V2SubjectResult).carry_over?.cumulative_average),
-                                      ""
-                                    )}
-                                  </td>
+                                  {showCumulativeAverage && (
+                                    <td style={tdStyle}>
+                                      {getValue(
+                                        (subject as V2SubjectResult).cumulative_average ??
+                                          (parseCarry((subject as V2SubjectResult).carry_over_json)?.cumulative_average ??
+                                            (subject as V2SubjectResult).carry_over?.cumulative_average),
+                                        ""
+                                      )}
+                                    </td>
+                                  )}
                                 </>
                               )}
 
                               {/* Legacy values */}
-                              {!hideSecondTerm && (
-                                <td style={tdStyle}>{legacySubject.secondterm || ""}</td>
-                              )}
-                              {!hideCummAvgLegacy && (
-                                <td style={tdStyle}>{legacySubject.average || ""}</td>
-                              )}
+                              {!hideFirstTermLegacy && <td style={tdStyle}>{legacySubject.firstterm || ""}</td>}
+                              {!hideSecondTerm && <td style={tdStyle}>{legacySubject.secondterm || ""}</td>}
+                              {!hideCummAvgLegacy && <td style={tdStyle}>{legacySubject.average || ""}</td>}
 
-                              {!hideGrade && <td style={tdStyle}>{(subject as any).grade || ""}</td>}
-                              {!hideRemark && (
-                                <td style={tdStyle}>{(subject as any).remark || ""}</td>
-                              )}
+                              {showResultGrade && !hideGrade && <td style={tdStyle}>{(subject as any).grade || ""}</td>}
+                              {showResultRemarks && !hideRemark && <td style={tdStyle}>{(subject as any).remark || ""}</td>}
                             </tr>
                           );
                         })}
                       </tbody>
                     </table>
 
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 11 }}>
+                      <span
+                        style={{
+                          background: themeSecondary,
+                          border: `1px solid ${themePrimary}`,
+                          borderRadius: 999,
+                          padding: "5px 9px",
+                          fontSize: 11,
+                          fontWeight: 900,
+                        }}
+                      >
+                        Average: {getValue((summary as any).total_average, "N/A")}%
+                      </span>
+                      {showResultGrade && (
+                        <span
+                          style={{
+                            background: themeSecondary,
+                            border: `1px solid ${themePrimary}`,
+                            borderRadius: 999,
+                            padding: "5px 9px",
+                            fontSize: 11,
+                            fontWeight: 900,
+                          }}
+                        >
+                          Grade: {getValue((summary as any).total_grade, "N/A")}
+                        </span>
+                      )}
+                      <span
+                        style={{
+                          background: themeSecondary,
+                          border: `1px solid ${themePrimary}`,
+                          borderRadius: 999,
+                          padding: "5px 9px",
+                          fontSize: 11,
+                          fontWeight: 900,
+                        }}
+                      >
+                        Status: {getValue((summary as any).general_remark, "N/A")}
+                      </span>
+                    </div>
+                      </section>
+
+                      <aside style={insightPanelStyle}>
+
+                    {displayOptions.show_domains && (
+                      <div style={analyticsGridStyle}>
+                        <div
+                          style={{
+                            border: `1px solid ${themePrimary}`,
+                            borderRadius: 10,
+                            padding: 10,
+                            background: "rgba(255,255,255,0.62)",
+                          }}
+                        >
+                          <h4
+                            style={{
+                              margin: "0 0 8px",
+                              color: themePrimary,
+                              fontSize: 12,
+                              textTransform: "uppercase",
+                              borderLeft: `4px solid ${themePrimary}`,
+                              paddingLeft: 7,
+                            }}
+                          >
+                            Subject Performance
+                          </h4>
+                          {topPerformanceRows.map((row, index) => (
+                            <div
+                              key={row.name}
+                              style={{ display: "grid", gridTemplateColumns: "120px 1fr 42px", gap: 8, alignItems: "center", margin: "6px 0", fontSize: 10.5 }}
+                            >
+                              <span>{row.name}</span>
+                              <span style={{ height: 8, borderRadius: 999, background: "rgba(15,23,42,0.08)", overflow: "hidden" }}>
+                                <span
+                                  style={{
+                                    display: "block",
+                                    height: "100%",
+                                    width: `${row.total}%`,
+                                    background: performanceChartColors[index % performanceChartColors.length],
+                                    borderRadius: 999,
+                                  }}
+                                />
+                              </span>
+                              <b>{row.total}%</b>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div
+                          style={{
+                            border: `1px solid ${themePrimary}`,
+                            borderRadius: 10,
+                            padding: 10,
+                            background: "rgba(255,255,255,0.62)",
+                          }}
+                        >
+                          <h4
+                            style={{
+                              margin: "0 0 8px",
+                              color: themePrimary,
+                              fontSize: 12,
+                              textTransform: "uppercase",
+                              borderLeft: `4px solid ${themePrimary}`,
+                              paddingLeft: 7,
+                            }}
+                          >
+                            Result Analytics
+                          </h4>
+                          {[
+                            ...Object.entries(gradeCounts)
+                              .filter(([grade]) => grade !== "N/A")
+                              .sort(([a], [b]) => a.localeCompare(b))
+                              .map(([grade, count]) => [`${grade} grades`, count, Math.round((count / Math.max(performanceRows.length, 1)) * 100)] as const),
+                            ...(displayOptions.show_attendance ? [[`Attendance`, `${attendancePercent}%`, attendancePercent] as const] : []),
+                          ].map(([label, value, percent], index) => (
+                            <div
+                              key={label}
+                              style={{ display: "grid", gridTemplateColumns: "92px 1fr 40px", gap: 8, alignItems: "center", margin: "6px 0", fontSize: 10.5 }}
+                            >
+                              <span>{label}</span>
+                              <span style={{ height: 8, borderRadius: 999, background: "rgba(15,23,42,0.08)", overflow: "hidden" }}>
+                                <span
+                                  style={{
+                                    display: "block",
+                                    height: "100%",
+                                    width: `${Math.max(0, Math.min(100, Number(percent) || 0))}%`,
+                                    background: resultAnalyticColors[index % resultAnalyticColors.length],
+                                    borderRadius: 999,
+                                  }}
+                                />
+                              </span>
+                              <b>{value}</b>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Domains */}
-                    {((data.affective_domains || []).length > 0 ||
-                      (data.psychomotor_domains || []).length > 0) && (
-                      <div style={{ display: "flex", marginTop: "12px", gap: "10px" }}>
-                        {(data.affective_domains || []).length > 0 && (
-                          <div style={{ flex: 1 }}>
-                            <h4 style={{ textAlign: "center", color: themePrimary }}>
-                              Affective Domain
-                            </h4>
+                    {displayOptions.show_domains && (affective_domains.length > 0 || psychomotor_domains.length > 0) && (
+                      <div style={domainsGridStyle}>
+                        {affective_domains.length > 0 && (
+                          <div>
                             <table style={domainTableStyle}>
+                              <caption style={{ fontWeight: 900, color: themePrimary, paddingBottom: 6, borderBottom: `2px solid ${themePrimary}` }}>
+                                Affective Domain
+                              </caption>
                               <tbody>
-                                {(data.affective_domains || []).map((row, i) => (
+                                {affective_domains.map((row, i) => (
                                   <tr key={i}>
                                     <td style={tdStyle}>{row.domain}</td>
                                     <td style={tdStyle}>{row.rating}</td>
@@ -1037,14 +1284,14 @@ export default function CheckResultPage() {
                           </div>
                         )}
 
-                        {(data.psychomotor_domains || []).length > 0 && (
-                          <div style={{ flex: 1 }}>
-                            <h4 style={{ textAlign: "center", color: themePrimary }}>
-                              Psychomotor Skills
-                            </h4>
+                        {psychomotor_domains.length > 0 && (
+                          <div>
                             <table style={domainTableStyle}>
+                              <caption style={{ fontWeight: 900, color: themePrimary, paddingBottom: 6, borderBottom: `2px solid ${themePrimary}` }}>
+                                Psychomotor Skills
+                              </caption>
                               <tbody>
-                                {(data.psychomotor_domains || []).map((row, i) => (
+                                {psychomotor_domains.map((row, i) => (
                                   <tr key={i}>
                                     <td style={tdStyle}>{row.domain}</td>
                                     <td style={tdStyle}>{row.rating}</td>
@@ -1056,35 +1303,30 @@ export default function CheckResultPage() {
                         )}
                       </div>
                     )}
+                      </aside>
+                    </div>
 
                     {/* Remarks */}
-                    <div style={{ marginTop: "12px" }}>
-                      <p>
+                    {displayOptions.show_remarks && <div
+                      style={{
+                        marginTop: "12px",
+                        border: `1px solid ${themePrimary}55`,
+                        borderRadius: 12,
+                        padding: 10,
+                        background: "rgba(255,255,255,0.62)",
+                        fontSize: 11,
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      <p style={{ margin: "0 0 5px" }}>
                         <strong style={{ color: themePrimary }}>Teacher's Remark:</strong>{" "}
-                        {getValue(summary?.class_teacher_comment, "")}
+                        {getValue((summary as any).class_teacher_comment, "")}
                       </p>
-                      <p>
-                        <strong style={{ color: themePrimary }}>Principal's Remark:</strong>{" "}
-                        {getValue(summary?.principal_comment, "")}
+                      <p style={{ margin: "0 0 8px" }}>
+                        <strong style={{ color: themePrimary }}>Principal/HM Remark:</strong>{" "}
+                        {getValue((summary as any).principal_comment, "")}
                       </p>
-
-                      <p>
-                        <strong style={{ color: themePrimary }}>Overall:</strong>{" "}
-                        {getValue(summary?.total_average, "N/A")} •{" "}
-                        <span
-                          style={{
-                            background: themeSecondary,
-                            padding: "2px 6px",
-                            borderRadius: 6,
-                            border: `1px solid ${themePrimary}`,
-                            fontWeight: 700,
-                          }}
-                        >
-                          Grade: {getValue(summary?.total_grade, "N/A")}
-                        </span>{" "}
-                        • Status: {getValue(summary?.general_remark, "N/A")}
-                      </p>
-                    </div>
+                    </div>}
 
                     {/* Signature + QR */}
                     <div
@@ -1093,38 +1335,36 @@ export default function CheckResultPage() {
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
+                        borderTop: isPremiumTemplate ? `1px solid ${themePrimary}55` : undefined,
+                        paddingTop: isPremiumTemplate ? 12 : undefined,
                       }}
                     >
-                      <div style={{ textAlign: "center" }}>
-                        <img
-                          src={
-                            school_info?.principal_signature ||
-                            "https://via.placeholder.com/120x60?text=Signature"
-                          }
-                          alt="Principal Signature"
-                          style={{
-                            width: "120px",
-                            height: "60px",
-                            objectFit: "contain",
-                          }}
-                        />
-                        <p style={{ margin: 0, color: themePrimary, fontWeight: 700 }}>
-                          Principal Signature
-                        </p>
-                      </div>
-
-                      <div style={{ textAlign: "center" }}>
-                        {qrDataUrl && (
+                      {displayOptions.show_signature ? (
+                        <div style={{ display: "flex", alignItems: "end", gap: 18 }}>
+                          <div style={{ textAlign: "center" }}>
+                            <img
+                              src={school_info?.principal_signature || "/media/result/default-signature.svg"}
+                              alt="Principal/HM Signature"
+                              style={{
+                                width: "120px",
+                                height: "60px",
+                                objectFit: "contain",
+                              }}
+                            />
+                            <p style={{ margin: 0, color: themePrimary, fontWeight: 700 }}>Principal/HM Signature</p>
+                          </div>
                           <img
-                            src={qrDataUrl}
-                            alt="QR Code"
-                            style={{ width: "100px", height: "100px" }}
+                            src="/media/result/default-stamp.svg"
+                            alt="School stamp"
+                            style={{ width: 68, height: 68, objectFit: "contain", transform: "rotate(-8deg)" }}
                           />
-                        )}
-                        <p style={{ margin: 0, color: themePrimary, fontWeight: 700 }}>
-                          Verify Result
-                        </p>
-                      </div>
+                        </div>
+                      ) : <div />}
+
+                      {displayOptions.show_qr_code ? <div style={{ textAlign: "center" }}>
+                        <img src={qrDataUrl || "/media/result/default-qrcode.svg"} alt="QR Code" style={{ width: "100px", height: "100px" }} />
+                        <p style={{ margin: 0, color: themePrimary, fontWeight: 700 }}>Verify Result</p>
+                      </div> : <div />}
                     </div>
                   </div>
                 </div>

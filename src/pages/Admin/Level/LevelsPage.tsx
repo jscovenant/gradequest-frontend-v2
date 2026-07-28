@@ -23,6 +23,7 @@ type StudentClass = {
   created_at?: string;
   updated_at?: string;
   status?: ClassStatus;
+  archived_at?: string | null;
 };
 
 type Section = {
@@ -80,6 +81,7 @@ export default function LevelsPage() {
 
   // ui state
   const [query, setQuery] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
   // modals
@@ -109,7 +111,7 @@ export default function LevelsPage() {
   async function fetchLevels() {
     try {
       setLoadingLevels(true);
-      const res = await authApi.get<StudentClass[]>("/levels");
+      const res = await authApi.get<StudentClass[]>("/levels", { params: showArchived ? { archived: 1 } : undefined });
       setLevels(res.data ?? []);
     } catch (err: any) {
       showError(getErrorMessage(err));
@@ -135,7 +137,7 @@ export default function LevelsPage() {
     setLoadingPage(true);
     Promise.all([fetchLevels(), fetchSections()]).finally(() => setLoadingPage(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [showArchived]);
 
   /* =========================
      DERIVED
@@ -227,6 +229,38 @@ export default function LevelsPage() {
       showSuccess(res.data?.message ?? "Class updated successfully.");
       setShowEdit(false);
       setEditId(null);
+      await fetchLevels();
+    } catch (err: any) {
+      showError(getErrorMessage(err));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function archiveLevel(level: StudentClass) {
+    const ok = window.confirm(
+      `Archive "${level.name}"?\n\nArchived classes will be hidden from future setup and result forms, but old records will remain safe.`
+    );
+
+    if (!ok) return;
+
+    try {
+      setBusyKey(`level:archive:${level.id}`);
+      const res = await authApi.delete(`/levels/${level.id}`);
+      showSuccess(res.data?.message ?? "Class archived successfully.");
+      await fetchLevels();
+    } catch (err: any) {
+      showError(getErrorMessage(err));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function restoreLevel(level: StudentClass) {
+    try {
+      setBusyKey(`level:restore:${level.id}`);
+      const res = await authApi.post(`/levels/${level.id}/restore`);
+      showSuccess(res.data?.message ?? "Class restored successfully.");
       await fetchLevels();
     } catch (err: any) {
       showError(getErrorMessage(err));
@@ -598,6 +632,8 @@ export default function LevelsPage() {
 
         .db-action-primary { border-color: rgba(30, 64, 175, 0.25); color: #1e40af; }
         .db-action-gold    { border-color: rgba(180, 83, 9, 0.25); color: #b45309; }
+        .db-action-danger  { border-color: rgba(185, 28, 28, 0.25); color: #b91c1c; }
+        .db-action-green   { border-color: rgba(6, 95, 70, 0.25); color: #065f46; }
 
         .db-pagination {
           display:flex;
@@ -977,12 +1013,18 @@ export default function LevelsPage() {
                     Refresh
                   </button>
 
-                  <button className="db-chip-btn" onClick={() => setShowCreate(true)} disabled={busyKey !== null} type="button">
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                      <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                    </svg>
-                    Add Class
+                  <button className="db-chip-btn" onClick={() => setShowArchived((v) => !v)} disabled={busyKey !== null} type="button">
+                    {showArchived ? "Show Active" : "View Archived"}
                   </button>
+
+                  {!showArchived ? (
+                    <button className="db-chip-btn" onClick={() => setShowCreate(true)} disabled={busyKey !== null} type="button">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                      </svg>
+                      Add Class
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
@@ -1016,6 +1058,8 @@ export default function LevelsPage() {
                     ) : (
                       pageRows.map((l, idx) => {
                         const busyEdit = isBusy(`level:update:${l.id}`);
+                        const busyArchive = isBusy(`level:archive:${l.id}`);
+                        const busyRestore = isBusy(`level:restore:${l.id}`);
                         const rowNo = (safePage - 1) * perPage + idx + 1;
 
                         return (
@@ -1043,7 +1087,7 @@ export default function LevelsPage() {
                                 <button
                                   className="db-action-btn db-action-primary"
                                   onClick={() => openEdit(l)}
-                                  disabled={busyKey !== null}
+                                  disabled={showArchived || busyKey !== null}
                                   type="button"
                                 >
                                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -1056,6 +1100,17 @@ export default function LevelsPage() {
                                     <path d="M10.6 3.9l1.5 1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
                                   </svg>
                                   Edit
+                                </button>
+
+                                <button
+                                  className={`db-action-btn ${showArchived ? "db-action-green" : "db-action-danger"}`}
+                                  onClick={() => (showArchived ? restoreLevel(l) : archiveLevel(l))}
+                                  disabled={busyKey !== null}
+                                  type="button"
+                                >
+                                  {showArchived
+                                    ? busyRestore ? "Restoring..." : "Restore"
+                                    : busyArchive ? "Archiving..." : "Archive"}
                                 </button>
 
                                 {busyEdit && (

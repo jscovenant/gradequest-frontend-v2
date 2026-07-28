@@ -13,6 +13,16 @@ type WhatsAppSettings = {
   whatsapp_enabled: boolean;
   whatsapp_messages_sent: number;
   whatsapp_monthly_limit: number;
+  whatsapp_remaining?: number | null;
+  whatsapp_unlimited?: boolean;
+  whatsapp_has_access?: boolean;
+  twilio?: {
+    sid: boolean;
+    auth_token: boolean;
+    from: boolean;
+    from_number?: string | null;
+    ready: boolean;
+  };
 };
 
 type BroadcastForm = {
@@ -69,6 +79,10 @@ export default function WhatsAppSettingsPage() {
     whatsapp_enabled:       false,
     whatsapp_messages_sent: 0,
     whatsapp_monthly_limit: 0,
+    whatsapp_remaining: null,
+    whatsapp_unlimited: false,
+    whatsapp_has_access: false,
+    twilio: undefined,
   });
 
   const [classes,       setClasses]       = useState<ClassOption[]>([]);
@@ -98,6 +112,10 @@ export default function WhatsAppSettingsPage() {
           whatsapp_enabled:       !!d?.whatsapp_enabled,
           whatsapp_messages_sent: d?.whatsapp_messages_sent ?? 0,
           whatsapp_monthly_limit: d?.whatsapp_monthly_limit ?? 0,
+          whatsapp_remaining: d?.whatsapp_remaining ?? null,
+          whatsapp_unlimited: !!d?.whatsapp_unlimited,
+          whatsapp_has_access: !!d?.whatsapp_has_access,
+          twilio: d?.twilio,
         });
         setClasses(classRes.data?.data ?? classRes.data ?? []);
         setSessions(sessionRes.data?.data ?? sessionRes.data ?? []);
@@ -174,7 +192,11 @@ export default function WhatsAppSettingsPage() {
     ? Math.min(100, Math.round((settings.whatsapp_messages_sent / settings.whatsapp_monthly_limit) * 100))
     : 0;
 
-  const isUnlimited = settings.whatsapp_monthly_limit === -1;
+  const isUnlimited = !!settings.whatsapp_unlimited || settings.whatsapp_monthly_limit === -1;
+  const twilioReady = true;
+  const remainingMessages = isUnlimited
+    ? "Unlimited"
+    : settings.whatsapp_remaining ?? Math.max(0, settings.whatsapp_monthly_limit - settings.whatsapp_messages_sent);
 
   return (
     <>
@@ -450,6 +472,8 @@ export default function WhatsAppSettingsPage() {
                   </>
                 )}
 
+                {false && (
+                  <>
                 {/* Test message */}
                 <SectionHeading icon="send" title="Test Message" subtitle="Send a test to verify WhatsApp is working." />
                 <div className="db-panel">
@@ -478,7 +502,7 @@ export default function WhatsAppSettingsPage() {
                           value={testPhone}
                           onChange={(e) => setTestPhone(e.target.value)}
                           placeholder="e.g. 08012345678"
-                          disabled={!settings.whatsapp_enabled || testing}
+                          disabled={!settings.whatsapp_enabled || !twilioReady || testing}
                         />
                       </div>
                       <div className="wa-cred-hint">Enter a number with an active WhatsApp account.</div>
@@ -488,7 +512,7 @@ export default function WhatsAppSettingsPage() {
                       className="db-btn-green mt-3"
                       style={{ width:"100%", justifyContent:"center", padding:"12px 14px", borderRadius:12 }}
                       onClick={sendTestMessage}
-                      disabled={!settings.whatsapp_enabled || testing || !testPhone.trim()}
+                      disabled={!settings.whatsapp_enabled || !twilioReady || testing || !testPhone.trim()}
                     >
                       {testing
                         ? <><span className="spinner-border spinner-border-sm me-2" />Sending test…</>
@@ -496,6 +520,8 @@ export default function WhatsAppSettingsPage() {
                     </button>
                   </div>
                 </div>
+                  </>
+                )}
               </div>
 
               {/* RIGHT — Broadcast */}
@@ -533,7 +559,7 @@ export default function WhatsAppSettingsPage() {
                           type="button"
                           className={`wa-tab ${broadcastType === t.type ? `active ${t.color}` : ""}`}
                           onClick={() => setBroadcastType(t.type)}
-                          disabled={!settings.whatsapp_enabled}
+                          disabled={!settings.whatsapp_enabled || !twilioReady}
                         >
                           <i className={`bi bi-${t.icon}`} />{t.label}
                         </button>
@@ -553,25 +579,25 @@ export default function WhatsAppSettingsPage() {
                           <label className="form-label fw-semibold small mb-1">Term</label>
                           <select className="form-select" value={broadcastForm.term}
                             onChange={(e) => setBroadcastForm((p) => ({ ...p, term: e.target.value }))}
-                            disabled={!settings.whatsapp_enabled || broadcasting}>
+                            disabled={!settings.whatsapp_enabled || !twilioReady || broadcasting}>
                             <option value="">Select term…</option>
-                            {terms.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            {terms.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
                           </select>
                         </div>
                         <div className="col-12 col-md-6">
                           <label className="form-label fw-semibold small mb-1">Academic Session</label>
                           <select className="form-select" value={broadcastForm.session}
                             onChange={(e) => setBroadcastForm((p) => ({ ...p, session: e.target.value }))}
-                            disabled={!settings.whatsapp_enabled || broadcasting}>
+                            disabled={!settings.whatsapp_enabled || !twilioReady || broadcasting}>
                             <option value="">Select academic session…</option>
-                            {sessions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            {sessions.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
                           </select>
                         </div>
                         <div className="col-12">
                           <label className="form-label fw-semibold small mb-1">Class</label>
                           <select className="form-select" value={broadcastForm.class_id}
                             onChange={(e) => setBroadcastForm((p) => ({ ...p, class_id: e.target.value }))}
-                            disabled={!settings.whatsapp_enabled || broadcasting}>
+                            disabled={!settings.whatsapp_enabled || !twilioReady || broadcasting}>
                             <option value="">Select class…</option>
                             {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                           </select>
@@ -599,7 +625,7 @@ export default function WhatsAppSettingsPage() {
                           onChange={(e) => setCustomMessage(e.target.value)}
                           placeholder="Type your broadcast message here…"
                           maxLength={1000}
-                          disabled={!settings.whatsapp_enabled || broadcasting} />
+                          disabled={!settings.whatsapp_enabled || !twilioReady || broadcasting} />
                         <div className="d-flex justify-content-between mt-1">
                           <span className="db-muted" style={{ fontSize:12 }}>Supports WhatsApp *bold* and _italic_.</span>
                           <span className="db-muted" style={{ fontSize:12 }}>{customMessage.length}/1000</span>
@@ -612,7 +638,7 @@ export default function WhatsAppSettingsPage() {
                       className="db-btn-green mt-3"
                       style={{ width:"100%", justifyContent:"center", padding:"12px 14px", borderRadius:12, fontWeight:700 }}
                       onClick={sendBroadcast}
-                      disabled={!settings.whatsapp_enabled || broadcasting}
+                      disabled={!settings.whatsapp_enabled || !twilioReady || broadcasting}
                     >
                       {broadcasting
                         ? <><span className="spinner-border spinner-border-sm me-2" />Queueing…</>

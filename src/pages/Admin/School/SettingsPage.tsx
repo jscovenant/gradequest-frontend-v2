@@ -60,6 +60,18 @@ type FeeReminderResponse = {
   quiet_hours_end: string | null;
 };
 
+type FeeAccessPolicy = {
+  enabled: boolean;
+  result_access_enabled: boolean;
+  result_min_payment_percent: number;
+  result_scope: "selected_period" | "all_outstanding";
+  message: string;
+};
+
+type FeeAccessPolicyResponse = {
+  policy: FeeAccessPolicy;
+};
+
 const clampPrefix = (v: string) => v.replace(/\s+/g, "").slice(0, 5).toUpperCase();
 
 function fmtUrlLabel(url?: string | null) {
@@ -102,6 +114,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingFee, setSavingFee] = useState(false);
+  const [savingFeeAccess, setSavingFeeAccess] = useState(false);
 
   const [app, setApp] = useState<AppSettings>({
     autoGenerateAdmissionNo: false,
@@ -147,6 +160,14 @@ const [domainBusy,   setDomainBusy]   = useState(false);
     sendWhatsApp: false,
     quietHoursStart: null,
     quietHoursEnd: null,
+  });
+
+  const [feeAccess, setFeeAccess] = useState<FeeAccessPolicy>({
+    enabled: false,
+    result_access_enabled: true,
+    result_min_payment_percent: 100,
+    result_scope: "selected_period",
+    message: "Result access is currently unavailable because the required school fee payment has not been completed.",
   });
 
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -208,6 +229,20 @@ const [domainBusy,   setDomainBusy]   = useState(false);
     });
   };
 
+  const mapFeeAccessFromResponse = (data?: FeeAccessPolicyResponse) => {
+    const p = data?.policy;
+    if (!p) return;
+    setFeeAccess({
+      enabled: !!p.enabled,
+      result_access_enabled: p.result_access_enabled !== false,
+      result_min_payment_percent: clampInt(p.result_min_payment_percent, 0, 100, 100),
+      result_scope: p.result_scope === "all_outstanding" ? "all_outstanding" : "selected_period",
+      message:
+        p.message ||
+        "Result access is currently unavailable because the required school fee payment has not been completed.",
+    });
+  };
+
   const openLogoPicker = () => logoInputRef.current?.click();
   const openSigPicker = () => sigInputRef.current?.click();
 
@@ -221,11 +256,13 @@ const [domainBusy,   setDomainBusy]   = useState(false);
 Promise.all([
   authApi.get<SettingsResponse>("/get-settings"),
   authApi.get<FeeReminderResponse>("/settings/fee-reminders"),
+  authApi.get<FeeAccessPolicyResponse>("/settings/fee-access-policy"),
   authApi.get<{ data: DomainRecord | null }>("/settings/domain").catch(() => ({ data: { data: null } })),
 ])
-  .then(([settingsRes, feeRes, domainRes]) => {
+  .then(([settingsRes, feeRes, feeAccessRes, domainRes]) => {
     mapSettingsFromResponse(settingsRes.data);
     mapFeeReminderFromResponse(feeRes.data);
+    mapFeeAccessFromResponse(feeAccessRes.data);
 
     const dr = domainRes.data?.data ?? null;
     setDomainRecord(dr);
@@ -286,6 +323,37 @@ Promise.all([
       setSavingFee(false);
     }
   };
+
+  const saveFeeAccessPolicy = async () => {
+    setSavingFeeAccess(true);
+    try {
+      const payload = {
+        enabled: !!feeAccess.enabled,
+        result_access_enabled: !!feeAccess.result_access_enabled,
+        result_min_payment_percent: clampInt(feeAccess.result_min_payment_percent, 0, 100, 100),
+        result_scope: feeAccess.result_scope,
+        message: feeAccess.message,
+      };
+
+      const res = await authApi.put("/settings/fee-access-policy", payload);
+      mapFeeAccessFromResponse(res.data);
+      showSuccess?.(res?.data?.message || "Fee access policy saved.");
+    } catch (err: any) {
+      console.error(err);
+      const { msg, errors } = parseBackendError(err);
+      if (errors && typeof errors === "object") {
+        const firstKey = Object.keys(errors)[0];
+        const firstVal = (errors as any)[firstKey];
+        const firstMsg = Array.isArray(firstVal) ? firstVal[0] : String(firstVal);
+        showError?.(firstMsg || msg);
+      } else {
+        showError?.(msg);
+      }
+    } finally {
+      setSavingFeeAccess(false);
+    }
+  };
+
 
   const saveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -365,6 +433,7 @@ Promise.all([
       // Also persist fee reminder settings (separate endpoint)
       // (If you prefer "Save All", keep it here. Otherwise user can use the "Save fee reminder setup" button.)
       await saveFeeReminderSettings();
+      await saveFeeAccessPolicy();
     } catch (err: any) {
       console.error(err);
       const { msg, errors } = parseBackendError(err);
@@ -436,12 +505,14 @@ const removeDomain = async () => {
   const refreshSettings = async () => {
     setLoading(true);
     try {
-      const [settingsRes, feeRes] = await Promise.all([
+      const [settingsRes, feeRes, feeAccessRes] = await Promise.all([
         authApi.get<SettingsResponse>("/get-settings"),
         authApi.get<FeeReminderResponse>("/settings/fee-reminders"),
+        authApi.get<FeeAccessPolicyResponse>("/settings/fee-access-policy"),
       ]);
       mapSettingsFromResponse(settingsRes.data);
       mapFeeReminderFromResponse(feeRes.data);
+      mapFeeAccessFromResponse(feeAccessRes.data);
 
       setLogoFile(null);
       setSignatureFile(null);
@@ -456,7 +527,7 @@ const removeDomain = async () => {
 
   const whatsappEnabled = app.whatsapp.enabled;
   const canSave = !loading && !saving;
-  const feeBusy = loading || saving || savingFee;
+  const feeBusy = loading || saving || savingFee || savingFeeAccess;
 
   return (
     <>
@@ -533,7 +604,7 @@ const removeDomain = async () => {
                 <div>
                   <div className="db-session-badge">
                     <span className="db-session-dot" />
-                    Settings — School, Reports & Messaging
+                    Settings - School & Messaging
                   </div>
 
                   <h1 className="db-greeting">
@@ -541,7 +612,7 @@ const removeDomain = async () => {
                   </h1>
 
                   <p className="db-hero-sub">
-                    Update your school profile, branding, report theme, auto admission number, WhatsApp preferences, and fee reminder automation.
+                    Update your school profile, branding, auto admission number, WhatsApp preferences, and fee reminder automation.
                   </p>
 
                   <div className="db-hero-btns">
@@ -1090,154 +1161,42 @@ const removeDomain = async () => {
 
                 {/* RIGHT COLUMN */}
                 <div className="col-12 col-lg-5">
-                  <SectionHeading icon="palette" title="Reports" subtitle="Theme controls for result printing/export." />
+                  <SectionHeading icon="person-badge" title="Student Setup" subtitle="Control how new student records are created." />
 
                   <div className="db-panel">
                     <div className="db-panel-head">
                       <div>
-                        <p className="db-panel-title">Report card theme</p>
-                        <p className="db-panel-sub">Customize colors used in result printing/export.</p>
+                        <p className="db-panel-title">Admission number</p>
+                        <p className="db-panel-sub">Choose whether the system should create admission numbers automatically.</p>
                       </div>
 
                       <span className="db-pill" style={{ background: "rgba(0,0,0,0.04)", color: "#7a6a5a" }}>
-                        <i className="bi bi-palette me-1" />
-                        Theme
+                        <i className="bi bi-person-vcard me-1" />
+                        Students
                       </span>
                     </div>
 
                     <div style={{ padding: 16 }}>
-                      <div className="row g-3">
-                        <div className="col-12">
-                          <label className="form-label fw-semibold small mb-1">Primary color</label>
-                          <div className="d-flex align-items-center gap-2">
-                            <input
-                              type="color"
-                              value={app.reportPrimaryColor}
-                              onChange={(e) => setApp((p) => ({ ...p, reportPrimaryColor: e.target.value }))}
-                              className="form-control form-control-color p-1"
-                              style={{ width: 56, height: 42, borderRadius: 12 }}
-                              disabled={loading || saving || savingFee}
-                            />
-                            <input
-                              className="form-control"
-                              value={app.reportPrimaryColor}
-                              onChange={(e) => setApp((p) => ({ ...p, reportPrimaryColor: e.target.value }))}
-                              disabled={loading || saving || savingFee}
-                            />
-                          </div>
+                      <div className="db-kv">
+                        <div>
+                          <label className="d-block">Auto-generate admission number</label>
+                          <b>{app.autoGenerateAdmissionNo ? "Enabled" : "Disabled"}</b>
                         </div>
 
-                        <div className="col-12">
-                          <label className="form-label fw-semibold small mb-1">Secondary color</label>
-                          <div className="d-flex align-items-center gap-2">
-                            <input
-                              type="color"
-                              value={app.reportSecondaryColor}
-                              onChange={(e) => setApp((p) => ({ ...p, reportSecondaryColor: e.target.value }))}
-                              className="form-control form-control-color p-1"
-                              style={{ width: 56, height: 42, borderRadius: 12 }}
-                              disabled={loading || saving || savingFee}
-                            />
-                            <input
-                              className="form-control"
-                              value={app.reportSecondaryColor}
-                              onChange={(e) => setApp((p) => ({ ...p, reportSecondaryColor: e.target.value }))}
-                              disabled={loading || saving || savingFee}
-                            />
-                          </div>
+                        <div className="form-check form-switch m-0">
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            role="switch"
+                            checked={app.autoGenerateAdmissionNo}
+                            onChange={(e) => updateAutoAdmission(e.target.checked)}
+                            disabled={loading || saving || savingFee}
+                          />
                         </div>
+                      </div>
 
-                        <div className="col-12">
-                          <label className="form-label fw-semibold small mb-1">Background color</label>
-                          <div className="d-flex align-items-center gap-2">
-                            <input
-                              type="color"
-                              value={app.reportBackgroundColor}
-                              onChange={(e) => setApp((p) => ({ ...p, reportBackgroundColor: e.target.value }))}
-                              className="form-control form-control-color p-1"
-                              style={{ width: 56, height: 42, borderRadius: 12 }}
-                              disabled={loading || saving || savingFee}
-                            />
-                            <input
-                              className="form-control"
-                              value={app.reportBackgroundColor}
-                              onChange={(e) => setApp((p) => ({ ...p, reportBackgroundColor: e.target.value }))}
-                              disabled={loading || saving || savingFee}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="col-12">
-                          <div
-                            className="db-card"
-                            style={{
-                              padding: 12,
-                              background: app.reportBackgroundColor,
-                              borderColor: "rgba(0,0,0,0.06)",
-                            }}
-                          >
-                            <div
-                              style={{
-                                background: app.reportPrimaryColor,
-                                borderRadius: 12,
-                                padding: "10px 12px",
-                                color: "#fff",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                gap: 12,
-                              }}
-                            >
-                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <i className="bi bi-mortarboard-fill" />
-                                <span style={{ fontWeight: 800 }}>Report Preview</span>
-                              </div>
-                              <span
-                                className="db-pill"
-                                style={{
-                                  background: app.reportSecondaryColor,
-                                  color: "#0f172a",
-                                  borderColor: "rgba(0,0,0,0.06)",
-                                }}
-                              >
-                                A+
-                              </span>
-                            </div>
-
-                            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
-                              <span className="db-muted" style={{ fontSize: 12 }}>
-                                Primary
-                              </span>
-                              <span className="db-muted" style={{ fontSize: 12 }}>
-                                Secondary
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="col-12">
-                          <div className="db-kv">
-                            <div>
-                              <label className="d-block">Auto-generate admission number</label>
-                              <b>{app.autoGenerateAdmissionNo ? "Enabled" : "Disabled"}</b>
-                            </div>
-
-                            <div className="form-check form-switch m-0">
-                              <input
-                                className="form-check-input"
-                                type="checkbox"
-                                role="switch"
-                                checked={app.autoGenerateAdmissionNo}
-                                onChange={(e) => updateAutoAdmission(e.target.checked)}
-                                disabled={loading || saving || savingFee}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="db-muted" style={{ fontSize: 12, marginTop: 8 }}>
-                            This toggle applies instantly (no need to click Save).
-                          </div>
-                        </div>
+                      <div className="db-muted" style={{ fontSize: 12, marginTop: 8 }}>
+                        This toggle applies instantly without clicking Save.
                       </div>
                     </div>
                   </div>
@@ -1353,6 +1312,143 @@ const removeDomain = async () => {
                       <div className="db-muted" style={{ marginTop: 12, fontSize: 12.5 }}>
                         <i className="bi bi-info-circle me-1" />
                         WhatsApp sending typically requires approved templates and sufficient wallet balance.
+                      </div>
+                    </div>
+                  </div>
+
+                  <SectionHeading icon="lock" title="Fee Access Control" subtitle="Control result access using school-fee payment records." />
+
+                  <div className="db-panel">
+                    <div className="db-panel-head">
+                      <div>
+                        <p className="db-panel-title">Student and parent access</p>
+                        <p className="db-panel-sub">Block result viewing when payment is below your school requirement.</p>
+                      </div>
+
+                      <span className="db-pill" style={{ background: feeAccess.enabled ? "rgba(34,197,94,0.1)" : "rgba(0,0,0,0.04)", color: feeAccess.enabled ? "#15803d" : "#7a6a5a" }}>
+                        <i className={`bi bi-${feeAccess.enabled ? "unlock" : "lock"} me-1`} />
+                        {feeAccess.enabled ? "Active" : "Off"}
+                      </span>
+                    </div>
+
+                    <div style={{ padding: 16 }}>
+                      <div className="db-kv">
+                        <div>
+                          <label className="d-block">Enable fee-based access control</label>
+                          <b>{feeAccess.enabled ? "Enabled" : "Disabled"}</b>
+                        </div>
+
+                        <div className="form-check form-switch m-0">
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            role="switch"
+                            checked={feeAccess.enabled}
+                            onChange={(e) => setFeeAccess((p) => ({ ...p, enabled: e.target.checked }))}
+                            disabled={feeBusy}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="row g-3 mt-2">
+                        <div className="col-12">
+                          <div className="db-kv">
+                            <div>
+                              <label className="d-block">Control result viewing</label>
+                              <b>{feeAccess.result_access_enabled ? "Yes" : "No"}</b>
+                            </div>
+
+                            <div className="form-check form-switch m-0">
+                              <input
+                                className="form-check-input"
+                                type="checkbox"
+                                role="switch"
+                                checked={feeAccess.result_access_enabled}
+                                onChange={(e) => setFeeAccess((p) => ({ ...p, result_access_enabled: e.target.checked }))}
+                                disabled={feeBusy || !feeAccess.enabled}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="col-12 col-md-6">
+                          <label className="form-label fw-semibold small mb-1">Minimum payment required</label>
+                          <div className="input-group">
+                            <input
+                              type="number"
+                              className="form-control"
+                              min={0}
+                              max={100}
+                              value={feeAccess.result_min_payment_percent}
+                              onChange={(e) =>
+                                setFeeAccess((p) => ({
+                                  ...p,
+                                  result_min_payment_percent: clampInt(e.target.value, 0, 100, 100),
+                                }))
+                              }
+                              disabled={feeBusy || !feeAccess.enabled || !feeAccess.result_access_enabled}
+                            />
+                            <span className="input-group-text">%</span>
+                          </div>
+                          <div className="db-muted" style={{ fontSize: 12, marginTop: 6 }}>
+                            Example: 70 allows result viewing after at least 70% payment.
+                          </div>
+                        </div>
+
+                        <div className="col-12 col-md-6">
+                          <label className="form-label fw-semibold small mb-1">Fees to check</label>
+                          <select
+                            className="form-select"
+                            value={feeAccess.result_scope}
+                            onChange={(e) =>
+                              setFeeAccess((p) => ({
+                                ...p,
+                                result_scope: e.target.value === "all_outstanding" ? "all_outstanding" : "selected_period",
+                              }))
+                            }
+                            disabled={feeBusy || !feeAccess.enabled || !feeAccess.result_access_enabled}
+                          >
+                            <option value="selected_period">Only this result term/session</option>
+                            <option value="all_outstanding">All outstanding fees</option>
+                          </select>
+                          <div className="db-muted" style={{ fontSize: 12, marginTop: 6 }}>
+                            Most schools should use the selected term/session option.
+                          </div>
+                        </div>
+
+                        <div className="col-12">
+                          <label className="form-label fw-semibold small mb-1">Message shown to parents/students</label>
+                          <textarea
+                            className="form-control"
+                            rows={3}
+                            maxLength={255}
+                            value={feeAccess.message}
+                            onChange={(e) => setFeeAccess((p) => ({ ...p, message: e.target.value }))}
+                            disabled={feeBusy || !feeAccess.enabled}
+                          />
+                        </div>
+
+                        <div className="col-12">
+                          <button
+                            type="button"
+                            className="db-refresh-btn"
+                            style={{ width: "100%", justifyContent: "center", padding: "12px 14px", borderRadius: 12 }}
+                            onClick={saveFeeAccessPolicy}
+                            disabled={feeBusy}
+                          >
+                            {savingFeeAccess ? (
+                              <>
+                                <span className="spinner-border spinner-border-sm me-2" />
+                                Saving policy...
+                              </>
+                            ) : (
+                              <>
+                                <i className="bi bi-save2 me-1" />
+                                Save access policy
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -36,6 +36,16 @@ type CarryOverJson = {
   cumulative_average: number;
 };
 
+type ReportColumnPolicy = {
+  carry_over_allowed?: boolean;
+  columns?: {
+    show_first_term?: boolean;
+    show_second_term?: boolean;
+    show_cumulative_total?: boolean;
+    show_cumulative_average?: boolean;
+  };
+};
+
 type ScoresState = Record<
   string,
   {
@@ -131,29 +141,15 @@ export default function AddResultV2Page() {
   // Layout state (TopNav/Sidebar)
   // -----------------------------
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(() => window.innerWidth >= 768);
-  const [isDesktop, setIsDesktop] = useState<boolean>(() => window.innerWidth >= 768);
 
   // Carry-over
   const [includeCarryOver, setIncludeCarryOver] = useState(false);
   const [schoolTerms, setSchoolTerms] = useState<string[]>([]);
   const [carryPreview, setCarryPreview] = useState<Record<number, Record<string, number>>>({});
+  const [reportColumnPolicy, setReportColumnPolicy] = useState<ReportColumnPolicy | null>(null);
+  const carryOverAllowed = Boolean(reportColumnPolicy?.carry_over_allowed);
 
   
-
-  useEffect(() => {
-    const onResize = () => {
-      const desktop = window.innerWidth >= 768;
-      setIsDesktop(desktop);
-      if (desktop) setSidebarOpen(true);
-    };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-
-
-
-
 
   // -----------------------------
   // LocalStorage keys
@@ -226,7 +222,7 @@ export default function AddResultV2Page() {
   const rows = Object.values(scores);
 
   // If checkbox is ON, average the cumulative averages (per subject)
-  if (includeCarryOver) {
+  if (includeCarryOver && carryOverAllowed) {
     const cumAverages = rows
       .map((r) => buildCarryOver(r.subject_id, term, r.total ?? 0).cumulative_average)
       .map((n) => Number(n))
@@ -243,7 +239,7 @@ export default function AddResultV2Page() {
 
   if (!totals.length) return "";
   return (totals.reduce((a, b) => a + b, 0) / totals.length).toFixed(1);
-}, [scores, includeCarryOver, carryPreview, term]);
+}, [scores, includeCarryOver, carryOverAllowed, carryPreview, term]);
 
 
   // -----------------------------
@@ -454,6 +450,10 @@ export default function AddResultV2Page() {
 
         setSchoolTerms(data.terms ?? []);
         setCarryPreview(data.carry_over_preview ?? {});
+        setReportColumnPolicy(data.report_column_policy ?? null);
+        if (!data.report_column_policy?.carry_over_allowed) {
+          setIncludeCarryOver(false);
+        }
 
         const existingRows = data.existing?.results ?? [];
         const detected = detectScoreTypeFromExisting(existingRows);
@@ -550,6 +550,8 @@ export default function AddResultV2Page() {
 
       setStudent(st);
       setSubjects(subjs);
+      setReportColumnPolicy(null);
+      setIncludeCarryOver(false);
       applyContext(data.term || "", data.session || "");
       setDepartment(st.department?.name || data.student?.department?.name || "");
 
@@ -591,6 +593,15 @@ export default function AddResultV2Page() {
       });
 
       setBatchId(data.batch.id);
+      if (student?.id) {
+        const formRes = await authApi.get(`/result-batches/${data.batch.id}/students/${student.id}/result-form`);
+        setReportColumnPolicy(formRes.data?.report_column_policy ?? null);
+        setSchoolTerms(formRes.data?.terms ?? []);
+        setCarryPreview(formRes.data?.carry_over_preview ?? {});
+        if (!formRes.data?.report_column_policy?.carry_over_allowed) {
+          setIncludeCarryOver(false);
+        }
+      }
       showSuccess(`Batch ready (#${data.batch.id}).`);
     } catch (e: any) {
       showError(e?.response?.data?.message || "Failed to resolve batch");
@@ -602,6 +613,7 @@ export default function AddResultV2Page() {
   useEffect(() => {
   if (directMode) return;
   if (!includeCarryOver) return;
+  if (!carryOverAllowed) return;
   if (!session || !term) return;
 
   const studentId = student?.id; // capture
@@ -634,7 +646,7 @@ export default function AddResultV2Page() {
   return () => {
     mounted = false;
   };
-}, [includeCarryOver, student?.id, session, term, directMode, showError]);
+}, [includeCarryOver, carryOverAllowed, student?.id, session, term, directMode, showError]);
 
 
   // -----------------------------
@@ -801,7 +813,7 @@ export default function AddResultV2Page() {
     setSaving(true);
     try {
       const resultsPayload = Object.values(scores).map((row) => {
-        const carry = includeCarryOver ? buildCarryOver(row.subject_id, term, row.total ?? 0) : null;
+        const carry = includeCarryOver && carryOverAllowed ? buildCarryOver(row.subject_id, term, row.total ?? 0) : null;
 
         return {
           subject_id: row.subject_id,
@@ -867,9 +879,8 @@ export default function AddResultV2Page() {
   const showBatchSidebar = step !== 1;
 
   const contentStyle: React.CSSProperties = {
-    paddingLeft: isDesktop ? 280 : 0,
     minHeight: "calc(100vh - 64px)",
-    background: "#f8fafc",
+    overflowX: "hidden",
   };
 
   return (
@@ -878,7 +889,7 @@ export default function AddResultV2Page() {
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-      <div style={contentStyle}>
+      <main className="gq-app-main result-entry-main ms-auto" style={contentStyle}>
         <div className="container-fluid py-4">
           {pageLoading ? (
             <CenterLoader label="Preparing Result Module..." />
@@ -1002,14 +1013,22 @@ export default function AddResultV2Page() {
                           type="checkbox"
                           id="includeCarryOver"
                           checked={includeCarryOver}
-                          onChange={(e) => setIncludeCarryOver(e.target.checked)}
+                          disabled={!carryOverAllowed}
+                          onChange={(e) => setIncludeCarryOver(carryOverAllowed && e.target.checked)}
                         />
                         <label className="form-check-label" htmlFor="includeCarryOver">
                           Include previous term scores (carry over)
                         </label>
                       </div>
 
-                     {includeCarryOver && (
+                      {!carryOverAllowed && (
+                        <div className="alert alert-warning mt-2 mb-0">
+                          Previous term score columns are not enabled for this class section and term. To use them, update the
+                          report-card design settings first.
+                        </div>
+                      )}
+
+                     {includeCarryOver && carryOverAllowed && (
                       <div className="alert alert-info mt-2 mb-0">
                         {carryLoading ? (
                           <>
@@ -1120,7 +1139,7 @@ export default function AddResultV2Page() {
                                       />
                                     </div>
 
-                                    {includeCarryOver && row && (
+                                    {includeCarryOver && carryOverAllowed && row && (
                                       <div className="mt-3 p-2 border rounded bg-light">
                                         <div className="small fw-semibold mb-1">Previous terms (auto)</div>
 
@@ -1422,7 +1441,7 @@ export default function AddResultV2Page() {
             </>
           )}
         </div>
-      </div>
+      </main>
     </>
   );
 }

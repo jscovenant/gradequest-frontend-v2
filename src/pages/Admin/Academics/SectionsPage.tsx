@@ -16,6 +16,7 @@ type Section = {
   school_id?: number;
   created_at?: string;
   updated_at?: string;
+  archived_at?: string | null;
 };
 
 type Paginated<T> = {
@@ -70,6 +71,7 @@ export default function SectionsPage() {
   // data
   const [sections, setSections] = useState<Section[]>([]);
   const [query, setQuery] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
 
   // pagination (server)
   const [page, setPage] = useState(1);
@@ -100,9 +102,9 @@ export default function SectionsPage() {
       // API exists as /sections or /sections/ in your project
       let res: any;
       try {
-        res = await authApi.get<Paginated<Section>>("/sections", { params: { page: p } });
+        res = await authApi.get<Paginated<Section>>("/sections", { params: { page: p, ...(showArchived ? { archived: 1 } : {}) } });
       } catch {
-        res = await authApi.get<Paginated<Section>>("/sections/", { params: { page: p } });
+        res = await authApi.get<Paginated<Section>>("/sections/", { params: { page: p, ...(showArchived ? { archived: 1 } : {}) } });
       }
 
       const payload = res.data;
@@ -133,12 +135,12 @@ export default function SectionsPage() {
     setLoadingPage(true);
     fetchSections(1).finally(() => setLoadingPage(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [showArchived]);
 
   useEffect(() => {
     fetchSections(page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  }, [page, showArchived]);
 
   /* =========================
      DERIVED
@@ -227,6 +229,38 @@ export default function SectionsPage() {
       } else {
         await fetchSections(page);
       }
+    } catch (err: any) {
+      showError(getErrorMessage(err));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function archiveSection(section: Section) {
+    const ok = window.confirm(
+      `Archive "${section.name}"?\n\nArchived sections will be hidden from future setup forms, but old records will remain safe.`
+    );
+
+    if (!ok) return;
+
+    try {
+      setBusyKey(`sec:archive:${section.id}`);
+      const res = await authApi.delete(`/sections/${section.id}`);
+      showSuccess(res.data?.message ?? "Section archived successfully.");
+      await fetchSections(page);
+    } catch (err: any) {
+      showError(getErrorMessage(err));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function restoreSection(section: Section) {
+    try {
+      setBusyKey(`sec:restore:${section.id}`);
+      const res = await authApi.post(`/sections/${section.id}/restore`);
+      showSuccess(res.data?.message ?? "Section restored successfully.");
+      await fetchSections(page);
     } catch (err: any) {
       showError(getErrorMessage(err));
     } finally {
@@ -502,6 +536,8 @@ export default function SectionsPage() {
         .db-action-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(0,0,0,0.08); background: #faf8f5; }
         .db-action-btn:disabled { opacity: .5; cursor: not-allowed; }
         .db-action-primary { border-color: rgba(30, 64, 175, 0.25); color: #1e40af; }
+        .db-action-danger  { border-color: rgba(185, 28, 28, 0.25); color: #b91c1c; }
+        .db-action-green   { border-color: rgba(6, 95, 70, 0.25); color: #065f46; }
 
         .db-pagination {
           display:flex;
@@ -696,7 +732,7 @@ export default function SectionsPage() {
                   </p>
 
                   <div className="db-hero-btns">
-                    <button className="db-btn-green" onClick={() => setShowCreate(true)} disabled={busyKey !== null} type="button">
+                    <button className="db-btn-green" onClick={() => setShowCreate(true)} disabled={showArchived || busyKey !== null} type="button">
                       <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                         <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                       </svg>
@@ -793,9 +829,14 @@ export default function SectionsPage() {
                   <button className="db-chip-btn" onClick={() => fetchSections(page)} disabled={busyKey !== null || loadingSections} type="button">
                     Refresh
                   </button>
-                  <button className="db-chip-btn" onClick={() => setShowCreate(true)} disabled={busyKey !== null} type="button">
-                    Add Section
+                  <button className="db-chip-btn" onClick={() => setShowArchived((v) => !v)} disabled={busyKey !== null} type="button">
+                    {showArchived ? "Show Active" : "View Archived"}
                   </button>
+                  {!showArchived ? (
+                    <button className="db-chip-btn" onClick={() => setShowCreate(true)} disabled={busyKey !== null} type="button">
+                      Add Section
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
@@ -823,7 +864,11 @@ export default function SectionsPage() {
                         </td>
                       </tr>
                     ) : (
-                      pageRows.map((s) => (
+                      pageRows.map((s) => {
+                        const busyArchive = isBusy(`sec:archive:${s.id}`);
+                        const busyRestore = isBusy(`sec:restore:${s.id}`);
+
+                        return (
                         <tr key={s.id}>
                           <td>
                             <div style={{ fontWeight: 900, color: "#1a1a2e" }}>{s.name}</div>
@@ -835,15 +880,26 @@ export default function SectionsPage() {
                               <button
                                 className="db-action-btn db-action-primary"
                                 onClick={() => openEdit(s)}
-                                disabled={busyKey !== null}
+                                disabled={showArchived || busyKey !== null}
                                 type="button"
                               >
                                 Edit
                               </button>
+                              <button
+                                className={`db-action-btn ${showArchived ? "db-action-green" : "db-action-danger"}`}
+                                onClick={() => (showArchived ? restoreSection(s) : archiveSection(s))}
+                                disabled={busyKey !== null}
+                                type="button"
+                              >
+                                {showArchived
+                                  ? busyRestore ? "Restoring..." : "Restore"
+                                  : busyArchive ? "Archiving..." : "Archive"}
+                              </button>
                             </div>
                           </td>
                         </tr>
-                      ))
+                        );
+                      })
                     )}
                   </tbody>
                 </table>

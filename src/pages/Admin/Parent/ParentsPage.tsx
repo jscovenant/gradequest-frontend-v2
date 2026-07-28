@@ -8,6 +8,7 @@ import Footer from "../../../components/LayoutComponents/Footer";
 import Loader from "../../../components/ui/dashboardLoader";
 import { useToast } from "../../../contexts/ToastContext";
 import PageTitle from "../../../components/PageTitle";
+import PeopleImportPanel from "../../../components/imports/PeopleImportPanel";
 
 /* =========================
    TYPES
@@ -24,6 +25,12 @@ type ParentRow = {
   surname?: string;
   email?: string;
   phone?: string;
+  phone_normalized?: string | null;
+  phone_validated_at?: string | null;
+  whatsapp_no?: string | null;
+  whatsapp_number?: string | null;
+  whatsapp_verified_at?: string | null;
+  whatsapp_verification_expires_at?: string | null;
   address?: string | null;
   default_password?: string | null;
 };
@@ -36,7 +43,7 @@ type StudentRow = {
   level_id?: number;
   level?: { id: number; name: string } | null;
 
-  // ✅ assignment info from backend (/students/by-classes)
+  // assignment info from backend (/students/by-classes)
   assigned_parent_id?: number | null;
   assigned_parent_firstname?: string | null;
   assigned_parent_surname?: string | null;
@@ -56,7 +63,7 @@ const capitalize = (str?: string | null) =>
   str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : "";
 
 const fullName = (p?: any) =>
-  [capitalize(p?.firstname), capitalize(p?.surname)].filter(Boolean).join(" ").trim() || "—";
+  [capitalize(p?.firstname), capitalize(p?.surname)].filter(Boolean).join(" ").trim() || "-";
 
 const initials = (p?: any) => {
   const a = (p?.firstname || "").trim().charAt(0).toUpperCase();
@@ -65,6 +72,8 @@ const initials = (p?: any) => {
 };
 
 const safeLower = (v?: string | null) => (v ?? "").toString().toLowerCase();
+const isVerified = (value?: string | null) => Boolean(value && value !== "0000-00-00 00:00:00");
+
 
 interface InfoItemProps {
   label: string;
@@ -207,6 +216,7 @@ export default function ParentsPage() {
   const [perPage] = useState(8);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [showImportPanel, setShowImportPanel] = useState(false);
 
   // ===== Profile modal =====
   const [selectedParent, setSelectedParent] = useState<ParentRow | null>(null);
@@ -254,6 +264,86 @@ export default function ParentsPage() {
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [studentSearch, setStudentSearch] = useState("");
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
+
+  const [contactParentId, setContactParentId] = useState<number | "">("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [whatsappCode, setWhatsappCode] = useState("");
+  const [contactBusy, setContactBusy] = useState<"phone" | "send" | "verify" | null>(null);
+
+  const selectedContactParent = useMemo(
+    () => allParents.find((p) => p.id === Number(contactParentId)) || null,
+    [allParents, contactParentId]
+  );
+
+  useEffect(() => {
+    if (!selectedContactParent) return;
+    setContactPhone(selectedContactParent.whatsapp_number || selectedContactParent.whatsapp_no || selectedContactParent.phone || "");
+    setWhatsappCode("");
+  }, [selectedContactParent]);
+
+  const replaceParentInState = (updated?: ParentRow) => {
+    if (!updated?.id) return;
+    setAllParents((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
+    setParents((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
+    setParentDetails((prev) => (prev?.parent?.id === updated.id ? { ...prev, parent: { ...prev.parent, ...updated } } : prev));
+    setSelectedParent((prev) => (prev?.id === updated.id ? { ...prev, ...updated } : prev));
+  };
+
+  const validateParentPhone = async () => {
+    if (!selectedContactParent) return showError("Select a parent first");
+    if (!contactPhone.trim()) return showError("Enter a phone number first");
+
+    setContactBusy("phone");
+    try {
+      const res = await authApi.post<{ message?: string; parent?: ParentRow }>(`/parents/${selectedContactParent.id}/validate-phone`, {
+        phone: contactPhone.trim(),
+      });
+      replaceParentInState(res.data?.parent);
+      showSuccess(res.data?.message || "Phone number validated");
+    } catch (err: any) {
+      showError(err?.response?.data?.message || "Phone validation failed");
+    } finally {
+      setContactBusy(null);
+    }
+  };
+
+  const sendParentWhatsappCode = async () => {
+    if (!selectedContactParent) return showError("Select a parent first");
+    if (!contactPhone.trim()) return showError("Enter a WhatsApp number first");
+
+    setContactBusy("send");
+    try {
+      const res = await authApi.post<{ message?: string; parent?: ParentRow }>(`/parents/${selectedContactParent.id}/whatsapp/send-code`, {
+        phone: contactPhone.trim(),
+      });
+      replaceParentInState(res.data?.parent);
+      setWhatsappCode("");
+      showSuccess(res.data?.message || "WhatsApp code sent");
+    } catch (err: any) {
+      showError(err?.response?.data?.message || "Unable to send WhatsApp code");
+    } finally {
+      setContactBusy(null);
+    }
+  };
+
+  const verifyParentWhatsappCode = async () => {
+    if (!selectedContactParent) return showError("Select a parent first");
+    if (!whatsappCode.trim()) return showError("Enter the WhatsApp code");
+
+    setContactBusy("verify");
+    try {
+      const res = await authApi.post<{ message?: string; parent?: ParentRow }>(`/parents/${selectedContactParent.id}/whatsapp/verify-code`, {
+        code: whatsappCode.trim(),
+      });
+      replaceParentInState(res.data?.parent);
+      setWhatsappCode("");
+      showSuccess(res.data?.message || "WhatsApp number verified");
+    } catch (err: any) {
+      showError(err?.response?.data?.message || "WhatsApp verification failed");
+    } finally {
+      setContactBusy(null);
+    }
+  };
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -545,13 +635,13 @@ export default function ParentsPage() {
     try {
       const res = await authApi.post("/students/by-classes", {
         class_ids: selectedClassIds,
-        parent_id: selectedParent.id, // ✅ for UI pre-check
+        parent_id: selectedParent.id, // for UI pre-check
       });
 
       const list: StudentRow[] = res.data?.students || [];
       setStudents(list);
 
-      // ✅ auto-check those already linked to this parent
+      // auto-check those already linked to this parent
       const alreadyLinkedIds = list.filter((s) => s.assigned_parent_id === selectedParent.id).map((s) => s.id);
       setSelectedStudentIds(alreadyLinkedIds);
 
@@ -569,7 +659,7 @@ export default function ParentsPage() {
     if (!term) return students;
 
     return students.filter((s) => {
-      const hay = [safeLower(s.firstname), safeLower(s.surname), safeLower(s.reg_no), safeLower(s.level?.name || "")].join(" ");
+                                    <span className="pr-pill pr-pill--gold">{s.level?.name || "-"}</span>
       return hay.includes(term);
     });
   }, [students, studentSearch]);
@@ -590,7 +680,7 @@ export default function ParentsPage() {
     if (!selectedParent) return showError("No parent selected");
     if (!selectedStudentIds.length) return showError("Select at least one student");
 
-    // ✅ Do not re-send those already linked to this parent
+    // Do not re-send those already linked to this parent
     const alreadyLinked = new Set(students.filter((s) => s.assigned_parent_id === selectedParent.id).map((s) => s.id));
     const toAssign = selectedStudentIds.filter((id) => !alreadyLinked.has(id));
 
@@ -644,6 +734,8 @@ export default function ParentsPage() {
   const totalParentsOnPage = parents?.length ?? 0;
   const parentsWithEmailCount = useMemo(() => parents.filter((p) => !!(p.email && p.email.trim())).length, [parents]);
   const parentsWithPhoneCount = useMemo(() => parents.filter((p) => !!(p.phone && p.phone.trim())).length, [parents]);
+  const phoneValidatedCount = useMemo(() => parents.filter((p) => isVerified(p.phone_validated_at)).length, [parents]);
+  const whatsappVerifiedCount = useMemo(() => parents.filter((p) => isVerified(p.whatsapp_verified_at)).length, [parents]);
   const childrenCountInProfile = parentDetails?.children?.length ?? 0;
 
   /** ================= CLIPBOARD ================= */
@@ -656,13 +748,13 @@ export default function ParentsPage() {
     }
   };
 
-  const anyBusy = loading || savingParent || creatingParent || assigning;
+  const anyBusy = loading || savingParent || creatingParent || assigning || !!contactBusy;
 
   return (
     <>
       <style>{`
 /* =========================
-   ParentsPage — "AdminDashboard" template skin
+   ParentsPage - "AdminDashboard" template skin
    (inline styles per your request)
 ========================= */
 
@@ -677,7 +769,19 @@ export default function ParentsPage() {
   background: var(--bs-body-bg, #f5f1eb);
   min-height: 100vh;
   font-family: "DM Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  padding: 28px 28px 0;
+  padding: 96px 24px 34px;
+  margin-left: 280px;
+  width: calc(100% - 280px);
+  max-width: calc(100% - 280px);
+  overflow-x: hidden;
+}
+@media (max-width: 991.98px){
+  .pr-main{
+    margin-left: 0;
+    width: 100%;
+    max-width: 100%;
+    padding: 88px 14px 28px;
+  }
 }
 
 .pr-hero{
@@ -1228,6 +1332,47 @@ export default function ParentsPage() {
 .pr-pill--purple{ background:#ede9fe; border-color: rgba(124,58,237,0.18); color:#7c3aed; }
 .pr-pill--gray{ background:#f1f5f9; border-color: rgba(71,85,105,0.16); color:#475569; }
 
+.pr-validation-grid{
+  display:grid;
+  grid-template-columns: minmax(220px, 1.1fr) minmax(220px, 1fr) minmax(160px, .8fr);
+  gap:12px;
+  padding:16px;
+}
+@media (max-width: 991.98px){ .pr-validation-grid{ grid-template-columns:1fr; } }
+.pr-field select{
+  width:100%;
+  border:1px solid #ede8e0;
+  border-radius:10px;
+  padding:10px 12px;
+  font-size:13px;
+  outline:none;
+  background:#fff;
+  color:#1a1a2e;
+}
+.pr-contact-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  align-items:center;
+  padding:0 16px 16px;
+}
+.pr-status-strip{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  padding:0 16px 16px;
+  color:#7a6a5a;
+  font-size:12.5px;
+}
+.pr-contact-note{
+  margin:0 16px 16px;
+  padding:10px 12px;
+  border:1px solid #dbeafe;
+  background:#eff6ff;
+  color:#1e40af;
+  border-radius:10px;
+  font-size:12.5px;
+}
 .pr-alert{
   display:flex; align-items:flex-start; gap:10px;
   background:#fff7ed;
@@ -1254,7 +1399,7 @@ export default function ParentsPage() {
         <div className="row">
           <Sidebar sidebarOpen={sidebarOpen} />
 
-          <main className="col-md-9 col-lg-10 ms-auto pr-main">
+          <main className="pr-main">
             {anyBusy && (
               <Loader
                 message={
@@ -1370,7 +1515,7 @@ export default function ParentsPage() {
                 { label: "Add Parent", desc: "Create a parent account", color: "#b45309", bg: "#fef3c7", onClick: openAddParentModal, icon: I.plus },
                 { label: "Refresh List", desc: "Reload parents data", color: "#1e40af", bg: "#dbeafe", onClick: fetchAllParents, icon: I.refresh },
                 { label: "Clear Search", desc: "Reset filters", color: "#065f46", bg: "#d1fae5", onClick: () => { setSearch(""); setPage(1); }, icon: I.search },
-                { label: "Help Tip", desc: "Assign children from profile", color: "#7c3aed", bg: "#ede9fe", onClick: () => showSuccess("Tip: Open a parent → Assign Child → select class(es) → load students → assign."), icon: I.shield },
+                { label: "Help Tip", desc: "Assign children from profile", color: "#7c3aed", bg: "#ede9fe", onClick: () => showSuccess("Tip: Open a parent -> Assign Child -> select class(es), load students, then assign."), icon: I.shield },
               ].map((a) => (
                 <a
                   key={a.label}
@@ -1391,6 +1536,73 @@ export default function ParentsPage() {
               ))}
             </div>
 
+            {/* ================= CONTACT VALIDATION ================= */}
+            <div className="pr-panel" style={{ marginBottom: 18 }}>
+              <div className="pr-panel-head">
+                <div className="pr-panel-title-group">
+                  <div className="pr-panel-icon" style={{ ["--pi" as any]: "#dbeafe", ["--pc" as any]: "#1e40af" }}>
+                    {I.phone}
+                  </div>
+                  <div>
+                    <p className="pr-panel-title">Parent Contact Validation</p>
+                    <p className="pr-panel-sub">Confirm regular phone numbers and WhatsApp numbers separately</p>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <span className="pr-pill pr-pill--green">Phone: {phoneValidatedCount}/{parents.length}</span>
+                  <span className="pr-pill pr-pill--blue">WhatsApp: {whatsappVerifiedCount}/{parents.length}</span>
+                </div>
+              </div>
+
+              <div className="pr-validation-grid">
+                <div className="pr-field">
+                  <label>Parent</label>
+                  <select value={contactParentId} onChange={(e) => setContactParentId(e.target.value ? Number(e.target.value) : "")}>
+                    <option value="">Select parent</option>
+                    {allParents.map((parent) => (
+                      <option key={parent.id} value={parent.id}>
+                        {fullName(parent)} - {parent.phone || parent.email || `ID ${parent.id}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="pr-field">
+                  <label>Phone / WhatsApp Number</label>
+                  <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="08030000000 or +2348030000000" />
+                </div>
+
+                <div className="pr-field">
+                  <label>WhatsApp Code</label>
+                  <input value={whatsappCode} onChange={(e) => setWhatsappCode(e.target.value)} placeholder="6-digit code" />
+                </div>
+              </div>
+
+              <div className="pr-contact-actions">
+                <button className="pr-refresh" onClick={validateParentPhone} disabled={!selectedContactParent || contactBusy !== null}>
+                  {contactBusy === "phone" ? "Checking..." : "Validate Phone"}
+                </button>
+                <button className="pr-refresh" onClick={sendParentWhatsappCode} disabled={!selectedContactParent || contactBusy !== null}>
+                  {contactBusy === "send" ? "Sending..." : "Send WhatsApp Code"}
+                </button>
+                <button className="pr-btn-gold" onClick={verifyParentWhatsappCode} disabled={!selectedContactParent || contactBusy !== null || !whatsappCode.trim()}>
+                  {contactBusy === "verify" ? "Verifying..." : "Verify WhatsApp"}
+                </button>
+              </div>
+
+              <div className="pr-status-strip">
+                <span className={`pr-pill ${isVerified(selectedContactParent?.phone_validated_at) ? "pr-pill--green" : "pr-pill--gray"}`}>
+                  Phone {isVerified(selectedContactParent?.phone_validated_at) ? "validated" : "not validated"}
+                </span>
+                <span className={`pr-pill ${isVerified(selectedContactParent?.whatsapp_verified_at) ? "pr-pill--green" : "pr-pill--gray"}`}>
+                  WhatsApp {isVerified(selectedContactParent?.whatsapp_verified_at) ? "verified" : "not verified"}
+                </span>
+                {selectedContactParent?.phone_normalized && <span>Normalized: <b>{selectedContactParent.phone_normalized}</b></span>}
+              </div>
+
+              <p className="pr-contact-note">During Twilio sandbox testing, the parent number must join your WhatsApp sandbox before messages can be delivered.</p>
+            </div>
+
             {/* ================= MAIN GRID ================= */}
             <div className="pr-grid">
               {/* Directory */}
@@ -1402,7 +1614,7 @@ export default function ParentsPage() {
                     </div>
                     <div>
                       <p className="pr-panel-title">Parent Directory</p>
-                      <p className="pr-panel-sub">Search by name, email or phone • Click “View” to open profile</p>
+                      <p className="pr-panel-sub">Search by name, email or phone - Click "View" to open profile</p>
                     </div>
                   </div>
 
@@ -1427,7 +1639,7 @@ export default function ParentsPage() {
                             setPage(1);
                           }}
                         >
-                          ✕
+                          x
                         </button>
                       )}
                     </div>
@@ -1439,11 +1651,17 @@ export default function ParentsPage() {
                       Refresh
                     </button>
 
+                    <button className="pr-refresh" onClick={() => setShowImportPanel(v => !v)} disabled={loading}>
+                      {showImportPanel ? "Close Import" : "Import"}
+                    </button>
+
                     <button className="pr-btn-gold" onClick={openAddParentModal} disabled={anyBusy}>
                       {I.plus} Add Parent
                     </button>
                   </div>
                 </div>
+
+                {showImportPanel && <PeopleImportPanel kind="parents" onImported={fetchAllParents} />}
 
                 <div style={{ overflowX: "auto" }}>
                   <table className="pr-table">
@@ -1452,6 +1670,7 @@ export default function ParentsPage() {
                         <th style={{ width: 460 }}>Parent</th>
                         <th style={{ width: 300 }}>Email</th>
                         <th style={{ width: 220 }}>Phone</th>
+                        <th style={{ width: 220 }}>Validation</th>
                         <th style={{ width: 260, textAlign: "right" }}>Action</th>
                       </tr>
                     </thead>
@@ -1459,13 +1678,13 @@ export default function ParentsPage() {
                     <tbody>
                       {loading ? (
                         <tr>
-                          <td colSpan={4} style={{ padding: "44px 16px", textAlign: "center", color: "#9a8a7a" }}>
-                            Loading parents…
+                          <td colSpan={5} style={{ padding: "44px 16px", textAlign: "center", color: "#9a8a7a" }}>
+                            Loading parents...
                           </td>
                         </tr>
                       ) : parents.length === 0 ? (
                         <tr>
-                          <td colSpan={4} style={{ padding: "44px 16px", textAlign: "center", color: "#9a8a7a" }}>
+                          <td colSpan={5} style={{ padding: "44px 16px", textAlign: "center", color: "#9a8a7a" }}>
                             No parents found. Try a different search or add a new parent.
                           </td>
                         </tr>
@@ -1482,13 +1701,23 @@ export default function ParentsPage() {
                               </div>
                             </td>
 
-                            <td style={{ color: "#9a8a7a" }}>{p.email || "—"}</td>
-                            <td style={{ color: "#9a8a7a" }}>{p.phone || "—"}</td>
+                            <td style={{ color: "#9a8a7a" }}>{p.email || "-"}</td>
+                            <td style={{ color: "#9a8a7a" }}>{p.phone || "-"}</td>
+                            <td>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                <span className={`pr-pill ${isVerified(p.phone_validated_at) ? "pr-pill--green" : "pr-pill--gray"}`}>Phone</span>
+                                <span className={`pr-pill ${isVerified(p.whatsapp_verified_at) ? "pr-pill--green" : "pr-pill--gray"}`}>WhatsApp</span>
+                              </div>
+                            </td>
 
                             <td style={{ textAlign: "right" }}>
                               <div style={{ display: "inline-flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                                 <button className="pr-mini-btn" onClick={() => openParent(p)}>
                                   {I.eye} View
+                                </button>
+
+                                <button className="pr-mini-btn" onClick={() => { setContactParentId(p.id); window.scrollTo({ top: 520, behavior: "smooth" }); }}>
+                                  {I.phone} Validate
                                 </button>
 
                                 <button className="pr-mini-btn pr-mini-btn--danger" onClick={() => deleteParent(p)}>
@@ -1517,7 +1746,7 @@ export default function ParentsPage() {
                     </button>
 
                     <span className="pr-page-current">
-                      {parents.length} shown • {allParents.length} total
+                      {parents.length} shown - {allParents.length} total
                     </span>
 
                     <button className="pr-page-btn" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}>
@@ -1548,7 +1777,7 @@ export default function ParentsPage() {
                   <div className="pr-alert" style={{ marginBottom: 0 }}>
                     <span style={{ flexShrink: 0 }}>{I.shield}</span>
                     <div>
-                      <div style={{ fontWeight: 700, marginBottom: 2 }}>One student → one parent</div>
+                      <div style={{ fontWeight: 700, marginBottom: 2 }}>One student to one parent</div>
                       Students already assigned to another parent are locked in the assign modal, and an error toast shows the parent name.
                     </div>
                   </div>
@@ -1562,7 +1791,7 @@ export default function ParentsPage() {
                       <ol style={{ margin: 0, paddingLeft: 18, color: "#7a6a5a", fontSize: 13.5, lineHeight: 1.7 }}>
                         <li>Click <b>View</b> on a parent.</li>
                         <li>Use <b>Assign Child</b> in the profile header.</li>
-                        <li>Select class(es) → <b>Load Students</b> → <b>Assign Selected</b>.</li>
+                        <li>Select class(es), click <b>Load Students</b>, then <b>Assign Selected</b>.</li>
                       </ol>
                     </div>
                   </div>
@@ -1611,12 +1840,12 @@ export default function ParentsPage() {
                   </div>
                   <div>
                     <h5>Add Parent</h5>
-                    <p>Create a parent account — password is auto-generated.</p>
+                    <p>Create a parent account - password is auto-generated.</p>
                   </div>
                 </div>
 
                 <button className="pr-btn-outline" onClick={closeAddParentModal} disabled={creatingParent}>
-                  ✕ Close
+                    Close
                 </button>
               </div>
             </div>
@@ -1672,7 +1901,7 @@ export default function ParentsPage() {
             </div>
 
             <div className="pr-modal-foot">
-              <small style={{ color: "#9a8a7a" }}>Tip: After creation, open profile → Security tab to view default password.</small>
+              <small style={{ color: "#9a8a7a" }}>Tip: After creation, open profile, then Security tab to view default password.</small>
 
               <div style={{ display: "inline-flex", gap: 8, flexWrap: "wrap" }}>
                 <button className="pr-mini-btn" onClick={closeAddParentModal} disabled={creatingParent}>
@@ -1723,7 +1952,7 @@ export default function ParentsPage() {
                   <div>
                     <h5>{parentDetails?.parent ? fullName(parentDetails.parent) : fullName(selectedParent)}</h5>
                     <p>
-                      {parentDetails?.parent?.email ?? selectedParent.email ?? "—"} • {parentDetails?.parent?.phone ?? selectedParent.phone ?? "—"}
+                      {parentDetails?.parent?.email ?? selectedParent.email ?? "-"} - {parentDetails?.parent?.phone ?? selectedParent.phone ?? "-"}
                     </p>
                   </div>
                 </div>
@@ -1737,13 +1966,13 @@ export default function ParentsPage() {
                             {I.plus} Assign Child
                           </button>
                           <button className="pr-btn-outline" onClick={enableEditMode}>
-                            ✎ Edit
+                            Edit
                           </button>
                         </>
                       ) : (
                         <>
                           <button className="pr-btn-gold" onClick={saveParent} disabled={savingParent}>
-                            {savingParent ? "Saving…" : "Save"}
+                            {savingParent ? "Saving..." : "Save"}
                           </button>
                           <button className="pr-btn-outline" onClick={cancelEditMode} disabled={savingParent}>
                             Cancel
@@ -1754,7 +1983,7 @@ export default function ParentsPage() {
                   )}
 
                   <button className="pr-btn-outline" onClick={closeParentModal}>
-                    ✕ Close
+                    Close
                   </button>
                 </div>
               </div>
@@ -1765,31 +1994,31 @@ export default function ParentsPage() {
                   onClick={() => setActiveTab("overview")}
                   disabled={loadingProfile}
                 >
-                  ▦ Overview
+                  Overview
                 </button>
                 <button
                   className={`pr-tab ${activeTab === "children" ? "pr-tab--active" : ""}`}
                   onClick={() => setActiveTab("children")}
                   disabled={loadingProfile}
                 >
-                  👥 Children
+                  Children
                 </button>
                 <button
                   className={`pr-tab ${activeTab === "security" ? "pr-tab--active" : ""}`}
                   onClick={() => setActiveTab("security")}
                   disabled={loadingProfile}
                 >
-                  🔒 Security
+                  Security
                 </button>
               </div>
             </div>
 
             <div className="pr-modal-body">
               {loadingProfile ? (
-                <div style={{ padding: 30, textAlign: "center", color: "#9a8a7a" }}>Loading parent details…</div>
+                <div style={{ padding: 30, textAlign: "center", color: "#9a8a7a" }}>Loading parent details...</div>
               ) : !parentDetails?.parent ? (
                 <div className="pr-alert">
-                  <span style={{ flexShrink: 0 }}>⚠</span>
+                  <span style={{ flexShrink: 0 }}>!</span>
                   No parent details available.
                 </div>
               ) : (
@@ -1834,9 +2063,9 @@ export default function ParentsPage() {
                             <InfoItem label="Full Name" value={fullName(parentDetails.parent)} icon={I.people} />
                             <InfoItem label="Email" value={parentDetails.parent.email || null} icon={I.mail} />
                             <InfoItem label="Phone" value={parentDetails.parent.phone || null} icon={I.phone} />
-                            <InfoItem label="Address" value={parentDetails.parent.address || null} icon={<span>📍</span>} />
+                            <InfoItem label="Address" value={parentDetails.parent.address || null} icon={<span>Address</span>} />
                             <BadgeItem label="Children Linked" value={String(parentDetails.children?.length ?? 0)} tone="blue" icon={I.child} />
-                            <BadgeItem label="Account Role" value="Parent" tone="gray" icon={<span>👤</span>} />
+                            <BadgeItem label="Account Role" value="Parent" tone="gray" icon={<span>Parent</span>} />
                           </div>
                         )}
                       </div>
@@ -1883,7 +2112,7 @@ export default function ParentsPage() {
                               {(parentDetails.children ?? []).length === 0 ? (
                                 <tr>
                                   <td colSpan={5} style={{ padding: "44px 16px", textAlign: "center", color: "#9a8a7a" }}>
-                                    No students linked. Click “Assign” to add children to this parent.
+                                    No students linked. Click "Assign" to add children to this parent.
                                   </td>
                                 </tr>
                               ) : (
@@ -1895,10 +2124,10 @@ export default function ParentsPage() {
                                       <div className="pr-subtle">ID: {c.id}</div>
                                     </td>
                                     <td>
-                                      <span className="pr-pill pr-pill--blue">{c.reg_no || "—"}</span>
+                                      <span className="pr-pill pr-pill--blue">{c.reg_no || "-"}</span>
                                     </td>
                                     <td>
-                                      <span className="pr-pill pr-pill--gold">{c.level?.name || "—"}</span>
+                                      <span className="pr-pill pr-pill--gold">{c.level?.name || "-"}</span>
                                     </td>
                                     <td style={{ textAlign: "right" }}>
                                       <button className="pr-mini-btn pr-mini-btn--danger" onClick={() => removeChild(c.id)}>
@@ -1919,8 +2148,8 @@ export default function ParentsPage() {
                     <div className="pr-card">
                       <div className="pr-card-pad">
                         <div className="pr-info-grid">
-                          <InfoItem label="Email" value={parentDetails.parent?.email || "—"} icon={I.mail} />
-                          <InfoItem label="Phone" value={parentDetails.parent?.phone || "—"} icon={I.phone} />
+                          <InfoItem label="Email" value={parentDetails.parent?.email || "-"} icon={I.mail} />
+                          <InfoItem label="Phone" value={parentDetails.parent?.phone || "-"} icon={I.phone} />
 
                           <div className="pr-info" style={{ gridColumn: "1 / -1" }}>
                             <div className="pr-info-label">
@@ -1935,7 +2164,7 @@ export default function ParentsPage() {
                                   passwordVisible
                                     ? parentDetails.parent?.default_password || "N/A"
                                     : parentDetails.parent?.default_password
-                                    ? "••••••••••"
+                                    ? "**********"
                                     : "N/A"
                                 }
                                 readOnly
@@ -1987,7 +2216,7 @@ export default function ParentsPage() {
             <div className="pr-modal-foot">
               <small style={{ color: "#9a8a7a" }}>Tip: Assign children by selecting classes in the Assign modal.</small>
               <button className="pr-mini-btn" onClick={closeParentModal}>
-                Close
+                    Close
               </button>
             </div>
           </div>
@@ -2019,13 +2248,13 @@ export default function ParentsPage() {
                   <div>
                     <h5>Assign Children</h5>
                     <p>
-                      Parent: <b style={{ color: "#e8c97a" }}>{fullName(selectedParent)}</b> • Select class(es) → load students → assign.
+                      Parent: <b style={{ color: "#e8c97a" }}>{fullName(selectedParent)}</b> - Select class(es), load students, then assign.
                     </p>
                   </div>
                 </div>
 
                 <button className="pr-btn-outline" onClick={closeAssignModal} disabled={assigning || studentsLoading || classesLoading}>
-                  ✕ Close
+                    Close
                 </button>
               </div>
             </div>
@@ -2037,7 +2266,7 @@ export default function ParentsPage() {
                   <div className="pr-panel-head">
                     <div className="pr-panel-title-group">
                       <div className="pr-panel-icon" style={{ ["--pi" as any]: "#dbeafe", ["--pc" as any]: "#1e40af" }}>
-                        <span>🏫</span>
+                        <span>School</span>
                       </div>
                       <div>
                         <p className="pr-panel-title">Classes</p>
@@ -2056,7 +2285,7 @@ export default function ParentsPage() {
 
                     <div style={{ marginTop: 10, maxHeight: 320, overflow: "auto", background: "#fff", borderRadius: 12, border: "1px solid #ede8e0", padding: 8 }}>
                       {classesLoading ? (
-                        <div style={{ padding: 14, textAlign: "center", color: "#9a8a7a" }}>Loading classes…</div>
+                        <div style={{ padding: 14, textAlign: "center", color: "#9a8a7a" }}>Loading classes...</div>
                       ) : filteredClasses.length === 0 ? (
                         <div style={{ padding: 14, textAlign: "center", color: "#9a8a7a" }}>No classes found</div>
                       ) : (
@@ -2101,7 +2330,7 @@ export default function ParentsPage() {
                         onClick={loadStudentsBySelectedClasses}
                         disabled={studentsLoading || !selectedClassIds.length}
                       >
-                        {studentsLoading ? "Loading students…" : "Load Students"}
+                        {studentsLoading ? "Loading students..." : "Load Students"}
                       </button>
 
                       <button className="pr-mini-btn" style={{ justifyContent: "center" }} onClick={() => setSelectedClassIds([])} disabled={!selectedClassIds.length}>
@@ -2147,12 +2376,12 @@ export default function ParentsPage() {
                         <tbody>
                           {filteredStudents.length === 0 ? (
                             <tr>
-                              <td colSpan={4} style={{ padding: "44px 16px", textAlign: "center", color: "#9a8a7a" }}>
+                              <td colSpan={5} style={{ padding: "44px 16px", textAlign: "center", color: "#9a8a7a" }}>
                                 <div style={{ fontWeight: 800, color: "#1a1a2e" }}>
                                   {students.length === 0 ? "No students loaded" : "No matches"}
                                 </div>
                                 <div style={{ marginTop: 6 }}>
-                                  {students.length === 0 ? "Select class(es) and click “Load Students”." : "Try a different keyword."}
+                                  {students.length === 0 ? "Select class(es) and click Load Students." : "Try a different keyword."}
                                 </div>
                               </td>
                             </tr>
@@ -2200,11 +2429,11 @@ export default function ParentsPage() {
                                   </td>
 
                                   <td>
-                                    <span className="pr-pill pr-pill--blue">{s.reg_no || "—"}</span>
+                                    <span className="pr-pill pr-pill--blue">{s.reg_no || "-"}</span>
                                   </td>
 
                                   <td>
-                                    <span className="pr-pill pr-pill--gold">{s.level?.name || "—"}</span>
+                                    <span className="pr-pill pr-pill--gold">{s.level?.name || "-"}</span>
                                   </td>
                                 </tr>
                               );
@@ -2220,7 +2449,7 @@ export default function ParentsPage() {
                       </button>
 
                       <button className="pr-btn-gold" onClick={assignSelectedChildren} disabled={assigning || !selectedStudentIds.length}>
-                        {assigning ? "Assigning…" : "Assign Selected"}
+                        {assigning ? "Assigning..." : "Assign Selected"}
                       </button>
                     </div>
 
@@ -2235,7 +2464,7 @@ export default function ParentsPage() {
             <div className="pr-modal-foot">
               <small style={{ color: "#9a8a7a" }}>Classes are fetched dynamically from Student Classes.</small>
               <button className="pr-mini-btn" onClick={closeAssignModal}>
-                Close
+                    Close
               </button>
             </div>
           </div>

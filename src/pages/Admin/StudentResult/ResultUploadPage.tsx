@@ -1,5 +1,5 @@
 // src/pages/Results/ResultUploadPage.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { authApi } from "../../../utils/axios";
 import { useToast } from "../../../contexts/ToastContext";
@@ -31,6 +31,30 @@ type Student = {
   saved_at?: string | null;
 };
 
+type Department = { id: number; name: string };
+
+type ImportPreview = {
+  summary: {
+    students_found: number;
+    ready_rows: number;
+    subjects_found: number;
+    errors_count: number;
+    warnings_count: number;
+    can_import: boolean;
+  };
+  rows: Array<{
+    row: number;
+    admission_no: string;
+    student_name: string;
+    status: string;
+    subjects: Array<{ subject_id: number; subject_name: string; ca: number; exam: number; total: number }>;
+  }>;
+  errors: string[];
+  warnings: string[];
+};
+
+type AssessmentFormat = "ca_exam" | "ca_ca_exam" | "ca_ca_ca_ca_exam";
+
 function useQuery() {
   const { search } = useLocation();
   return useMemo(() => new URLSearchParams(search), [search]);
@@ -58,8 +82,16 @@ export default function ResultUploadPage() {
 
   const [batch, setBatch] = useState<Batch | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
 
   const [filter, setFilter] = useState("");
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [assessmentFormat, setAssessmentFormat] = useState<AssessmentFormat>("ca_exam");
+  const [importDepartmentId, setImportDepartmentId] = useState<number | "">("");
+  const importFileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const t = window.setTimeout(() => setPageLoading(false), 120);
@@ -81,9 +113,10 @@ export default function ResultUploadPage() {
       setStudentsLoading(true);
 
       try {
-        const [bRes, sRes] = await Promise.all([
+        const [bRes, sRes, dRes] = await Promise.all([
           authApi.get(`/result-batches/${batchId}`),
           authApi.get(`/result-batches/${batchId}/students`),
+          authApi.get("/fdepartments").catch(() => ({ data: [] })),
         ]);
 
         if (!mounted) return;
@@ -93,6 +126,8 @@ export default function ResultUploadPage() {
 
         const rawStudents = sRes.data?.data ?? sRes.data ?? [];
         setStudents(Array.isArray(rawStudents) ? rawStudents : []);
+        const rawDepartments = dRes.data?.data ?? dRes.data ?? [];
+        setDepartments(Array.isArray(rawDepartments) ? rawDepartments : []);
       } catch (e: any) {
         console.error(e);
         showError?.(e?.response?.data?.message || "Failed to load batch upload data.");
@@ -132,6 +167,109 @@ export default function ResultUploadPage() {
 
   const handleGoToAddResult = (studentId: number) => {
     navigate(`/students/results/add?batchId=${batchId}&studentId=${studentId}`);
+  };
+
+  const refreshStudents = async () => {
+    if (!batchId) return;
+    const sRes = await authApi.get(`/result-batches/${batchId}/students`);
+    const rawStudents = sRes.data?.data ?? sRes.data ?? [];
+    setStudents(Array.isArray(rawStudents) ? rawStudents : []);
+  };
+
+  const downloadTemplate = async (format: "xlsx" | "xls" | "csv") => {
+    if (!batchId) return;
+    try {
+      const res = await authApi.get(`/result-batches/${batchId}/result-import/template`, {
+        params: {
+          format,
+          assessment_format: assessmentFormat,
+          ...(importDepartmentId ? { department_id: importDepartmentId } : {}),
+        },
+        responseType: "blob",
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `result_upload_template_batch_${batchId}.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e: any) {
+      console.error(e);
+      showError?.(e?.response?.data?.message || "Unable to download result template.");
+    }
+  };
+
+  const handlePreviewImport = async () => {
+    if (!batchId || !importFile) {
+      showWarning?.("Choose an Excel or CSV file first.");
+      return;
+    }
+
+    const form = new FormData();
+    form.append("file", importFile);
+    if (importDepartmentId) form.append("department_id", String(importDepartmentId));
+
+    setPreviewing(true);
+    try {
+      const res = await authApi.post(`/result-batches/${batchId}/result-import/preview`, form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setImportPreview(res.data);
+      if (res.data?.summary?.can_import) {
+        showSuccess?.("File looks good. You can now import the results.");
+      } else {
+        showWarning?.("Please correct the highlighted issues before importing.");
+      }
+    } catch (e: any) {
+      console.error(e);
+      const data = e?.response?.data;
+      const message = data?.message || data?.errors?.file?.[0] || "Unable to preview result file.";
+      showError?.(message);
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  const handleImportFileChange = (file?: File | null) => {
+    setImportFile(file ?? null);
+    setImportPreview(null);
+
+    if (file) {
+      showSuccess?.(`${file.name} selected. You can preview it now.`);
+      window.setTimeout(() => window.focus(), 100);
+    }
+  };
+
+  const chooseImportFile = () => {
+    importFileInputRef.current?.click();
+  };
+
+  const handleConfirmImport = async () => {
+    if (!batchId || !importFile || !importPreview?.summary?.can_import) return;
+
+    const form = new FormData();
+    form.append("file", importFile);
+    if (importDepartmentId) form.append("department_id", String(importDepartmentId));
+
+    setImporting(true);
+    try {
+      const res = await authApi.post(`/result-batches/${batchId}/result-import/import`, form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      showSuccess?.(res.data?.message || "Results imported successfully.");
+      setImportFile(null);
+      setImportPreview(null);
+      await refreshStudents();
+    } catch (e: any) {
+      console.error(e);
+      const data = e?.response?.data;
+      const message = data?.message || data?.errors?.file?.[0] || "Unable to import result file.";
+      showError?.(message);
+    } finally {
+      setImporting(false);
+    }
   };
 
   const handleComputeBatch = async () => {
@@ -710,6 +848,238 @@ export default function ResultUploadPage() {
                           Pending: <span className="db-strong">{stats.pending}</span>
                         </div>
                       </div>
+                    </div>
+
+                    <div
+                      style={{
+                        border: "1px solid rgba(201,168,76,0.28)",
+                        background: "#fffdf8",
+                        borderRadius: 14,
+                        padding: 16,
+                        display: "grid",
+                        gap: 14,
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
+                        <div>
+                          <div className="db-strong" style={{ fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
+                            <i className="bi bi-file-earmark-spreadsheet" style={{ color: "#c9a84c" }} />
+                            Upload results with Excel or CSV
+                          </div>
+                          <div className="db-muted" style={{ fontSize: 12.5, marginTop: 4 }}>
+                            Choose the score format, download the template, fill scores, preview the file, then import.
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <select
+                            value={importDepartmentId}
+                            onChange={(e) => {
+                              setImportDepartmentId(e.target.value ? Number(e.target.value) : "");
+                              setImportPreview(null);
+                            }}
+                            style={{
+                              border: "1px solid #e5ddd3",
+                              borderRadius: 10,
+                              padding: "8px 10px",
+                              background: "#fff",
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: "#4a4a5a",
+                              minWidth: 190,
+                            }}
+                            aria-label="Select department for result upload template"
+                          >
+                            <option value="">All departments</option>
+                            {departments.map((department) => (
+                              <option key={department.id} value={department.id}>
+                                {department.name}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={assessmentFormat}
+                            onChange={(e) => {
+                              setAssessmentFormat(e.target.value as AssessmentFormat);
+                              setImportPreview(null);
+                            }}
+                            style={{
+                              border: "1px solid #e5ddd3",
+                              borderRadius: 10,
+                              padding: "8px 10px",
+                              background: "#fff",
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: "#4a4a5a",
+                            }}
+                            aria-label="Select result upload score format"
+                          >
+                            <option value="ca_exam">CA + Exam</option>
+                            <option value="ca_ca_exam">CA 1 + CA 2 + Exam</option>
+                            <option value="ca_ca_ca_ca_exam">CA 1 + CA 2 + CA 3 + CA 4 + Exam</option>
+                          </select>
+                          <button className="db-refresh-btn" onClick={() => downloadTemplate("xlsx")} disabled={!batchId}>
+                            <i className="bi bi-download" />
+                            Excel template
+                          </button>
+                          <button className="db-refresh-btn" onClick={() => downloadTemplate("csv")} disabled={!batchId}>
+                            <i className="bi bi-filetype-csv" />
+                            CSV template
+                          </button>
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+                          gap: 10,
+                          alignItems: "center",
+                        }}
+                      >
+                        <input
+                          ref={importFileInputRef}
+                          type="file"
+                          accept=".xlsx,.xls,.csv"
+                          onClick={(e) => {
+                            (e.currentTarget as HTMLInputElement).value = "";
+                          }}
+                          onChange={(e) => {
+                            handleImportFileChange(e.target.files?.[0] ?? null);
+                          }}
+                          style={{ display: "none" }}
+                        />
+
+                        <div
+                          style={{
+                            gridColumn: "span 2",
+                            border: "1px dashed rgba(201,168,76,0.7)",
+                            borderRadius: 12,
+                            background: "#fff",
+                            padding: 12,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 12,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <div style={{ minWidth: 0 }}>
+                            <div className="db-strong" style={{ fontSize: 13.5 }}>
+                              {importFile ? importFile.name : "No file selected"}
+                            </div>
+                            <div className="db-muted" style={{ fontSize: 12, marginTop: 3 }}>
+                              Save and close the Excel file before previewing, then return here if Windows opens Excel.
+                            </div>
+                          </div>
+                          <button className="db-refresh-btn" onClick={chooseImportFile} disabled={previewing || importing} type="button">
+                            <i className="bi bi-folder2-open" />
+                            Choose file
+                          </button>
+                        </div>
+
+                        <button className="db-refresh-btn" onClick={handlePreviewImport} disabled={!importFile || previewing} type="button">
+                          {previewing ? <span className="spinner-border spinner-border-sm" role="status" /> : <i className="bi bi-eye" />}
+                          Preview
+                        </button>
+                        <button
+                          className="db-btn-gold"
+                          onClick={handleConfirmImport}
+                          disabled={!importPreview?.summary?.can_import || importing}
+                          type="button"
+                        >
+                          {importing ? <span className="spinner-border spinner-border-sm" role="status" /> : <i className="bi bi-cloud-upload-fill" />}
+                          Import
+                        </button>
+                      </div>
+
+                      {importPreview && (
+                        <div style={{ display: "grid", gap: 12 }}>
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <span className="db-badge" style={{ background: "#f5f1eb", color: "#1a1a2e" }}>
+                              {importPreview.summary.ready_rows} ready row(s)
+                            </span>
+                            <span className="db-badge" style={{ background: "#f5f1eb", color: "#1a1a2e" }}>
+                              {importPreview.summary.subjects_found} subject(s)
+                            </span>
+                            <span
+                              className="db-badge"
+                              style={{
+                                background: importPreview.summary.errors_count ? "rgba(239,68,68,0.1)" : "rgba(34,197,94,0.1)",
+                                color: importPreview.summary.errors_count ? "#b91c1c" : "#15803d",
+                              }}
+                            >
+                              {importPreview.summary.errors_count} error(s)
+                            </span>
+                            <span className="db-badge" style={{ background: "rgba(245,158,11,0.12)", color: "#92400e" }}>
+                              {importPreview.summary.warnings_count} warning(s)
+                            </span>
+                          </div>
+
+                          {(importPreview.errors.length > 0 || importPreview.warnings.length > 0) && (
+                            <div
+                              style={{
+                                display: "grid",
+                                gap: 8,
+                                maxHeight: 180,
+                                overflow: "auto",
+                                background: "#fff",
+                                border: "1px solid #ede8e0",
+                                borderRadius: 12,
+                                padding: 12,
+                              }}
+                            >
+                              {importPreview.errors.slice(0, 8).map((error, index) => (
+                                <div key={`err-${index}`} style={{ color: "#b91c1c", fontSize: 12.5, fontWeight: 700 }}>
+                                  <i className="bi bi-exclamation-circle" /> {error}
+                                </div>
+                              ))}
+                              {importPreview.warnings.slice(0, 6).map((warning, index) => (
+                                <div key={`warn-${index}`} style={{ color: "#92400e", fontSize: 12.5, fontWeight: 700 }}>
+                                  <i className="bi bi-info-circle" /> {warning}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {importPreview.rows.length > 0 && (
+                            <div style={{ overflowX: "auto", border: "1px solid #ede8e0", borderRadius: 12 }}>
+                              <table className="db-table">
+                                <thead>
+                                  <tr>
+                                    <th>Row</th>
+                                    <th>Student</th>
+                                    <th>Adm No</th>
+                                    <th>Subjects with scores</th>
+                                    <th>Status</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {importPreview.rows.slice(0, 5).map((row) => (
+                                    <tr key={`${row.row}-${row.admission_no}`}>
+                                      <td>{row.row}</td>
+                                      <td className="db-strong">{row.student_name || "Unknown"}</td>
+                                      <td>{row.admission_no}</td>
+                                      <td>{row.subjects.length}</td>
+                                      <td>
+                                        <span
+                                          className="db-pill"
+                                          style={{
+                                            background: row.status === "ready" ? "rgba(34,197,94,0.1)" : "rgba(245,158,11,0.12)",
+                                            color: row.status === "ready" ? "#15803d" : "#92400e",
+                                          }}
+                                        >
+                                          {row.status === "ready" ? "Ready" : "No scores"}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Table */}

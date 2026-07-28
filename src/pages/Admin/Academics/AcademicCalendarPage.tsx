@@ -21,6 +21,7 @@ interface Term {
   status?: TermStatus;
   created_at?: string;
   updated_at?: string;
+  archived_at?: string | null;
 }
 
 type SessionStatus = "Active" | "Inactive" | string;
@@ -34,6 +35,7 @@ interface AcademicSession {
   is_current?: boolean | number;
   created_at?: string;
   updated_at?: string;
+  archived_at?: string | null;
 }
 
 type TabKey = "sessions" | "terms";
@@ -93,6 +95,7 @@ export default function AcademicCalendarPage() {
 
   // ===== UI State =====
   const [activeTab, setActiveTab] = useState<TabKey>("sessions");
+  const [showArchived, setShowArchived] = useState(false);
   const [query, setQuery] = useState("");
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
@@ -143,7 +146,7 @@ export default function AcademicCalendarPage() {
   async function fetchTerms() {
     try {
       setLoadingTerms(true);
-      const res = await authApi.get<Term[]>("/terms");
+      const res = await authApi.get<Term[]>("/terms", { params: showArchived ? { archived: 1 } : undefined });
       setTerms(res.data ?? []);
     } catch (err: any) {
       showError(getErrorMessage(err));
@@ -155,7 +158,7 @@ export default function AcademicCalendarPage() {
   async function fetchSessions() {
     try {
       setLoadingSessions(true);
-      const res = await authApi.get<AcademicSession[]>("/sessions");
+      const res = await authApi.get<AcademicSession[]>("/sessions", { params: showArchived ? { archived: 1 } : undefined });
       setSessions(res.data ?? []);
     } catch (err: any) {
       showError(getErrorMessage(err));
@@ -168,12 +171,12 @@ export default function AcademicCalendarPage() {
     setLoading(true);
     Promise.all([fetchSessions(), fetchTerms()]).finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [showArchived]);
 
   useEffect(() => {
     setQuery("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
+  }, [activeTab, showArchived]);
 
   /* =========================
      DERIVED
@@ -306,6 +309,37 @@ export default function AcademicCalendarPage() {
     }
   }
 
+  async function archiveTerm(term: Term) {
+    const ok = window.confirm(
+      `Archive "${term.name}"?\n\nArchived terms will be hidden from future result entry, but old student results will remain safe.`
+    );
+    if (!ok) return;
+
+    try {
+      setBusyKey(`term:archive:${term.id}`);
+      const res = await authApi.delete(`/terms/${term.id}`);
+      showSuccess(res.data?.message ?? "Term archived.");
+      await fetchTerms();
+    } catch (err: any) {
+      showError(getErrorMessage(err));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function restoreTerm(term: Term) {
+    try {
+      setBusyKey(`term:restore:${term.id}`);
+      const res = await authApi.post(`/terms/${term.id}/restore`);
+      showSuccess(res.data?.message ?? "Term restored.");
+      await fetchTerms();
+    } catch (err: any) {
+      showError(getErrorMessage(err));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
   /* =========================
      SESSION ACTIONS
   ========================= */
@@ -377,6 +411,37 @@ export default function AcademicCalendarPage() {
       // ✅ your route is POST /sessions/set-current/{id}
       const res = await authApi.post(`/sessions/set-current/${sessionId}`);
       showSuccess(res.data?.message ?? "Current session updated.");
+      await fetchSessions();
+    } catch (err: any) {
+      showError(getErrorMessage(err));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function archiveSession(session: AcademicSession) {
+    const ok = window.confirm(
+      `Archive "${session.name}"?\n\nArchived sessions will be hidden from future result entry, but old student results will remain safe.`
+    );
+    if (!ok) return;
+
+    try {
+      setBusyKey(`session:archive:${session.id}`);
+      const res = await authApi.delete(`/sessions/${session.id}`);
+      showSuccess(res.data?.message ?? "Academic session archived.");
+      await fetchSessions();
+    } catch (err: any) {
+      showError(getErrorMessage(err));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function restoreSession(session: AcademicSession) {
+    try {
+      setBusyKey(`session:restore:${session.id}`);
+      const res = await authApi.post(`/sessions/${session.id}/restore`);
+      showSuccess(res.data?.message ?? "Academic session restored.");
       await fetchSessions();
     } catch (err: any) {
       showError(getErrorMessage(err));
@@ -760,6 +825,7 @@ export default function AcademicCalendarPage() {
         .db-action-primary { border-color: rgba(30, 64, 175, 0.25); color: #1e40af; }
         .db-action-gold    { border-color: rgba(180, 83, 9, 0.25); color: #b45309; }
         .db-action-green   { border-color: rgba(6, 95, 70, 0.25); color: #065f46; }
+        .db-action-danger  { border-color: rgba(185, 28, 28, 0.25); color: #b91c1c; }
 
         .db-pagination {
           display:flex;
@@ -1188,23 +1254,36 @@ export default function AcademicCalendarPage() {
                     ) : null}
                   </div>
 
+                  <button
+                    className="db-chip-btn"
+                    onClick={() => setShowArchived((v) => !v)}
+                    disabled={busyKey !== null}
+                    type="button"
+                  >
+                    {showArchived ? "Show Active" : "View Archived"}
+                  </button>
+
                   {activeTab === "sessions" ? (
                     <>
                       <button className="db-chip-btn" onClick={fetchSessions} disabled={loadingSessions || busyKey !== null} type="button">
                         Refresh
                       </button>
-                      <button className="db-chip-btn" onClick={() => setShowCreateSession(true)} disabled={busyKey !== null} type="button">
-                        Add Session
-                      </button>
+                      {!showArchived ? (
+                        <button className="db-chip-btn" onClick={() => setShowCreateSession(true)} disabled={busyKey !== null} type="button">
+                          Add Session
+                        </button>
+                      ) : null}
                     </>
                   ) : (
                     <>
                       <button className="db-chip-btn" onClick={fetchTerms} disabled={loadingTerms || busyKey !== null} type="button">
                         Refresh
                       </button>
-                      <button className="db-chip-btn" onClick={() => setShowCreateTerm(true)} disabled={busyKey !== null} type="button">
-                        Add Term
-                      </button>
+                      {!showArchived ? (
+                        <button className="db-chip-btn" onClick={() => setShowCreateTerm(true)} disabled={busyKey !== null} type="button">
+                          Add Term
+                        </button>
+                      ) : null}
                     </>
                   )}
                 </div>
@@ -1254,6 +1333,8 @@ export default function AcademicCalendarPage() {
                           const current = toBool(s.is_current);
                           const busySet = isBusy(`session:current:${s.id}`);
                           const busyEdit = isBusy(`session:update:${s.id}`);
+                          const busyArchive = isBusy(`session:archive:${s.id}`);
+                          const busyRestore = isBusy(`session:restore:${s.id}`);
 
                           return (
                             <tr key={s.id}>
@@ -1284,7 +1365,7 @@ export default function AcademicCalendarPage() {
                                   <button
                                     className="db-action-btn db-action-primary"
                                     onClick={() => openEditSession(s)}
-                                    disabled={busyKey !== null}
+                                    disabled={showArchived || busyKey !== null}
                                     type="button"
                                   >
                                     Edit
@@ -1293,7 +1374,7 @@ export default function AcademicCalendarPage() {
                                   <button
                                     className="db-action-btn db-action-green"
                                     onClick={() => setCurrentSession(s.id)}
-                                    disabled={current || busyKey !== null}
+                                    disabled={showArchived || current || busyKey !== null}
                                     type="button"
                                     title={current ? "Already current" : "Set as current"}
                                   >
@@ -1308,6 +1389,18 @@ export default function AcademicCalendarPage() {
                                     ) : (
                                       "Set Current"
                                     )}
+                                  </button>
+
+                                  <button
+                                    className="db-action-btn db-action-danger"
+                                    onClick={() => (showArchived ? restoreSession(s) : archiveSession(s))}
+                                    disabled={busyKey !== null}
+                                    type="button"
+                                    title={showArchived ? "Restore session" : "Archive session"}
+                                  >
+                                    {showArchived
+                                      ? busyRestore ? "Restoring..." : "Restore"
+                                      : busyArchive ? "Archiving..." : "Archive"}
                                   </button>
 
                                   {busyEdit ? <span className="db-pill">Saving…</span> : null}
@@ -1335,6 +1428,8 @@ export default function AcademicCalendarPage() {
                         const isActive = (t.status ?? "").toLowerCase() === "active";
                         const busySet = isBusy(`term:setactive:${t.id}`);
                         const busyEdit = isBusy(`term:update:${t.id}`);
+                        const busyArchive = isBusy(`term:archive:${t.id}`);
+                        const busyRestore = isBusy(`term:restore:${t.id}`);
 
                         return (
                           <tr key={t.id}>
@@ -1365,7 +1460,7 @@ export default function AcademicCalendarPage() {
                                 <button
                                   className="db-action-btn db-action-primary"
                                   onClick={() => openEditTerm(t)}
-                                  disabled={busyKey !== null}
+                                  disabled={showArchived || busyKey !== null}
                                   type="button"
                                 >
                                   Edit
@@ -1374,7 +1469,7 @@ export default function AcademicCalendarPage() {
                                 <button
                                   className="db-action-btn db-action-green"
                                   onClick={() => setActiveTerm(t.id)}
-                                  disabled={isActive || busyKey !== null}
+                                  disabled={showArchived || isActive || busyKey !== null}
                                   type="button"
                                   title={isActive ? "Already active" : "Set as active"}
                                 >
@@ -1389,6 +1484,18 @@ export default function AcademicCalendarPage() {
                                   ) : (
                                     "Set Active"
                                   )}
+                                </button>
+
+                                <button
+                                  className="db-action-btn db-action-danger"
+                                  onClick={() => (showArchived ? restoreTerm(t) : archiveTerm(t))}
+                                  disabled={busyKey !== null}
+                                  type="button"
+                                  title={showArchived ? "Restore term" : "Archive term"}
+                                >
+                                  {showArchived
+                                    ? busyRestore ? "Restoring..." : "Restore"
+                                    : busyArchive ? "Archiving..." : "Archive"}
                                 </button>
 
                                 {busyEdit ? <span className="db-pill">Saving…</span> : null}

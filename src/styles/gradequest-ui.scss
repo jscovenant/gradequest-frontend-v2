@@ -38,7 +38,9 @@ body {
 }
 
 .gq-app-main,
-.db-main {
+.db-main,
+.sd-main,
+.teacher-db-main {
   background:
     linear-gradient(180deg, rgba(211, 0, 176, 0.035), transparent 260px),
     var(--gq-light) !important;
@@ -49,7 +51,9 @@ body {
 
 @media (min-width: 768px) {
   .gq-app-main,
-  .db-main {
+  .db-main,
+  .sd-main,
+  .teacher-db-main {
     padding-left: 28px !important;
     padding-right: 28px !important;
     width: calc(100% - var(--gq-sidebar-width)) !important;
@@ -58,7 +62,9 @@ body {
   }
 
   .gq-sidebar-collapsed .gq-app-main,
-  .gq-sidebar-collapsed .db-main {
+  .gq-sidebar-collapsed .db-main,
+  .gq-sidebar-collapsed .sd-main,
+  .gq-sidebar-collapsed .teacher-db-main {
     width: calc(100% - var(--gq-sidebar-collapsed-width)) !important;
     max-width: calc(100% - var(--gq-sidebar-collapsed-width)) !important;
   }

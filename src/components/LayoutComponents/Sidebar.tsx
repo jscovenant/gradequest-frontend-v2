@@ -241,6 +241,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       collapseId: "billingMenu",
       children: [{ label: "Subscribers", href: "/superadmin/subscribers" },
         { label: "Billing Policy", href: "/superadmin/billing-policy" },
+        { label: "Twilio WhatsApp", href: "/superadmin/twilio-whatsapp" },
         { label: "Bookings", href: "/demo-bookers" }
       ],
       
@@ -267,16 +268,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       children: [{ label: "Blogs", href: "/blogs" }],
       roles: ["Super-Admin"],
     },
-     {
-      label: "Whatsapp Broadcast",
-      icon: "chat-dots",
-      collapseId: "blogsMenu",
-      children: [{ label: "WP Settings", href: "/settings/school-wp-settings" },
-        { label: "WP Verification", href: "/settings/parent-wp-verification" }
-      ],
-      roles: ["Super-Admin"],
-    },
-
     {
       label: "Results",
       icon: "file-earmark-text",
@@ -287,6 +278,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
         { label: "Prepare Term Results", href: "/students/results/batch", roles: ["Admin"], },
         { label: "Enter Student Scores", href: "/students/results/add", roles: ["Admin", "Teacher"], },
         { label: "Monitor Results", href: "/result/monitor", roles: ["Admin"], },
+        { label: "Result Design", href: "/results/design", roles: ["Admin"], },
         { label: "Generate PIN", href: "/results/pins", roles: ["Admin"], },
       ],
       roles: ["Admin", "Teacher"],

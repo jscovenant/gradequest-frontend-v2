@@ -39,11 +39,36 @@ interface Student {
   dob?: string; address?: string; blood_group?: string | null;
   religion?: string | null; nationality?: string | null;
   username?: string | null; school_id?: number;
+  student_status?: string;
 }
 
 interface CachedProfile {
   profile: any;
   performance: { labels: string[]; data: number[] };
+}
+
+interface StudentImportPreview {
+  summary: {
+    total_rows: number;
+    ready_rows: number;
+    errors_count: number;
+    warnings_count: number;
+    can_import: boolean;
+  };
+  rows: Array<{
+    row: number;
+    firstname: string;
+    surname: string;
+    admission_no?: string;
+    class_name?: string;
+    section_name?: string;
+    department_name?: string;
+    status: "ready" | "error" | string;
+    errors?: string[];
+    warnings?: string[];
+  }>;
+  errors: string[];
+  warnings: string[];
 }
 
 type ModalTab = "overview" | "sessions" | "performance" | "ratings" | "security";
@@ -53,6 +78,22 @@ const capitalize = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1).toL
 const fullName   = (s?: any) =>
   [capitalize(s?.firstname ?? ""), capitalize(s?.third_name ?? ""), capitalize(s?.surname ?? "")]
     .filter(Boolean).join(" ").trim();
+
+const lifecycleLabel = (status?: string | null) => {
+  const normalized = (status || "active").toLowerCase();
+  if (normalized === "alumni") return "Alumni";
+  if (normalized === "graduate") return "Graduate";
+  if (normalized === "withdrawn") return "Withdrawn";
+  return normalized === "active" ? "Active" : capitalize(normalized);
+};
+
+const lifecycleClass = (status?: string | null) => {
+  const normalized = (status || "active").toLowerCase();
+  if (normalized === "active") return "db-badge--green";
+  if (normalized === "graduate") return "db-badge--blue";
+  if (normalized === "alumni") return "db-badge--amber";
+  return "db-badge--gray";
+};
 
 const InfoRow = ({ label, value, icon }: { label: string; value?: string | null; icon?: React.ReactNode }) => (
   <div className="sp-info-row">
@@ -84,7 +125,7 @@ const RatingRow = ({
 /* ========================= COMPONENT ========================= */
 export default function StudentsPage() {
   const navigate = useNavigate();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError, showWarning } = useToast();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -95,6 +136,15 @@ export default function StudentsPage() {
   const [perPage]                   = useState(8);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading]       = useState(false);
+  const [studentStatusFilter, setStudentStatusFilter] = useState<"active" | "alumni" | "graduate" | "all">("active");
+  const [statusCounts, setStatusCounts] = useState({ active: 0, alumni: 0, graduate: 0, withdrawn: 0 });
+  const [showImportPanel, setShowImportPanel] = useState(false);
+  const [studentImportFile, setStudentImportFile] = useState<File | null>(null);
+  const [studentImportPreview, setStudentImportPreview] = useState<StudentImportPreview | null>(null);
+  const [previewingStudents, setPreviewingStudents] = useState(false);
+  const [importingStudents, setImportingStudents] = useState(false);
+  const [downloadingTemplate, setDownloadingTemplate] = useState<"xlsx" | "csv" | null>(null);
+  const [updatingLifecycleId, setUpdatingLifecycleId] = useState<number | null>(null);
 
   /* Profile */
   const [selectedStudent, setSelectedStudent]   = useState<Student | null>(null);
@@ -137,6 +187,7 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
   const chartRef      = useRef<HTMLCanvasElement | null>(null);
   const chartInstance = useRef<Chart | null>(null);
   const profileCache  = useRef<Record<number, CachedProfile>>({});
+  const studentImportInputRef = useRef<HTMLInputElement | null>(null);
 
   const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
   const getPhoto = (photo?: string) => photo ? `${BASE_URL}/uploads/users/${photo}` : "/media/profile.jpg";
@@ -150,14 +201,111 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      const res = await authApi.get("/all-students", { params: { page, perPage, search } });
+      const res = await authApi.get("/all-students", { params: { page, perPage, search, student_status: studentStatusFilter } });
       const d = res.data.students;
       setStudents(d?.data || d || []);
       setTotalPages(d?.last_page || 1);
+      setStatusCounts({
+        active: Number(res.data.status_counts?.active ?? 0),
+        alumni: Number(res.data.status_counts?.alumni ?? 0),
+        graduate: Number(res.data.status_counts?.graduate ?? 0),
+        withdrawn: Number(res.data.status_counts?.withdrawn ?? 0),
+      });
     } catch (err: any) { showError(err?.response?.data?.message ?? "Failed to load students"); }
     finally { setLoading(false); }
   };
-  useEffect(() => { fetchStudents(); }, [page, search]);
+  useEffect(() => { fetchStudents(); }, [page, search, studentStatusFilter]);
+
+  const downloadStudentTemplate = async (format: "xlsx" | "csv") => {
+    setDownloadingTemplate(format);
+    try {
+      const res = await authApi.get("/students/import/template", {
+        params: { format },
+        responseType: "blob",
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `student_upload_template.${format}`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      showError(err?.response?.data?.message ?? "Could not download template");
+    } finally {
+      setDownloadingTemplate(null);
+    }
+  };
+
+  const handleStudentImportFile = (file?: File | null) => {
+    setStudentImportFile(file ?? null);
+    setStudentImportPreview(null);
+    if (file) {
+      showSuccess(`${file.name} selected. Preview it before importing.`);
+      window.setTimeout(() => window.focus(), 100);
+    }
+  };
+
+  const previewStudentImport = async () => {
+    if (!studentImportFile) {
+      showWarning?.("Choose an Excel or CSV file first.");
+      return;
+    }
+    setPreviewingStudents(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", studentImportFile);
+      const res = await authApi.post("/students/import/preview", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      setStudentImportPreview(res.data);
+      if (res.data?.summary?.errors_count > 0) showWarning?.("Some rows need correction before import.");
+      else showSuccess("File looks good. You can import now.");
+    } catch (err: any) {
+      showError(err?.response?.data?.message ?? "Could not preview file");
+    } finally {
+      setPreviewingStudents(false);
+    }
+  };
+
+  const importStudentsFromFile = async () => {
+    if (!studentImportFile || !studentImportPreview?.summary?.can_import) {
+      showWarning?.("Preview a valid file before importing.");
+      return;
+    }
+    setImportingStudents(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", studentImportFile);
+      const res = await authApi.post("/students/import", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      showSuccess(res.data?.message ?? "Students imported successfully.");
+      setStudentImportFile(null);
+      setStudentImportPreview(null);
+      if (studentImportInputRef.current) studentImportInputRef.current.value = "";
+      fetchStudents();
+    } catch (err: any) {
+      setStudentImportPreview(err?.response?.data?.preview ?? studentImportPreview);
+      showError(err?.response?.data?.message ?? "Student import failed");
+    } finally {
+      setImportingStudents(false);
+    }
+  };
+
+  const updateStudentLifecycle = async (student: Student, student_status: "active" | "alumni" | "graduate") => {
+    if ((student.student_status || (student.status === 1 ? "active" : "inactive")) === student_status) return;
+    const confirmed = window.confirm(`Mark ${fullName(student) || "this student"} as ${lifecycleLabel(student_status)}?`);
+    if (!confirmed) return;
+    setUpdatingLifecycleId(student.id);
+    try {
+      const res = await authApi.patch(`/students/${student.id}/lifecycle-status`, { student_status });
+      showSuccess(res.data?.message ?? "Student status updated.");
+      delete profileCache.current[student.id];
+      fetchStudents();
+    } catch (err: any) {
+      showError(err?.response?.data?.message ?? "Could not update student status");
+    } finally {
+      setUpdatingLifecycleId(null);
+    }
+  };
 
   /* ─── Open student ─── */
   const openStudent = async (student: Student) => {
@@ -343,11 +491,14 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
 };
 
   /* ─── Derived stats ─── */
-  const activeCount = useMemo(() => students.filter(s => s.status === 1).length, [students]);
+  const activeCount = statusCounts.active;
+  const alumniCount = statusCounts.alumni;
+  const graduateCount = statusCounts.graduate;
   const maleCount   = useMemo(() => students.filter(s => (s.sex ?? "").toLowerCase() === "male").length, [students]);
   const femaleCount = useMemo(() => students.filter(s => (s.sex ?? "").toLowerCase() === "female").length, [students]);
 
   const modalStudent = studentDetails?.student ?? selectedStudent;
+  const modalLifecycle = modalStudent?.student_status || (modalStudent?.status === 1 ? "active" : "inactive");
 
   /* ========================= RENDER ========================= */
   return (
@@ -482,6 +633,33 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
         /* Primary sm-btn — $dark bg, amber hover hint */
         .db-sm-btn-primary { background:var(--sp-dark); color:#fff; border-color:var(--sp-dark); }
         .db-sm-btn-primary:hover { background:#1a1a2e; color:#fff; }
+        .db-status-select { min-width:130px; background:var(--sp-light); border:1px solid var(--sp-border); border-radius:8px; padding:8px 10px; font-family:'DM Sans',sans-serif; font-size:12.5px; color:var(--sp-dark); outline:none; }
+        .db-status-select:focus { border-color:var(--sp-accent-border); box-shadow:0 0 0 3px var(--sp-accent-dim); background:#fff; }
+
+        .db-filter-tabs { display:flex; align-items:center; flex-wrap:wrap; gap:6px; padding:16px 24px 0; }
+        .db-filter-tab { border:1px solid var(--sp-border); background:var(--sp-light); color:#7a6a5a; border-radius:999px; padding:7px 12px; font-size:12px; cursor:pointer; transition:background .2s,border-color .2s,color .2s; }
+        .db-filter-tab--active { background:var(--sp-dark); border-color:var(--sp-dark); color:#fff; }
+
+        .db-import-panel { margin:16px 24px 0; border:1px solid var(--sp-border); border-radius:12px; background:linear-gradient(180deg,#fff,var(--sp-light)); padding:18px; }
+        .db-import-grid { display:grid; grid-template-columns:minmax(220px,1fr) minmax(260px,1.2fr); gap:16px; align-items:start; }
+        @media(max-width:800px){ .db-import-grid{grid-template-columns:1fr;} }
+        .db-import-title { font-family:'Playfair Display',serif; color:var(--sp-dark); font-size:16px; font-weight:700; margin:0 0 4px; }
+        .db-import-sub { color:#8b7b6b; font-size:12.5px; line-height:1.55; margin:0 0 12px; }
+        .db-import-file { border:1.5px dashed var(--sp-accent-border); background:#fff; border-radius:12px; padding:16px; cursor:pointer; display:flex; gap:12px; align-items:center; min-height:84px; transition:border-color .2s,background .2s; }
+        .db-import-file:hover { border-color:var(--sp-accent); background:var(--sp-accent-dim); }
+        .db-import-file-icon { width:42px; height:42px; border-radius:10px; background:var(--sp-accent-dim); color:rgb(180,83,9); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .db-import-file-name { color:var(--sp-dark); font-size:13px; font-weight:600; word-break:break-word; }
+        .db-import-file-hint { color:#9a8a7a; font-size:12px; margin-top:3px; }
+        .db-import-summary { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:12px; }
+        @media(max-width:700px){ .db-import-summary{grid-template-columns:repeat(2,1fr);} }
+        .db-import-metric { background:#fff; border:1px solid var(--sp-border); border-radius:10px; padding:10px; }
+        .db-import-metric span { display:block; color:#9a8a7a; font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; }
+        .db-import-metric strong { display:block; color:var(--sp-dark); font-family:'Playfair Display',serif; font-size:20px; margin-top:2px; }
+        .db-import-errors { max-height:145px; overflow:auto; margin-top:10px; border-radius:10px; border:1px solid rgba(239,68,68,.16); background:rgba(239,68,68,.04); padding:10px 12px; color:rgb(185,28,28); font-size:12px; line-height:1.55; }
+        .db-import-preview-table { max-height:220px; overflow:auto; border:1px solid var(--sp-border); border-radius:10px; margin-top:12px; background:#fff; }
+        .db-import-preview-table table { width:100%; border-collapse:collapse; }
+        .db-import-preview-table th, .db-import-preview-table td { padding:8px 10px; font-size:12px; border-bottom:1px solid rgba(0,0,0,.05); white-space:nowrap; }
+        .db-import-preview-table th { color:#9a8a7a; background:var(--sp-light); text-transform:uppercase; letter-spacing:.08em; font-size:10px; }
 
         /* ── Table ── */
         .db-table { width:100%; border-collapse:collapse; }
@@ -827,6 +1005,17 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
                 </div>
 
                 <div className="d-flex align-items-center flex-wrap gap-2">
+                  <select
+                    className="db-status-select"
+                    value={studentStatusFilter}
+                    onChange={(e) => { setStudentStatusFilter(e.target.value as any); setPage(1); }}
+                    aria-label="Filter student status"
+                  >
+                    <option value="active">Active students</option>
+                    <option value="alumni">Alumni</option>
+                    <option value="graduate">Graduates</option>
+                    <option value="all">All students</option>
+                  </select>
                   <div className="db-search-wrap">
                     <span className="db-search-icon">
                       <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.4"/><path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
@@ -847,12 +1036,125 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
                     </svg>
                     Refresh
                   </button>
+                  <button className="db-sm-btn" onClick={() => setShowImportPanel(v => !v)}>
+                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 4l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 10v2h10v-2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    {showImportPanel ? "Close Import" : "Import Students"}
+                  </button>
                   <button className="db-sm-btn db-sm-btn-primary" onClick={() => navigate("/students/register")}>
                     <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>
                     Add Student
                   </button>
                 </div>
               </div>
+
+              <div className="db-filter-tabs">
+                {[
+                  ["active", `Active (${activeCount})`],
+                  ["alumni", `Alumni (${alumniCount})`],
+                  ["graduate", `Graduates (${graduateCount})`],
+                  ["all", "All"],
+                ].map(([value, label]) => (
+                  <button
+                    key={value}
+                    className={`db-filter-tab ${studentStatusFilter === value ? "db-filter-tab--active" : ""}`}
+                    onClick={() => { setStudentStatusFilter(value as any); setPage(1); }}
+                    type="button"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {showImportPanel && (
+                <div className="db-import-panel">
+                  <div className="db-import-grid">
+                    <div>
+                      <p className="db-import-title">Upload students</p>
+                      <p className="db-import-sub">
+                        Download the template, fill one student per row, then preview the file. Only clean rows are allowed into the register.
+                      </p>
+                      <div className="d-flex flex-wrap gap-2 mb-3">
+                        <button className="db-sm-btn" onClick={() => downloadStudentTemplate("xlsx")} disabled={!!downloadingTemplate}>
+                          {downloadingTemplate === "xlsx" ? "Preparing..." : "Download Excel"}
+                        </button>
+                        <button className="db-sm-btn" onClick={() => downloadStudentTemplate("csv")} disabled={!!downloadingTemplate}>
+                          {downloadingTemplate === "csv" ? "Preparing..." : "Download CSV"}
+                        </button>
+                      </div>
+                      <label className="db-import-file">
+                        <input
+                          ref={studentImportInputRef}
+                          type="file"
+                          accept=".xlsx,.xls,.csv"
+                          hidden
+                          onChange={(e) => handleStudentImportFile(e.target.files?.[0])}
+                        />
+                        <span className="db-import-file-icon">
+                          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M6 2h6l4 4v12H6a2 2 0 01-2-2V4a2 2 0 012-2z" stroke="currentColor" strokeWidth="1.5"/><path d="M12 2v5h4M7 12h6M7 15h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        </span>
+                        <span>
+                          <span className="db-import-file-name">{studentImportFile?.name || "Choose Excel or CSV file"}</span>
+                          <span className="db-import-file-hint">Accepted formats: xlsx, xls, csv</span>
+                        </span>
+                      </label>
+                      <div className="d-flex flex-wrap gap-2 mt-3">
+                        <button className="db-sm-btn" onClick={previewStudentImport} disabled={!studentImportFile || previewingStudents}>
+                          {previewingStudents ? "Checking..." : "Preview File"}
+                        </button>
+                        <button
+                          className="db-sm-btn db-sm-btn-primary"
+                          onClick={importStudentsFromFile}
+                          disabled={!studentImportPreview?.summary?.can_import || importingStudents}
+                        >
+                          {importingStudents ? "Importing..." : "Import Students"}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      {studentImportPreview ? (
+                        <>
+                          <div className="db-import-summary">
+                            <div className="db-import-metric"><span>Rows</span><strong>{studentImportPreview.summary.total_rows}</strong></div>
+                            <div className="db-import-metric"><span>Ready</span><strong>{studentImportPreview.summary.ready_rows}</strong></div>
+                            <div className="db-import-metric"><span>Errors</span><strong>{studentImportPreview.summary.errors_count}</strong></div>
+                            <div className="db-import-metric"><span>Warnings</span><strong>{studentImportPreview.summary.warnings_count}</strong></div>
+                          </div>
+                          {studentImportPreview.errors?.length > 0 && (
+                            <div className="db-import-errors">
+                              {studentImportPreview.errors.slice(0, 8).map((error, index) => <div key={index}>{error}</div>)}
+                              {studentImportPreview.errors.length > 8 && <div>And {studentImportPreview.errors.length - 8} more error(s).</div>}
+                            </div>
+                          )}
+                          <div className="db-import-preview-table">
+                            <table>
+                              <thead>
+                                <tr><th>Row</th><th>Name</th><th>Reg. No</th><th>Class</th><th>Status</th></tr>
+                              </thead>
+                              <tbody>
+                                {studentImportPreview.rows.slice(0, 10).map(row => (
+                                  <tr key={row.row}>
+                                    <td>{row.row}</td>
+                                    <td>{[row.firstname, row.surname].filter(Boolean).join(" ") || "N/A"}</td>
+                                    <td>{row.admission_no || "Auto"}</td>
+                                    <td>{row.class_name || "Not found"}</td>
+                                    <td><span className={`db-badge ${row.status === "ready" ? "db-badge--green" : "db-badge--gray"}`}>{row.status === "ready" ? "Ready" : "Fix"}</span></td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="sp-empty" style={{ padding: 24 }}>
+                          <div className="sp-empty-title">Preview will appear here</div>
+                          <div className="sp-empty-sub">The system will check class, section, department, admission number, email, and plan limit before import.</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="overflow-auto">
                 <table className="db-table">
@@ -882,7 +1184,7 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
                     ) : students.length === 0 ? (
                       <tr><td colSpan={5} className="db-table-empty">No students found.</td></tr>
                     ) : students.map(s => {
-                      const isActive = s.status === 1;
+                      const lifecycle = s.student_status || (s.status === 1 ? "active" : "inactive");
                       const initials = [s.firstname?.[0], s.surname?.[0]].filter(Boolean).join("").toUpperCase();
                       return (
                         <tr key={s.id}>
@@ -901,8 +1203,8 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
                           <td><span className="db-badge db-badge--blue">{s.reg_no}</span></td>
                           <td><span className="db-badge db-badge--amber">{s.level?.name || "—"}</span></td>
                           <td>
-                            <span className={`db-badge ${isActive ? "db-badge--green" : "db-badge--gray"}`}>
-                              {isActive ? "Active" : "Inactive"}
+                            <span className={`db-badge ${lifecycleClass(lifecycle)}`}>
+                              {lifecycleLabel(lifecycle)}
                             </span>
                           </td>
                           <td style={{ textAlign: "right" }}>
@@ -917,6 +1219,16 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
                                 <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 7h7M6 4l3 3-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M10 2h2a1 1 0 011 1v8a1 1 0 01-1 1h-2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
                                 Withdraw
                               </button>
+                              <select
+                                className="db-status-select"
+                                value={["active", "alumni", "graduate"].includes(lifecycle) ? lifecycle : "active"}
+                                disabled={updatingLifecycleId === s.id}
+                                onChange={(e) => updateStudentLifecycle(s, e.target.value as "active" | "alumni" | "graduate")}
+                              >
+                                <option value="active">Active</option>
+                                <option value="alumni">Alumni</option>
+                                <option value="graduate">Graduate</option>
+                              </select>
                             </div>
                           </td>
                         </tr>
@@ -968,15 +1280,15 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
                           {[modalStudent?.firstname?.[0], modalStudent?.surname?.[0]].filter(Boolean).join("").toUpperCase()}
                         </div>
                     }
-                    {modalStudent?.status === 1 && <div className="sp-online-dot" />}
+                    {modalLifecycle === "active" && <div className="sp-online-dot" />}
                   </div>
 
                   <div className="sp-header-info">
                     <div className="d-flex align-items-center flex-wrap gap-2 mb-1">
                       <span className="sp-modal-name">{fullName(modalStudent)}</span>
-                      <span className={`sp-status ${modalStudent?.status === 1 ? "sp-status--active" : "sp-status--inactive"}`}>
+                      <span className={`sp-status ${modalLifecycle === "active" ? "sp-status--active" : "sp-status--inactive"}`}>
                         <span className="sp-status-dot" />
-                        {modalStudent?.status === 1 ? "Active" : "Inactive"}
+                        {lifecycleLabel(modalLifecycle)}
                       </span>
                     </div>
                     <div className="sp-modal-meta">

@@ -44,6 +44,31 @@ type BillingDashboardResponse = {
   revenue_model?: string | null;
 };
 
+type ResultBatchStatus = "draft" | "computed" | "approved" | "published" | string;
+
+type ReviewBatch = {
+  id: number;
+  class_id: number;
+  class_name: string;
+  term: string;
+  session: string;
+  status: ResultBatchStatus;
+  updated_at?: string | null;
+  review?: {
+    total_students: number;
+    completed_students: number;
+    missing_students_count: number;
+    open_alerts: number;
+    open_high_alerts: number;
+    can_approve: boolean;
+    can_publish: boolean;
+    simple_status: string;
+  };
+};
+
+type ReviewBatchResponse = { data: ReviewBatch[] };
+type ReviewSummaryResponse = { batch: ReviewBatch; review: NonNullable<ReviewBatch["review"]> };
+
 const STAT_META = [
   { color: "var(--bs-warning,  rgb(245,158,11))", bg: "rgba(245,158,11,0.10)", label: "vs last term" },
   { color: "var(--bs-info,     rgb(59,130,246))", bg: "rgba(59,130,246,0.10)", label: "active staff" },
@@ -58,6 +83,8 @@ const QUICK_ACTIONS = [
     icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/><path d="M14 2v6h6M12 11v6M9 14l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg> },
   { label:"Generate PINs",  desc:"Create result access cards",   color:"var(--bs-info, rgb(59,130,246))",    bg:"rgba(59,130,246,0.10)", path:"/results/pins",
     icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="8" width="18" height="13" rx="2" stroke="currentColor" strokeWidth="1.6"/><path d="M7 8V6a5 5 0 0110 0v2" stroke="currentColor" strokeWidth="1.5"/><circle cx="12" cy="14" r="1.5" fill="currentColor"/><path d="M12 15.5v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg> },
+  { label:"Fee Access",     desc:"Control result viewing",       color:"var(--bs-danger, rgb(239,68,68))",   bg:"rgba(239,68,68,0.09)",  path:"/school/settings",
+    icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="4" y="10" width="16" height="10" rx="2" stroke="currentColor" strokeWidth="1.6"/><path d="M8 10V7a4 4 0 018 0v3" stroke="currentColor" strokeWidth="1.5"/><path d="M12 14v2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg> },
   { label:"View Reports",   desc:"Analytics & insights",         color:"var(--bs-primary, rgb(211,0,176))",  bg:"rgba(211,0,176,0.08)",  path:"/students/report",
     icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 20V14M8 20V8M12 20V11M16 20V5M20 20V9" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/><path d="M4 14l4-6 4 3 4-9 4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg> },
 ];
@@ -73,10 +100,113 @@ function getAlertConfig(severity: AlertItem["severity"]) {
     icon:<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4"/><path d="M8 7.5v3M8 6h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> };
 }
 
-function formatAlertMeta(a: AlertItem) { return [a.class_name,a.subject_name,a.student_name].filter(Boolean).join(" · ") || "Academic monitoring"; }
+function formatAlertMeta(a: AlertItem) { return [a.class_name,a.subject_name,a.student_name].filter(Boolean).join(" Â· ") || "Academic monitoring"; }
 function formatRelativeTime(d?: string|null): string { if(!d)return""; const diff=Date.now()-new Date(d).getTime(); const m=Math.floor(diff/60000); if(m<1)return"just now"; if(m<60)return`${m}m ago`; const h=Math.floor(m/60); if(h<24)return`${h}h ago`; return`${Math.floor(h/24)}d ago`; }
 
-/* ─── AcademicAlertSection ─── */
+function resultStatusLabel(status?: ResultBatchStatus) {
+  const s = String(status || "").toLowerCase();
+  if (s === "draft") return "Still Entering";
+  if (s === "computed") return "Ready for Review";
+  if (s === "approved") return "Approved";
+  if (s === "published") return "Published";
+  return "Needs Review";
+}
+
+function resultStatusTone(status?: ResultBatchStatus) {
+  const s = String(status || "").toLowerCase();
+  if (s === "published") return "published";
+  if (s === "approved") return "approved";
+  if (s === "computed") return "computed";
+  return "draft";
+}
+
+function ResultReviewQueue({ batches, loading, busyId, error, onRefresh, onApprove, onPublish, onReopen, onOpenBroadsheet }: {
+  batches: ReviewBatch[]; loading: boolean; busyId: number | null; error: string | null;
+  onRefresh:()=>void; onApprove:(batch:ReviewBatch)=>void; onPublish:(batch:ReviewBatch)=>void; onReopen:(batch:ReviewBatch)=>void; onOpenBroadsheet:(batch:ReviewBatch)=>void;
+}) {
+  const waiting = batches.filter((b) => String(b.status).toLowerCase() !== "published").length;
+
+  return (
+    <div className="rrq-panel">
+      <div className="rrq-head">
+        <div className="rrq-title-wrap">
+          <div className="rrq-icon"><i className="bi bi-clipboard-check" /></div>
+          <div>
+            <h2 className="rrq-title">Results to Review</h2>
+            <p className="rrq-sub">Latest class results waiting for admin or principal approval.</p>
+          </div>
+        </div>
+        <div className="rrq-head-actions">
+          <span className="rrq-count">{waiting} waiting</span>
+          <button className="db-refresh-btn" onClick={onRefresh} disabled={loading}>
+            <i className={`bi bi-arrow-clockwise ${loading ? "rrq-spin" : ""}`} />
+            {loading ? "Loading" : "Refresh"}
+          </button>
+        </div>
+      </div>
+
+      {error && <div className="rrq-error"><i className="bi bi-exclamation-circle" />{error}</div>}
+
+      <div className="rrq-body">
+        {loading && batches.length === 0 ? (
+          [0,1,2].map((i) => (
+            <div className="rrq-card" key={i}>
+              <div className="rm-skel rm-skel--title" style={{width:"38%"}}/>
+              <div className="rm-skel rm-skel--sub mt-2" style={{width:"70%"}}/>
+              <div className="rm-skel mt-3" style={{width:"100%",height:8}}/>
+            </div>
+          ))
+        ) : batches.length === 0 ? (
+          <div className="rrq-empty">
+            <i className="bi bi-check2-circle" />
+            <div><p>No result is waiting for review.</p><span>When teachers save class results, the latest batches will appear here.</span></div>
+          </div>
+        ) : (
+          batches.map((batch) => {
+            const review = batch.review;
+            const total = Number(review?.total_students || 0);
+            const done = Number(review?.completed_students || 0);
+            const progress = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+            const tone = resultStatusTone(batch.status);
+            const busy = busyId === batch.id;
+            const status = String(batch.status).toLowerCase();
+            const canApprove = !!review?.can_approve && status !== "approved" && status !== "published";
+            const canPublish = !!review?.can_publish && status !== "published";
+
+            return (
+              <div className="rrq-card" key={batch.id}>
+                <div className="rrq-card-top">
+                  <div>
+                    <div className="rrq-class">{batch.class_name}</div>
+                    <div className="rrq-meta">{batch.term} â€¢ {batch.session} â€¢ updated {formatRelativeTime(batch.updated_at)}</div>
+                  </div>
+                  <span className={`rrq-badge rrq-badge--${tone}`}>{resultStatusLabel(batch.status)}</span>
+                </div>
+                <p className="rrq-status-text">{review?.simple_status || "Open this result batch to review the class scores."}</p>
+                <div className="rrq-progress-row"><span>{done}/{total} students completed</span><span>{progress}%</span></div>
+                <div className="rrq-track"><div className="rrq-fill" style={{width:`${progress}%`}} /></div>
+                <div className="rrq-notes">
+                  {Number(review?.missing_students_count || 0) > 0 && <span><i className="bi bi-person-dash" />{review?.missing_students_count} missing</span>}
+                  {Number(review?.open_high_alerts || 0) > 0 && <span className="rrq-note-danger"><i className="bi bi-exclamation-triangle" />{review?.open_high_alerts} serious alert{review?.open_high_alerts === 1 ? "" : "s"}</span>}
+                  {Number(review?.open_alerts || 0) > 0 && Number(review?.open_high_alerts || 0) === 0 && <span><i className="bi bi-info-circle" />{review?.open_alerts} alert{review?.open_alerts === 1 ? "" : "s"}</span>}
+                  {review?.can_approve && <span className="rrq-note-good"><i className="bi bi-check-circle" />Ready</span>}
+                </div>
+                <div className="rrq-actions">
+                  <button className="rrq-btn rrq-btn-light" onClick={()=>onOpenBroadsheet(batch)} disabled={busy}>Review</button>
+                  {canApprove && <button className="rrq-btn rrq-btn-dark" onClick={()=>onApprove(batch)} disabled={busy}>{busy ? "Working" : "Approve"}</button>}
+                  {canPublish && <button className="rrq-btn rrq-btn-gold" onClick={()=>onPublish(batch)} disabled={busy}>{busy ? "Working" : "Publish"}</button>}
+                  {status === "published" && <button className="rrq-btn rrq-btn-light" onClick={()=>onReopen(batch)} disabled={busy}>Reopen</button>}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* â”€â”€â”€ AcademicAlertSection â”€â”€â”€ */
 function AcademicAlertSection({ alerts, loading, error, counts, onRefresh, alertsLoading, onViewAll }: {
   alerts: AlertItem[]; loading: boolean; error: string|null;
   counts: {open_total:number;high:number;medium:number;low:number};
@@ -103,7 +233,7 @@ function AcademicAlertSection({ alerts, loading, error, counts, onRefresh, alert
               <path d="M12 7A5 5 0 112 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
               <path d="M12 3v4h-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            {alertsLoading?"Loading…":"Refresh"}
+            {alertsLoading?"Loadingâ€¦":"Refresh"}
           </button>
         </div>
 
@@ -208,7 +338,7 @@ function AcademicAlertSection({ alerts, loading, error, counts, onRefresh, alert
   );
 }
 
-/* ─── Main ─── */
+/* â”€â”€â”€ Main â”€â”€â”€ */
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [sidebarOpen,setSidebarOpen]=useState(false);
@@ -232,6 +362,10 @@ export default function AdminDashboard() {
   const [topPage,setTopPage]=useState(1);
   const [paymentLinkCopied,setPaymentLinkCopied]=useState(false);
   const [currentPackage,setCurrentPackage]=useState("Core");
+  const [reviewBatches,setReviewBatches]=useState<ReviewBatch[]>([]);
+  const [reviewLoading,setReviewLoading]=useState(false);
+  const [reviewError,setReviewError]=useState<string|null>(null);
+  const [reviewBusyId,setReviewBusyId]=useState<number|null>(null);
   const topLimit=5;
   const totalPages=useMemo(()=>!topMeta?1:Math.max(1,Math.ceil(topMeta.total/topLimit)),[topMeta]);
   const adminUser = getUser();
@@ -240,8 +374,10 @@ export default function AdminDashboard() {
 
   const fetchTop=async(page:number)=>{setTopLoading(true);setTopError(null);try{const res=await authApi.get<TopStudentsResponse>("/top-performing-students",{params:{limit:topLimit,page}});setTopStudents(Array.isArray(res.data.data)?res.data.data:[]);setTopMeta({total:res.data.total??0,session_used:res.data.session_used??"",term_used:res.data.term_used??""});}catch(e:any){setTopStudents([]);setTopMeta(null);setTopError(e?.response?.data?.message||"Unable to load top students.");}finally{setTopLoading(false);}};
   const fetchAlerts=async()=>{setAlertsLoading(true);setAlertsError(null);try{const res=await authApi.get<AlertSummaryResponse>("/admin/academic-alerts/summary");setAlerts(res.data.data||[]);setAlertCounts(res.data.counts||{open_total:0,high:0,medium:0,low:0,submission_open_total:0,submission_overdue_total:0});}catch(e:any){setAlerts([]);setAlertCounts({open_total:0,high:0,medium:0,low:0,submission_open_total:0,submission_overdue_total:0});setAlertsError(e?.response?.data?.message||"Unable to load academic alerts.");}finally{setAlertsLoading(false);}};
+  const fetchReviewBatches=async(termValue=currentTerm,sessionValue=academicSession)=>{setReviewLoading(true);setReviewError(null);try{const params:any={};if(termValue)params.term=termValue;if(sessionValue)params.session=sessionValue;const res=await authApi.get<ReviewBatchResponse>("/admin/result-batches",{params});const list=(Array.isArray(res.data.data)?res.data.data:[]).slice(0,5);const enriched=await Promise.all(list.map(async(batch)=>{try{const summary=await authApi.get<ReviewSummaryResponse>(`/result-batches/${batch.id}/review-summary`);return{...batch,...summary.data.batch,review:summary.data.review};}catch{return batch;}}));setReviewBatches(enriched);}catch(e:any){setReviewBatches([]);setReviewError(e?.response?.data?.message||"Unable to load results for review.");}finally{setReviewLoading(false);}};
+  const runReviewAction=async(batch:ReviewBatch,action:"approve"|"publish"|"reopen")=>{setReviewBusyId(batch.id);setReviewError(null);try{await authApi.post(`/result-batches/${batch.id}/${action}`);await fetchReviewBatches();}catch(e:any){setReviewError(e?.response?.data?.message||`Unable to ${action} this result batch.`);}finally{setReviewBusyId(null);}};
 
-  useEffect(()=>{setLoading(true);Promise.allSettled([authApi.get("/current-session-term"),authApi.get("/dashboard/counts"),authApi.get("/performance-stats"),authApi.get<AlertSummaryResponse>("/admin/academic-alerts/summary"),authApi.get<BillingDashboardResponse>("/school/billing/dashboard")]).then(([sessRes,countsRes,perfRes,alertRes,billingRes])=>{if(sessRes.status==="fulfilled"){setAcademicSession(sessRes.value.data.session??"");setCurrentTerm(sessRes.value.data.term??"");} if(countsRes.status==="fulfilled"){const c=countsRes.value.data??{};setTotalUsers(Number(c.total_users??(Number(c.students??0)+Number(c.teachers??0)+Number(c.parents??0))));setStats([{title:"Total Students",value:Number(c.students??0),icon:"students"},{title:"Teachers",value:Number(c.teachers??0),icon:"teachers"},{title:"Total Parents",value:Number(c.parents??0),icon:"parents"},{title:"Results Uploaded",value:c.results_uploaded??"0%",icon:"results"}]);} if(perfRes.status==="fulfilled"){const pts:PerformancePoint[]=Array.isArray(perfRes.value.data.data)?perfRes.value.data.data:[];setPerfLabels(pts.map(d=>d.term));setPerfData(pts.map(d=>d.average));} if(alertRes.status==="fulfilled"){setAlerts(Array.isArray(alertRes.value.data.data)?alertRes.value.data.data:[]);setAlertCounts(alertRes.value.data.counts||{open_total:0,high:0,medium:0,low:0,submission_open_total:0,submission_overdue_total:0});} if(billingRes.status==="fulfilled"){setCurrentPackage(billingRes.value.data?.package?.name||"Core");} if([sessRes,countsRes,perfRes,alertRes].some(r=>r.status==="rejected")){setAlertsError("Some dashboard sections could not be loaded.");}}).finally(()=>{setLoading(false);fetchTop(1);});},[]);
+  useEffect(()=>{setLoading(true);Promise.allSettled([authApi.get("/current-session-term"),authApi.get("/dashboard/counts"),authApi.get("/performance-stats"),authApi.get<AlertSummaryResponse>("/admin/academic-alerts/summary"),authApi.get<BillingDashboardResponse>("/school/billing/dashboard")]).then(([sessRes,countsRes,perfRes,alertRes,billingRes])=>{let termForReview="";let sessionForReview="";if(sessRes.status==="fulfilled"){sessionForReview=sessRes.value.data.session??"";termForReview=sessRes.value.data.term??"";setAcademicSession(sessionForReview);setCurrentTerm(termForReview);} if(countsRes.status==="fulfilled"){const c=countsRes.value.data??{};setTotalUsers(Number(c.total_users??(Number(c.students??0)+Number(c.teachers??0)+Number(c.parents??0))));setStats([{title:"Total Students",value:Number(c.students??0),icon:"students"},{title:"Teachers",value:Number(c.teachers??0),icon:"teachers"},{title:"Total Parents",value:Number(c.parents??0),icon:"parents"},{title:"Results Uploaded",value:c.results_uploaded??"0%",icon:"results"}]);} if(perfRes.status==="fulfilled"){const pts:PerformancePoint[]=Array.isArray(perfRes.value.data.data)?perfRes.value.data.data:[];setPerfLabels(pts.map(d=>d.term));setPerfData(pts.map(d=>d.average));} if(alertRes.status==="fulfilled"){setAlerts(Array.isArray(alertRes.value.data.data)?alertRes.value.data.data:[]);setAlertCounts(alertRes.value.data.counts||{open_total:0,high:0,medium:0,low:0,submission_open_total:0,submission_overdue_total:0});} if(billingRes.status==="fulfilled"){setCurrentPackage(billingRes.value.data?.package?.name||"Core");} if([sessRes,countsRes,perfRes,alertRes].some(r=>r.status==="rejected")){setAlertsError("Some dashboard sections could not be loaded.");}return{termForReview,sessionForReview};}).then(({termForReview,sessionForReview})=>{fetchReviewBatches(termForReview,sessionForReview);}).finally(()=>{setLoading(false);fetchTop(1);});},[]);
   useEffect(()=>{fetchTop(topPage);},[topPage]);
   useEffect(()=>{if(!chartRef.current)return;const ctx=chartRef.current.getContext("2d");if(!ctx)return;chartInst.current?.destroy();chartInst.current=new Chart(ctx,{type:"bar",data:{labels:perfLabels,datasets:[{label:"Average Score",data:perfData,backgroundColor:(context)=>{const g=context.chart.ctx.createLinearGradient(0,0,0,260);g.addColorStop(0,"rgba(255,200,87,0.88)");g.addColorStop(1,"rgba(255,200,87,0.20)");return g;},borderRadius:6,barThickness:32}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:"#050008",padding:12,cornerRadius:8,titleColor:"rgb(255,200,87)",bodyColor:"#94a3b8",titleFont:{size:13,weight:"bold" as const},bodyFont:{size:12}}},scales:{x:{grid:{display:false},ticks:{font:{size:11},color:"#9a8a7a"},border:{display:false}},y:{beginAtZero:true,grid:{color:"rgba(0,0,0,0.04)"},ticks:{font:{size:11},color:"#9a8a7a"},border:{display:false}}}}});return()=>{chartInst.current?.destroy();};},[perfLabels,perfData]);
 
@@ -345,12 +481,44 @@ export default function AdminDashboard() {
         .gq-plus-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
         .gq-plus-current{font-size:11.5px;color:#7a6a5a;background:#fff;border:1px solid rgba(5,0,8,0.08);border-radius:999px;padding:7px 10px}
         @media(max-width:575.98px){.gq-plus-banner{padding:16px}.gq-plus-left{min-width:0}.gq-plus-title{font-size:19px}.gq-plus-actions{width:100%}.gq-plus-actions .db-btn-gold,.gq-plus-actions .db-btn-outline{width:100%;justify-content:center}}
+        .rrq-panel{background:#fff;border:1px solid rgba(5,0,8,0.08);border-radius:var(--db-radius);box-shadow:0 14px 34px rgba(5,0,8,0.055);margin:-6px 0 24px;overflow:hidden}
+        .rrq-head{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:20px 22px;border-bottom:1px solid rgba(5,0,8,0.06);flex-wrap:wrap}
+        .rrq-title-wrap{display:flex;align-items:center;gap:12px;min-width:260px}
+        .rrq-icon{width:42px;height:42px;border-radius:12px;background:rgba(211,0,176,0.08);color:var(--db-magenta);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+        .rrq-title{font-family:'Playfair Display',serif;font-size:18px;font-weight:900;color:var(--db-dark);margin:0 0 3px}
+        .rrq-sub{font-size:12.5px;color:#9a8a7a;margin:0;line-height:1.45}
+        .rrq-head-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+        .rrq-count{font-size:11.5px;font-weight:750;color:rgb(146,64,14);background:rgba(255,200,87,0.18);border:1px solid rgba(255,200,87,0.28);border-radius:999px;padding:7px 10px}
+        .rrq-body{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:16px}
+        @media(max-width:1199.98px){.rrq-body{grid-template-columns:repeat(2,minmax(0,1fr))}}
+        @media(max-width:767.98px){.rrq-body{grid-template-columns:1fr}.rrq-head{align-items:flex-start}.rrq-head-actions{width:100%;justify-content:space-between}.rrq-title-wrap{min-width:0}}
+        .rrq-card{border:1px solid rgba(5,0,8,0.08);border-radius:12px;background:linear-gradient(180deg,#fff,#fffcf7);padding:15px;min-width:0;display:flex;flex-direction:column;gap:10px}
+        .rrq-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+        .rrq-class{font-size:14px;font-weight:850;color:var(--db-dark);line-height:1.25}
+        .rrq-meta{font-size:11.5px;color:#9a8a7a;margin-top:3px;line-height:1.4}
+        .rrq-badge{font-size:10.5px;font-weight:850;letter-spacing:.04em;text-transform:uppercase;border-radius:999px;padding:5px 8px;white-space:nowrap}
+        .rrq-badge--draft{background:#f1f5f9;color:#475569}.rrq-badge--computed{background:rgba(59,130,246,0.10);color:#1d4ed8}.rrq-badge--approved{background:rgba(245,158,11,0.13);color:#92400e}.rrq-badge--published{background:rgba(34,197,94,0.12);color:#15803d}
+        .rrq-status-text{font-size:12.5px;color:#6b5f55;line-height:1.55;margin:0;min-height:38px}
+        .rrq-progress-row{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;color:#7a6a5a;font-weight:650}
+        .rrq-track{height:8px;border-radius:999px;background:#f0ebe3;overflow:hidden}.rrq-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--db-magenta),var(--db-accent));transition:width .35s ease}
+        .rrq-notes{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:24px}
+        .rrq-notes span{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:#7a6a5a;background:var(--db-light);border:1px solid rgba(5,0,8,0.06);border-radius:999px;padding:5px 8px}
+        .rrq-notes .rrq-note-danger{color:#b91c1c;background:rgba(239,68,68,0.06);border-color:rgba(239,68,68,0.16)}
+        .rrq-notes .rrq-note-good{color:#15803d;background:rgba(34,197,94,0.08);border-color:rgba(34,197,94,0.16)}
+        .rrq-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:auto}
+        .rrq-btn{border:none;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:750;cursor:pointer;transition:transform .18s,background .18s,color .18s;border:1px solid transparent}
+        .rrq-btn:hover:not(:disabled){transform:translateY(-1px)}.rrq-btn:disabled{opacity:.55;cursor:not-allowed}
+        .rrq-btn-light{background:#fff;color:#5f5147;border-color:rgba(5,0,8,0.10)}.rrq-btn-dark{background:var(--db-dark);color:#fff}.rrq-btn-gold{background:var(--db-accent);color:var(--db-dark)}
+        .rrq-empty{grid-column:1/-1;display:flex;align-items:center;gap:12px;border:1px dashed rgba(5,0,8,0.12);border-radius:12px;padding:22px;color:#8c7f8f;background:var(--db-light)}
+        .rrq-empty i{font-size:26px;color:var(--db-success)}.rrq-empty p{font-weight:850;color:var(--db-dark);margin:0 0 3px}.rrq-empty span{font-size:12.5px}
+        .rrq-error{display:flex;align-items:center;gap:8px;margin:14px 16px 0;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.16);color:#b91c1c;border-radius:10px;padding:10px 12px;font-size:12.5px}
+        .rrq-spin{animation:dbSpin .8s linear infinite}
         .db-skeleton{height:14px;border-radius:7px;background:linear-gradient(90deg,#f0ebe3 25%,#e8e0d5 50%,#f0ebe3 75%);background-size:200% 100%;animation:dbSkeleton 1.4s ease infinite}
         @keyframes dbSkeleton{from{background-position:200% 0}to{background-position:-200% 0}}
         @keyframes dbSpin{to{transform:rotate(360deg)}}
         .rm-skel{display:block;border-radius:6px;background:linear-gradient(90deg,#f0ebe3 25%,#e8e0d5 50%,#f0ebe3 75%);background-size:200% 100%;animation:dbSkeleton 1.4s ease infinite}
         .rm-skel--title{height:14px;width:55%}.rm-skel--sub{height:11px;width:70%}
-        /* ═══ ACADEMIC ALERTS ═══ */
+        /* â•â•â• ACADEMIC ALERTS â•â•â• */
         .aa-wrap{display:grid;grid-template-columns:1fr 300px;gap:20px;margin-bottom:24px;align-items:start}
         @media(max-width:991.98px){.aa-wrap{grid-template-columns:1fr}}
         .aa-panel{background:#fff;border:1px solid var(--db-border);border-radius:var(--db-radius);overflow:hidden}
@@ -412,7 +580,7 @@ export default function AdminDashboard() {
         <div className="row">
           <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}/>
           <main className="col-md-9 col-lg-10 ms-auto db-main">
-            {loading&&<Loader message="Loading dashboard…"/>}
+            {loading&&<Loader message="Loading dashboardâ€¦"/>}
 
             {/* Hero */}
             <div className="db-hero">
@@ -420,7 +588,7 @@ export default function AdminDashboard() {
               <div className="db-hero-glow2" aria-hidden="true"/>
               <div className="db-hero-inner">
                 <div>
-                  <div className="db-session-badge"><span className="db-session-dot"/>{academicSession||"Loading…"} — {currentTerm||"…"}</div>
+                  <div className="db-session-badge"><span className="db-session-dot"/>{academicSession||"Loadingâ€¦"} â€” {currentTerm||"â€¦"}</div>
                   <h1 className="db-greeting">{getGreeting()}, <em>Admin.</em></h1>
                   <p className="db-hero-sub">Here's an overview of your school's performance and activity this term.</p>
                   <div className="d-flex flex-wrap gap-2">
@@ -444,7 +612,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* ── Academic Alerts ── */}
+            {/* â”€â”€ Academic Alerts â”€â”€ */}
             <div className="gq-plus-banner">
               <div className="gq-plus-left">
                 <div className="gq-plus-icon">
@@ -476,6 +644,18 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </div>
+
+            <ResultReviewQueue
+              batches={reviewBatches}
+              loading={reviewLoading}
+              busyId={reviewBusyId}
+              error={reviewError}
+              onRefresh={fetchReviewBatches}
+              onApprove={(batch)=>runReviewAction(batch,"approve")}
+              onPublish={(batch)=>runReviewAction(batch,"publish")}
+              onReopen={(batch)=>runReviewAction(batch,"reopen")}
+              onOpenBroadsheet={(batch)=>navigate(`/results/broadsheet/${batch.id}`)}
+            />
 
             <AcademicAlertSection alerts={alerts} loading={alertsLoading&&alerts.length===0} error={alertsError} counts={{open_total:alertCounts.open_total,high:alertCounts.high,medium:alertCounts.medium,low:alertCounts.low}} onRefresh={fetchAlerts} alertsLoading={alertsLoading} onViewAll={()=>navigate("/admin/academic-alerts")}/>
 
@@ -521,9 +701,9 @@ export default function AdminDashboard() {
                 <div className="db-panel-head">
                   <div className="d-flex align-items-center gap-3">
                     <div className="db-panel-icon" style={{"--pi":"var(--db-accent-dim)","--pc":"rgb(180,83,9)"} as React.CSSProperties}><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2l1.6 4H14L10.8 8.4l1.2 3.6L8 9.8 4 12l1.2-3.6L2 6h4.4z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg></div>
-                    <div><p className="db-panel-title">Top Performing Students</p><p className="db-panel-sub">{topMeta?`${topMeta.term_used} · ${topMeta.session_used}`:"Current term & session"}</p></div>
+                    <div><p className="db-panel-title">Top Performing Students</p><p className="db-panel-sub">{topMeta?`${topMeta.term_used} Â· ${topMeta.session_used}`:"Current term & session"}</p></div>
                   </div>
-                  <button className="db-refresh-btn" onClick={()=>fetchTop(topPage)} disabled={topLoading}><svg width="13" height="13" viewBox="0 0 14 14" fill="none" style={{animation:topLoading?"dbSpin 0.8s linear infinite":"none"}}><path d="M12 7A5 5 0 112 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M12 3v4h-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>{topLoading?"Loading…":"Refresh"}</button>
+                  <button className="db-refresh-btn" onClick={()=>fetchTop(topPage)} disabled={topLoading}><svg width="13" height="13" viewBox="0 0 14 14" fill="none" style={{animation:topLoading?"dbSpin 0.8s linear infinite":"none"}}><path d="M12 7A5 5 0 112 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M12 3v4h-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>{topLoading?"Loadingâ€¦":"Refresh"}</button>
                 </div>
                 {topError&&<div className="db-alert"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" style={{flexShrink:0}}><circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.3"/><path d="M8 5v3.5M8 10.5v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>{topError}</div>}
                 <div className="overflow-auto">

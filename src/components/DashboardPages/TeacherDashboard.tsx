@@ -510,10 +510,12 @@ export default function TeacherDashboard() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;600;700&display=swap');
         .teacher-db-main{
-          background:var(--bs-light,#fcf8f8);
+          background:
+            linear-gradient(180deg, rgba(211,0,176,0.035), transparent 260px),
+            var(--bs-light,#fcf8f8);
           min-height:100vh;
           font-family:'DM Sans',system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-          padding:28px 28px 0;
+          overflow-x:hidden;
         }
         .teacher-db-hero{
           background:var(--bs-dark,#050008)!important;
@@ -748,7 +750,7 @@ export default function TeacherDashboard() {
         .teacher-db-action-title{font-size:13.5px;font-weight:700;color:#050008;margin-bottom:4px}
         .teacher-db-action-copy{font-size:11.5px;font-weight:300;color:#9a8a7a}
         @media(max-width:767.98px){
-          .teacher-db-main{padding:20px 16px 0}
+          .teacher-db-main{padding-left:16px!important;padding-right:16px!important}
           .teacher-db-hero{padding:26px 22px}
         }
       `}</style>

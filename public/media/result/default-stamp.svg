@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+  <circle cx="48" cy="48" r="39" fill="none" stroke="#0f3d7a" stroke-width="4" stroke-dasharray="8 5"/>
+  <circle cx="48" cy="48" r="27" fill="none" stroke="#0f3d7a" stroke-width="2"/>
+  <text x="48" y="43" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="700" fill="#0f3d7a">SCHOOL</text>
+  <text x="48" y="57" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="700" fill="#0f3d7a">STAMP</text>
+</svg>

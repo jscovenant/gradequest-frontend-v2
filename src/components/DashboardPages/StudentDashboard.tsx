@@ -1,28 +1,39 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Chart from "chart.js/auto";
 import { authApi } from "../../utils/axios";
-
 import TopNav from "../../components/LayoutComponents/TopNav";
 import Sidebar from "../../components/LayoutComponents/Sidebar";
 import Footer from "../../components/LayoutComponents/Footer";
 import Loader from "../../components/ui/dashboardLoader";
 import PageTitle from "../PageTitle";
 
-interface StatCard {
-  title: string;
-  value: string | number;
-  icon: string;
-  subtitle?: string;
-}
+type StudentInfo = {
+  id: number;
+  name: string;
+  reg_no?: string;
+  class?: string | null;
+  photo?: string | null;
+};
+
+type CurrentResult = {
+  school_id: number;
+  student_id: number;
+  class_id: number;
+  class_name?: string | null;
+  term: string;
+  session: string;
+  status: string;
+  is_published: boolean;
+  has_result: boolean;
+  average?: string | number | null;
+  grade?: string | null;
+  position?: string | number | null;
+  updated_at?: string | null;
+};
 
 type DashboardResponse = {
-  student: {
-    id: number;
-    name: string;
-    reg_no?: string;
-    photo?: string | null;
-    class?: string | null;
-  };
+  student: StudentInfo;
   stats: {
     subjects: number;
     attendance_rate: number;
@@ -43,632 +54,353 @@ type DashboardResponse = {
   };
   next_class?: any;
   recent_notifications?: any[];
+  current_result?: CurrentResult | null;
+  latest_published_result?: CurrentResult | null;
 };
 
-export default function StudentDashboard() {
-  // ===== Sidebar State =====
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+const emptyDashboard: DashboardResponse = {
+  student: { id: 0, name: "Student" },
+  stats: { subjects: 0, attendance_rate: 0, fee_balance: 0, unread_notifications: 0, results_count: 0, avg_score: 0 },
+  fees: { total_fees: 0, total_paid: 0, balance: 0 },
+  charts: { performance: [], access: { labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], data: [0, 0, 0, 0, 0, 0, 0] } },
+  recent_notifications: [],
+};
 
-  // ===== Academic Info =====
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+function money(n?: number) {
+  return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(Number(n || 0));
+}
+
+function shortDate(value?: string | null) {
+  if (!value) return "Not available";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function resultLabel(result?: CurrentResult | null) {
+  if (!result) return { label: "No current result", text: "The school has not prepared your current term result yet.", tone: "muted" };
+  if (!result.has_result) return { label: "Not entered yet", text: "Your scores for this term have not been entered yet.", tone: "muted" };
+  if (!result.is_published) return { label: "Waiting for release", text: "Your result has been prepared. It will show here after the school publishes it.", tone: "warning" };
+  return { label: "Available now", text: "Your current term result has been published.", tone: "success" };
+}
+
+function canOpenResult(result?: CurrentResult | null) {
+  return Boolean(result?.is_published && result?.has_result);
+}
+
+function parseNotification(n: any) {
+  const data = typeof n?.data === "string" ? (() => {
+    try { return JSON.parse(n.data); } catch { return {}; }
+  })() : (n?.data || {});
+
+  return {
+    title: data.title || data.subject || n?.type?.split("\\").pop() || "Notification",
+    body: data.message || data.body || "Open notifications to read more.",
+  };
+}
+
+export default function StudentDashboard() {
+  const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [academicSession, setAcademicSession] = useState("");
   const [currentTerm, setCurrentTerm] = useState("");
+  const [dashboard, setDashboard] = useState<DashboardResponse>(emptyDashboard);
+  const performanceRef = useRef<HTMLCanvasElement | null>(null);
+  const accessRef = useRef<HTMLCanvasElement | null>(null);
+  const performanceChart = useRef<Chart | null>(null);
+  const accessChart = useRef<Chart | null>(null);
 
-  // ===== Loading State =====
-  const [loading, setLoading] = useState(true);
-
-  // ===== Student Info =====
-  const [studentName, setStudentName] = useState("Student");
-  const [studentRegNo, setStudentRegNo] = useState<string>("");
-  const [studentClass, setStudentClass] = useState<string>("");
-
-  // ===== Widgets =====
-  const [nextClass, setNextClass] = useState<any>(null);
-  const [recentNotifications, setRecentNotifications] = useState<any[]>([]);
-
-  // ===== Stats =====
-  const [stats, setStats] = useState<StatCard[]>([
-    { title: "My Subjects", value: 0, icon: "book" },
-    { title: "Attendance Rate", value: "0%", icon: "clipboard-check" },
-    { title: "Fee Balance", value: 0, icon: "wallet2" },
-    { title: "Unread Notices", value: 0, icon: "bell" },
-  ]);
-
-  // ===== Chart Refs =====
-  const accessChartRef = useRef<HTMLCanvasElement | null>(null);
-  const performanceChartRef = useRef<HTMLCanvasElement | null>(null);
-  const accessChartInstance = useRef<Chart | null>(null);
-  const performanceChartInstance = useRef<Chart | null>(null);
-
-  // ===== Chart Data =====
-  const [accessLabels, setAccessLabels] = useState<string[]>([]);
-  const [accessData, setAccessData] = useState<number[]>([]);
-  const [performanceLabels, setPerformanceLabels] = useState<string[]>([]);
-  const [performanceData, setPerformanceData] = useState<number[]>([]);
-
-  // ===== Helper: format money =====
-  const formatMoney = (n: number) =>
-    new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(n || 0);
-
-  // ===== Fetch all dashboard data =====
-  useEffect(() => {
-    setLoading(true);
-
-    const fetchSessionTerm = authApi.get("/current-session-term");
-    const fetchStudentDash = authApi.get("/student/dashboard");
-
-    Promise.all([fetchSessionTerm, fetchStudentDash])
-      .then(([sessionRes, dashRes]) => {
-        // ✅ Session & Term
-        setAcademicSession(sessionRes.data.session);
-        setCurrentTerm(sessionRes.data.term);
-
-        const data: DashboardResponse = dashRes.data;
-
-        // ✅ Student header info
-        setStudentName(data.student?.name || "Student");
-        setStudentRegNo(data.student?.reg_no || "");
-        setStudentClass(data.student?.class || "");
-
-        // ✅ Widgets
-        setNextClass(data.next_class || null);
-        setRecentNotifications(data.recent_notifications || []);
-
-        // ✅ Stats Cards
-        setStats([
-          {
-            title: "My Subjects",
-            value: data.stats.subjects ?? 0,
-            icon: "book",
-            subtitle: "Enrolled this session",
-          },
-          {
-            title: "Attendance Rate",
-            value: `${data.stats.attendance_rate ?? 0}%`,
-            icon: "clipboard-check",
-            subtitle: "Present vs absent",
-          },
-          {
-            title: "Fee Balance",
-            value: formatMoney(data.stats.fee_balance ?? 0),
-            icon: "wallet2",
-            subtitle: "Outstanding fees",
-          },
-          {
-            title: "Unread Notices",
-            value: data.stats.unread_notifications ?? 0,
-            icon: "bell",
-            subtitle: "Announcements",
-          },
-        ]);
-
-        // ✅ Performance chart
-        const perf = data.charts?.performance || [];
-        setPerformanceLabels(perf.map((p) => p.label));
-        setPerformanceData(perf.map((p) => Math.round((p.average || 0) * 10) / 10));
-
-        // ✅ Access chart (result checks)
-        const access = data.charts?.access;
-        if (access?.labels?.length) {
-          setAccessLabels(access.labels);
-          setAccessData(access.data || []);
-        } else {
-          // fallback if backend has no activity logs yet
-          setAccessLabels(["Mon", "Tue", "Wed", "Thu", "Fri"]);
-          setAccessData([0, 0, 0, 0, 0]);
+  const openableResult = canOpenResult(dashboard.current_result)
+    ? dashboard.current_result
+    : dashboard.latest_published_result;
+  const displayResult = canOpenResult(openableResult) ? openableResult : dashboard.current_result;
+  const resultState = canOpenResult(dashboard.current_result)
+    ? resultLabel(dashboard.current_result)
+    : canOpenResult(dashboard.latest_published_result)
+      ? {
+          label: "Latest result available",
+          text: `${dashboard.latest_published_result?.term || "Latest term"} - ${dashboard.latest_published_result?.session || "Academic session"} has been published. Your current term result is still waiting for release.`,
+          tone: "success",
         }
-      })
-      .catch((err) => console.error(err))
-      .finally(() => setLoading(false));
+      : resultLabel(dashboard.current_result);
+  const feePaidPercent = dashboard.fees.total_fees > 0
+    ? Math.min(100, Math.round((dashboard.fees.total_paid / dashboard.fees.total_fees) * 100))
+    : 0;
+
+  const latestAverage = useMemo(() => {
+    const perf = dashboard.charts.performance || [];
+    const last = perf.length ? perf[perf.length - 1]?.average : dashboard.stats.avg_score;
+    return Number(last || 0).toFixed(1);
+  }, [dashboard]);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    setError("");
+
+    Promise.allSettled([
+      authApi.get("/current-session-term"),
+      authApi.get<DashboardResponse>("/student/dashboard"),
+    ]).then(([sessionRes, dashRes]) => {
+      if (!mounted) return;
+
+      if (sessionRes.status === "fulfilled") {
+        setAcademicSession(sessionRes.value.data.session || "");
+        setCurrentTerm(sessionRes.value.data.term || "");
+      }
+
+      if (dashRes.status === "fulfilled") {
+        setDashboard({
+          ...emptyDashboard,
+          ...dashRes.value.data,
+          charts: {
+            performance: dashRes.value.data.charts?.performance || [],
+            access: dashRes.value.data.charts?.access?.labels?.length
+              ? dashRes.value.data.charts.access
+              : emptyDashboard.charts.access,
+          },
+          recent_notifications: Array.isArray(dashRes.value.data.recent_notifications) ? dashRes.value.data.recent_notifications : [],
+        });
+      } else {
+        setError(dashRes.reason?.response?.data?.message || "Unable to load your dashboard.");
+      }
+    }).finally(() => mounted && setLoading(false));
+
+    return () => { mounted = false; };
   }, []);
 
-  // ===== Chart Logic =====
   useEffect(() => {
-    const primaryColor =
-      getComputedStyle(document.documentElement).getPropertyValue("--bs-primary").trim() || "#0d6efd";
+    if (!performanceRef.current || !accessRef.current) return;
 
-    const withAlpha = (color: string, alpha: number) => {
-      if (color.startsWith("rgb")) return color.replace("rgb", "rgba").replace(")", `, ${alpha})`);
-      return color + Math.round(alpha * 255).toString(16).padStart(2, "0");
-    };
+    const performanceCtx = performanceRef.current.getContext("2d");
+    const accessCtx = accessRef.current.getContext("2d");
+    if (!performanceCtx || !accessCtx) return;
 
-    const createGradient = (ctx: CanvasRenderingContext2D) => {
-      const g = ctx.createLinearGradient(0, 0, 0, 320);
-      g.addColorStop(0, withAlpha(primaryColor, 0.35));
-      g.addColorStop(1, withAlpha(primaryColor, 0.05));
-      return g;
-    };
+    performanceChart.current?.destroy();
+    accessChart.current?.destroy();
 
-    // ===== Access Chart =====
-    if (accessChartRef.current) {
-      const ctx = accessChartRef.current.getContext("2d");
-      if (!ctx) return;
-
-      accessChartInstance.current?.destroy();
-
-      accessChartInstance.current = new Chart(ctx, {
-        type: "line",
-        data: {
-          labels: accessLabels,
-          datasets: [
-            {
-              label: "Result Checks",
-              data: accessData,
-              borderColor: "#0d6efd",
-              backgroundColor: createGradient(ctx),
-              pointBackgroundColor: "#0d6efd",
-              pointBorderColor: "#fff",
-              pointBorderWidth: 2,
-              pointRadius: 6,
-              pointHoverRadius: 8,
-              tension: 0.4,
-              fill: true,
-            },
-          ],
+    const perf = dashboard.charts.performance || [];
+    performanceChart.current = new Chart(performanceCtx, {
+      type: "bar",
+      data: {
+        labels: perf.map((p) => p.label),
+        datasets: [{
+          label: "Average",
+          data: perf.map((p) => Number(p.average || 0)),
+          backgroundColor: "rgba(211,0,176,0.82)",
+          borderRadius: 7,
+          barThickness: 34,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: "#8a7d72", font: { size: 11 } } },
+          y: { beginAtZero: true, grid: { color: "rgba(5,0,8,0.06)" }, ticks: { color: "#8a7d72", font: { size: 11 } } },
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              backgroundColor: "rgba(0, 0, 0, 0.8)",
-              padding: 12,
-              cornerRadius: 8,
-              titleFont: { size: 13, weight: "bold" },
-              bodyFont: { size: 12 },
-            },
-          },
-          scales: {
-            x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-            y: { grid: { color: "rgba(0, 0, 0, 0.05)" }, ticks: { stepSize: 5, font: { size: 11 } } },
-          },
-        },
-      });
-    }
+      },
+    });
 
-    // ===== Performance Chart =====
-    if (performanceChartRef.current) {
-      const ctx = performanceChartRef.current.getContext("2d");
-      if (!ctx) return;
-
-      performanceChartInstance.current?.destroy();
-
-      performanceChartInstance.current = new Chart(ctx, {
-        type: "bar",
-        data: {
-          labels: performanceLabels,
-          datasets: [
-            {
-              label: "Average Score",
-              data: performanceData,
-              backgroundColor: "#0d6efd",
-              borderRadius: 8,
-              barThickness: 40,
-              hoverBackgroundColor: "#0b5ed7",
-            },
-          ],
+    accessChart.current = new Chart(accessCtx, {
+      type: "line",
+      data: {
+        labels: dashboard.charts.access.labels,
+        datasets: [{
+          label: "Result views",
+          data: dashboard.charts.access.data,
+          borderColor: "rgb(255,200,87)",
+          backgroundColor: "rgba(255,200,87,0.18)",
+          pointBackgroundColor: "rgb(255,200,87)",
+          pointBorderColor: "#fff",
+          pointRadius: 4,
+          tension: 0.38,
+          fill: true,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: "#8a7d72", font: { size: 11 } } },
+          y: { beginAtZero: true, grid: { color: "rgba(5,0,8,0.06)" }, ticks: { color: "#8a7d72", font: { size: 11 }, precision: 0 } },
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              backgroundColor: "rgba(0, 0, 0, 0.8)",
-              padding: 12,
-              cornerRadius: 8,
-              titleFont: { size: 13, weight: "bold" },
-              bodyFont: { size: 12 },
-            },
-          },
-          scales: {
-            x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-            y: { beginAtZero: true, grid: { color: "rgba(0, 0, 0, 0.05)" }, ticks: { font: { size: 11 } } },
-          },
-        },
-      });
-    }
+      },
+    });
 
     return () => {
-      accessChartInstance.current?.destroy();
-      performanceChartInstance.current?.destroy();
+      performanceChart.current?.destroy();
+      accessChart.current?.destroy();
     };
-  }, [accessLabels, accessData, performanceLabels, performanceData]);
+  }, [dashboard.charts]);
 
-  // Get current time greeting
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good Morning";
-    if (hour < 17) return "Good Afternoon";
-    return "Good Evening";
+  const openCurrentResult = () => {
+    const result = openableResult;
+    if (!canOpenResult(result)) return;
+
+    navigate("/students/results/show", {
+      state: {
+        studentId: result.student_id,
+        classId: result.class_id,
+        term: result.term,
+        session: result.session,
+        schoolId: result.school_id,
+      },
+    });
   };
 
   return (
     <>
+      <style>{`
+        :root{--sd-bg:var(--bs-light,#fcf8f8);--sd-dark:var(--bs-dark,#050008);--sd-primary:var(--bs-primary,rgb(211,0,176));--sd-gold:var(--bs-secondary,rgb(255,200,87));--sd-border:rgba(5,0,8,0.08);--sd-radius:14px}
+        .sd-main{background:linear-gradient(180deg,rgba(211,0,176,0.035),transparent 260px),var(--sd-bg);min-height:100vh;padding:26px 28px 0;overflow-x:hidden}
+        .sd-hero{background:linear-gradient(135deg,var(--sd-dark),#180820);border-radius:var(--sd-radius);padding:26px;position:relative;overflow:hidden;color:#fff;box-shadow:0 18px 42px rgba(5,0,8,0.12);margin:0 0 18px}
+        .sd-hero::before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle,rgba(255,255,255,.045) 1px,transparent 1px);background-size:22px 22px}
+        .sd-hero-inner{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:20px;align-items:center}
+        .sd-pill-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.sd-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);font-size:11.5px;color:rgba(255,255,255,.78)}
+        .sd-title{font-size:clamp(24px,3vw,36px);font-weight:900;letter-spacing:0;margin:0 0 8px}.sd-title span{color:var(--sd-gold)}
+        .sd-sub{font-size:13.5px;color:rgba(255,255,255,.62);line-height:1.65;max-width:620px;margin:0 0 18px}
+        .sd-actions{display:flex;gap:10px;flex-wrap:wrap}.sd-btn{border:0;border-radius:10px;padding:10px 15px;font-size:13px;font-weight:750;display:inline-flex;align-items:center;gap:8px;text-decoration:none;cursor:pointer}.sd-btn-gold{background:var(--sd-gold);color:var(--sd-dark)}.sd-btn-light{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#fff}
+        .sd-profile-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:18px}.sd-profile-stat{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08)}.sd-profile-stat:last-child{border-bottom:0}.sd-profile-label{font-size:11.5px;color:rgba(255,255,255,.48)}.sd-profile-value{font-size:14px;font-weight:850;color:var(--sd-gold);text-align:right}
+        .sd-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:18px;margin-bottom:18px}.sd-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+        .sd-card{background:#fff;border:1px solid var(--sd-border);border-radius:var(--sd-radius);box-shadow:0 10px 28px rgba(5,0,8,.045);min-width:0}.sd-card-pad{padding:18px}
+        .sd-stat{padding:16px}.sd-stat-icon{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;margin-bottom:12px}.sd-stat-label{font-size:11.5px;color:#8a7d72;margin:0 0 5px}.sd-stat-value{font-size:22px;font-weight:900;color:var(--sd-dark);margin:0}.sd-stat-sub{font-size:11.5px;color:#a3978d;margin-top:6px}
+        .sd-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.sd-card-title{font-size:15px;font-weight:900;color:var(--sd-dark);margin:0}.sd-card-sub{font-size:12px;color:#8a7d72;margin:2px 0 0}
+        .sd-result-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center}.sd-result-badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:6px 10px;font-size:11.5px;font-weight:850;margin-bottom:10px}.sd-result-badge.success{color:#15803d;background:rgba(34,197,94,.1)}.sd-result-badge.warning{color:#92400e;background:rgba(245,158,11,.14)}.sd-result-badge.muted{color:#64748b;background:#f1f5f9}
+        .sd-result-title{font-size:20px;font-weight:900;color:var(--sd-dark);margin:0 0 6px}.sd-result-text{font-size:13px;color:#6b5f55;line-height:1.6;margin:0}.sd-result-metrics{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.sd-mini{background:var(--sd-bg);border:1px solid rgba(5,0,8,.06);border-radius:10px;padding:10px 12px;min-width:92px}.sd-mini-label{font-size:10.5px;color:#8a7d72}.sd-mini-value{font-size:16px;font-weight:900;color:var(--sd-dark)}
+        .sd-chart{height:280px}.sd-fee-track,.sd-att-track{height:9px;border-radius:999px;background:#f0ebe3;overflow:hidden}.sd-fee-fill,.sd-att-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--sd-primary),var(--sd-gold))}
+        .sd-list{display:flex;flex-direction:column;gap:10px}.sd-note{padding:12px;border-radius:10px;background:var(--sd-bg);border:1px solid rgba(5,0,8,.06)}.sd-note-title{font-size:13px;font-weight:850;color:var(--sd-dark);margin:0 0 3px}.sd-note-body{font-size:12px;color:#7a6a5a;margin:0;line-height:1.5}
+        .sd-empty{padding:22px;border-radius:12px;border:1px dashed rgba(5,0,8,.12);color:#8a7d72;background:var(--sd-bg);font-size:13px}.sd-error{background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.18);color:#b91c1c;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px}
+        @media(max-width:1199.98px){.sd-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.sd-grid{grid-template-columns:1fr}.sd-hero-inner{grid-template-columns:1fr}}
+        @media(max-width:575.98px){.sd-main{padding:18px 14px 0}.sd-stats{grid-template-columns:1fr}.sd-result-card{grid-template-columns:1fr}.sd-actions .sd-btn{width:100%;justify-content:center}.sd-profile-card{display:none}}
+      `}</style>
+
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       <PageTitle title="Student Dashboard" />
 
       <div className="container-fluid">
         <div className="row">
-          <Sidebar sidebarOpen={sidebarOpen} />
+          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+          <main className="col-md-9 col-lg-10 ms-auto sd-main">
+            {loading && <Loader message="Loading student dashboard..." />}
+            {error && <div className="sd-error"><i className="bi bi-exclamation-circle me-2" />{error}</div>}
 
-          <main
-            className="col-md-9 col-lg-10 ms-auto px-4 d-flex flex-column min-vh-100"
-            style={{ backgroundColor: "#f8f9fa" }}
-          >
-            {loading && <Loader message="Loading dashboard..." />}
-
-            {/* Hero Section */}
-            <div
-              className="mt-4 p-4 position-relative overflow-hidden"
-              style={{
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                borderRadius: "16px",
-                boxShadow: "0 10px 30px rgba(102, 126, 234, 0.3)",
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  top: "-50px",
-                  right: "-50px",
-                  width: "200px",
-                  height: "200px",
-                  background: "rgba(255, 255, 255, 0.1)",
-                  borderRadius: "50%",
-                  filter: "blur(40px)",
-                }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "-30px",
-                  left: "-30px",
-                  width: "150px",
-                  height: "150px",
-                  background: "rgba(255, 255, 255, 0.1)",
-                  borderRadius: "50%",
-                  filter: "blur(40px)",
-                }}
-              />
-
-              <div className="row align-items-center position-relative">
-                <div className="col-md-8">
-                  <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
-                    <span
-                      className="badge px-3 py-2"
-                      style={{
-                        backgroundColor: "rgba(255, 255, 255, 0.2)",
-                        color: "#fff",
-                        borderRadius: "20px",
-                        fontSize: "0.75rem",
-                        fontWeight: "500",
-                      }}
-                    >
-                      <i className="bi bi-calendar-check me-1"></i>
-                      {academicSession || "Loading..."} — {currentTerm || "..."}
-                    </span>
-
-                    {studentClass && (
-                      <span
-                        className="badge px-3 py-2"
-                        style={{
-                          backgroundColor: "rgba(16, 185, 129, 0.9)",
-                          color: "#fff",
-                          borderRadius: "20px",
-                          fontSize: "0.75rem",
-                          fontWeight: "500",
-                        }}
-                      >
-                        <i className="bi bi-mortarboard-fill me-1"></i>
-                        {studentClass}
-                      </span>
-                    )}
-
-                    {studentRegNo && (
-                      <span
-                        className="badge px-3 py-2"
-                        style={{
-                          backgroundColor: "rgba(255, 255, 255, 0.15)",
-                          color: "#fff",
-                          borderRadius: "20px",
-                          fontSize: "0.75rem",
-                          fontWeight: "500",
-                        }}
-                      >
-                        <i className="bi bi-person-badge me-1"></i>
-                        {studentRegNo}
-                      </span>
-                    )}
+            <section className="sd-hero">
+              <div className="sd-hero-inner">
+                <div>
+                  <div className="sd-pill-row">
+                    <span className="sd-pill"><i className="bi bi-calendar-check" />{academicSession || "Academic session"} • {currentTerm || "Current term"}</span>
+                    {dashboard.student.class && <span className="sd-pill"><i className="bi bi-mortarboard" />{dashboard.student.class}</span>}
+                    {dashboard.student.reg_no && <span className="sd-pill"><i className="bi bi-person-badge" />{dashboard.student.reg_no}</span>}
                   </div>
-
-                  <h2 className="fw-bold text-white mb-2">
-                    {getGreeting()}, {studentName}! 👋
-                  </h2>
-
-                  <p className="text-white mb-4" style={{ opacity: 0.9, fontSize: "1rem" }}>
-                    Here’s your academic snapshot: attendance, fees, results and your latest updates.
-                  </p>
-
-                  <div className="d-flex gap-2 flex-wrap">
-                    <a
-                      className="btn btn-light px-4 py-2 d-flex align-items-center gap-2"
-                      style={{ borderRadius: "10px", fontWeight: "500", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)" }}
-                      href="/student/my-fees"
-                    >
-                      <i className="bi bi-wallet2"></i>
-                      My Fees
-                    </a>
-
-                    <a
-                      className="btn px-4 py-2 d-flex align-items-center gap-2"
-                      style={{
-                        borderRadius: "10px",
-                        fontWeight: "500",
-                        backgroundColor: "rgba(255, 255, 255, 0.2)",
-                        color: "#fff",
-                        border: "1px solid rgba(255, 255, 255, 0.3)",
-                      }}
-                      href="/results"
-                    >
-                      <i className="bi bi-journal-check"></i>
-                      Check Results
-                    </a>
+                  <h1 className="sd-title">{greeting()}, <span>{dashboard.student.name || "Student"}</span></h1>
+                  <p className="sd-sub">Track your attendance, fees, notices and published results from one simple dashboard.</p>
+                  <div className="sd-actions">
+                    <button className="sd-btn sd-btn-gold" onClick={openCurrentResult} disabled={!canOpenResult(openableResult)}>
+                      <i className="bi bi-journal-check" /> {canOpenResult(dashboard.current_result) ? "View Current Result" : "View Latest Result"}
+                    </button>
+                    <button className="sd-btn sd-btn-light" onClick={()=>navigate("/student/my-fees")}><i className="bi bi-wallet2" /> My Fees</button>
+                    <button className="sd-btn sd-btn-light" onClick={()=>navigate("/notifications")}><i className="bi bi-bell" /> Notices</button>
                   </div>
                 </div>
-
-                <div className="col-md-4 d-none d-md-block text-end">
-                  <div
-                    style={{
-                      background: "rgba(255, 255, 255, 0.15)",
-                      backdropFilter: "blur(10px)",
-                      borderRadius: "16px",
-                      padding: "1.5rem",
-                      border: "1px solid rgba(255, 255, 255, 0.2)",
-                    }}
-                  >
-                    <div className="d-flex align-items-center justify-content-between mb-3">
-                      <span className="text-white" style={{ fontSize: "0.9rem", opacity: 0.9 }}>
-                        Quick Summary
-                      </span>
-                      <i className="bi bi-speedometer2 text-white"></i>
-                    </div>
-
-                    <div className="d-flex flex-column gap-2">
-                      <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-white" style={{ fontSize: "0.85rem", opacity: 0.8 }}>
-                          Avg Score
-                        </span>
-                        <span className="text-white fw-bold">{performanceData.length ? `${performanceData.at(-1)}%` : "—"}</span>
-                      </div>
-
-                      <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-white" style={{ fontSize: "0.85rem", opacity: 0.8 }}>
-                          Results Records
-                        </span>
-                        <span className="text-white fw-bold">{/* safely read */}{stats?.[0]?.value !== undefined ? "" : ""}</span>
-                      </div>
-
-                      <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-white" style={{ fontSize: "0.85rem", opacity: 0.8 }}>
-                          Unread Notices
-                        </span>
-                        <span className="text-white fw-bold">{stats?.[3]?.value ?? 0}</span>
-                      </div>
-                    </div>
-                  </div>
+                <div className="sd-profile-card">
+                  <div className="sd-profile-stat"><span className="sd-profile-label">Average score</span><span className="sd-profile-value">{latestAverage}%</span></div>
+                  <div className="sd-profile-stat"><span className="sd-profile-label">Attendance</span><span className="sd-profile-value">{dashboard.stats.attendance_rate || 0}%</span></div>
+                  <div className="sd-profile-stat"><span className="sd-profile-label">Fee balance</span><span className="sd-profile-value">{money(dashboard.fees.balance)}</span></div>
                 </div>
               </div>
-            </div>
+            </section>
 
-
-            {/* Stats Cards */}
-            <div className="row g-3 mb-4 mt-1">
-              {stats.map(({ title, value, icon, subtitle }, index) => {
-                const colors = [
-                  { gradient: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", icon: "#667eea", bg: "#f0edff" },
-                  { gradient: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)", icon: "#f5576c", bg: "#fff0f3" },
-                  { gradient: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)", icon: "#00f2fe", bg: "#e6f9ff" },
-                  { gradient: "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)", icon: "#38f9d7", bg: "#e6fff9" },
-                ];
-
-                return (
-                  <div className="col-md-6 col-lg-3" key={title}>
-                    <div
-                      className="card border-0 h-100 position-relative overflow-hidden"
-                      style={{
-                        borderRadius: "12px",
-                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                        transition: "transform 0.2s, box-shadow 0.2s",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = "translateY(-4px)";
-                        e.currentTarget.style.boxShadow = "0 8px 20px rgba(0, 0, 0, 0.12)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.08)";
-                      }}
-                    >
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          height: "4px",
-                          background: colors[index].gradient,
-                        }}
-                      />
-
-                      <div className="card-body p-4">
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                          <div className="p-2 rounded-3" style={{ backgroundColor: colors[index].bg }}>
-                            <i className={`bi bi-${icon} fs-4`} style={{ color: colors[index].icon }}></i>
-                          </div>
-                          <i className="bi bi-three-dots-vertical text-muted" style={{ cursor: "pointer" }}></i>
-                        </div>
-
-                        <p className="text-muted mb-1 small">{title}</p>
-                        <h3 className="fw-bold mb-1" style={{ color: "#1e293b" }}>
-                          {value}
-                        </h3>
-
-                        <small className="text-muted">{subtitle || ""}</small>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Charts + Widgets */}
-            <div className="row g-4 mb-4">
-              <div className="col-lg-8">
-                <div className="card shadow-sm border-0 h-100" style={{ borderRadius: "12px" }}>
-                  <div className="card-body p-4">
-                    <div className="d-flex justify-content-between align-items-center mb-4">
-                      <div className="d-flex align-items-center gap-2">
-                        <div className="p-2 rounded-2" style={{ backgroundColor: "#e0e7ff" }}>
-                          <i className="bi bi-graph-up-arrow" style={{ color: "#6366f1" }}></i>
-                        </div>
-                        <div>
-                          <h6 className="mb-0 fw-semibold" style={{ color: "#1e293b" }}>
-                            Result Check Activity
-                          </h6>
-                          <small className="text-muted">Last 7 days</small>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ height: 300 }}>
-                      <canvas ref={accessChartRef} />
-                    </div>
+            <section className="sd-card sd-card-pad mb-3">
+              <div className="sd-result-card">
+                <div>
+                  <span className={`sd-result-badge ${resultState.tone}`}><i className="bi bi-circle-fill" style={{fontSize:7}} />{resultState.label}</span>
+                  <h2 className="sd-result-title">{displayResult?.term || currentTerm || "Current Term"} Result</h2>
+                  <p className="sd-result-text">{resultState.text}</p>
+                  <div className="sd-result-metrics">
+                    <div className="sd-mini"><div className="sd-mini-label">Average</div><div className="sd-mini-value">{displayResult?.average ?? "N/A"}</div></div>
+                    <div className="sd-mini"><div className="sd-mini-label">Grade</div><div className="sd-mini-value">{displayResult?.grade ?? "N/A"}</div></div>
+                    <div className="sd-mini"><div className="sd-mini-label">Position</div><div className="sd-mini-value">{displayResult?.position ?? "N/A"}</div></div>
                   </div>
                 </div>
+                <button className="sd-btn sd-btn-gold" onClick={openCurrentResult} disabled={!canOpenResult(openableResult)}>
+                  <i className="bi bi-eye" /> {canOpenResult(dashboard.current_result) ? "Open Result" : "Open Latest Result"}
+                </button>
+              </div>
+            </section>
+
+            <section className="sd-stats">
+              {[
+                { label:"Subjects", value:dashboard.stats.subjects, sub:"Registered subjects", icon:"book", bg:"rgba(211,0,176,.08)", color:"var(--sd-primary)" },
+                { label:"Attendance", value:`${dashboard.stats.attendance_rate || 0}%`, sub:"Current attendance rate", icon:"clipboard-check", bg:"rgba(34,197,94,.1)", color:"#16a34a" },
+                { label:"Fee Balance", value:money(dashboard.stats.fee_balance), sub:"Outstanding school fees", icon:"wallet2", bg:"rgba(245,158,11,.12)", color:"#b45309" },
+                { label:"Notices", value:dashboard.stats.unread_notifications, sub:"Unread messages", icon:"bell", bg:"rgba(59,130,246,.1)", color:"#2563eb" },
+              ].map((item)=>(
+                <div className="sd-card sd-stat" key={item.label}>
+                  <div className="sd-stat-icon" style={{background:item.bg,color:item.color}}><i className={`bi bi-${item.icon}`} /></div>
+                  <p className="sd-stat-label">{item.label}</p>
+                  <p className="sd-stat-value">{item.value}</p>
+                  <div className="sd-stat-sub">{item.sub}</div>
+                </div>
+              ))}
+            </section>
+
+            <section className="sd-grid">
+              <div className="sd-card sd-card-pad">
+                <div className="sd-card-head">
+                  <div><h3 className="sd-card-title">Performance Trend</h3><p className="sd-card-sub">Your average score by term</p></div>
+                  <span className="sd-pill" style={{color:"#5f5147",borderColor:"rgba(5,0,8,.08)",background:"var(--sd-bg)"}}>{dashboard.stats.results_count} result record{dashboard.stats.results_count === 1 ? "" : "s"}</span>
+                </div>
+                <div className="sd-chart"><canvas ref={performanceRef} /></div>
               </div>
 
-              <div className="col-lg-4">
-                <div className="card shadow-sm border-0 h-100" style={{ borderRadius: "12px" }}>
-                  <div className="card-body p-4">
-                    <div className="d-flex align-items-center gap-2 mb-4">
-                      <div className="p-2 rounded-2" style={{ backgroundColor: "#dbeafe" }}>
-                        <i className="bi bi-bar-chart-fill" style={{ color: "#3b82f6" }}></i>
-                      </div>
-                      <div>
-                        <h6 className="mb-0 fw-semibold" style={{ color: "#1e293b" }}>
-                          Performance Trend
-                        </h6>
-                        <small className="text-muted">Average by term</small>
-                      </div>
-                    </div>
+              <div className="sd-card sd-card-pad">
+                <div className="sd-card-head"><div><h3 className="sd-card-title">Fees</h3><p className="sd-card-sub">Payment summary</p></div></div>
+                <div className="sd-result-metrics mb-3">
+                  <div className="sd-mini"><div className="sd-mini-label">Paid</div><div className="sd-mini-value">{money(dashboard.fees.total_paid)}</div></div>
+                  <div className="sd-mini"><div className="sd-mini-label">Balance</div><div className="sd-mini-value">{money(dashboard.fees.balance)}</div></div>
+                </div>
+                <div className="sd-progress-text d-flex justify-content-between mb-2"><small>{feePaidPercent}% paid</small><small>{shortDate(dashboard.fees.last_payment_date)}</small></div>
+                <div className="sd-fee-track"><div className="sd-fee-fill" style={{width:`${feePaidPercent}%`}} /></div>
+                <button className="sd-btn sd-btn-gold mt-3" onClick={()=>navigate("/student/my-fees")}><i className="bi bi-receipt" /> View Fee Details</button>
+              </div>
+            </section>
 
-                    <div style={{ height: 300 }}>
-                      <canvas ref={performanceChartRef} />
-                    </div>
+            <section className="sd-grid">
+              <div className="sd-card sd-card-pad">
+                <div className="sd-card-head"><div><h3 className="sd-card-title">Result View Activity</h3><p className="sd-card-sub">How often you checked results this week</p></div></div>
+                <div className="sd-chart"><canvas ref={accessRef} /></div>
+              </div>
+
+              <div className="sd-card sd-card-pad">
+                <div className="sd-card-head"><div><h3 className="sd-card-title">Today</h3><p className="sd-card-sub">Next class and recent notices</p></div></div>
+                {dashboard.next_class ? (
+                  <div className="sd-note mb-3">
+                    <p className="sd-note-title">{dashboard.next_class.subject_name || dashboard.next_class.subject || "Next class"}</p>
+                    <p className="sd-note-body">{dashboard.next_class.start_time || "Time not set"} - {dashboard.next_class.end_time || "Time not set"} {dashboard.next_class.venue ? `• ${dashboard.next_class.venue}` : ""}</p>
                   </div>
+                ) : <div className="sd-empty mb-3">No class timetable found for today.</div>}
+
+                <div className="sd-list">
+                  {(dashboard.recent_notifications || []).slice(0,3).map((n:any)=> {
+                    const note = parseNotification(n);
+                    return <div className="sd-note" key={n.id}><p className="sd-note-title">{note.title}</p><p className="sd-note-body">{note.body}</p></div>;
+                  })}
+                  {(!dashboard.recent_notifications || dashboard.recent_notifications.length === 0) && <div className="sd-empty">No recent notices.</div>}
                 </div>
               </div>
-            </div>
-
-            {/* Next class + recent notifications */}
-            <div className="row g-4 mb-4">
-              <div className="col-lg-5">
-                <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
-                  <div className="card-body p-4">
-                    <div className="d-flex align-items-center justify-content-between mb-3">
-                      <div className="d-flex align-items-center gap-2">
-                        <div className="p-2 rounded-2" style={{ backgroundColor: "#ecfeff" }}>
-                          <i className="bi bi-calendar2-event" style={{ color: "#06b6d4" }}></i>
-                        </div>
-                        <div>
-                          <h6 className="mb-0 fw-semibold">Next Class</h6>
-                          <small className="text-muted">Today’s schedule</small>
-                        </div>
-                      </div>
-                    </div>
-
-                    {!nextClass ? (
-                      <div className="text-muted">No timetable entry found for today.</div>
-                    ) : (
-                      <div className="d-flex flex-column gap-2">
-                        <div className="d-flex justify-content-between">
-                          <span className="text-muted">Subject</span>
-                          <span className="fw-semibold">{nextClass.subject_name || nextClass.subject || "—"}</span>
-                        </div>
-                        <div className="d-flex justify-content-between">
-                          <span className="text-muted">Time</span>
-                          <span className="fw-semibold">
-                            {(nextClass.start_time || "—")} - {(nextClass.end_time || "—")}
-                          </span>
-                        </div>
-                        <div className="d-flex justify-content-between">
-                          <span className="text-muted">Venue</span>
-                          <span className="fw-semibold">{nextClass.venue || nextClass.room || "—"}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="col-lg-7">
-                <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
-                  <div className="card-body p-4">
-                    <div className="d-flex align-items-center justify-content-between mb-3">
-                      <div className="d-flex align-items-center gap-2">
-                        <div className="p-2 rounded-2" style={{ backgroundColor: "#fff7ed" }}>
-                          <i className="bi bi-megaphone" style={{ color: "#f97316" }}></i>
-                        </div>
-                        <div>
-                          <h6 className="mb-0 fw-semibold">Recent Notifications</h6>
-                          <small className="text-muted">Latest announcements</small>
-                        </div>
-                      </div>
-
-                      <a href="/notifications" className="btn btn-sm btn-light" style={{ borderRadius: 8 }}>
-                        View all
-                      </a>
-                    </div>
-
-                    {recentNotifications.length === 0 ? (
-                      <div className="text-muted">No notifications yet.</div>
-                    ) : (
-                      <div className="d-flex flex-column gap-3">
-                        {recentNotifications.map((n: any) => {
-                          let title = "Notification";
-                          let body = "";
-
-                          // Laravel stores data as JSON string sometimes
-                          const dataObj = typeof n.data === "string" ? (() => {
-                            try { return JSON.parse(n.data); } catch { return {}; }
-                          })() : (n.data || {});
-
-                          title = dataObj.title || dataObj.subject || n.type?.split("\\").pop() || "Notification";
-                          body = dataObj.message || dataObj.body || "";
-
-                          return (
-                            <div key={n.id} className="p-3 rounded-3" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-                              <div className="d-flex justify-content-between align-items-start">
-                                <div>
-                                  <div className="fw-semibold" style={{ color: "#0f172a" }}>{title}</div>
-                                  <div className="text-muted small">{body}</div>
-                                </div>
-                                {n.read_at ? (
-                                  <span className="badge bg-light text-muted">Read</span>
-                                ) : (
-                                  <span className="badge bg-warning text-dark">New</span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
+            </section>
 
             <Footer />
           </main>

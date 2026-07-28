@@ -18,6 +18,7 @@ type Department = {
   school_id?: number;
   created_at?: string;
   updated_at?: string;
+  archived_at?: string | null;
 };
 
 function getErrorMessage(err: any): string {
@@ -64,6 +65,7 @@ export default function DepartmentPage() {
   // data
   const [departments, setDepartments] = useState<Department[]>([]);
   const [query, setQuery] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
 
   // modals
   const [showCreate, setShowCreate] = useState(false);
@@ -86,7 +88,7 @@ export default function DepartmentPage() {
   async function fetchDepartments() {
     try {
       setLoadingDepartments(true);
-      const res = await authApi.get<Department[]>("/departments");
+      const res = await authApi.get<Department[]>("/departments", { params: showArchived ? { archived: 1 } : undefined });
       setDepartments(Array.isArray(res.data) ? res.data : []);
     } catch (err: any) {
       showError(getErrorMessage(err));
@@ -100,7 +102,7 @@ export default function DepartmentPage() {
     setLoadingPage(true);
     fetchDepartments().finally(() => setLoadingPage(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [showArchived]);
 
   /* =========================
      DERIVED
@@ -180,6 +182,38 @@ export default function DepartmentPage() {
       setEditId(null);
       setEditName("");
       setEditDesc("");
+      await fetchDepartments();
+    } catch (err: any) {
+      showError(getErrorMessage(err));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function archiveDepartment(department: Department) {
+    const ok = window.confirm(
+      `Archive "${department.name}"?\n\nArchived departments will be hidden from future setup and result forms, but old records will remain safe.`
+    );
+
+    if (!ok) return;
+
+    try {
+      setBusyKey(`dept:archive:${department.id}`);
+      const res = await authApi.delete(`/departments/${department.id}`);
+      showSuccess(res.data?.message ?? "Department archived successfully.");
+      await fetchDepartments();
+    } catch (err: any) {
+      showError(getErrorMessage(err));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function restoreDepartment(department: Department) {
+    try {
+      setBusyKey(`dept:restore:${department.id}`);
+      const res = await authApi.post(`/departments/${department.id}/restore`);
+      showSuccess(res.data?.message ?? "Department restored successfully.");
       await fetchDepartments();
     } catch (err: any) {
       showError(getErrorMessage(err));
@@ -523,6 +557,8 @@ export default function DepartmentPage() {
         .db-action-btn:disabled { opacity: .5; cursor: not-allowed; }
 
         .db-action-primary { border-color: rgba(30, 64, 175, 0.25); color: #1e40af; }
+        .db-action-danger  { border-color: rgba(185, 28, 28, 0.25); color: #b91c1c; }
+        .db-action-green   { border-color: rgba(6, 95, 70, 0.25); color: #065f46; }
 
         .db-pagination {
           display:flex;
@@ -868,9 +904,14 @@ export default function DepartmentPage() {
                   <button className="db-chip-btn" onClick={fetchDepartments} disabled={busyKey !== null || loadingDepartments} type="button">
                     Refresh
                   </button>
-                  <button className="db-chip-btn" onClick={() => setShowCreate(true)} disabled={busyKey !== null} type="button">
-                    Add Department
+                  <button className="db-chip-btn" onClick={() => setShowArchived((v) => !v)} disabled={busyKey !== null} type="button">
+                    {showArchived ? "Show Active" : "View Archived"}
                   </button>
+                  {!showArchived ? (
+                    <button className="db-chip-btn" onClick={() => setShowCreate(true)} disabled={busyKey !== null} type="button">
+                      Add Department
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
@@ -899,7 +940,11 @@ export default function DepartmentPage() {
                         </td>
                       </tr>
                     ) : (
-                      pageRows.map((d) => (
+                      pageRows.map((d) => {
+                        const busyArchive = isBusy(`dept:archive:${d.id}`);
+                        const busyRestore = isBusy(`dept:restore:${d.id}`);
+
+                        return (
                         <tr key={d.id}>
                           <td>
                             <div style={{ fontWeight: 900, color: "#1a1a2e" }}>{d.name}</div>
@@ -913,15 +958,26 @@ export default function DepartmentPage() {
                               <button
                                 className="db-action-btn db-action-primary"
                                 onClick={() => openEdit(d)}
-                                disabled={busyKey !== null}
+                                disabled={showArchived || busyKey !== null}
                                 type="button"
                               >
                                 Edit
                               </button>
+                              <button
+                                className={`db-action-btn ${showArchived ? "db-action-green" : "db-action-danger"}`}
+                                onClick={() => (showArchived ? restoreDepartment(d) : archiveDepartment(d))}
+                                disabled={busyKey !== null}
+                                type="button"
+                              >
+                                {showArchived
+                                  ? busyRestore ? "Restoring..." : "Restore"
+                                  : busyArchive ? "Archiving..." : "Archive"}
+                              </button>
                             </div>
                           </td>
                         </tr>
-                      ))
+                        );
+                      })
                     )}
                   </tbody>
                 </table>

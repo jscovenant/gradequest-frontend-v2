@@ -15,6 +15,7 @@ import FinancialRecords from "./pages/Admin/fianance/FinancialRecord";
 import AddResultV2Page from "./pages/Admin/StudentResult/AddResultV2Page";
 import ResultBatchSetupPage from "./pages/Admin/StudentResult/ResultBatchSetupPage";
 import ResultUploadPage from "./pages/Admin/StudentResult/ResultUploadPage";
+import ResultTemplateSettingsPage from "./pages/Admin/StudentResult/ResultTemplateSettingsPage";
 import ShowResult from "./pages/Admin/StudentResult/ShowResult";
 import TermsPage from "./pages/Admin/Academics/AcademicCalendarPage";
 import BroadsheetPage from "./pages/Admin/StudentResult/BroadsheetPage";
@@ -38,6 +39,7 @@ import SubscribersManagementPage from "./pages/Super-Admin/SubscribersManagement
 import MarketingEmailPage from "./pages/Super-Admin/MarketingEmailPage";
 import SubscriptionPlansPage from "./pages/Super-Admin/SubscriptionPlansPage";
 import BillingPolicyPage from "./pages/Super-Admin/BillingPolicyPage";
+import TwilioWhatsappPage from "./pages/Super-Admin/TwilioWhatsappPage";
 import BlogsPage from "./pages/Super-Admin/BlogsPage";
 import TestimonialsPage from "./pages/Super-Admin/TestimonialsPage";
 import StaffQrAttendancePage from "./pages/Admin/Biometric/StaffQrAttendancePage";
@@ -70,8 +72,6 @@ import BursarsPage from "./pages/Admin/Bursar/BursarsPage";
 import ForgotPasswordPage from "./pages/Forgotpasswordpage";
 import ResetPasswordPage from "./pages/Resetpasswordpage";
 import ResultSubmissionDeadlinePage from "./pages/Admin/StudentResult/ResultSubmissionDeadlinePage";
-import SchoolWhatsappSettingsPage from "./pages/Admin/School/SchoolWhatsappSettingsPage";
-import ParentWhatsappVerificationPage from "./pages/Admin/Parent/ParentWhatsappVerificationPage";
 import ResultMonitoringPage from "./pages/Admin/StudentResult/Resultmonitoringpage";
 import WhatsAppSettingsPage from "./pages/Admin/School/WhatsAppSettingsPage";
 import OnlinePayFeesPage from "./pages/Admin/Billing/OnlinePayFeesPage";
@@ -125,29 +125,6 @@ function App() {
               </RequireAuth>
             }
           />
-          <Route
-            path="/settings/school-wp-settings"
-            element={
-              <RequireAuth roles={["Super-Admin"]}>
-                <OnboardingGuard>
-                  <SchoolWhatsappSettingsPage />
-                </OnboardingGuard>
-              </RequireAuth>
-            }
-          />
-
-            <Route
-            path="/settings/parent-wp-verification"
-            element={
-              <RequireAuth roles={["Super-Admin"]}>
-                <OnboardingGuard>
-                  <ParentWhatsappVerificationPage />
-                </OnboardingGuard>
-              </RequireAuth>
-            }
-          />
-
-
              <Route
             path="/notifications"
             element={
@@ -283,9 +260,20 @@ function App() {
           />
 
           <Route
+            path="/results/design"
+            element={
+              <RequireAuth roles={["Admin"]}>
+                <OnboardingGuard>
+                  <ResultTemplateSettingsPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
             path="/students/results/show"
             element={
-              <RequireAuth roles={["Admin", "Teacher"]}>
+              <RequireAuth roles={["Admin", "Teacher", "Student"]}>
                 <OnboardingGuard>
                   <ShowResult />
                 </OnboardingGuard>
@@ -699,6 +687,16 @@ function App() {
               <RequireAuth roles={["Super-Admin"]}>
                 <OnboardingGuard>
                   <BillingPolicyPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/superadmin/twilio-whatsapp"
+            element={
+              <RequireAuth roles={["Super-Admin"]}>
+                <OnboardingGuard>
+                  <TwilioWhatsappPage />
                 </OnboardingGuard>
               </RequireAuth>
             }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { authApi } from "../../../utils/axios";
 
 import TopNav from "../../../components/LayoutComponents/TopNav";
@@ -7,6 +7,7 @@ import Footer from "../../../components/LayoutComponents/Footer";
 import Loader from "../../../components/ui/dashboardLoader";
 import { useToast } from "../../../contexts/ToastContext";
 import PageTitle from "../../../components/PageTitle";
+import PeopleImportPanel from "../../../components/imports/PeopleImportPanel";
 
 /* =========================
    TYPES
@@ -30,6 +31,8 @@ interface Teacher {
   address?: string | null;
   photo?: string | null;
   status?: number | string | null;
+  teacher_status?: string | null;
+  teacher_status_reason?: string | null;
 
   level?: Level | null;
 
@@ -40,6 +43,8 @@ interface Teacher {
 }
 
 type ModalTab = "overview" | "security";
+type TeacherLifecycleStatus = "active" | "suspended" | "inactive" | "resigned";
+type TeacherStatusFilter = TeacherLifecycleStatus | "all";
 
 /* =========================
    HELPERS
@@ -67,6 +72,38 @@ function safeStatusActive(status?: any) {
   return String(status) === "1" || status === 1 || String(status).toLowerCase() === "active";
 }
 
+const teacherLifecycleOptions: Array<{ value: TeacherStatusFilter; label: string; hint: string }> = [
+  { value: "active", label: "Active", hint: "Can log in and work" },
+  { value: "suspended", label: "Suspended", hint: "Temporarily blocked" },
+  { value: "inactive", label: "Inactive", hint: "Hidden from normal work" },
+  { value: "resigned", label: "Resigned", hint: "No longer with school" },
+  { value: "all", label: "All", hint: "Show every teacher" },
+];
+
+const normalizeTeacherLifecycle = (teacher?: Teacher | any): TeacherLifecycleStatus => {
+  const status = String(teacher?.teacher_status || "").toLowerCase();
+  if (["active", "suspended", "inactive", "resigned"].includes(status)) {
+    return status as TeacherLifecycleStatus;
+  }
+  return safeStatusActive(teacher?.status) ? "active" : "inactive";
+};
+
+const teacherLifecycleLabel = (status?: string | null) => {
+  const normalized = String(status || "active").toLowerCase();
+  if (normalized === "suspended") return "Suspended";
+  if (normalized === "inactive") return "Inactive";
+  if (normalized === "resigned") return "Resigned";
+  return "Active";
+};
+
+const teacherLifecyclePillClass = (status?: string | null) => {
+  const normalized = String(status || "active").toLowerCase();
+  if (normalized === "suspended") return "db-pill--warn";
+  if (normalized === "inactive") return "db-pill--no";
+  if (normalized === "resigned") return "db-pill--info";
+  return "db-pill--ok";
+};
+
 /* =========================
    PAGE
 ========================= */
@@ -83,6 +120,15 @@ export default function TeachersPage() {
   const [perPage] = useState(8);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [showImportPanel, setShowImportPanel] = useState(false);
+  const [teacherStatusFilter, setTeacherStatusFilter] = useState<TeacherStatusFilter>("active");
+  const [statusCounts, setStatusCounts] = useState<Record<TeacherLifecycleStatus, number>>({
+    active: 0,
+    suspended: 0,
+    inactive: 0,
+    resigned: 0,
+  });
+  const [updatingLifecycleId, setUpdatingLifecycleId] = useState<number | null>(null);
 
   // ===== Levels =====
   const [levels, setLevels] = useState<Level[]>([]);
@@ -138,12 +184,18 @@ export default function TeachersPage() {
     setLoading(true);
     try {
       const res = await authApi.get("/all-teachers", {
-        params: { page, perPage, search },
+        params: { page, perPage, search, teacher_status: teacherStatusFilter },
       });
 
       const data = res.data.teachers;
       setTeachers(data.data || data);
       setTotalPages(data.last_page || 1);
+      setStatusCounts({
+        active: Number(res.data.status_counts?.active || 0),
+        suspended: Number(res.data.status_counts?.suspended || 0),
+        inactive: Number(res.data.status_counts?.inactive || 0),
+        resigned: Number(res.data.status_counts?.resigned || 0),
+      });
     } catch (err: any) {
       console.error(err);
       showError(err?.response?.data?.message ?? "Failed to load teachers");
@@ -164,7 +216,7 @@ export default function TeachersPage() {
   useEffect(() => {
     fetchTeachers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, search]);
+  }, [page, search, teacherStatusFilter]);
 
   useEffect(() => {
     fetchLevels();
@@ -311,6 +363,46 @@ export default function TeachersPage() {
     }
   };
 
+  const updateTeacherLifecycle = async (teacher: Teacher, newStatus: TeacherLifecycleStatus) => {
+    const oldStatus = normalizeTeacherLifecycle(teacher);
+    if (oldStatus === newStatus) return;
+
+    let reason: string | null = null;
+    if (newStatus !== "active") {
+      reason = window.prompt(
+        `Reason for marking ${fullName(teacher) || "this teacher"} as ${teacherLifecycleLabel(newStatus)}?`
+      );
+      if (reason === null) return;
+    }
+
+    const ok = window.confirm(
+      `Confirm ${teacherLifecycleLabel(newStatus)} for ${fullName(teacher) || "this teacher"}?`
+    );
+    if (!ok) return;
+
+    setUpdatingLifecycleId(teacher.id);
+    try {
+      const res = await authApi.patch(`/teachers/${teacher.id}/lifecycle-status`, {
+        teacher_status: newStatus,
+        reason,
+      });
+
+      const updatedTeacher = res.data.teacher || { ...teacher, teacher_status: newStatus };
+      showSuccess(res.data.message || "Teacher status updated successfully.");
+      await fetchTeachers();
+
+      if (selectedTeacher?.id === teacher.id) {
+        setSelectedTeacher(updatedTeacher);
+        setTeacherDetails((prev: any) => (prev ? { ...prev, teacher: updatedTeacher } : prev));
+      }
+    } catch (err: any) {
+      console.error(err);
+      showError(err?.response?.data?.message || "Could not update teacher status");
+    } finally {
+      setUpdatingLifecycleId(null);
+    }
+  };
+
   /* =========================
      ADD TEACHER MODAL
   ========================= */
@@ -391,9 +483,10 @@ export default function TeachersPage() {
      DERIVED STATS
   ========================= */
   const totalTeachers = teachers?.length ?? 0;
-  const activeCount = useMemo(() => teachers.filter((t) => safeStatusActive(t.status)).length, [teachers]);
-  const maleCount = useMemo(() => teachers.filter((t) => (t.sex ?? "").toLowerCase() === "male").length, [teachers]);
-  const femaleCount = useMemo(() => teachers.filter((t) => (t.sex ?? "").toLowerCase() === "female").length, [teachers]);
+  const activeCount = statusCounts.active;
+  const suspendedCount = statusCounts.suspended;
+  const inactiveCount = statusCounts.inactive;
+  const resignedCount = statusCounts.resigned;
 
   const roleHint = "Admin";
 
@@ -406,6 +499,25 @@ export default function TeachersPage() {
   min-height: 100vh;
   font-family: "DM Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   padding: 28px 28px 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+@media (min-width: 768px){
+  .teacher-page-main{
+    margin-left: 260px !important;
+    width: calc(100% - 260px) !important;
+    max-width: calc(100% - 260px) !important;
+    flex: 0 0 calc(100% - 260px) !important;
+  }
+}
+@media (max-width: 767.98px){
+  .teacher-page-main{
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 18px 14px 0;
+  }
 }
 .db-hero{
   background:#0f172a;
@@ -632,6 +744,50 @@ export default function TeachersPage() {
 .db-pill--muted{ background: rgba(148,163,184,0.18); color:#64748b; }
 .db-pill--ok{ background: rgba(34,197,94,0.14); color:#15803d; }
 .db-pill--no{ background: rgba(100,116,139,0.18); color:#475569; }
+.db-pill--warn{ background: rgba(245,158,11,0.16); color:#b45309; }
+
+.db-filter-tabs{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
+  width:100%;
+}
+.db-filter-tab{
+  border:1px solid #e5ddd3;
+  background:#fff;
+  color:#7a6a5a;
+  border-radius:12px;
+  padding:9px 12px;
+  cursor:pointer;
+  transition: background .2s, border-color .2s, color .2s, transform .2s;
+  text-align:left;
+  min-height:44px;
+}
+.db-filter-tab:hover{ background:#faf8f5; transform: translateY(-1px); }
+.db-filter-tab--active{
+  background:#0f172a;
+  border-color:#0f172a;
+  color:#fff;
+}
+.db-filter-tab-label{ display:block; font-size:12.5px; font-weight:900; line-height:1.1; }
+.db-filter-tab-count{ display:block; font-size:11px; opacity:.68; margin-top:3px; }
+.db-status-select{
+  border:1px solid #e5ddd3;
+  background:#fff;
+  border-radius:10px;
+  padding:8px 10px;
+  font-size:12px;
+  font-weight:800;
+  color:#1a1a2e;
+  outline:none;
+  min-height:36px;
+}
+.db-status-select:focus{
+  border-color: rgba(201,168,76,0.7);
+  box-shadow: 0 0 0 3px rgba(201,168,76,0.15);
+}
+.db-status-select:disabled{ opacity:.55; cursor:not-allowed; }
 
 .db-table{ width:100%; border-collapse:collapse; }
 .db-table th{
@@ -824,7 +980,7 @@ export default function TeachersPage() {
         <div className="row">
           <Sidebar sidebarOpen={sidebarOpen} />
 
-          <main className="col-md-9 col-lg-10 ms-auto db-main">
+          <main className="teacher-page-main db-main">
             {(loading || savingTeacher || creatingTeacher) && (
               <Loader
                 message={
@@ -854,8 +1010,8 @@ export default function TeachersPage() {
                   </h1>
 
                   <p className="db-hero-sub">
-                    Search teachers, view profiles, edit details, update class enrollment, and manage login credentials
-                    securely.
+                    Search teachers, view profiles, edit details, update class enrollment, manage login credentials,
+                    and control staff access when a teacher is suspended, inactive, or has resigned.
                   </p>
 
                   <div className="db-hero-btns">
@@ -890,6 +1046,9 @@ export default function TeachersPage() {
                       />
                       Refresh
                     </button>
+                    <button className="db-btn-outline" onClick={() => setShowImportPanel(v => !v)} disabled={loading}>
+                      {showImportPanel ? "Close Import" : "Import Teachers"}
+                    </button>
                   </div>
                 </div>
 
@@ -905,13 +1064,13 @@ export default function TeachersPage() {
                   </div>
                   <div className="db-hero-stat-sep" />
                   <div className="db-hero-stat-item">
-                    <span className="db-hero-stat-label">Male</span>
-                    <span className="db-hero-stat-val">{maleCount}</span>
+                    <span className="db-hero-stat-label">Suspended</span>
+                    <span className="db-hero-stat-val">{suspendedCount}</span>
                   </div>
                   <div className="db-hero-stat-sep" />
                   <div className="db-hero-stat-item">
-                    <span className="db-hero-stat-label">Female</span>
-                    <span className="db-hero-stat-val">{femaleCount}</span>
+                    <span className="db-hero-stat-label">Inactive</span>
+                    <span className="db-hero-stat-val">{inactiveCount}</span>
                   </div>
 
                   <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
@@ -928,8 +1087,8 @@ export default function TeachersPage() {
               {[
                 { title: "Teachers (Page)", value: totalTeachers, color: "#1e40af", bg: "#dbeafe", hint: "loaded in current view" },
                 { title: "Active", value: activeCount, color: "#15803d", bg: "#dcfce7", hint: "status active" },
-                { title: "Male", value: maleCount, color: "#0369a1", bg: "#e0f2fe", hint: "gender: male" },
-                { title: "Female", value: femaleCount, color: "#be123c", bg: "#ffe4e6", hint: "gender: female" },
+                { title: "Suspended", value: suspendedCount, color: "#b45309", bg: "#fef3c7", hint: "temporarily blocked" },
+                { title: "Inactive / Resigned", value: inactiveCount + resignedCount, color: "#475569", bg: "#e2e8f0", hint: "not in active service" },
               ].map((c, i) => (
                 <div
                   className="db-stat"
@@ -951,14 +1110,13 @@ export default function TeachersPage() {
                         </svg>
                       ) : i === 2 ? (
                         <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                          <path d="M10 2v16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" opacity="0.35" />
-                          <path d="M6 8a4 4 0 118 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                          <path d="M4 10h12" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                          <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.2" opacity="0.35" />
                         </svg>
                       ) : (
                         <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                          <path d="M10 2v16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" opacity="0.35" />
-                          <path d="M6 6h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                          <path d="M10 6v6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                          <path d="M6 5h8M6 10h8M6 15h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                          <path d="M14 14l2 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                         </svg>
                       )}
                     </div>
@@ -1028,6 +1186,31 @@ export default function TeachersPage() {
                     </div>
                   </div>
 
+                  <div className="db-filter-tabs">
+                    {teacherLifecycleOptions.map((option) => {
+                      const count =
+                        option.value === "all"
+                          ? activeCount + suspendedCount + inactiveCount + resignedCount
+                          : statusCounts[option.value];
+                      return (
+                        <button
+                          key={option.value}
+                          className={`db-filter-tab ${
+                            teacherStatusFilter === option.value ? "db-filter-tab--active" : ""
+                          }`}
+                          onClick={() => {
+                            setTeacherStatusFilter(option.value);
+                            setPage(1);
+                          }}
+                          title={option.hint}
+                        >
+                          <span className="db-filter-tab-label">{option.label}</span>
+                          <span className="db-filter-tab-count">{count} teacher(s)</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
                   <div className="db-actions" style={{ marginLeft: "auto" }}>
                     {search.trim() ? (
                       <button
@@ -1045,9 +1228,14 @@ export default function TeachersPage() {
                     <button className="db-mini-btn db-mini-btn--p" onClick={openAddTeacherModal}>
                       + Add Teacher
                     </button>
+                    <button className="db-mini-btn" onClick={() => setShowImportPanel(v => !v)}>
+                      {showImportPanel ? "Close Import" : "Import"}
+                    </button>
                   </div>
                 </div>
               </div>
+
+              {showImportPanel && <PeopleImportPanel kind="teachers" onImported={fetchTeachers} />}
 
               <div style={{ overflowX: "auto" }}>
                 <table className="db-table">
@@ -1078,7 +1266,7 @@ export default function TeachersPage() {
                       </tr>
                     ) : (
                       teachers.map((t) => {
-                        const statusOk = safeStatusActive(t.status);
+                        const lifecycleStatus = normalizeTeacherLifecycle(t);
                         const className = t.level?.name || t.teacher_enrollment?.level?.name || "—";
                         return (
                           <tr key={t.id}>
@@ -1111,13 +1299,27 @@ export default function TeachersPage() {
                             </td>
 
                             <td>
-                              <span className={`db-pill ${statusOk ? "db-pill--ok" : "db-pill--no"}`}>
-                                {statusOk ? "Active" : "Inactive"}
+                              <span className={`db-pill ${teacherLifecyclePillClass(lifecycleStatus)}`}>
+                                {teacherLifecycleLabel(lifecycleStatus)}
                               </span>
                             </td>
 
                             <td style={{ textAlign: "right" }}>
                               <div style={{ display: "inline-flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                                <select
+                                  className="db-status-select"
+                                  value={lifecycleStatus}
+                                  disabled={updatingLifecycleId === t.id}
+                                  onChange={(e) =>
+                                    updateTeacherLifecycle(t, e.target.value as TeacherLifecycleStatus)
+                                  }
+                                  title="Change teacher access status"
+                                >
+                                  <option value="active">Active</option>
+                                  <option value="suspended">Suspended</option>
+                                  <option value="inactive">Inactive</option>
+                                  <option value="resigned">Resigned</option>
+                                </select>
                                 <button className="db-mini-btn db-mini-btn--p" onClick={() => openTeacher(t)}>
                                   View
                                 </button>
@@ -1642,7 +1844,30 @@ export default function TeachersPage() {
                             </div>
                             <div className="db-kv">
                               <div className="db-kv-label">Status</div>
-                              <div className="db-kv-val">{safeStatusActive(teacherDetails.teacher?.status) ? "Active" : "Inactive"}</div>
+                              <div className="db-kv-val" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                                <span className={`db-pill ${teacherLifecyclePillClass(normalizeTeacherLifecycle(teacherDetails.teacher))}`}>
+                                  {teacherLifecycleLabel(normalizeTeacherLifecycle(teacherDetails.teacher))}
+                                </span>
+                                <select
+                                  className="db-status-select"
+                                  value={normalizeTeacherLifecycle(teacherDetails.teacher)}
+                                  disabled={updatingLifecycleId === teacherDetails.teacher?.id}
+                                  onChange={(e) =>
+                                    updateTeacherLifecycle(teacherDetails.teacher, e.target.value as TeacherLifecycleStatus)
+                                  }
+                                  title="Change teacher access status"
+                                >
+                                  <option value="active">Active</option>
+                                  <option value="suspended">Suspended</option>
+                                  <option value="inactive">Inactive</option>
+                                  <option value="resigned">Resigned</option>
+                                </select>
+                              </div>
+                              {teacherDetails.teacher?.teacher_status_reason ? (
+                                <div className="db-muted" style={{ marginTop: 6 }}>
+                                  Reason: {teacherDetails.teacher.teacher_status_reason}
+                                </div>
+                              ) : null}
                             </div>
                           </div>
                         )}

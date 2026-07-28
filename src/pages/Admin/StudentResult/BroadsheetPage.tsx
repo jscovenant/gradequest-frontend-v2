@@ -24,6 +24,7 @@ type BroadsheetSubject = { id: number; name: string };
 
 type SubjectCell = {
   ca: any;
+  ca_total: number | null;
   exam: number | null;
   total: number | null;
   effective_total: number | null;
@@ -96,10 +97,26 @@ function formatNum(n: number | null | undefined) {
   return String(n);
 }
 
+function rowTotalScore(row: BroadsheetRow, subjectIds: string[], includePrevious: boolean) {
+  return subjectIds.reduce((sum, sid) => {
+    const cell = row.subjects[sid];
+    const score = includePrevious ? cell?.effective_total : cell?.total;
+    return sum + (Number.isFinite(Number(score)) ? Number(score) : 0);
+  }, 0);
+}
+
 function csvEscape(v: any) {
   const s = String(v ?? "");
   if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;
+}
+
+function excelEscape(v: any) {
+  return String(v ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function isValidNumberString(s: string) {
@@ -232,39 +249,56 @@ export default function BroadsheetPage() {
   }
 
   // ✅ Export CSV (client-side): exports whatever is currently loaded (including filtered rows).
-  function exportCSVClient() {
+  function broadsheetExportRows() {
     if (!data) return;
 
     const headers = [
       "Reg No",
       "Name",
-      ...data.subjects.map((s) => `${s.name} (Total)`),
-      ...data.subjects.map((s) => `${s.name} (Pos)`),
+      ...data.subjects.flatMap((s) => [
+        `${s.name} (CA)`,
+        `${s.name} (Exam)`,
+        `${s.name} (Total)`,
+        `${s.name} (Grade)`,
+      ]),
+      "Total Score",
       "Average",
+      "Overall Grade",
       "Overall Pos",
     ];
 
     const rows = data.rows.map((r) => {
-      const totals = subjectIds.map((sid) => {
+      const subjectScores = subjectIds.flatMap((sid) => {
         const cell = r.subjects[sid];
         const total = includePrevious ? cell?.effective_total : cell?.total;
-        return formatNum(total);
-      });
-
-      const positions = subjectIds.map((sid) => {
-        const cell = r.subjects[sid];
-        return cell?.position ?? "-";
+        return [
+          formatNum(cell?.ca_total),
+          formatNum(cell?.exam),
+          formatNum(total),
+          cell?.grade || "-",
+        ];
       });
 
       return [
         r.reg_no || "-",
         r.name,
-        ...totals,
-        ...positions,
+        ...subjectScores,
+        formatNum(rowTotalScore(r, subjectIds, includePrevious)),
         formatNum(r.overall.average),
+        r.overall.grade || "-",
         r.overall.position ?? "-",
       ];
     });
+
+    return { headers, rows };
+  }
+
+  function exportCSVClient() {
+    if (!data) return;
+    const exportData = broadsheetExportRows();
+    if (!exportData) return;
+
+    const { headers, rows } = exportData;
 
     const csv = [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
 
@@ -283,6 +317,46 @@ export default function BroadsheetPage() {
     URL.revokeObjectURL(url);
   }
 
+  function exportExcelClient() {
+    if (!data) return;
+    const exportData = broadsheetExportRows();
+    if (!exportData) return;
+
+    const { headers, rows } = exportData;
+    const title = `Broadsheet Batch ${data.batch.id} - ${data.batch.term} - ${data.batch.session}`;
+    const html = `
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <style>
+            table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px; }
+            th, td { border: 1px solid #999; padding: 6px 8px; white-space: nowrap; }
+            th { background: #f2f2f2; font-weight: bold; }
+            .title { font-size: 16px; font-weight: bold; background: #050008; color: #ffffff; }
+          </style>
+        </head>
+        <body>
+          <table>
+            <tr><td class="title" colspan="${headers.length}">${excelEscape(title)}</td></tr>
+            <tr>${headers.map((h) => `<th>${excelEscape(h)}</th>`).join("")}</tr>
+            ${rows.map((row) => `<tr>${row.map((cell) => `<td>${excelEscape(cell)}</td>`).join("")}</tr>`).join("")}
+          </table>
+        </body>
+      </html>
+    `;
+
+    const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const suffix = filterSubjectId ? `_filtered_subject_${filterSubjectId}` : "";
+    a.href = url;
+    a.download = `broadsheet_batch_${data.batch.id}_${data.batch.term}_${data.batch.session}${suffix}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   const clearSubjectFilter = () => {
     setFilterSubjectId("");
     setMinScore("");
@@ -292,55 +366,41 @@ export default function BroadsheetPage() {
 
   return (
     <>
+      <style>{`
+        .bs-hero{background:linear-gradient(135deg,var(--gq-dark,#050008),#180820);border-radius:14px;box-shadow:0 18px 42px rgba(5,0,8,.12)}
+        .bs-pill{background:rgba(255,255,255,.08)!important;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.82)!important}
+        .bs-pill-gold{background:rgba(255,200,87,.16)!important;border:1px solid rgba(255,200,87,.26);color:var(--gq-secondary,#ffc857)!important}
+        .bs-panel{background:rgba(255,255,255,.06)!important;border:1px solid rgba(255,255,255,.1)!important;border-radius:14px!important}
+        .bs-card{border:1px solid var(--gq-border,rgba(5,0,8,.09))!important;border-radius:14px!important;box-shadow:0 10px 28px rgba(5,0,8,.045)!important}
+        .bs-btn-primary{background:var(--gq-primary,#d300b0)!important;border-color:var(--gq-primary,#d300b0)!important;color:#fff!important}
+        .bs-btn-gold{background:var(--gq-secondary,#ffc857)!important;border-color:var(--gq-secondary,#ffc857)!important;color:var(--gq-dark,#050008)!important}
+        .bs-btn-soft{background:var(--gq-surface-soft,#fbf7f8)!important;border-color:rgba(5,0,8,.08)!important;color:#5f5147!important}
+        .bs-table-wrap{border:1px solid rgba(5,0,8,.07);border-radius:14px;overflow:auto;max-height:70vh}
+        .bs-table thead{position:sticky;top:0;z-index:2}.bs-table thead th{background:var(--gq-surface-soft,#fbf7f8)!important;color:#74675e!important;border-bottom:1px solid rgba(5,0,8,.08)!important}
+        .bs-table td{border-bottom:1px solid rgba(5,0,8,.06)!important}.bs-total-badge{background:var(--gq-primary,#d300b0)!important}.bs-highlight{background:rgba(211,0,176,.06)!important}
+      `}</style>
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       <PageTitle title="Broadsheet" />
 
       <div className="container-fluid">
         <div className="row">
-          <Sidebar sidebarOpen={sidebarOpen} />
+          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-          <main className="col-md-9 col-lg-10 ms-auto px-4 d-flex flex-column min-vh-100" style={{ backgroundColor: "#f8f9fa" }}>
+          <main className="col-md-9 col-lg-10 ms-auto gq-app-main d-flex flex-column">
             {(loading || computing) && <Loader message={computing ? "Computing broadsheet..." : "Loading broadsheet..."} />}
 
             {/* HERO */}
             <div
-              className="mt-4 p-4 position-relative overflow-hidden"
+              className="bs-hero mt-4 p-4 position-relative overflow-hidden"
               style={{
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                 borderRadius: 16,
-                boxShadow: "0 10px 30px rgba(102, 126, 234, 0.3)",
               }}
             >
-              <div
-                style={{
-                  position: "absolute",
-                  top: "-50px",
-                  right: "-50px",
-                  width: 200,
-                  height: 200,
-                  background: "rgba(255, 255, 255, 0.10)",
-                  borderRadius: "50%",
-                  filter: "blur(40px)",
-                }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "-30px",
-                  left: "-30px",
-                  width: 150,
-                  height: 150,
-                  background: "rgba(255, 255, 255, 0.10)",
-                  borderRadius: "50%",
-                  filter: "blur(40px)",
-                }}
-              />
-
               <div className="row align-items-center position-relative g-3">
                 <div className="col-lg-8">
                   <div className="d-flex flex-wrap gap-2 align-items-center mb-2">
                     <span
-                      className="badge px-3 py-2"
+                      className="bs-pill badge px-3 py-2"
                       style={{
                         backgroundColor: "rgba(255, 255, 255, 0.2)",
                         color: "#fff",
@@ -354,7 +414,7 @@ export default function BroadsheetPage() {
                     </span>
 
                     <span
-                      className="badge px-3 py-2"
+                      className="bs-pill-gold badge px-3 py-2"
                       style={{
                         backgroundColor: "rgba(16, 185, 129, 0.9)",
                         color: "#fff",
@@ -369,7 +429,7 @@ export default function BroadsheetPage() {
 
                     {filterSubjectId && (
                       <span
-                        className="badge px-3 py-2"
+                        className="bs-pill badge px-3 py-2"
                         style={{
                           backgroundColor: "rgba(255,255,255,0.22)",
                           color: "#fff",
@@ -394,13 +454,8 @@ export default function BroadsheetPage() {
 
                 <div className="col-lg-4 d-none d-lg-block">
                   <div
-                    style={{
-                      background: "rgba(255, 255, 255, 0.15)",
-                      backdropFilter: "blur(10px)",
-                      borderRadius: 16,
-                      padding: "1.25rem",
-                      border: "1px solid rgba(255, 255, 255, 0.2)",
-                    }}
+                    className="bs-panel"
+                    style={{ backdropFilter: "blur(10px)", padding: "1.25rem" }}
                   >
                     <div className="d-flex align-items-center justify-content-between mb-3">
                       <span className="text-white" style={{ fontSize: "0.9rem", opacity: 0.9 }}>
@@ -452,7 +507,7 @@ export default function BroadsheetPage() {
             </div>
 
             {/* TOOLBAR */}
-            <div className="card border-0 shadow-sm mb-4 mt-3" style={{ borderRadius: 12 }}>
+            <div className="bs-card card border-0 mb-4 mt-3">
               <div className="card-body p-3 p-md-4 d-flex flex-wrap gap-3 align-items-center justify-content-between">
                 <div style={{ minWidth: 280 }}>
                   <div className="fw-semibold" style={{ color: "#1e293b" }}>
@@ -539,24 +594,24 @@ export default function BroadsheetPage() {
                   </select>
 
                   {filterSubjectId && (
-                    <button className="btn btn-outline-secondary" onClick={clearSubjectFilter} style={{ borderRadius: 10 }}>
+                    <button className="btn bs-btn-soft" onClick={clearSubjectFilter} style={{ borderRadius: 10 }}>
                       <i className="bi bi-x-circle me-1" />
                       Clear filter
                     </button>
                   )}
 
                   {/* actions */}
-                  <button className="btn btn-outline-secondary" onClick={() => navigate(-1)} style={{ borderRadius: 10 }}>
+                  <button className="btn bs-btn-soft" onClick={() => navigate(-1)} style={{ borderRadius: 10 }}>
                     <i className="bi bi-arrow-left me-1" />
                     Back
                   </button>
 
-                  <button className="btn btn-outline-primary" onClick={loadBroadsheet} disabled={loading || computing || !batchId} style={{ borderRadius: 10 }}>
+                  <button className="btn bs-btn-soft" onClick={loadBroadsheet} disabled={loading || computing || !batchId} style={{ borderRadius: 10 }}>
                     <i className="bi bi-arrow-clockwise me-1" />
                     {loading ? "Refreshing..." : "Refresh"}
                   </button>
 
-                  <button className="btn btn-primary" onClick={computeBroadsheet} disabled={computing || loading || !batchId} style={{ borderRadius: 10, fontWeight: 700 }}>
+                  <button className="btn bs-btn-primary" onClick={computeBroadsheet} disabled={computing || loading || !batchId} style={{ borderRadius: 10, fontWeight: 700 }}>
                     {computing ? (
                       <>
                         <span className="spinner-border spinner-border-sm me-2" />
@@ -570,9 +625,14 @@ export default function BroadsheetPage() {
                     )}
                   </button>
 
-                  <button className="btn btn-success" onClick={exportCSVClient} disabled={!data || loading || computing} style={{ borderRadius: 10, fontWeight: 700 }} title={!data ? "Load broadsheet first" : ""}>
+                  <button className="btn bs-btn-gold" onClick={exportExcelClient} disabled={!data || loading || computing} style={{ borderRadius: 10, fontWeight: 700 }} title={!data ? "Load broadsheet first" : ""}>
                     <i className="bi bi-download me-2" />
-                    Export CSV
+                    Export Excel
+                  </button>
+
+                  <button className="btn bs-btn-soft" onClick={exportCSVClient} disabled={!data || loading || computing} style={{ borderRadius: 10, fontWeight: 700 }} title={!data ? "Load broadsheet first" : ""}>
+                    <i className="bi bi-filetype-csv me-2" />
+                    CSV
                   </button>
                 </div>
               </div>
@@ -587,11 +647,11 @@ export default function BroadsheetPage() {
             </div>
 
             {/* TABLE */}
-            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
+            <div className="bs-card card border-0 mb-4">
               <div className="card-body p-0">
-                <div className="table-responsive" style={{ maxHeight: "70vh" }}>
-                  <table className="table table-hover mb-0 align-middle">
-                    <thead className="table-light" style={{ position: "sticky", top: 0, zIndex: 2 }}>
+                <div className="bs-table-wrap table-responsive">
+                  <table className="bs-table table table-hover mb-0 align-middle">
+                    <thead>
                       <tr className="text-muted small">
                         <th style={{ minWidth: 140 }} className="ps-4">
                           Reg No
@@ -599,13 +659,15 @@ export default function BroadsheetPage() {
                         <th style={{ minWidth: 260 }}>Name</th>
 
                         {data?.subjects.map((s) => (
-                          <th key={s.id} style={{ minWidth: 160 }}>
+                          <th key={s.id} style={{ minWidth: 230 }}>
                             <div className="fw-semibold">{s.name}</div>
-                            <div className="text-muted small">Total / Pos</div>
+                            <div className="text-muted small">CA / Exam / Total / Grade</div>
                           </th>
                         ))}
 
+                        <th style={{ minWidth: 130 }}>Total Score</th>
                         <th style={{ minWidth: 120 }}>Average</th>
+                        <th style={{ minWidth: 120 }}>Grade</th>
                         <th style={{ minWidth: 100 }} className="pe-4">
                           Pos
                         </th>
@@ -648,18 +710,24 @@ export default function BroadsheetPage() {
                             const isHighlighted = filterSubjectId && String(filterSubjectId) === sid;
 
                             return (
-                              <td key={`${r.student_result_id}-${sid}`}>
-                                <div className="d-flex flex-column">
-                                  <span className="fw-semibold" style={isHighlighted ? { color: "#0d6efd" } : undefined}>
-                                    {formatNum(total)}
-                                  </span>
-                                  <span className="text-muted small">Pos: {cell?.position ?? "-"}</span>
+                              <td key={`${r.student_result_id}-${sid}`} className={isHighlighted ? "bs-highlight" : undefined}>
+                                <div className="d-flex flex-column gap-1">
+                                  <div className="d-flex flex-wrap gap-1">
+                                    <span className="badge text-bg-light border">CA: {formatNum(cell?.ca_total)}</span>
+                                    <span className="badge text-bg-light border">Exam: {formatNum(cell?.exam)}</span>
+                                    <span className="bs-total-badge badge text-bg-primary">Total: {formatNum(total)}</span>
+                                  </div>
+                                  <div className="d-flex flex-wrap gap-1">
+                                    <span className="text-muted small">Grade: <b>{cell?.grade || "-"}</b></span>
+                                  </div>
                                 </div>
                               </td>
                             );
                           })}
 
+                          <td className="fw-semibold">{formatNum(rowTotalScore(r, subjectIds, includePrevious))}</td>
                           <td className="fw-semibold">{formatNum(r.overall.average)}</td>
+                          <td className="fw-semibold">{r.overall.grade || "-"}</td>
                           <td className="pe-4 fw-semibold">{r.overall.position ?? "-"}</td>
                         </tr>
                       ))}

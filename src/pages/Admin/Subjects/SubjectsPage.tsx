@@ -22,6 +22,7 @@ type Subject = {
   school_id?: number;
   created_at?: string;
   updated_at?: string;
+  archived_at?: string | null;
 
   section?: { id: number; name: string } | null;
   department?: { id: number; name: string } | null;
@@ -80,6 +81,7 @@ export default function SubjectsPage() {
   // selection / ui
   const [departmentId, setDepartmentId] = useState<string>("");
   const [query, setQuery] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
   // modals
@@ -138,7 +140,7 @@ export default function SubjectsPage() {
 
     try {
       setLoadingSubjects(true);
-      const res = await authApi.get<Subject[]>(`/departments/${depId}/subjects`);
+      const res = await authApi.get<Subject[]>(`/departments/${depId}/subjects`, { params: showArchived ? { archived: 1 } : undefined });
       const list = Array.isArray(res.data) ? res.data : [];
 
       setSubjects(list);
@@ -172,7 +174,7 @@ export default function SubjectsPage() {
       setQuery("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [departmentId]);
+  }, [departmentId, showArchived]);
 
   /* =========================
      DERIVED
@@ -262,6 +264,38 @@ export default function SubjectsPage() {
       setShowEdit(false);
       setEditId(null);
       setEditName("");
+      if (departmentId) await fetchSubjects(departmentId);
+    } catch (err: any) {
+      showError(getErrorMessage(err));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function archiveSubject(subject: Subject) {
+    const ok = window.confirm(
+      `Archive "${subject.name}"?\n\nArchived subjects will be hidden from future result entry and template downloads, but old student results will remain safe.`
+    );
+
+    if (!ok) return;
+
+    try {
+      setBusyKey(`subject:archive:${subject.id}`);
+      const res = await authApi.delete(`/subjects/${subject.id}`);
+      showSuccess(res.data?.message ?? "Subject archived successfully.");
+      if (departmentId) await fetchSubjects(departmentId);
+    } catch (err: any) {
+      showError(getErrorMessage(err));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function restoreSubject(subject: Subject) {
+    try {
+      setBusyKey(`subject:restore:${subject.id}`);
+      const res = await authApi.post(`/subjects/${subject.id}/restore`);
+      showSuccess(res.data?.message ?? "Subject restored successfully.");
       if (departmentId) await fetchSubjects(departmentId);
     } catch (err: any) {
       showError(getErrorMessage(err));
@@ -673,6 +707,7 @@ export default function SubjectsPage() {
         .db-action-primary { border-color: rgba(30, 64, 175, 0.25); color: #1e40af; }
         .db-action-gold    { border-color: rgba(180, 83, 9, 0.25); color: #b45309; }
         .db-action-green   { border-color: rgba(6, 95, 70, 0.25); color: #065f46; }
+        .db-action-danger  { border-color: rgba(185, 28, 28, 0.25); color: #b91c1c; }
 
         .db-helper-row {
           display:flex;
@@ -910,7 +945,7 @@ export default function SubjectsPage() {
                     <button
                       className="db-btn-gold"
                       onClick={() => setShowCreate(true)}
-                      disabled={!departmentId || busyKey !== null}
+                      disabled={showArchived || !departmentId || busyKey !== null}
                       title={!departmentId ? "Select a department first" : ""}
                       type="button"
                     >
@@ -1120,33 +1155,46 @@ export default function SubjectsPage() {
 
                   <button
                     className="db-chip-btn"
-                    onClick={() => setShowCreate(true)}
-                    disabled={!departmentId || busyKey !== null}
-                    title={!departmentId ? "Select a department first" : ""}
+                    onClick={() => setShowArchived((v) => !v)}
+                    disabled={busyKey !== null}
                     type="button"
                   >
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                      <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                    </svg>
-                    Add
+                    {showArchived ? "Show Active" : "View Archived"}
                   </button>
 
-                  <button
-                    className="db-chip-btn"
-                    onClick={() => setShowAssign(true)}
-                    disabled={!departmentId || selectedCount === 0 || busyKey !== null}
-                    title={selectedCount === 0 ? "Select subjects first" : ""}
-                    type="button"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                      <path d="M7 8h6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                      <path d="M6.5 6.3l7 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                      <path d="M6.5 9.7l7-5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                      <circle cx="6" cy="8" r="2.1" stroke="currentColor" strokeWidth="1.4" />
-                      <circle cx="14" cy="8" r="2.1" stroke="currentColor" strokeWidth="1.4" />
-                    </svg>
-                    Assign ({selectedCount})
-                  </button>
+                  {!showArchived ? (
+                    <>
+                      <button
+                        className="db-chip-btn"
+                        onClick={() => setShowCreate(true)}
+                        disabled={!departmentId || busyKey !== null}
+                        title={!departmentId ? "Select a department first" : ""}
+                        type="button"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                          <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                        </svg>
+                        Add
+                      </button>
+
+                      <button
+                        className="db-chip-btn"
+                        onClick={() => setShowAssign(true)}
+                        disabled={!departmentId || selectedCount === 0 || busyKey !== null}
+                        title={selectedCount === 0 ? "Select subjects first" : ""}
+                        type="button"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                          <path d="M7 8h6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                          <path d="M6.5 6.3l7 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                          <path d="M6.5 9.7l7-5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                          <circle cx="6" cy="8" r="2.1" stroke="currentColor" strokeWidth="1.4" />
+                          <circle cx="14" cy="8" r="2.1" stroke="currentColor" strokeWidth="1.4" />
+                        </svg>
+                        Assign ({selectedCount})
+                      </button>
+                    </>
+                  ) : null}
                 </div>
               </div>
 
@@ -1187,7 +1235,7 @@ export default function SubjectsPage() {
                           type="checkbox"
                           className="db-checkbox"
                           checked={allFilteredSelected}
-                          disabled={!departmentId || filteredSubjects.length === 0}
+                          disabled={showArchived || !departmentId || filteredSubjects.length === 0}
                           onChange={(e) => {
                             if (!departmentId) return;
                             if (e.target.checked) selectAllFiltered();
@@ -1228,6 +1276,8 @@ export default function SubjectsPage() {
                     ) : (
                       pageRows.map((s) => {
                         const busyEdit = isBusy(`subject:update:${s.id}`);
+                        const busyArchive = isBusy(`subject:archive:${s.id}`);
+                        const busyRestore = isBusy(`subject:restore:${s.id}`);
                         return (
                           <tr key={s.id}>
                             <td>
@@ -1236,7 +1286,8 @@ export default function SubjectsPage() {
                                 className="db-checkbox"
                                 checked={!!selectedIds[s.id]}
                                 onChange={() => toggleSelect(s.id)}
-                                title="Select subject"
+                                disabled={showArchived}
+                                title={showArchived ? "Archived subjects cannot be assigned" : "Select subject"}
                               />
                             </td>
 
@@ -1260,7 +1311,7 @@ export default function SubjectsPage() {
 
                             <td style={{ textAlign: "right" }}>
                               <div className="db-actions">
-                                <button className="db-action-btn db-action-primary" onClick={() => openEdit(s)} disabled={busyKey !== null} type="button">
+                                <button className="db-action-btn db-action-primary" onClick={() => openEdit(s)} disabled={showArchived || busyKey !== null} type="button">
                                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                                     <path
                                       d="M3 11.5V13h1.5L12.8 4.7 11.3 3.2 3 11.5z"
@@ -1271,6 +1322,28 @@ export default function SubjectsPage() {
                                     <path d="M10.6 3.9l1.5 1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
                                   </svg>
                                   Edit
+                                </button>
+
+                                <button
+                                  className={`db-action-btn ${showArchived ? "db-action-green" : "db-action-danger"}`}
+                                  onClick={() => (showArchived ? restoreSubject(s) : archiveSubject(s))}
+                                  disabled={busyKey !== null}
+                                  type="button"
+                                  title={showArchived ? "Restore subject" : "Archive subject"}
+                                >
+                                  {showArchived ? (
+                                    busyRestore ? "Restoring..." : "Restore"
+                                  ) : busyArchive ? (
+                                    <>
+                                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ animation: "dbSpin .9s linear infinite" }}>
+                                        <path d="M12 7A5 5 0 112 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                                        <path d="M12 3v4h-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                                      </svg>
+                                      Archiving...
+                                    </>
+                                  ) : (
+                                    "Archive"
+                                  )}
                                 </button>
 
                                 {busyEdit && (

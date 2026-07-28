@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { authApi } from "../../../utils/axios";
 
 import TopNav from "../../../components/LayoutComponents/TopNav";
@@ -7,9 +8,6 @@ import Footer from "../../../components/LayoutComponents/Footer";
 import Loader from "../../../components/ui/dashboardLoader";
 import PageTitle from "../../../components/PageTitle";
 
-/* =========================
-   TYPES
-========================= */
 type SubjectRow = {
   id: number;
   name: string;
@@ -22,37 +20,23 @@ type MySubjectsResponse = {
   subjects: SubjectRow[];
 };
 
-interface StatCard {
-  title: string;
-  value: string | number;
-  icon: string;
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
 }
 
 export default function StudentMySubjectsPage() {
-  // ===== Sidebar State =====
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  // ===== Loading & Error =====
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
-
-  // ===== Data =====
   const [department, setDepartment] = useState<string | null>(null);
   const [subjects, setSubjects] = useState<SubjectRow[]>([]);
   const [serverMsg, setServerMsg] = useState("");
-
-  // ===== Search =====
   const [search, setSearch] = useState("");
 
-  // ===== Stats =====
-  const [stats, setStats] = useState<StatCard[]>([
-    { title: "Department", value: "—", icon: "diagram-3" },
-    { title: "Total Subjects", value: 0, icon: "book" },
-    { title: "Showing", value: 0, icon: "filter" },
-    { title: "Search", value: "Off", icon: "search" },
-  ]);
-
-  // ===== Fetch Subjects =====
   useEffect(() => {
     let mounted = true;
     setLoading(true);
@@ -62,19 +46,12 @@ export default function StudentMySubjectsPage() {
       .get<MySubjectsResponse>("/student/my-subjects")
       .then((res) => {
         if (!mounted) return;
-
-        const dep = res.data?.department ?? null;
-        const subs = res.data?.subjects ?? [];
-        const msg = res.data?.message ?? "";
-
-        setDepartment(dep);
-        setSubjects(subs);
-        setServerMsg(msg);
+        setDepartment(res.data?.department ?? null);
+        setSubjects(Array.isArray(res.data?.subjects) ? res.data.subjects : []);
+        setServerMsg(res.data?.message ?? "");
       })
       .catch((err) => {
-        console.error(err);
         if (!mounted) return;
-
         setErrorMsg(err?.response?.data?.message || "Failed to load subjects.");
         setSubjects([]);
         setDepartment(null);
@@ -91,375 +68,133 @@ export default function StudentMySubjectsPage() {
     const q = search.trim().toLowerCase();
     if (!q) return subjects;
 
-    return subjects.filter((s) => {
-      const name = (s.name || "").toLowerCase();
-      const code = (s.subject_id || "").toLowerCase();
+    return subjects.filter((subject) => {
+      const name = (subject.name || "").toLowerCase();
+      const code = (subject.subject_id || "").toLowerCase();
       return name.includes(q) || code.includes(q);
     });
   }, [subjects, search]);
 
-  // keep stats synced
-  useEffect(() => {
-    setStats([
-      { title: "Department", value: department || "—", icon: "diagram-3" },
-      { title: "Total Subjects", value: subjects.length, icon: "book" },
-      { title: "Showing", value: filtered.length, icon: "filter" },
-      { title: "Search", value: search.trim() ? "On" : "Off", icon: "search" },
-    ]);
-  }, [department, subjects.length, filtered.length, search]);
-
-  // Get current time greeting
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good Morning";
-    if (hour < 17) return "Good Afternoon";
-    return "Good Evening";
-  };
-
   return (
     <>
+      <style>{`
+        .sp-hero{background:linear-gradient(135deg,var(--gq-dark,#050008),#180820);border-radius:14px;padding:26px;position:relative;overflow:hidden;color:#fff;box-shadow:0 18px 42px rgba(5,0,8,.12);margin-bottom:18px}
+        .sp-hero:before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle,rgba(255,255,255,.045) 1px,transparent 1px);background-size:22px 22px}
+        .sp-hero-inner{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:20px;align-items:center}
+        .sp-pill-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.sp-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);font-size:11.5px;color:rgba(255,255,255,.78)}
+        .sp-title{font-size:clamp(24px,3vw,34px);font-weight:900;letter-spacing:0;margin:0 0 8px}.sp-title span{color:var(--gq-secondary,#ffc857)}
+        .sp-sub{font-size:13.5px;color:rgba(255,255,255,.64);line-height:1.65;max-width:650px;margin:0}
+        .sp-panel{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:18px}.sp-panel-row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08)}.sp-panel-row:last-child{border-bottom:0}.sp-panel-label{font-size:11.5px;color:rgba(255,255,255,.5)}.sp-panel-value{font-size:14px;font-weight:850;color:var(--gq-secondary,#ffc857);text-align:right}
+        .sp-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}.sp-card{background:#fff;border:1px solid var(--gq-border,rgba(5,0,8,.09));border-radius:14px;box-shadow:0 10px 28px rgba(5,0,8,.045);min-width:0}.sp-stat{padding:16px}.sp-stat-icon{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;background:rgba(211,0,176,.08);color:var(--gq-primary,#d300b0)}.sp-stat-label{font-size:11.5px;color:#8a7d72;margin:0 0 5px}.sp-stat-value{font-size:22px;font-weight:900;color:var(--gq-dark,#050008);margin:0}.sp-stat-sub{font-size:11.5px;color:#a3978d;margin-top:6px}
+        .sp-card-pad{padding:18px}.sp-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.sp-card-title{font-size:15px;font-weight:900;color:var(--gq-dark,#050008);margin:0}.sp-card-sub{font-size:12px;color:#8a7d72;margin:2px 0 0}
+        .sp-search{display:flex;gap:10px;align-items:center}.sp-input-wrap{flex:1;position:relative}.sp-input-wrap i{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:#9b8f86}.sp-input{width:100%;height:42px;border:1px solid rgba(5,0,8,.09);border-radius:10px;padding:0 14px 0 38px;outline:none}.sp-input:focus{border-color:rgba(211,0,176,.4);box-shadow:0 0 0 4px rgba(211,0,176,.08)}
+        .sp-btn{border:0;border-radius:10px;padding:10px 15px;font-size:13px;font-weight:750;display:inline-flex;align-items:center;gap:8px;text-decoration:none;cursor:pointer}.sp-btn-gold{background:var(--gq-secondary,#ffc857);color:var(--gq-dark,#050008)}.sp-btn-soft{background:var(--gq-surface-soft,#fbf7f8);color:#5f5147;border:1px solid rgba(5,0,8,.08)}
+        .sp-subjects{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.sp-subject{padding:16px;transition:transform .18s ease,box-shadow .18s ease}.sp-subject:hover{transform:translateY(-3px);box-shadow:0 16px 34px rgba(5,0,8,.07)}.sp-subject-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.sp-subject-icon{width:42px;height:42px;border-radius:12px;background:rgba(255,200,87,.16);color:#b77900;display:flex;align-items:center;justify-content:center;flex:0 0 auto}.sp-subject-name{font-size:15px;font-weight:900;color:var(--gq-dark,#050008);margin:0}.sp-subject-code{font-size:12px;color:#8a7d72;margin:2px 0 0}.sp-subject-foot{display:flex;justify-content:space-between;align-items:center;margin-top:18px;padding-top:12px;border-top:1px solid rgba(5,0,8,.06);font-size:12px;color:#7a6a5a}
+        .sp-empty,.sp-error{border-radius:12px;padding:18px;font-size:13px}.sp-empty{border:1px dashed rgba(5,0,8,.14);background:var(--gq-surface-soft,#fbf7f8);color:#7a6a5a;text-align:center}.sp-error{background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.18);color:#b91c1c;margin-bottom:16px}
+        @media(max-width:1199.98px){.sp-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sp-subjects{grid-template-columns:repeat(2,minmax(0,1fr))}.sp-hero-inner{grid-template-columns:1fr}}
+        @media(max-width:575.98px){.sp-hero{padding:20px}.sp-grid,.sp-subjects{grid-template-columns:1fr}.sp-search{align-items:stretch;flex-direction:column}.sp-panel{display:none}.sp-btn{justify-content:center;width:100%}}
+      `}</style>
+
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       <PageTitle title="My Subjects" />
 
       <div className="container-fluid">
         <div className="row">
-          <Sidebar sidebarOpen={sidebarOpen} />
+          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-          <main
-            className="col-md-9 col-lg-10 ms-auto px-4 d-flex flex-column min-vh-100"
-            style={{ backgroundColor: "#f8f9fa" }}
-          >
+          <main className="col-md-9 col-lg-10 ms-auto gq-app-main d-flex flex-column">
             {loading && <Loader message="Loading subjects..." />}
+            {errorMsg && <div className="sp-error"><i className="bi bi-exclamation-circle me-2" />{errorMsg}</div>}
 
-            {/* Hero Section (same color template) */}
-            <div
-              className="mt-4 p-4 position-relative overflow-hidden"
-              style={{
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                borderRadius: "16px",
-                boxShadow: "0 10px 30px rgba(102, 126, 234, 0.3)",
-              }}
-            >
-              {/* Decorative elements */}
-              <div
-                style={{
-                  position: "absolute",
-                  top: "-50px",
-                  right: "-50px",
-                  width: "200px",
-                  height: "200px",
-                  background: "rgba(255, 255, 255, 0.1)",
-                  borderRadius: "50%",
-                  filter: "blur(40px)",
-                }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "-30px",
-                  left: "-30px",
-                  width: "150px",
-                  height: "150px",
-                  background: "rgba(255, 255, 255, 0.1)",
-                  borderRadius: "50%",
-                  filter: "blur(40px)",
-                }}
-              />
-
-              <div className="row align-items-center position-relative">
-                <div className="col-md-8">
-                  <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
-                    <span
-                      className="badge px-3 py-2"
-                      style={{
-                        backgroundColor: "rgba(255, 255, 255, 0.2)",
-                        color: "#fff",
-                        borderRadius: "20px",
-                        fontSize: "0.75rem",
-                        fontWeight: "500",
-                      }}
-                    >
-                      <i className="bi bi-diagram-3 me-1"></i>
-                      {department || "Department —"}
-                    </span>
-
-                    <span
-                      className="badge px-3 py-2"
-                      style={{
-                        backgroundColor: "rgba(16, 185, 129, 0.9)",
-                        color: "#fff",
-                        borderRadius: "20px",
-                        fontSize: "0.75rem",
-                        fontWeight: "500",
-                      }}
-                    >
-                      <i className="bi bi-check-circle-fill me-1"></i>
-                      Student Account
-                    </span>
+            <section className="sp-hero">
+              <div className="sp-hero-inner">
+                <div>
+                  <div className="sp-pill-row">
+                    <span className="sp-pill"><i className="bi bi-diagram-3" />{department || "Department not assigned"}</span>
+                    <span className="sp-pill"><i className="bi bi-book" />{subjects.length} subject{subjects.length === 1 ? "" : "s"}</span>
                   </div>
-
-                  <h2 className="fw-bold text-white mb-2">{getGreeting()}, Student! 👋</h2>
-                  <p className="text-white mb-0" style={{ opacity: 0.9, fontSize: "1rem" }}>
-                    Here are the subjects available in your department. Use search to find any subject quickly.
-                  </p>
-
-                  {!!serverMsg && (
-                    <div className="mt-3">
-                      <span
-                        className="badge px-3 py-2"
-                        style={{
-                          backgroundColor: "rgba(255, 255, 255, 0.2)",
-                          color: "#fff",
-                          borderRadius: "20px",
-                          fontSize: "0.75rem",
-                          fontWeight: "500",
-                        }}
-                      >
-                        <i className="bi bi-info-circle me-1"></i>
-                        {serverMsg}
-                      </span>
-                    </div>
-                  )}
+                  <h1 className="sp-title">{greeting()}, <span>Student.</span></h1>
+                  <p className="sp-sub">See all subjects assigned to you. Use the search box to quickly find a subject by name or code.</p>
+                  {serverMsg && <div className="sp-pill-row mt-3"><span className="sp-pill"><i className="bi bi-info-circle" />{serverMsg}</span></div>}
                 </div>
 
-                <div className="col-md-4 d-none d-md-block text-end">
-                  <div
-                    style={{
-                      background: "rgba(255, 255, 255, 0.15)",
-                      backdropFilter: "blur(10px)",
-                      borderRadius: "16px",
-                      padding: "1.5rem",
-                      border: "1px solid rgba(255, 255, 255, 0.2)",
-                    }}
-                  >
-                    <div className="d-flex align-items-center justify-content-between mb-3">
-                      <span className="text-white" style={{ fontSize: "0.9rem", opacity: 0.9 }}>
-                        Quick Stats
-                      </span>
-                      <i className="bi bi-book-half text-white"></i>
-                    </div>
-                    <div className="d-flex flex-column gap-2">
-                      <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-white" style={{ fontSize: "0.85rem", opacity: 0.8 }}>
-                          Total Subjects
-                        </span>
-                        <span className="text-white fw-bold">{subjects.length}</span>
-                      </div>
-                      <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-white" style={{ fontSize: "0.85rem", opacity: 0.8 }}>
-                          Showing
-                        </span>
-                        <span className="text-white fw-bold">{filtered.length}</span>
-                      </div>
-                    </div>
-                  </div>
+                <div className="sp-panel">
+                  <div className="sp-panel-row"><span className="sp-panel-label">Department</span><span className="sp-panel-value">{department || "Not set"}</span></div>
+                  <div className="sp-panel-row"><span className="sp-panel-label">Subjects</span><span className="sp-panel-value">{subjects.length}</span></div>
+                  <div className="sp-panel-row"><span className="sp-panel-label">Showing</span><span className="sp-panel-value">{filtered.length}</span></div>
                 </div>
               </div>
-            </div>
+            </section>
 
-            {/* Error */}
-            {errorMsg && (
-              <div className="alert alert-danger mt-3" role="alert">
-                <i className="bi bi-exclamation-triangle me-2"></i>
-                {errorMsg}
-              </div>
-            )}
+            <section className="sp-grid">
+              {[
+                { label: "Department", value: department || "Not set", sub: "Your learning group", icon: "diagram-3" },
+                { label: "Total Subjects", value: subjects.length, sub: "Assigned to you", icon: "book" },
+                { label: "Showing", value: filtered.length, sub: "After search filter", icon: "filter" },
+                { label: "Search", value: search.trim() ? "On" : "Off", sub: "Find subjects faster", icon: "search" },
+              ].map((item) => (
+                <div className="sp-card sp-stat" key={item.label}>
+                  <div className="sp-stat-icon"><i className={`bi bi-${item.icon}`} /></div>
+                  <p className="sp-stat-label">{item.label}</p>
+                  <p className="sp-stat-value">{item.value}</p>
+                  <div className="sp-stat-sub">{item.sub}</div>
+                </div>
+              ))}
+            </section>
 
-            {/* Stats Cards (same color template) */}
-            <div className="row g-3 mb-4 mt-3">
-              {stats.map(({ title, value, icon }, index) => {
-                const colors = [
-                  {
-                    gradient: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                    icon: "#667eea",
-                    bg: "#f0edff",
-                  },
-                  {
-                    gradient: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-                    icon: "#f5576c",
-                    bg: "#fff0f3",
-                  },
-                  {
-                    gradient: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
-                    icon: "#00f2fe",
-                    bg: "#e6f9ff",
-                  },
-                  {
-                    gradient: "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)",
-                    icon: "#38f9d7",
-                    bg: "#e6fff9",
-                  },
-                ];
-
-                return (
-                  <div className="col-md-6 col-lg-3" key={title}>
-                    <div
-                      className="card border-0 h-100 position-relative overflow-hidden"
-                      style={{
-                        borderRadius: "12px",
-                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                        transition: "transform 0.2s, box-shadow 0.2s",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = "translateY(-4px)";
-                        e.currentTarget.style.boxShadow = "0 8px 20px rgba(0, 0, 0, 0.12)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.08)";
-                      }}
-                    >
-                      {/* Gradient accent */}
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          height: "4px",
-                          background: colors[index].gradient,
-                        }}
-                      />
-
-                      <div className="card-body p-4">
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                          <div className="p-2 rounded-3" style={{ backgroundColor: colors[index].bg }}>
-                            <i className={`bi bi-${icon} fs-4`} style={{ color: colors[index].icon }}></i>
-                          </div>
-                          <i className="bi bi-three-dots-vertical text-muted" style={{ cursor: "pointer" }}></i>
-                        </div>
-
-                        <p className="text-muted mb-1 small">{title}</p>
-                        <h3 className="fw-bold mb-0" style={{ color: "#1e293b" }}>
-                          {value}
-                        </h3>
-
-                        <div className="mt-3 pt-3" style={{ borderTop: "1px solid #f1f5f9" }}>
-                          <small className="text-muted d-flex align-items-center gap-1">
-                            <i className="bi bi-check-circle text-success"></i>
-                            Updated
-                          </small>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Search */}
-            <div className="card shadow-sm border-0 mb-3" style={{ borderRadius: "12px" }}>
-              <div className="card-body p-4">
-                <div className="row g-2 align-items-end">
-                  <div className="col-md-8">
-                    <label className="form-label small text-muted mb-1">Search subjects</label>
-                    <div className="input-group">
-                      <span className="input-group-text bg-white">
-                        <i className="bi bi-search"></i>
-                      </span>
-                      <input
-                        className="form-control"
-                        placeholder="Search by subject name or subject code"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="col-md-4 d-flex justify-content-md-end">
-                    <button className="btn btn-outline-secondary" onClick={() => setSearch("")} disabled={!search.trim()}>
-                      <i className="bi bi-x-circle me-1"></i>
-                      Clear
-                    </button>
-                  </div>
+            <section className="sp-card sp-card-pad mb-3">
+              <div className="sp-card-head">
+                <div>
+                  <h2 className="sp-card-title">Find a Subject</h2>
+                  <p className="sp-card-sub">Search by subject name or subject code.</p>
                 </div>
               </div>
-            </div>
+              <div className="sp-search">
+                <div className="sp-input-wrap">
+                  <i className="bi bi-search" />
+                  <input
+                    className="sp-input"
+                    placeholder="Example: Mathematics or MTH101"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                  />
+                </div>
+                <button className="sp-btn sp-btn-soft" onClick={() => setSearch("")} disabled={!search.trim()}>
+                  <i className="bi bi-x-circle" /> Clear
+                </button>
+                <button className="sp-btn sp-btn-gold" onClick={() => navigate("/dashboard")}>
+                  <i className="bi bi-speedometer2" /> Dashboard
+                </button>
+              </div>
+            </section>
 
-            {/* Subjects List */}
-            <div className="row g-3 mb-4">
+            <section className="sp-subjects mb-4">
               {!filtered.length ? (
-                <div className="col-12">
-                  <div className="card border-0 shadow-sm" style={{ borderRadius: "12px" }}>
-                    <div className="card-body p-5 text-center text-muted">
-                      <i className="bi bi-book fs-1 d-block mb-2"></i>
-                      <div className="fw-semibold">No subjects found</div>
-                      <small>Try changing your search term or contact the admin to confirm subject setup.</small>
-                    </div>
-                  </div>
+                <div className="sp-empty sp-card" style={{ gridColumn: "1 / -1" }}>
+                  <i className="bi bi-book fs-2 d-block mb-2" />
+                  <strong>No subjects found</strong>
+                  <div>Try another search word or contact the school if your subjects are missing.</div>
                 </div>
               ) : (
-                filtered.map((s) => (
-                  <div className="col-md-6 col-lg-4" key={s.id}>
-                    <div
-                      className="card border-0 h-100 position-relative overflow-hidden"
-                      style={{
-                        borderRadius: "12px",
-                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                        transition: "transform 0.2s, box-shadow 0.2s",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = "translateY(-4px)";
-                        e.currentTarget.style.boxShadow = "0 8px 20px rgba(0, 0, 0, 0.12)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.08)";
-                      }}
-                    >
-                      {/* small accent like dashboard */}
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          height: "4px",
-                          background: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
-                        }}
-                      />
-
-                      <div className="card-body p-4">
-                        <div className="d-flex justify-content-between align-items-start mb-2">
-                          <div className="d-flex align-items-center gap-2">
-                            <div className="p-2 rounded-3" style={{ backgroundColor: "#e6f9ff" }}>
-                              <i className="bi bi-book-half fs-5" style={{ color: "#00bcd4" }}></i>
-                            </div>
-
-                            <div>
-                              <div className="fw-semibold" style={{ color: "#0f172a" }}>
-                                {s.name}
-                              </div>
-                              <small className="text-muted">{s.subject_id ? `Code: ${s.subject_id}` : "Code: —"}</small>
-                            </div>
-                          </div>
-
-                          <span className="badge text-bg-light">#{s.id}</span>
-                        </div>
-
-                        <p className="text-muted mb-0" style={{ fontSize: "0.9rem" }}>
-                          Subject available for your department. Results will appear when published.
-                        </p>
-                      </div>
-
-                      <div className="card-footer bg-white border-0 px-4 pb-4 pt-0">
-                        <div className="d-flex justify-content-between align-items-center">
-                          <small className="text-muted">
-                            <i className="bi bi-check2-circle me-1"></i>
-                            Available
-                          </small>
-
-                          <button className="btn btn-sm btn-outline-primary" disabled>
-                            <i className="bi bi-arrow-right me-1"></i>
-                            View
-                          </button>
+                filtered.map((subject) => (
+                  <article className="sp-card sp-subject" key={subject.id}>
+                    <div className="sp-subject-top">
+                      <div className="d-flex gap-3">
+                        <div className="sp-subject-icon"><i className="bi bi-book-half" /></div>
+                        <div>
+                          <h3 className="sp-subject-name">{subject.name}</h3>
+                          <p className="sp-subject-code">{subject.subject_id ? `Code: ${subject.subject_id}` : "No subject code"}</p>
                         </div>
                       </div>
                     </div>
-                  </div>
+                    <div className="sp-subject-foot">
+                      <span><i className="bi bi-check2-circle me-1" />Available</span>
+                      <span>#{subject.id}</span>
+                    </div>
+                  </article>
                 ))
               )}
-            </div>
+            </section>
 
             <Footer />
           </main>
