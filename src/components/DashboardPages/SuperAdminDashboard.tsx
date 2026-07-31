@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Chart from "chart.js/auto";
-
 import TopNav from "../LayoutComponents/TopNav";
 import Sidebar from "../LayoutComponents/Sidebar";
 import Footer from "../LayoutComponents/Footer";
@@ -8,1059 +8,127 @@ import Loader from "../ui/dashboardLoader";
 import { authApi } from "../../utils/axios";
 import { useToast } from "../../contexts/ToastContext";
 import PageTitle from "../PageTitle";
+import { getUser } from "../../utils/token";
 
-/* =========================
-   TYPES
-========================= */
-
-type Plan = {
-  id: number;
-  name: string;
-  price?: number | null;
-  duration_in_days?: number | null;
-};
-
-type SubscriptionRow = {
-  id: number;
-  status: string;
-  starts_at?: string | null;
-  ends_at?: string | null;
-  auto_renew?: boolean;
-  user?: {
-    id: number;
-    firstname?: string;
-    surname?: string;
-    name?: string;
-    email?: string;
-    school_id?: number | null;
-  };
-  plan?: Plan | null;
-};
-
-type Paginated<T> = {
-  current_page: number;
-  data: T[];
-  from?: number | null;
-  to?: number | null;
-  last_page: number;
-  per_page: number;
-  total: number;
-};
-
-type AdminRow = {
-  id: number;
-  firstname?: string;
-  surname?: string;
-  email?: string;
-  phone?: string | null;
-  created_at?: string | null;
-  status?: string | number | null;
-  school?: {
-    id?: number;
-    school_name?: string;
-    email?: string;
-    phone?: string;
-    address?: string;
-  } | null;
-  roles?: { id: number; name: string }[];
-};
-
-type LogRow = {
-  id: number;
-  user_id?: number | null;
-  user_name: string;
-  action: string;
-  description?: string | null;
-  ip_address?: string | null;
-  user_agent?: string | null;
-  created_at: string;
-};
-
+type Plan = { id: number; name: string; price?: number | null; duration_in_days?: number | null };
+type SubscriptionRow = { id: number; status: string; starts_at?: string | null; ends_at?: string | null; auto_renew?: boolean; user?: { id: number; firstname?: string; surname?: string; name?: string; email?: string; school_id?: number | null }; plan?: Plan | null };
+type Paginated<T> = { current_page: number; data: T[]; from?: number | null; to?: number | null; last_page: number; per_page: number; total: number };
+type AdminRow = { id: number; firstname?: string; surname?: string; email?: string; created_at?: string | null; school?: { id?: number; school_name?: string } | null };
+type LogRow = { id: number; user_name: string; action: string; description?: string | null; created_at: string };
 type RevenueRow = { month: string; revenue: number };
+type Tier = "core" | "premium_active" | "premium_expired";
 
-type StatCard = {
-  title: string;
-  value: string | number;
-  icon: string;
-  hint?: string;
-};
+function isCorePlan(name?: string | null) { const n = (name || "").trim().toLowerCase(); return !n || n === "free" || n === "core"; }
+function deriveTier(s: SubscriptionRow): Tier { if (isCorePlan(s.plan?.name)) return "core"; const d = s.ends_at ? new Date(s.ends_at) : null; return d && !Number.isNaN(d.getTime()) && d.getTime() < Date.now() ? "premium_expired" : "premium_active"; }
+function tierLabel(t: Tier) { return t === "premium_active" ? "Premium Active" : t === "premium_expired" ? "Premium Expired" : "Core"; }
+function tierClass(t: Tier) { return t === "premium_active" ? "sa-pill good" : t === "premium_expired" ? "sa-pill warn" : "sa-pill muted"; }
+function statusClass(s?: string) { const v = String(s || "").toLowerCase(); if (v.includes("active")) return "sa-pill good"; if (v.includes("pending")) return "sa-pill warn"; if (v.includes("expire") || v.includes("cancel")) return "sa-pill danger"; return "sa-pill muted"; }
+function fmtNaira(n: number) { try { return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 }).format(Number(n || 0)); } catch { return `NGN ${Number(n || 0).toLocaleString()}`; } }
+function fmtDate(v?: string | null) { if (!v) return "Not set"; const d = new Date(v); return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }); }
+function personName(u?: SubscriptionRow["user"] | AdminRow) { if (!u) return "Unknown"; const n = `${(u as any).surname ?? ""} ${(u as any).firstname ?? ""}`.trim(); return n || (u as any).name || (u as any).email || "Unknown"; }
+function initials(n: string) { return n.split(" ").filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("") || "GQ"; }
 
-/* =========================
-   HELPERS
-========================= */
-
-type Tier = "free" | "premium_active" | "premium_expired";
-
-function isFreePlanName(name?: string | null) {
-  const n = (name || "").trim().toLowerCase();
-  return !n || n === "free";
+function Metric({ title, value, hint, icon, tone = "pink" }: { title: string; value: string | number; hint: string; icon: string; tone?: string }) {
+  return <div className={`sa-metric tone-${tone}`}><div className="sa-metric-top"><span className="sa-metric-icon"><i className={`bi bi-${icon}`} /></span><i className="bi bi-arrow-up-right sa-metric-arrow" /></div><p>{title}</p><h3>{value}</h3><small>{hint}</small></div>;
 }
-
-function deriveTier(s: SubscriptionRow): Tier {
-  const planName = s.plan?.name ?? null;
-  if (isFreePlanName(planName)) return "free";
-
-  const ends = s.ends_at ? new Date(s.ends_at) : null;
-  if (ends && !Number.isNaN(ends.getTime())) {
-    return ends.getTime() >= Date.now() ? "premium_active" : "premium_expired";
-  }
-  // If plan isn't free but ends_at is missing, treat as premium active
-  return "premium_active";
+function Panel({ title, subtitle, action, children }: { title: string; subtitle?: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return <section className="sa-panel"><div className="sa-panel-head"><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div>{action && <div>{action}</div>}</div>{children}</section>;
 }
-
-function tierLabel(t: Tier) {
-  if (t === "premium_active") return "Premium (Active)";
-  if (t === "premium_expired") return "Premium (Expired)";
-  return "Free";
+function Empty({ text }: { text: string }) { return <div className="sa-empty"><i className="bi bi-inbox" /><span>{text}</span></div>; }
+function Pager({ data, perPage, sizes, onPage, onPerPage }: { data: Paginated<any> | null; perPage: number; sizes: number[]; onPage: (p: number) => void; onPerPage: (n: number) => void }) {
+  if (!data || data.last_page <= 1) return null;
+  return <div className="sa-pager"><span>Showing {data.from ?? 0} - {data.to ?? 0} of {data.total}</span><div><select value={perPage} onChange={(e) => onPerPage(Number(e.target.value))}>{sizes.map((n) => <option key={n} value={n}>{n}/page</option>)}</select><button disabled={data.current_page <= 1} onClick={() => onPage(Math.max(1, data.current_page - 1))}><i className="bi bi-chevron-left" /></button><b>{data.current_page} / {data.last_page}</b><button disabled={data.current_page >= data.last_page} onClick={() => onPage(Math.min(data.last_page, data.current_page + 1))}><i className="bi bi-chevron-right" /></button></div></div>;
 }
-
-function tierBadge(t: Tier) {
-  if (t === "premium_active") return "bg-success";
-  if (t === "premium_expired") return "bg-warning text-dark";
-  return "bg-secondary";
-}
-
-function fmtNaira(n: number) {
-  try {
-    return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(n);
-  } catch {
-    return `₦${Number(n || 0).toLocaleString()}`;
-  }
-}
-
-function fmtDate(val?: string | null) {
-  if (!val) return "—";
-  const d = new Date(val);
-  if (Number.isNaN(d.getTime())) return val;
-  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-}
-
-function nameOf(u?: SubscriptionRow["user"]) {
-  if (!u) return "—";
-  const composed = `${u.surname ?? ""} ${u.firstname ?? ""}`.trim();
-  return composed || u.name || u.email || "—";
-}
-
-function statusBadge(status: string) {
-  const s = (status || "").toLowerCase();
-  if (s.includes("active")) return "bg-success";
-  if (s.includes("pending")) return "bg-warning text-dark";
-  if (s.includes("cancel")) return "bg-secondary";
-  if (s.includes("expire")) return "bg-danger";
-  return "bg-light text-dark";
-}
-
-/* =========================
-   COMPONENT
-========================= */
 
 export default function SuperAdminDashboard() {
+  const navigate = useNavigate();
   const { showError, showSuccess } = useToast();
-
-  // layout
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  // loading
   const [loading, setLoading] = useState(true);
-
-  // stats
-  const [stats, setStats] = useState<StatCard[]>([
-    { title: "Admin Schools", value: 0, icon: "buildings" },
-    { title: "Total Subscribers", value: 0, icon: "people" },
-    { title: "Premium Users", value: 0, icon: "award", hint: "Active + Expired" },
-    { title: "Revenue (YTD)", value: fmtNaira(0), icon: "cash-coin" },
-  ]);
-
-  // Revenue chart
-  const revChartRef = useRef<HTMLCanvasElement | null>(null);
-  const revChartInstance = useRef<Chart | null>(null);
-  const [revLabels, setRevLabels] = useState<string[]>([]);
-  const [revData, setRevData] = useState<number[]>([]);
-
-  // Subscribers
-  const [subsPage, setSubsPage] = useState(1);
-  const [subsPerPage, setSubsPerPage] = useState(10);
-  const [subsStatus, setSubsStatus] = useState<string>("");
-  const [subsActiveOnly, setSubsActiveOnly] = useState(false);
-  const [subsSearch, setSubsSearch] = useState("");
-
-  // ✅ tier filter (computed on frontend)
-  const [subsTier, setSubsTier] = useState<"all" | "free" | "premium_all" | "premium_active" | "premium_expired">("all");
-
+  const [revenueRows, setRevenueRows] = useState<RevenueRow[]>([]);
   const [subs, setSubs] = useState<Paginated<SubscriptionRow> | null>(null);
-
-  // Admins
-  const [adminsPage, setAdminsPage] = useState(1);
-  const [adminsPerPage, setAdminsPerPage] = useState(8);
-  const [adminsSearch, setAdminsSearch] = useState("");
   const [admins, setAdmins] = useState<Paginated<AdminRow> | null>(null);
-
-  // Logs
-  const [logsPage, setLogsPage] = useState(1);
-  const [logsPerPage, setLogsPerPage] = useState(10);
   const [logs, setLogs] = useState<Paginated<LogRow> | null>(null);
+  const [subsPage, setSubsPage] = useState(1); const [subsPerPage, setSubsPerPage] = useState(10); const [subsStatus, setSubsStatus] = useState(""); const [subsTier, setSubsTier] = useState("all"); const [subsSearch, setSubsSearch] = useState(""); const [activeOnly, setActiveOnly] = useState(false);
+  const [adminsPage, setAdminsPage] = useState(1); const [adminsPerPage, setAdminsPerPage] = useState(8); const [adminsSearch, setAdminsSearch] = useState("");
+  const [logsPage, setLogsPage] = useState(1); const [logsPerPage, setLogsPerPage] = useState(10); const [selectedLogs, setSelectedLogs] = useState<number[]>([]); const [deletingLogs, setDeletingLogs] = useState(false);
+  const chartRef = useRef<HTMLCanvasElement | null>(null); const chartInstance = useRef<Chart | null>(null);
+  const currentUser = getUser();
+  const superAdminPermissions = Array.isArray(currentUser?.super_admin_permissions) ? currentUser.super_admin_permissions : [];
+  const can = (permission: string) => superAdminPermissions.includes("all") || superAdminPermissions.includes(permission);
+  const visibleSubs = useMemo(() => (subs?.data || []).filter((s) => { const t = deriveTier(s); if (subsTier === "core") return t === "core"; if (subsTier === "premium_active") return t === "premium_active"; if (subsTier === "premium_expired") return t === "premium_expired"; if (subsTier === "premium") return t !== "core"; return true; }), [subs, subsTier]);
+  const tierCounts = useMemo(() => (subs?.data || []).reduce((a, s) => { const t = deriveTier(s); a.total += 1; if (t === "core") a.core += 1; if (t === "premium_active") a.active += 1; if (t === "premium_expired") a.expired += 1; return a; }, { total: 0, core: 0, active: 0, expired: 0 }), [subs]);
+  const ytdRevenue = useMemo(() => revenueRows.reduce((sum, r) => sum + Number(r.revenue || 0), 0), [revenueRows]);
+  const latestRevenue = Number(revenueRows[revenueRows.length - 1]?.revenue || 0);
+  const activeSubsOnPage = (subs?.data || []).filter((s) => String(s.status || "").toLowerCase().includes("active")).length;
+  const logIds = useMemo(() => (logs?.data || []).map((l) => l.id), [logs]);
+  const allLogsSelected = logIds.length > 0 && logIds.every((id) => selectedLogs.includes(id));
 
-  // ✅ Logs bulk selection
-  const [selectedLogIds, setSelectedLogIds] = useState<number[]>([]);
-  const [deletingLogs, setDeletingLogs] = useState(false);
+  async function fetchRevenue() { const res = await authApi.get("/monthly-revenue-stats"); setRevenueRows(Array.isArray(res.data?.data) ? res.data.data : []); }
+  async function fetchSubscribers(page = subsPage, perPage = subsPerPage) { const p = new URLSearchParams(); p.set("page", String(page)); p.set("per_page", String(perPage)); if (subsStatus) p.set("status", subsStatus); if (activeOnly) p.set("active", "1"); if (subsSearch.trim()) p.set("search", subsSearch.trim()); const res = await authApi.get(`/admin/subscriptions?${p.toString()}`); setSubs(res.data?.data || null); }
+  async function fetchAdmins(page = adminsPage, perPage = adminsPerPage) { const p = new URLSearchParams(); p.set("page", String(page)); p.set("perPage", String(perPage)); if (adminsSearch.trim()) p.set("search", adminsSearch.trim()); const res = await authApi.get(`/admin-users?${p.toString()}`); setAdmins(res.data || null); }
+  async function fetchLogs(page = logsPage, perPage = logsPerPage) { const p = new URLSearchParams(); p.set("page", String(page)); p.set("per_page", String(perPage)); const res = await authApi.get(`/platform-logs?${p.toString()}`); setLogs(res.data || null); }
+  async function refreshDashboard(toast = false) { setLoading(true); try { const tasks: Promise<any>[] = []; if (can("finance") || can("billing")) tasks.push(fetchRevenue(), fetchSubscribers()); if (can("support") || can("billing") || can("finance")) tasks.push(fetchAdmins()); if (can("audit")) tasks.push(fetchLogs()); await Promise.all(tasks); if (toast) showSuccess("Dashboard refreshed."); } catch (e: any) { showError(e?.response?.data?.message || "Failed to load Super Admin dashboard."); } finally { setLoading(false); } }
 
-  const logsOnPageIds = useMemo(() => (logs?.data || []).map((l) => l.id), [logs]);
-  const allSelectedOnPage = useMemo(() => {
-    if (!logsOnPageIds.length) return false;
-    return logsOnPageIds.every((id) => selectedLogIds.includes(id));
-  }, [logsOnPageIds, selectedLogIds]);
-
-  const selectedCount = selectedLogIds.length;
-
-  /* =========================
-     DERIVED: SUBS VIEW + COUNTS
-  ========================= */
-
-  const subsTierCounts = useMemo(() => {
-    const rows = subs?.data || [];
-    let free = 0;
-    let pa = 0;
-    let pe = 0;
-
-    rows.forEach((r) => {
-      const t = deriveTier(r);
-      if (t === "free") free++;
-      if (t === "premium_active") pa++;
-      if (t === "premium_expired") pe++;
-    });
-
-    return { free, premium_active: pa, premium_expired: pe, premium_all: pa + pe, totalOnPage: rows.length };
-  }, [subs]);
-
-  const visibleSubs = useMemo(() => {
-    const rows = subs?.data || [];
-    return rows.filter((s) => {
-      const t = deriveTier(s);
-
-      if (subsTier === "free" && t !== "free") return false;
-      if (subsTier === "premium_active" && t !== "premium_active") return false;
-      if (subsTier === "premium_expired" && t !== "premium_expired") return false;
-      if (subsTier === "premium_all" && !(t === "premium_active" || t === "premium_expired")) return false;
-
-      return true;
-    });
-  }, [subs, subsTier]);
-
-  /* =========================
-     FETCHERS (MATCH YOUR ROUTES)
-  ========================= */
-
-  const fetchRevenue = async () => {
-    const res = await authApi.get("/monthly-revenue-stats");
-    const rows: RevenueRow[] = res.data?.data || [];
-
-    setRevLabels(rows.map((r) => r.month));
-    setRevData(rows.map((r) => Number(r.revenue || 0)));
-
-    const total = rows.reduce((sum, r) => sum + Number(r.revenue || 0), 0);
-    setStats((prev) => {
-      const next = [...prev];
-      next[3] = { ...next[3], value: fmtNaira(total) };
-      return next;
-    });
-  };
-
-  const fetchSubscribers = async () => {
-    const params = new URLSearchParams();
-    params.set("page", String(subsPage));
-    params.set("per_page", String(subsPerPage));
-    if (subsStatus) params.set("status", subsStatus);
-    if (subsActiveOnly) params.set("active", "1");
-    if (subsSearch.trim()) params.set("search", subsSearch.trim());
-
-    const res = await authApi.get(`/admin/subscriptions?${params.toString()}`);
-    const paginated: Paginated<SubscriptionRow> = res.data?.data;
-    setSubs(paginated);
-
-    // ✅ Stats: total subscribers (from server)
-    const totalSubs = paginated?.total ?? 0;
-
-    // ✅ Premium count (computed only from current page; we label it clearly)
-    const pageRows = paginated?.data || [];
-    const premiumOnPage = pageRows.filter((r) => {
-      const t = deriveTier(r);
-      return t === "premium_active" || t === "premium_expired";
-    }).length;
-
-    setStats((prev) => {
-      const next = [...prev];
-      next[1] = { ...next[1], value: totalSubs, hint: "Total in database" };
-      next[2] = { ...next[2], value: premiumOnPage, hint: "Premium on current page" };
-      return next;
-    });
-  };
-
-  const fetchAdmins = async () => {
-    const params = new URLSearchParams();
-    params.set("page", String(adminsPage));
-    params.set("perPage", String(adminsPerPage));
-    if (adminsSearch.trim()) params.set("search", adminsSearch.trim());
-
-    const res = await authApi.get(`/admin-users?${params.toString()}`);
-    const paginated: Paginated<AdminRow> = res.data;
-    setAdmins(paginated);
-
-    setStats((prev) => {
-      const next = [...prev];
-      next[0] = { ...next[0], value: paginated?.total ?? 0 };
-      return next;
-    });
-  };
-
-  const fetchLogs = async () => {
-    const params = new URLSearchParams();
-    params.set("page", String(logsPage));
-    params.set("per_page", String(logsPerPage));
-
-    const res = await authApi.get(`/platform-logs?${params.toString()}`);
-    const paginated: Paginated<LogRow> = res.data;
-    setLogs(paginated);
-  };
-
-  /* =========================
-     INITIAL LOAD
-  ========================= */
+  useEffect(() => { void refreshDashboard(false); }, []);
+  useEffect(() => { if (can("finance") || can("billing")) fetchSubscribers(subsPage, subsPerPage).catch(() => showError("Failed to load subscribers.")); }, [subsPage, subsPerPage]);
+  useEffect(() => { if (can("support") || can("billing") || can("finance")) fetchAdmins(adminsPage, adminsPerPage).catch(() => showError("Failed to load schools.")); }, [adminsPage, adminsPerPage]);
+  useEffect(() => { if (can("audit")) fetchLogs(logsPage, logsPerPage).catch(() => showError("Failed to load activity.")); }, [logsPage, logsPerPage]);
 
   useEffect(() => {
-    setLoading(true);
+    if (!chartRef.current) return; const ctx = chartRef.current.getContext("2d"); if (!ctx) return;
+    chartInstance.current?.destroy();
+    chartInstance.current = new Chart(ctx, { type: "bar", data: { labels: revenueRows.map((r) => r.month), datasets: [{ label: "Revenue", data: revenueRows.map((r) => Number(r.revenue || 0)), backgroundColor: "rgba(211,0,176,.78)", hoverBackgroundColor: "rgba(247,201,72,.95)", borderRadius: 8, barThickness: 28 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (item) => fmtNaira(Number(item.raw || 0)) } } }, scales: { x: { grid: { display: false }, ticks: { color: "#766a79", font: { size: 11 } } }, y: { beginAtZero: true, grid: { color: "rgba(29,21,31,.08)" }, ticks: { color: "#766a79", font: { size: 11 } } } } } });
+    return () => chartInstance.current?.destroy();
+  }, [revenueRows]);
 
-    Promise.all([fetchRevenue(), fetchSubscribers(), fetchAdmins(), fetchLogs()])
-      .catch((err) => {
-        console.error(err);
-        showError(err?.response?.data?.message || "Failed to load Super Admin dashboard.");
-      })
-      .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  /* =========================
-     RELOAD ON PAGINATION
-  ========================= */
-
-  useEffect(() => {
-    fetchSubscribers().catch(() => showError("Failed to load subscribers."));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subsPage, subsPerPage]);
-
-  useEffect(() => {
-    fetchAdmins().catch(() => showError("Failed to load admin users."));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminsPage, adminsPerPage]);
-
-  useEffect(() => {
-    fetchLogs().catch(() => showError("Failed to load logs."));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [logsPage, logsPerPage]);
-
-  /* =========================
-     CHART RENDER
-  ========================= */
-
-  useEffect(() => {
-    if (!revChartRef.current) return;
-    const ctx = revChartRef.current.getContext("2d");
-    if (!ctx) return;
-
-    revChartInstance.current?.destroy();
-
-    revChartInstance.current = new Chart(ctx, {
-      type: "bar",
-      data: {
-        labels: revLabels,
-        datasets: [{ label: "Revenue (₦)", data: revData, borderRadius: 10, barThickness: 32 }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-          y: { beginAtZero: true, ticks: { font: { size: 11 } } },
-        },
-      },
-    });
-
-    return () => revChartInstance.current?.destroy();
-  }, [revLabels, revData]);
-
-  /* =========================
-     UI ACTIONS
-  ========================= */
-
-  const applySubsFilters = () => {
-    setSubsPage(1);
-    fetchSubscribers()
-      .then(() => showSuccess("Subscribers updated."))
-      .catch(() => showError("Failed to apply subscriber filters."));
-  };
-
-  const applyAdminsSearch = () => {
-    setAdminsPage(1);
-    fetchAdmins()
-      .then(() => showSuccess("Admin users updated."))
-      .catch(() => showError("Failed to apply admin search."));
-  };
-
-  const reloadLogs = () => {
-    setLogsPage(1);
-    fetchLogs()
-      .then(() => showSuccess("Logs reloaded."))
-      .catch(() => showError("Failed to reload logs."));
-  };
-
-  /* =========================
-     LOGS BULK SELECT + DELETE
-  ========================= */
-
-  const toggleLog = (id: number) => {
-    setSelectedLogIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  };
-
-  const toggleSelectAllOnPage = () => {
-    const ids = logsOnPageIds;
-    if (!ids.length) return;
-
-    setSelectedLogIds((prev) => {
-      const allOnPageSelected = ids.every((id) => prev.includes(id));
-      if (allOnPageSelected) {
-        return prev.filter((id) => !ids.includes(id));
-      }
-      const merged = new Set([...prev, ...ids]);
-      return Array.from(merged);
-    });
-  };
-
-  const clearSelectedLogs = () => setSelectedLogIds([]);
-
-  const bulkDeleteLogs = async () => {
-    if (selectedLogIds.length === 0) return;
-
-    const ok = window.confirm(`Delete ${selectedLogIds.length} selected log(s)? This cannot be undone.`);
-    if (!ok) return;
-
-    setDeletingLogs(true);
-    try {
-      await authApi.post("/platform-logs/delete-multiple", { ids: selectedLogIds });
-
-      showSuccess("Selected logs deleted.");
-
-      clearSelectedLogs();
-
-      const remainingOnPage =
-        (logs?.data || []).length - logsOnPageIds.filter((id) => selectedLogIds.includes(id)).length;
-
-      if (remainingOnPage <= 0 && (logs?.current_page || 1) > 1) {
-        setLogsPage((p) => Math.max(1, p - 1));
-      } else {
-        await fetchLogs();
-      }
-    } catch (err: any) {
-      console.error(err);
-      showError(err?.response?.data?.message || "Failed to delete logs.");
-    } finally {
-      setDeletingLogs(false);
-    }
-  };
+  function applySubscriberFilters() { setSubsPage(1); fetchSubscribers(1, subsPerPage).then(() => showSuccess("Subscribers updated.")).catch(() => showError("Failed to apply subscriber filters.")); }
+  function applyAdminSearch() { setAdminsPage(1); fetchAdmins(1, adminsPerPage).then(() => showSuccess("Schools updated.")).catch(() => showError("Failed to apply school search.")); }
+  function reloadLogs() { setLogsPage(1); fetchLogs(1, logsPerPage).then(() => showSuccess("Activity reloaded.")).catch(() => showError("Failed to reload activity.")); }
+  function toggleLog(id: number) { setSelectedLogs((cur) => cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]); }
+  function toggleAllLogs() { setSelectedLogs((cur) => allLogsSelected ? cur.filter((id) => !logIds.includes(id)) : Array.from(new Set([...cur, ...logIds]))); }
+  async function deleteSelectedLogs() { if (!selectedLogs.length) return; if (!window.confirm(`Delete ${selectedLogs.length} selected activity log(s)?`)) return; setDeletingLogs(true); try { await authApi.post("/platform-logs/delete-multiple", { ids: selectedLogs }); setSelectedLogs([]); showSuccess("Selected logs deleted."); await fetchLogs(); } catch (e: any) { showError(e?.response?.data?.message || "Failed to delete selected logs."); } finally { setDeletingLogs(false); } }
 
   return (
     <>
-      <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-      <PageTitle title="SuperAdmin Dashboard" />
-
-      <div className="container-fluid">
-        <div className="row">
-          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-
-          <main className="col-md-9 col-lg-10 ms-auto px-4 d-flex flex-column min-vh-100 sa-main">
-            {loading && <Loader message="Loading Super Admin dashboard..." />}
-
-            {/* HERO */}
-            <div
-              className="mt-4 p-4 position-relative overflow-hidden sa-hero"
-              style={{
-                borderRadius: 16,
-              }}
-            >
-              <div className="row align-items-center position-relative g-3">
-                <div className="col-lg-8">
-                  <div className="d-flex flex-wrap gap-2 align-items-center mb-2">
-                    <span
-                      className="badge px-3 py-2"
-                      style={{
-                        backgroundColor: "rgba(255, 255, 255, 0.2)",
-                        color: "#fff",
-                        borderRadius: 999,
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                      }}
-                    >
-                      <i className="bi bi-shield-lock me-1" />
-                      Super Admin Console
-                    </span>
-                    <span
-                      className="badge px-3 py-2"
-                      style={{
-                        backgroundColor: "rgba(16, 185, 129, 0.9)",
-                        color: "#fff",
-                        borderRadius: 999,
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                      }}
-                    >
-                      <i className="bi bi-check-circle-fill me-1" />
-                      Platform Online
-                    </span>
-                  </div>
-
-                  <h2 className="fw-bold text-white mb-2">Platform Dashboard</h2>
-                  <p className="text-white mb-0" style={{ opacity: 0.9, fontSize: "1rem" }}>
-                    Monitor revenue, subscribers (Free vs Premium Active/Expired), admin schools, and activity logs.
-                  </p>
-
-                  {/* quick tier chips (current page only) */}
-                  <div className="d-flex flex-wrap gap-2 mt-3">
-                    <span className="badge bg-light text-dark" style={{ borderRadius: 999 }}>
-                      Free: <b>{subsTierCounts.free}</b>
-                    </span>
-                    <span className="badge bg-light text-dark" style={{ borderRadius: 999 }}>
-                      Premium Active: <b>{subsTierCounts.premium_active}</b>
-                    </span>
-                    <span className="badge bg-light text-dark" style={{ borderRadius: 999 }}>
-                      Premium Expired: <b>{subsTierCounts.premium_expired}</b>
-                    </span>
-                    <span className="badge bg-light text-dark" style={{ borderRadius: 999 }}>
-                      Premium Total: <b>{subsTierCounts.premium_all}</b>
-                    </span>
-                    <span className="badge bg-light text-dark" style={{ borderRadius: 999 }}>
-                      On page: <b>{subsTierCounts.totalOnPage}</b>
-                    </span>
-                  </div>
-                </div>
-
-                <div className="col-lg-4 d-none d-lg-block">
-                  <div
-                    style={{
-                      background: "rgba(255, 255, 255, 0.15)",
-                      backdropFilter: "blur(10px)",
-                      borderRadius: 16,
-                      padding: "1.25rem",
-                      border: "1px solid rgba(255, 255, 255, 0.2)",
-                    }}
-                  >
-                    <div className="d-flex align-items-center justify-content-between mb-2">
-                      <span className="text-white" style={{ fontSize: "0.9rem", opacity: 0.9 }}>
-                        Quick Actions
-                      </span>
-                      <i className="bi bi-lightning-charge text-white" />
-                    </div>
-
-                    <div className="d-flex flex-column gap-2">
-                      <button
-                        className="btn btn-light btn-sm"
-                        style={{ borderRadius: 10, fontWeight: 700 }}
-                        onClick={() => {
-                          applySubsFilters();
-                          applyAdminsSearch();
-                          reloadLogs();
-                          fetchRevenue().catch(() => {});
-                        }}
-                      >
-                        <i className="bi bi-arrow-repeat me-1" />
-                        Refresh Dashboard
-                      </button>
-
-                      <button
-                        className="btn btn-outline-light btn-sm"
-                        style={{ borderRadius: 10 }}
-                        onClick={() => window.scrollTo({ top: 950, behavior: "smooth" })}
-                      >
-                        <i className="bi bi-graph-up me-1" />
-                        Jump to Analytics
-                      </button>
-                    </div>
-
-                    <div className="mt-3 text-white small" style={{ opacity: 0.9 }}>
-                      <i className="bi bi-info-circle me-1" />
-                      Premium stat card is computed from <b>current page</b> until you add a backend aggregate endpoint.
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* STATS */}
-            <div className="row g-3 my-3">
-              {stats.map((s, idx) => {
-                const colors = [
-                  { gradient: "linear-gradient(135deg, var(--gq-primary) 0%, #f05ed4 100%)", icon: "var(--gq-primary)", bg: "rgba(211, 0, 176, 0.08)" },
-                  { gradient: "linear-gradient(135deg, var(--gq-secondary) 0%, #ffe08c 100%)", icon: "#a66a00", bg: "rgba(255, 200, 87, 0.18)" },
-                  { gradient: "linear-gradient(135deg, #0ea5e9 0%, #7dd3fc 100%)", icon: "#0284c7", bg: "rgba(14, 165, 233, 0.1)" },
-                  { gradient: "linear-gradient(135deg, #10b981 0%, #86efac 100%)", icon: "#059669", bg: "rgba(16, 185, 129, 0.1)" },
-                ];
-
-                return (
-                  <div className="col-md-6 col-lg-3" key={s.title}>
-                    <div className="card border-0 h-100 position-relative overflow-hidden" style={{ borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
-                      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: colors[idx].gradient }} />
-                      <div className="card-body p-4">
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                          <div className="p-2 rounded-3" style={{ backgroundColor: colors[idx].bg }}>
-                            <i className={`bi bi-${s.icon} fs-4`} style={{ color: colors[idx].icon }} />
-                          </div>
-                          <i className="bi bi-three-dots-vertical text-muted" />
-                        </div>
-
-                        <p className="text-muted mb-1 small">{s.title}</p>
-                        <h3 className="fw-bold mb-0" style={{ color: "#1e293b" }}>
-                          {s.value}
-                        </h3>
-
-                        <div className="mt-3 pt-3" style={{ borderTop: "1px solid #f1f5f9" }}>
-                          <small className="text-muted">
-                            {s.hint ? (
-                              <>
-                                <i className="bi bi-info-circle me-1" />
-                                {s.hint}
-                              </>
-                            ) : (
-                              <>
-                                <i className="bi bi-activity me-1" />
-                                Live platform stat
-                              </>
-                            )}
-                          </small>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* REVENUE */}
-            <div className="card shadow-sm border-0 mb-4" style={{ borderRadius: 12 }}>
-              <div className="card-body p-4">
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <div>
-                    <div className="fw-semibold" style={{ color: "#1e293b" }}>
-                      Monthly Revenue
-                    </div>
-                    <div className="text-muted small">Successful subscription payments (this year)</div>
-                  </div>
-
-                  <button className="btn btn-sm btn-light" style={{ borderRadius: 10 }} onClick={() => fetchRevenue().catch(() => showError("Failed to refresh revenue stats."))}>
-                    <i className="bi bi-arrow-repeat me-1" />
-                    Refresh
-                  </button>
-                </div>
-
-                <div style={{ height: 320 }}>
-                  <canvas ref={revChartRef} />
-                </div>
-              </div>
-            </div>
-
-            {/* SUBSCRIBERS */}
-            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
-              <div className="card-body p-3 p-md-4">
-                <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                  <div>
-                    <div className="fw-semibold" style={{ color: "#1e293b" }}>
-                      Subscribers
-                    </div>
-                    <div className="text-muted small">Route: /admin/subscriptions</div>
-                  </div>
-
-                  <div className="d-flex flex-wrap gap-2">
-                    <select className="form-select form-select-sm" style={{ width: 170, borderRadius: 10 }} value={subsStatus} onChange={(e) => setSubsStatus(e.target.value)}>
-                      <option value="">All Status</option>
-                      <option value="active">Active</option>
-                      <option value="pending">Pending</option>
-                      <option value="cancelled">Cancelled</option>
-                      <option value="canceled">Canceled</option>
-                      <option value="expired">Expired</option>
-                    </select>
-
-                    <select className="form-select form-select-sm" style={{ width: 220, borderRadius: 10 }} value={subsTier} onChange={(e) => setSubsTier(e.target.value as any)}>
-                      <option value="all">All tiers</option>
-                      <option value="free">Free</option>
-                      <option value="premium_all">Premium (Active + Expired)</option>
-                      <option value="premium_active">Premium (Active)</option>
-                      <option value="premium_expired">Premium (Expired)</option>
-                    </select>
-
-                    <div className="form-check d-flex align-items-center gap-2">
-                      <input className="form-check-input" type="checkbox" id="activeOnly" checked={subsActiveOnly} onChange={(e) => setSubsActiveOnly(e.target.checked)} />
-                      <label className="form-check-label small" htmlFor="activeOnly">
-                        Active only
-                      </label>
-                    </div>
-
-                    <div className="input-group input-group-sm" style={{ width: 260 }}>
-                      <span className="input-group-text">
-                        <i className="bi bi-search" />
-                      </span>
-                      <input className="form-control" placeholder="Search name/email..." value={subsSearch} onChange={(e) => setSubsSearch(e.target.value)} />
-                    </div>
-
-                    <button className="btn btn-sm btn-primary" style={{ borderRadius: 10, fontWeight: 700 }} onClick={applySubsFilters}>
-                      <i className="bi bi-funnel me-1" />
-                      Apply
-                    </button>
-                  </div>
-                </div>
-
-                <div className="table-responsive">
-                  <table className="table table-hover align-middle mb-0">
-                    <thead style={{ background: "#eef2ff" }}>
-                      <tr>
-                        <th>User</th>
-                        <th>Email</th>
-                        <th>Tier</th>
-                        <th>Plan</th>
-                        <th>Status</th>
-                        <th>Start</th>
-                        <th>End</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visibleSubs.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="text-center text-muted py-4">
-                            No subscriptions found for the selected filters.
-                          </td>
-                        </tr>
-                      ) : (
-                        visibleSubs.map((s) => {
-                          const t = deriveTier(s);
-                          return (
-                            <tr key={s.id}>
-                              <td className="fw-semibold">{nameOf(s.user)}</td>
-                              <td className="text-muted">{s.user?.email || "—"}</td>
-                              <td>
-                                <span className={`badge ${tierBadge(t)}`} style={{ borderRadius: 999 }}>
-                                  {tierLabel(t)}
-                                </span>
-                              </td>
-                              <td>{s.plan?.name || "—"}</td>
-                              <td>
-                                <span className={`badge ${statusBadge(s.status)}`} style={{ borderRadius: 999 }}>
-                                  {s.status}
-                                </span>
-                              </td>
-                              <td className="text-muted">{fmtDate(s.starts_at)}</td>
-                              <td className="text-muted">{fmtDate(s.ends_at)}</td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {subs && subs.last_page > 1 && (
-                  <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
-                    <div className="text-muted small">
-                      Showing {subs.from ?? 0} - {subs.to ?? 0} of {subs.total}
-                      <span className="ms-2">
-                        • Visible: <b>{visibleSubs.length}</b>
-                      </span>
-                    </div>
-
-                    <div className="d-flex gap-2 align-items-center">
-                      <select
-                        className="form-select form-select-sm"
-                        style={{ width: 110, borderRadius: 10 }}
-                        value={subsPerPage}
-                        onChange={(e) => {
-                          setSubsPerPage(Number(e.target.value));
-                          setSubsPage(1);
-                        }}
-                      >
-                        {[10, 20, 30, 50].map((n) => (
-                          <option key={n} value={n}>
-                            {n}/page
-                          </option>
-                        ))}
-                      </select>
-
-                      <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 10 }} disabled={subs.current_page <= 1} onClick={() => setSubsPage((p) => Math.max(1, p - 1))}>
-                        <i className="bi bi-chevron-left" />
-                      </button>
-
-                      <span className="small text-muted">
-                        Page <b>{subs.current_page}</b> / {subs.last_page}
-                      </span>
-
-                      <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 10 }} disabled={subs.current_page >= subs.last_page} onClick={() => setSubsPage((p) => Math.min(subs.last_page, p + 1))}>
-                        <i className="bi bi-chevron-right" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <div className="mt-3 text-muted small">
-                  <i className="bi bi-info-circle me-1" />
-                  Tier is computed from <b>plan.name</b> + <b>ends_at</b>. Premium includes Active + Expired.
-                </div>
-              </div>
-            </div>
-
-            {/* ADMINS + LOGS */}
-            <div className="row g-4 mb-4">
-              {/* ADMINS */}
-              <div className="col-lg-6">
-                <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 12 }}>
-                  <div className="card-body p-3 p-md-4">
-                    <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                      <div>
-                        <div className="fw-semibold" style={{ color: "#1e293b" }}>
-                          Admin Users
-                        </div>
-                        <div className="text-muted small">Route: /admin-users</div>
-                      </div>
-
-                      <div className="d-flex gap-2 align-items-center">
-                        <div className="input-group input-group-sm" style={{ width: 230 }}>
-                          <span className="input-group-text">
-                            <i className="bi bi-search" />
-                          </span>
-                          <input className="form-control" placeholder="Search admin..." value={adminsSearch} onChange={(e) => setAdminsSearch(e.target.value)} />
-                        </div>
-                        <button className="btn btn-sm btn-primary" style={{ borderRadius: 10, fontWeight: 700 }} onClick={applyAdminsSearch}>
-                          Apply
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="table-responsive">
-                      <table className="table table-hover align-middle mb-0">
-                        <thead style={{ background: "#eef2ff" }}>
-                          <tr>
-                            <th>Name</th>
-                            <th>Email</th>
-                            <th>School</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(admins?.data || []).length === 0 ? (
-                            <tr>
-                              <td colSpan={3} className="text-center text-muted py-4">
-                                No admins found.
-                              </td>
-                            </tr>
-                          ) : (
-                            (admins?.data || []).map((a) => (
-                              <tr key={a.id}>
-                                <td className="fw-semibold">{`${a.surname ?? ""} ${a.firstname ?? ""}`.trim() || "—"}</td>
-                                <td className="text-muted">{a.email || "—"}</td>
-                                <td className="text-muted">{a.school?.school_name || "—"}</td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {admins && admins.last_page > 1 && (
-                      <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
-                        <div className="text-muted small">
-                          Showing {admins.from ?? 0} - {admins.to ?? 0} of {admins.total}
-                        </div>
-
-                        <div className="d-flex gap-2 align-items-center">
-                          <select
-                            className="form-select form-select-sm"
-                            style={{ width: 110, borderRadius: 10 }}
-                            value={adminsPerPage}
-                            onChange={(e) => {
-                              setAdminsPerPage(Number(e.target.value));
-                              setAdminsPage(1);
-                            }}
-                          >
-                            {[8, 12, 20].map((n) => (
-                              <option key={n} value={n}>
-                                {n}/page
-                              </option>
-                            ))}
-                          </select>
-
-                          <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 10 }} disabled={admins.current_page <= 1} onClick={() => setAdminsPage((p) => Math.max(1, p - 1))}>
-                            <i className="bi bi-chevron-left" />
-                          </button>
-
-                          <span className="small text-muted">
-                            Page <b>{admins.current_page}</b> / {admins.last_page}
-                          </span>
-
-                          <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 10 }} disabled={admins.current_page >= admins.last_page} onClick={() => setAdminsPage((p) => Math.min(admins.last_page, p + 1))}>
-                            <i className="bi bi-chevron-right" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* LOGS */}
-              <div className="col-lg-6">
-                <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 12 }}>
-                  <div className="card-body p-3 p-md-4">
-                    <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                      <div>
-                        <div className="fw-semibold" style={{ color: "#1e293b" }}>
-                          Platform Logs
-                        </div>
-                        <div className="text-muted small">Route: /platform-logs</div>
-                      </div>
-
-                      <div className="d-flex gap-2">
-                        <button className="btn btn-sm btn-light" style={{ borderRadius: 10 }} onClick={reloadLogs}>
-                          <i className="bi bi-arrow-repeat me-1" />
-                          Reload
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Bulk actions bar */}
-                    <div
-                      className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 p-2"
-                      style={{
-                        background: "#f8fafc",
-                        border: "1px solid #e2e8f0",
-                        borderRadius: 12,
-                      }}
-                    >
-                      <div className="d-flex align-items-center gap-2">
-                        <input type="checkbox" className="form-check-input" checked={allSelectedOnPage} onChange={toggleSelectAllOnPage} id="selectAllLogsOnPage" />
-                        <label htmlFor="selectAllLogsOnPage" className="small text-muted mb-0">
-                          Select all on page
-                        </label>
-
-                        <span className="badge bg-light text-dark" style={{ borderRadius: 999 }}>
-                          {selectedCount} selected
-                        </span>
-                      </div>
-
-                      <div className="d-flex gap-2">
-                        <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 10 }} disabled={selectedCount === 0 || deletingLogs} onClick={clearSelectedLogs}>
-                          Clear
-                        </button>
-
-                        <button className="btn btn-sm btn-danger" style={{ borderRadius: 10, fontWeight: 700 }} disabled={selectedCount === 0 || deletingLogs} onClick={bulkDeleteLogs}>
-                          {deletingLogs ? (
-                            <>
-                              <span className="spinner-border spinner-border-sm me-2" />
-                              Deleting...
-                            </>
-                          ) : (
-                            <>
-                              <i className="bi bi-trash3 me-1" />
-                              Delete Selected
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="table-responsive">
-                      <table className="table table-hover align-middle mb-0">
-                        <thead style={{ background: "#eef2ff" }}>
-                          <tr>
-                            <th style={{ width: 40 }} />
-                            <th>When</th>
-                            <th>User</th>
-                            <th>Action</th>
-                          </tr>
-                        </thead>
-
-                        <tbody>
-                          {(logs?.data || []).length === 0 ? (
-                            <tr>
-                              <td colSpan={4} className="text-center text-muted py-4">
-                                No logs found.
-                              </td>
-                            </tr>
-                          ) : (
-                            (logs?.data || []).map((l) => (
-                              <tr key={l.id}>
-                                <td>
-                                  <input type="checkbox" className="form-check-input" checked={selectedLogIds.includes(l.id)} onChange={() => toggleLog(l.id)} />
-                                </td>
-                                <td className="text-muted">{fmtDate(l.created_at)}</td>
-                                <td className="fw-semibold">{l.user_name}</td>
-                                <td>
-                                  <div className="fw-semibold">{l.action}</div>
-                                  <div className="text-muted small" style={{ maxWidth: 340 }}>
-                                    {l.description || "—"}
-                                  </div>
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {logs && logs.last_page > 1 && (
-                      <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
-                        <div className="text-muted small">
-                          Showing {logs.from ?? 0} - {logs.to ?? 0} of {logs.total}
-                        </div>
-
-                        <div className="d-flex gap-2 align-items-center">
-                          <select
-                            className="form-select form-select-sm"
-                            style={{ width: 110, borderRadius: 10 }}
-                            value={logsPerPage}
-                            onChange={(e) => {
-                              setLogsPerPage(Number(e.target.value));
-                              setLogsPage(1);
-                            }}
-                          >
-                            {[10, 20, 30].map((n) => (
-                              <option key={n} value={n}>
-                                {n}/page
-                              </option>
-                            ))}
-                          </select>
-
-                          <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 10 }} disabled={logs.current_page <= 1} onClick={() => setLogsPage((p) => Math.max(1, p - 1))}>
-                            <i className="bi bi-chevron-left" />
-                          </button>
-
-                          <span className="small text-muted">
-                            Page <b>{logs.current_page}</b> / {logs.last_page}
-                          </span>
-
-                          <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 10 }} disabled={logs.current_page >= logs.last_page} onClick={() => setLogsPage((p) => Math.min(logs.last_page, p + 1))}>
-                            <i className="bi bi-chevron-right" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="mt-3 text-muted small">
-                      <i className="bi bi-info-circle me-1" />
-                      Bulk delete removes the selected log entries from the database permanently.
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-auto">
-              <Footer />
-            </div>
-          </main>
-        </div>
-      </div>
+      <style>{`
+        :root{--sa-bg:#f7f3ef;--sa-panel:#fff;--sa-ink:#1d151f;--sa-muted:#7d7180;--sa-border:rgba(29,21,31,.1);--sa-gold:#f7c948;--sa-primary:var(--bs-primary,#d300b0);--sa-green:#16a34a;--sa-blue:#2563eb;--sa-red:#dc2626}
+        .sa-main{min-height:100vh;background:linear-gradient(180deg,#fbfaf8 0%,var(--sa-bg) 100%);margin-left:280px;width:calc(100% - 280px);max-width:calc(100% - 280px);padding:96px 28px 32px;transition:margin .2s,width .2s}.sa-shell{max-width:1480px;margin:0 auto}.sa-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:end;background:linear-gradient(135deg,#1d151f 0%,#322339 55%,#4e1243 100%);border-radius:20px;padding:28px;color:#fff;box-shadow:0 20px 50px rgba(29,21,31,.18)}.sa-eyebrow{display:inline-flex;align-items:center;gap:8px;color:var(--sa-gold);font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;margin-bottom:10px}.sa-title{font-family:'Playfair Display',serif;font-size:clamp(30px,4vw,46px);font-weight:900;letter-spacing:0;line-height:1.05;margin:0 0 10px}.sa-sub{max-width:760px;color:rgba(255,255,255,.78);line-height:1.7;font-size:14px;margin:0}.sa-hero-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+        .sa-btn{border:0;border-radius:10px;min-height:40px;padding:9px 14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap}.sa-btn:disabled{opacity:.55;cursor:not-allowed}.sa-btn-gold{background:var(--sa-gold);color:#251a00}.sa-btn-dark{background:#1d151f;color:#fff}.sa-btn-soft{background:#fff;color:var(--sa-ink);border:1px solid var(--sa-border)}.sa-btn-light{background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.18)}
+        .sa-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:18px 0}.sa-metric{background:#fff;border:1px solid var(--sa-border);border-radius:16px;padding:18px;box-shadow:0 12px 32px rgba(29,21,31,.06)}.sa-metric-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}.sa-metric-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;background:rgba(211,0,176,.1);color:var(--sa-primary)}.tone-gold .sa-metric-icon{background:rgba(247,201,72,.16);color:#9a6500}.tone-green .sa-metric-icon{background:rgba(22,163,74,.12);color:var(--sa-green)}.tone-blue .sa-metric-icon{background:rgba(37,99,235,.1);color:var(--sa-blue)}.tone-red .sa-metric-icon{background:rgba(220,38,38,.1);color:var(--sa-red)}.sa-metric p{font-size:12px;color:var(--sa-muted);font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin:0 0 6px}.sa-metric h3{font-size:clamp(21px,2.4vw,30px);font-weight:900;color:var(--sa-ink);margin:0;letter-spacing:0}.sa-metric small{font-size:12px;color:#9b8f9d}.sa-metric-arrow{color:#b3a6b5;font-size:13px}
+        .sa-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(320px,.65fr);gap:18px;margin-bottom:18px}.sa-two{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}.sa-panel{background:#fff;border:1px solid var(--sa-border);border-radius:16px;box-shadow:0 12px 32px rgba(29,21,31,.06);overflow:hidden;margin-bottom:18px}.sa-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 20px;border-bottom:1px solid var(--sa-border)}.sa-panel-head h2{font-family:'Playfair Display',serif;color:var(--sa-ink);font-weight:900;font-size:21px;margin:0;letter-spacing:0}.sa-panel-head p{font-size:12.5px;color:var(--sa-muted);margin:3px 0 0}.sa-chart{height:310px;padding:18px 20px 22px}.sa-health{display:grid;gap:12px;padding:18px 20px}.sa-health-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 14px;border:1px solid var(--sa-border);border-radius:12px;background:#fbfaf8}.sa-health-main{display:flex;align-items:center;gap:10px}.sa-health-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:#fff;color:var(--sa-primary)}.sa-health-title{font-weight:900;color:var(--sa-ink);font-size:13.5px;margin:0}.sa-health-sub{font-size:12px;color:var(--sa-muted);margin:2px 0 0}.sa-health-value{font-weight:900;color:var(--sa-ink);font-size:20px}
+        .sa-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}.sa-action{border:1px solid var(--sa-border);background:#fff;border-radius:14px;padding:16px;text-decoration:none;color:var(--sa-ink);box-shadow:0 10px 26px rgba(29,21,31,.05)}.sa-action:hover{color:var(--sa-ink)}.sa-action i{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:rgba(211,0,176,.1);color:var(--sa-primary);font-size:18px;margin-bottom:12px}.sa-action-title{font-weight:900;margin:0 0 4px}.sa-action-sub{font-size:12.5px;color:var(--sa-muted);margin:0;line-height:1.5}
+        .sa-filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 20px;border-bottom:1px solid var(--sa-border);background:#fbfaf8}.sa-input,.sa-select{height:38px;border:1px solid var(--sa-border);background:#fff;border-radius:10px;padding:0 11px;color:var(--sa-ink);font-size:13px;outline:0}.sa-check{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--sa-muted);font-weight:700}.sa-table-wrap{overflow:auto}.sa-table{width:100%;min-width:760px;border-collapse:separate;border-spacing:0}.sa-table th{background:#fff;color:#74677a;text-transform:uppercase;font-size:11px;letter-spacing:.08em;padding:12px 14px;border-bottom:1px solid var(--sa-border)}.sa-table td{padding:14px;border-bottom:1px solid rgba(29,21,31,.07);font-size:13.5px;color:var(--sa-ink);vertical-align:middle}.sa-table tr:hover td{background:#fffaf4}.sa-name-cell{display:flex;align-items:center;gap:10px;min-width:0}.sa-avatar{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--sa-primary),#763179);color:#fff;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0}.sa-main-text{font-weight:900;color:var(--sa-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}.sa-sub-text{font-size:12px;color:var(--sa-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px}.sa-pill{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:5px 9px;font-size:10.5px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}.sa-pill.good{background:rgba(22,163,74,.12);color:#15803d}.sa-pill.warn{background:rgba(247,201,72,.18);color:#9a6500}.sa-pill.danger{background:rgba(220,38,38,.1);color:#b91c1c}.sa-pill.muted{background:#f1edf2;color:#756878}
+        .sa-pager{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;color:var(--sa-muted);font-size:12.5px}.sa-pager>div{display:flex;align-items:center;gap:8px}.sa-pager select,.sa-pager button{height:34px;border:1px solid var(--sa-border);background:#fff;border-radius:9px;padding:0 9px;color:var(--sa-ink)}.sa-pager button:disabled{opacity:.45}.sa-empty{padding:34px 20px;text-align:center;color:var(--sa-muted);display:flex;flex-direction:column;align-items:center;gap:8px}.sa-empty i{font-size:28px;color:#c2b7c4}.sa-log-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 20px;border-bottom:1px solid var(--sa-border);background:#fbfaf8}.sa-log-select{display:flex;align-items:center;gap:8px;color:var(--sa-muted);font-size:12.5px;font-weight:800}.sa-risk{padding:18px 20px;display:grid;gap:12px}.sa-risk-item{display:flex;gap:12px;padding:14px;border-radius:12px;border:1px solid var(--sa-border);background:#fbfaf8}.sa-risk-dot{width:10px;height:10px;border-radius:999px;margin-top:5px;flex-shrink:0}.sa-risk-dot.red{background:#ef4444}.sa-risk-dot.gold{background:#f59e0b}.sa-risk-dot.green{background:#16a34a}.sa-risk-title{font-weight:900;color:var(--sa-ink);margin:0 0 3px;font-size:13.5px}.sa-risk-sub{color:var(--sa-muted);font-size:12.5px;line-height:1.5;margin:0}
+        @media(max-width:1199px){.sa-main{margin-left:0;width:100%;max-width:100%;padding:92px 16px 28px}.sa-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.sa-grid,.sa-two{grid-template-columns:1fr}.sa-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.sa-hero{grid-template-columns:1fr}.sa-hero-actions{justify-content:flex-start}}@media(max-width:640px){.sa-main{padding-left:12px;padding-right:12px}.sa-metrics,.sa-actions{grid-template-columns:1fr}.sa-hero{padding:22px}.sa-panel-head,.sa-filters,.sa-log-toolbar,.sa-pager{align-items:flex-start;flex-direction:column}.sa-btn,.sa-input,.sa-select{width:100%}.sa-pager>div{width:100%;justify-content:space-between}.sa-chart{height:260px}}
+      `}</style>
+      <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title="Platform Command Center" />
+      <PageTitle title="Super Admin Dashboard" />
+      <div className="container-fluid"><div className="row"><Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+        <main className="sa-main">{loading && <Loader message="Loading Super Admin dashboard..." />}<div className="sa-shell">
+          <section className="sa-hero"><div><div className="sa-eyebrow"><i className="bi bi-shield-lock" /> GradeQuest Super Admin</div><h1 className="sa-title">Platform Command Center</h1><p className="sa-sub">Monitor the platform areas assigned to your administrator account. Your access level is {currentUser?.super_admin_type_label || "Super Admin"}.</p></div><div className="sa-hero-actions"><button className="sa-btn sa-btn-light" onClick={() => refreshDashboard(true)}><i className="bi bi-arrow-repeat" />Refresh</button><button className="sa-btn sa-btn-gold" onClick={() => navigate("/superadmin/billing-policy")}><i className="bi bi-sliders" />Billing policy</button></div></section>
+          <section className="sa-metrics"><Metric title="Admin schools" value={admins?.total ?? 0} hint="Registered school owners" icon="building" /><Metric title="Subscribers" value={subs?.total ?? 0} hint={`${activeSubsOnPage} active on this page`} icon="people" tone="blue" /><Metric title="Premium schools" value={tierCounts.active} hint="Active premium on current page" icon="stars" tone="green" /><Metric title="Platform Revenue YTD" value={fmtNaira(ytdRevenue)} hint={`${fmtNaira(latestRevenue)} last recorded month`} icon="cash-coin" tone="gold" /></section>
+          <section className="sa-actions"><a className="sa-action" href="/superadmin/subscribers" onClick={(e) => { e.preventDefault(); navigate("/superadmin/subscribers"); }}><i className="bi bi-people" /><p className="sa-action-title">Manage subscribers</p><p className="sa-action-sub">Review school subscriptions and billing records.</p></a><a className="sa-action" href="/subplan" onClick={(e) => { e.preventDefault(); navigate("/subplan"); }}><i className="bi bi-boxes" /><p className="sa-action-title">Package settings</p><p className="sa-action-sub">Configure pricing, student limits, and features.</p></a><a className="sa-action" href="/superadmin/twilio-whatsapp" onClick={(e) => { e.preventDefault(); navigate("/superadmin/twilio-whatsapp"); }}><i className="bi bi-whatsapp" /><p className="sa-action-title">WhatsApp gateway</p><p className="sa-action-sub">Check Twilio readiness and testing.</p></a><a className="sa-action" href="/demo-bookers" onClick={(e) => { e.preventDefault(); navigate("/demo-bookers"); }}><i className="bi bi-calendar-check" /><p className="sa-action-title">Demo requests</p><p className="sa-action-sub">Follow up with interested schools.</p></a></section>
+          <section className="sa-grid"><Panel title="Revenue trend" subtitle="Monthly platform revenue performance."><div className="sa-chart"><canvas ref={chartRef} /></div></Panel><Panel title="Platform health" subtitle="Signals that need attention."><div className="sa-health"><div className="sa-health-row"><div className="sa-health-main"><div className="sa-health-icon"><i className="bi bi-check-circle" /></div><div><p className="sa-health-title">Active subscribers</p><p className="sa-health-sub">Active status on current page</p></div></div><span className="sa-health-value">{activeSubsOnPage}</span></div><div className="sa-health-row"><div className="sa-health-main"><div className="sa-health-icon"><i className="bi bi-exclamation-triangle" /></div><div><p className="sa-health-title">Expired premium</p><p className="sa-health-sub">May need renewal follow-up</p></div></div><span className="sa-health-value">{tierCounts.expired}</span></div><div className="sa-health-row"><div className="sa-health-main"><div className="sa-health-icon"><i className="bi bi-activity" /></div><div><p className="sa-health-title">Activity logs</p><p className="sa-health-sub">Recent platform actions</p></div></div><span className="sa-health-value">{logs?.total ?? 0}</span></div></div></Panel></section>
+          <Panel title="Schools and subscriptions" subtitle="Monitor current package status and renewal state." action={<button className="sa-btn sa-btn-soft" onClick={applySubscriberFilters}><i className="bi bi-funnel" />Apply filters</button>}>
+            <div className="sa-filters"><select className="sa-select" value={subsStatus} onChange={(e) => setSubsStatus(e.target.value)}><option value="">All status</option><option value="active">Active</option><option value="pending">Pending</option><option value="cancelled">Cancelled</option><option value="canceled">Canceled</option><option value="expired">Expired</option></select><select className="sa-select" value={subsTier} onChange={(e) => setSubsTier(e.target.value)}><option value="all">All packages</option><option value="core">Core</option><option value="premium">Premium schools</option><option value="premium_active">Premium active</option><option value="premium_expired">Premium expired</option></select><input className="sa-input" style={{ minWidth: 260 }} placeholder="Search school owner or email" value={subsSearch} onChange={(e) => setSubsSearch(e.target.value)} /><label className="sa-check"><input type="checkbox" checked={activeOnly} onChange={(e) => setActiveOnly(e.target.checked)} />Active only</label></div>
+            <div className="sa-table-wrap"><table className="sa-table"><thead><tr><th>School owner</th><th>Email</th><th>Package</th><th>Tier</th><th>Status</th><th>Start</th><th>End</th></tr></thead><tbody>{visibleSubs.length === 0 ? <tr><td colSpan={7}><Empty text="No subscribers match this selection." /></td></tr> : visibleSubs.map((s) => { const tier = deriveTier(s); const owner = personName(s.user); return <tr key={s.id}><td><div className="sa-name-cell"><div className="sa-avatar">{initials(owner)}</div><div><div className="sa-main-text">{owner}</div><div className="sa-sub-text">School ID: {s.user?.school_id ?? "Not linked"}</div></div></div></td><td><span className="sa-sub-text">{s.user?.email || "Not provided"}</span></td><td>{s.plan?.name || "Core"}</td><td><span className={tierClass(tier)}>{tierLabel(tier)}</span></td><td><span className={statusClass(s.status)}>{s.status || "Unknown"}</span></td><td>{fmtDate(s.starts_at)}</td><td>{fmtDate(s.ends_at)}</td></tr>; })}</tbody></table></div>
+            <Pager data={subs} perPage={subsPerPage} sizes={[10, 20, 30, 50]} onPage={setSubsPage} onPerPage={(n) => { setSubsPerPage(n); setSubsPage(1); }} />
+          </Panel>
+          <section className="sa-two">
+            <Panel title="School owners" subtitle="Recently registered administrator accounts." action={<button className="sa-btn sa-btn-soft" onClick={applyAdminSearch}><i className="bi bi-search" />Search</button>}>
+              <div className="sa-filters"><input className="sa-input" style={{ minWidth: 260 }} placeholder="Search school owner" value={adminsSearch} onChange={(e) => setAdminsSearch(e.target.value)} /></div><div className="sa-table-wrap"><table className="sa-table" style={{ minWidth: 560 }}><thead><tr><th>Name</th><th>Email</th><th>School</th></tr></thead><tbody>{(admins?.data || []).length === 0 ? <tr><td colSpan={3}><Empty text="No school owner found." /></td></tr> : (admins?.data || []).map((a) => { const n = personName(a); return <tr key={a.id}><td><div className="sa-name-cell"><div className="sa-avatar">{initials(n)}</div><div><div className="sa-main-text">{n}</div><div className="sa-sub-text">Joined {fmtDate(a.created_at)}</div></div></div></td><td><span className="sa-sub-text">{a.email || "Not provided"}</span></td><td>{a.school?.school_name || "Not set"}</td></tr>; })}</tbody></table></div><Pager data={admins} perPage={adminsPerPage} sizes={[8, 12, 20]} onPage={setAdminsPage} onPerPage={(n) => { setAdminsPerPage(n); setAdminsPage(1); }} />
+            </Panel>
+            <Panel title="Operational risk" subtitle="Business follow-up items for the platform team."><div className="sa-risk"><div className="sa-risk-item"><span className="sa-risk-dot red" /><div><p className="sa-risk-title">Expired premium accounts</p><p className="sa-risk-sub">{tierCounts.expired} premium account(s) on this page may need renewal or downgrade follow-up.</p></div></div><div className="sa-risk-item"><span className="sa-risk-dot gold" /><div><p className="sa-risk-title">Core package schools</p><p className="sa-risk-sub">{tierCounts.core} school(s) on this page are on Core. They are good candidates for GradeQuestPlus upgrade prompts.</p></div></div><div className="sa-risk-item"><span className="sa-risk-dot green" /><div><p className="sa-risk-title">Platform activity</p><p className="sa-risk-sub">Keep reviewing activity logs for billing override, access changes, and support-sensitive actions.</p></div></div></div></Panel>
+          </section>
+          <Panel title="Platform activity" subtitle="Audit trail of important activity across GradeQuest." action={<button className="sa-btn sa-btn-soft" onClick={reloadLogs}><i className="bi bi-arrow-repeat" />Reload</button>}>
+            <div className="sa-log-toolbar"><label className="sa-log-select"><input type="checkbox" checked={allLogsSelected} onChange={toggleAllLogs} />Select all on this page</label><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><button className="sa-btn sa-btn-soft" disabled={!selectedLogs.length || deletingLogs} onClick={() => setSelectedLogs([])}>Clear</button><button className="sa-btn sa-btn-dark" disabled={!selectedLogs.length || deletingLogs} onClick={deleteSelectedLogs}><i className="bi bi-trash3" />{deletingLogs ? "Deleting" : `Delete ${selectedLogs.length || ""}`}</button></div></div>
+            <div className="sa-table-wrap"><table className="sa-table"><thead><tr><th style={{ width: 42 }}></th><th>When</th><th>User</th><th>Action</th><th>Description</th></tr></thead><tbody>{(logs?.data || []).length === 0 ? <tr><td colSpan={5}><Empty text="No platform activity found." /></td></tr> : (logs?.data || []).map((l) => <tr key={l.id}><td><input type="checkbox" checked={selectedLogs.includes(l.id)} onChange={() => toggleLog(l.id)} /></td><td>{fmtDate(l.created_at)}</td><td><div className="sa-main-text">{l.user_name || "System"}</div></td><td><span className="sa-pill muted">{l.action || "Activity"}</span></td><td><span className="sa-sub-text">{l.description || "No description"}</span></td></tr>)}</tbody></table></div><Pager data={logs} perPage={logsPerPage} sizes={[10, 20, 30]} onPage={setLogsPage} onPerPage={(n) => { setLogsPerPage(n); setLogsPage(1); }} />
+          </Panel>
+          <div className="mt-auto"><Footer /></div>
+        </div></main></div></div>
     </>
   );
 }
+
+

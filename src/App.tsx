@@ -1,88 +1,101 @@
+﻿import { Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import "aos/dist/aos.css";
-import Login from "./pages/login";
-import HomePage from "./pages/HomePage";
-import Signup from "./pages/signup";
-import Dashboard from "./pages/Dashboard";
 import RequireAuth from "./auth/RequireAuth";
-import Unauthorized from "./pages/Unauthorized";
-
-import StudentsPage from "./pages/Admin/students/StudentsPage";
-import AttendancePage from "./pages/Admin/students/AttendancePage";
-import StudentReportPage from "./pages/Admin/students/StudentReportPage";
-import StudentRegisterPage from "./pages/Admin/students/StudentRegisterPage";
-import FinancialRecords from "./pages/Admin/fianance/FinancialRecord";
-import AddResultV2Page from "./pages/Admin/StudentResult/AddResultV2Page";
-import ResultBatchSetupPage from "./pages/Admin/StudentResult/ResultBatchSetupPage";
-import ResultUploadPage from "./pages/Admin/StudentResult/ResultUploadPage";
-import ResultTemplateSettingsPage from "./pages/Admin/StudentResult/ResultTemplateSettingsPage";
-import ShowResult from "./pages/Admin/StudentResult/ShowResult";
-import TermsPage from "./pages/Admin/Academics/AcademicCalendarPage";
-import BroadsheetPage from "./pages/Admin/StudentResult/BroadsheetPage";
-import LevelsPage from "./pages/Admin/Level/LevelsPage";
-import SubjectsPage from "./pages/Admin/Subjects/SubjectsPage";
-import DepartmentPage from "./pages/Admin/Academics/DepartmentPage";
-import SectionsPage from "./pages/Admin/Academics/SectionsPage";
-import FeeMethodsPage from "./pages/Admin/Fees/FeeMethodsPage";
-import FeeStructurePage from "./pages/Admin/Fees/FeeStructurePage";
-import StudentFeePaymentPage from "./pages/Admin/Fees/StudentFeePaymentPage";
-import ReceiptApprovalPage from "./pages/Admin/Fees/ReceiptApprovalPage";
-import SchoolFeesReportPage from "./pages/Admin/Fees/FeesReport";
-import SettingsPage from "./pages/Admin/School/SettingsPage";
-import PromoteStudentsPage from "./pages/Admin/students/PromoteStudentsPage";
-import BillingPage from "./pages/Admin/Billing/BillingPage";
-import CheckoutPage from "./pages/Admin/Billing/CheckoutPage";
-import GradequestInvoicePaymentPage from "./pages/Admin/Billing/GradequestInvoicePaymentPage";
-import WalletPage from "./pages/Admin/Wallet/WalletPage";
-import AdminUserDetailsPage from "./pages/Super-Admin/AdminUserDetailsPage";
-import SubscribersManagementPage from "./pages/Super-Admin/SubscribersManagementPage";
-import MarketingEmailPage from "./pages/Super-Admin/MarketingEmailPage";
-import SubscriptionPlansPage from "./pages/Super-Admin/SubscriptionPlansPage";
-import BillingPolicyPage from "./pages/Super-Admin/BillingPolicyPage";
-import TwilioWhatsappPage from "./pages/Super-Admin/TwilioWhatsappPage";
-import BlogsPage from "./pages/Super-Admin/BlogsPage";
-import TestimonialsPage from "./pages/Super-Admin/TestimonialsPage";
-import StaffQrAttendancePage from "./pages/Admin/Biometric/StaffQrAttendancePage";
-import StaffAttendanceLogsPage from "./pages/Admin/Biometric/StaffAttendanceLogsPage";
-import StaffAttendanceSettingsPage from "./pages/Admin/Biometric/AttendanceSettingsPage";
-import TeachersPage from "./pages/Admin/Teacher/TeachersPage";
-import TeacherSubjectsPage from "./pages/Admin/Teacher/TeacherSubjectsPage";
-import ParentsPage from "./pages/Admin/Parent/ParentsPage";
-import StudentMyFeesPage from "./pages/Admin/students/StudentMyFeesPage";
-import StudentMySubjectsPage from "./pages/Admin/students/StudentMySubjectsPage";
-import ParentChildrenPage from "./pages/Admin/Parent/ParentChildrenPage";
-import SchoolBankAccountsPage from "./pages/Admin/School/SchoolBankAccountsPage";
-import ChildFeeDetailsPage from "./pages/Admin/Parent/ChildFeeDetailsPage";
-import ReceiptUploadPage from "./pages/Admin/Fees/ReceiptUploadPage";
-import ParentPaymentSummaryPage from "./pages/Admin/Parent/ParentPaymentSummaryPage";
-import ResultPinsPage from "./pages/Admin/StudentResult/ResultPinsPage";
-import CheckResultPage from "./pages/Admin/StudentResult/CheckResultPage";
-
 import { FeatureProvider } from "./contexts/FeatureContext";
-import OnboardingPage from "./pages/Onboarding/OnboardingPage";
 import OnboardingGuard from "./auth/OnboardingGuard";
-import ProfileSettingsPage from "./pages/ProfileSettingsPage";
-import NotificationsPage from "./pages/Notification/NotificationsPage";
-import InvoiceNotificationsPage from "./pages/Invoices/InvoiceNotificationsPage";
-import InvoiceNotificationDetailsPage from "./pages/Invoices/InvoiceNotificationDetailsPage";
-import PaymentInstructionsPage from "./pages/Invoices/PaymentInstructionsPage";
-import BookDemo from "./pages/Bookdemo ";
-import DemoBookingsPage from "./pages/Super-Admin/DemoBookingsPage";
-import BursarsPage from "./pages/Admin/Bursar/BursarsPage";
-import ForgotPasswordPage from "./pages/Forgotpasswordpage";
-import ResetPasswordPage from "./pages/Resetpasswordpage";
-import ResultSubmissionDeadlinePage from "./pages/Admin/StudentResult/ResultSubmissionDeadlinePage";
-import ResultMonitoringPage from "./pages/Admin/StudentResult/Resultmonitoringpage";
-import WhatsAppSettingsPage from "./pages/Admin/School/WhatsAppSettingsPage";
-import OnlinePayFeesPage from "./pages/Admin/Billing/OnlinePayFeesPage";
-import PublicFeePaymentPage from "./pages/PublicFeePaymentPage";
+import Loader from "./components/ui/dashboardLoader";
+
+const Login = lazy(() => import("./pages/login"));
+const HomePage = lazy(() => import("./pages/HomePage"));
+const Signup = lazy(() => import("./pages/signup"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Unauthorized = lazy(() => import("./pages/Unauthorized"));
+const StudentsPage = lazy(() => import("./pages/Admin/students/StudentsPage"));
+const AttendancePage = lazy(() => import("./pages/Admin/students/AttendancePage"));
+const StudentReportPage = lazy(() => import("./pages/Admin/students/StudentReportPage"));
+const StudentRegisterPage = lazy(() => import("./pages/Admin/students/StudentRegisterPage"));
+const FinancialRecords = lazy(() => import("./pages/Admin/fianance/FinancialRecord"));
+const AddResultV2Page = lazy(() => import("./pages/Admin/StudentResult/AddResultV2Page"));
+const ResultBatchSetupPage = lazy(() => import("./pages/Admin/StudentResult/ResultBatchSetupPage"));
+const ResultUploadPage = lazy(() => import("./pages/Admin/StudentResult/ResultUploadPage"));
+const AdminResultReviewPage = lazy(() => import("./pages/Admin/StudentResult/AdminResultReviewPage"));
+const ResultTemplateSettingsPage = lazy(() => import("./pages/Admin/StudentResult/ResultTemplateSettingsPage"));
+const ShowResult = lazy(() => import("./pages/Admin/StudentResult/ShowResult"));
+const TermsPage = lazy(() => import("./pages/Admin/Academics/AcademicCalendarPage"));
+const BroadsheetPage = lazy(() => import("./pages/Admin/StudentResult/BroadsheetPage"));
+const LevelsPage = lazy(() => import("./pages/Admin/Level/LevelsPage"));
+const SubjectsPage = lazy(() => import("./pages/Admin/Subjects/SubjectsPage"));
+const DepartmentPage = lazy(() => import("./pages/Admin/Academics/DepartmentPage"));
+const SectionsPage = lazy(() => import("./pages/Admin/Academics/SectionsPage"));
+const FeeMethodsPage = lazy(() => import("./pages/Admin/Fees/FeeMethodsPage"));
+const FeeStructurePage = lazy(() => import("./pages/Admin/Fees/FeeStructurePage"));
+const StudentFeePaymentPage = lazy(() => import("./pages/Admin/Fees/StudentFeePaymentPage"));
+const ReceiptApprovalPage = lazy(() => import("./pages/Admin/Fees/ReceiptApprovalPage"));
+const SchoolFeesReportPage = lazy(() => import("./pages/Admin/Fees/FeesReport"));
+const SettingsPage = lazy(() => import("./pages/Admin/School/SettingsPage"));
+const PromoteStudentsPage = lazy(() => import("./pages/Admin/students/PromoteStudentsPage"));
+const BillingPage = lazy(() => import("./pages/Admin/Billing/BillingPage"));
+const CheckoutPage = lazy(() => import("./pages/Admin/Billing/CheckoutPage"));
+const GradequestInvoicePaymentPage = lazy(() => import("./pages/Admin/Billing/GradequestInvoicePaymentPage"));
+const WalletPage = lazy(() => import("./pages/Admin/Wallet/WalletPage"));
+const AdminUserDetailsPage = lazy(() => import("./pages/Super-Admin/AdminUserDetailsPage"));
+const SubscribersManagementPage = lazy(() => import("./pages/Super-Admin/SubscribersManagementPage"));
+const MarketingEmailPage = lazy(() => import("./pages/Super-Admin/MarketingEmailPage"));
+const SalesRepresentativesPage = lazy(() => import("./pages/Super-Admin/SalesRepresentativesPage"));
+const SalesLeadsManagementPage = lazy(() => import("./pages/Super-Admin/SalesLeadsPage"));
+const SalesPayoutsPage = lazy(() => import("./pages/Super-Admin/SalesPayoutsPage"));
+const PlatformStaffPage = lazy(() => import("./pages/Super-Admin/PlatformStaffPage"));
+const SubscriptionPlansPage = lazy(() => import("./pages/Super-Admin/SubscriptionPlansPage"));
+const BillingPolicyPage = lazy(() => import("./pages/Super-Admin/BillingPolicyPage"));
+const TwilioWhatsappPage = lazy(() => import("./pages/Super-Admin/TwilioWhatsappPage"));
+const BlogsPage = lazy(() => import("./pages/Super-Admin/BlogsPage"));
+const TestimonialsPage = lazy(() => import("./pages/Super-Admin/TestimonialsPage"));
+const StaffQrAttendancePage = lazy(() => import("./pages/Admin/Biometric/StaffQrAttendancePage"));
+const StaffAttendanceLogsPage = lazy(() => import("./pages/Admin/Biometric/StaffAttendanceLogsPage"));
+const StaffAttendanceSettingsPage = lazy(() => import("./pages/Admin/Biometric/AttendanceSettingsPage"));
+const TeachersPage = lazy(() => import("./pages/Admin/Teacher/TeachersPage"));
+const TeacherSubjectsPage = lazy(() => import("./pages/Admin/Teacher/TeacherSubjectsPage"));
+const ParentsPage = lazy(() => import("./pages/Admin/Parent/ParentsPage"));
+const StudentMyFeesPage = lazy(() => import("./pages/Admin/students/StudentMyFeesPage"));
+const StudentMySubjectsPage = lazy(() => import("./pages/Admin/students/StudentMySubjectsPage"));
+const ParentChildrenPage = lazy(() => import("./pages/Admin/Parent/ParentChildrenPage"));
+const SchoolBankAccountsPage = lazy(() => import("./pages/Admin/School/SchoolBankAccountsPage"));
+const ChildFeeDetailsPage = lazy(() => import("./pages/Admin/Parent/ChildFeeDetailsPage"));
+const ReceiptUploadPage = lazy(() => import("./pages/Admin/Fees/ReceiptUploadPage"));
+const ParentPaymentSummaryPage = lazy(() => import("./pages/Admin/Parent/ParentPaymentSummaryPage"));
+const ResultPinsPage = lazy(() => import("./pages/Admin/StudentResult/ResultPinsPage"));
+const CheckResultPage = lazy(() => import("./pages/Admin/StudentResult/CheckResultPage"));
+const OnboardingPage = lazy(() => import("./pages/Onboarding/OnboardingPage"));
+const ProfileSettingsPage = lazy(() => import("./pages/ProfileSettingsPage"));
+const NotificationsPage = lazy(() => import("./pages/Notification/NotificationsPage"));
+const InvoiceNotificationsPage = lazy(() => import("./pages/Invoices/InvoiceNotificationsPage"));
+const InvoiceNotificationDetailsPage = lazy(() => import("./pages/Invoices/InvoiceNotificationDetailsPage"));
+const PaymentInstructionsPage = lazy(() => import("./pages/Invoices/PaymentInstructionsPage"));
+const BookDemo = lazy(() => import("./pages/Bookdemo "));
+const DemoBookingsPage = lazy(() => import("./pages/Super-Admin/DemoBookingsPage"));
+const BursarsPage = lazy(() => import("./pages/Admin/Bursar/BursarsPage"));
+const ForgotPasswordPage = lazy(() => import("./pages/Forgotpasswordpage"));
+const ResetPasswordPage = lazy(() => import("./pages/Resetpasswordpage"));
+const ResultSubmissionDeadlinePage = lazy(() => import("./pages/Admin/StudentResult/ResultSubmissionDeadlinePage"));
+const ResultMonitoringPage = lazy(() => import("./pages/Admin/StudentResult/Resultmonitoringpage"));
+const CbtExamsPage = lazy(() => import("./pages/Admin/CBT/CbtExamsPage"));
+const StudentCbtExamsPage = lazy(() => import("./pages/Student/CBT/StudentCbtExamsPage"));
+const WhatsAppSettingsPage = lazy(() => import("./pages/Admin/School/WhatsAppSettingsPage"));
+const OnlinePayFeesPage = lazy(() => import("./pages/Admin/Billing/OnlinePayFeesPage"));
+const PublicFeePaymentPage = lazy(() => import("./pages/PublicFeePaymentPage"));
+const SalesLeadsPage = lazy(() => import("./pages/Sales/SalesLeadsPage"));
+const SalesCommissionsPage = lazy(() => import("./pages/Sales/SalesCommissionsPage"));
+const SalesPayoutSettingsPage = lazy(() => import("./pages/Sales/SalesPayoutSettingsPage"));
+const ChangeInitialPasswordPage = lazy(() => import("./pages/ChangeInitialPasswordPage"));
 
 function App() {
   return (
     <BrowserRouter>
       <FeatureProvider>
+        <Suspense fallback={<Loader message="Preparing page..." />}>
         <Routes>
-          {/* ✅ PUBLIC ROUTES (NO GUARDS) */}
+          {/* Ã¢Å“â€¦ PUBLIC ROUTES (NO GUARDS) */}
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Signup />} />
@@ -94,7 +107,16 @@ function App() {
            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-          {/* ✅ PROTECTED ROUTES (RequireAuth + OnboardingGuard) */}
+          {/* Ã¢Å“â€¦ PROTECTED ROUTES (RequireAuth + OnboardingGuard) */}
+          <Route
+            path="/change-password"
+            element={
+              <RequireAuth roles={["Admin", "Sales-Representative", "Platform-Staff"]}>
+                <ChangeInitialPasswordPage />
+              </RequireAuth>
+            }
+          />
+
           <Route
             path="/onboarding"
             element={
@@ -107,7 +129,7 @@ function App() {
           <Route
             path="/dashboard"
             element={
-              <RequireAuth roles={["Admin", "Teacher", "Super-Admin", "Student", "Parent", "Bursar"]}>
+              <RequireAuth roles={["Admin", "Teacher", "Super-Admin", "Platform-Staff", "Student", "Parent", "Bursar", "Sales-Representative"]}>
                 <OnboardingGuard>
                   <Dashboard />
                 </OnboardingGuard>
@@ -128,7 +150,7 @@ function App() {
              <Route
             path="/notifications"
             element={
-              <RequireAuth roles={["Admin", "Teacher", "Super-Admin", "Student", "Parent", "Bursar"]}>
+              <RequireAuth roles={["Admin", "Teacher", "Super-Admin", "Platform-Staff", "Student", "Parent", "Bursar"]}>
                 <OnboardingGuard>
                   <NotificationsPage />
                 </OnboardingGuard>
@@ -249,6 +271,17 @@ function App() {
           />
 
           <Route
+            path="/results/review"
+            element={
+              <RequireAuth roles={["Admin"]}>
+                <OnboardingGuard>
+                  <AdminResultReviewPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
             path="/results/upload"
             element={
               <RequireAuth roles={["Admin", "Teacher"]}>
@@ -298,6 +331,28 @@ function App() {
               <RequireAuth roles={["Admin", "Teacher"]}>
                 <OnboardingGuard>
                   <BroadsheetPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/cbt/exams"
+            element={
+              <RequireAuth roles={["Admin", "Teacher"]}>
+                <OnboardingGuard>
+                  <CbtExamsPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/student/cbt/exams"
+            element={
+              <RequireAuth roles={["Student"]}>
+                <OnboardingGuard>
+                  <StudentCbtExamsPage />
                 </OnboardingGuard>
               </RequireAuth>
             }
@@ -640,11 +695,44 @@ function App() {
             }
           />
 
+
+          <Route
+            path="/sales/leads"
+            element={
+              <RequireAuth roles={["Sales-Representative"]}>
+                <OnboardingGuard>
+                  <SalesLeadsPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/sales/commissions"
+            element={
+              <RequireAuth roles={["Sales-Representative"]}>
+                <OnboardingGuard>
+                  <SalesCommissionsPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/sales/payout-settings"
+            element={
+              <RequireAuth roles={["Sales-Representative"]}>
+                <OnboardingGuard>
+                  <SalesPayoutSettingsPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
           {/* Super Admin */}
           <Route
             path="/superadmin/subscribers"
             element={
-              <RequireAuth roles={["Super-Admin"]}>
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["billing"]}>
                 <OnboardingGuard>
                   <SubscribersManagementPage />
                 </OnboardingGuard>
@@ -654,7 +742,7 @@ function App() {
               <Route
             path="/demo-bookers"
             element={
-              <RequireAuth roles={["Super-Admin"]}>
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["sales"]}>
                 <OnboardingGuard>
                   <DemoBookingsPage />
                 </OnboardingGuard>
@@ -662,9 +750,47 @@ function App() {
             }
           />
           <Route
+            path="/superadmin/platform-staff"
+            element={
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["staff"]}>
+                <OnboardingGuard>
+                  <PlatformStaffPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />          <Route
+            path="/superadmin/sales-representatives"
+            element={
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["sales"]}>
+                <OnboardingGuard>
+                  <SalesRepresentativesPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/superadmin/sales-leads"
+            element={
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["sales"]}>
+                <OnboardingGuard>
+                  <SalesLeadsManagementPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />          <Route
+            path="/superadmin/sales-payouts"
+            element={
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["finance"]}>
+                <OnboardingGuard>
+                  <SalesPayoutsPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
             path="/superadmin/send-message"
             element={
-              <RequireAuth roles={["Super-Admin"]}>
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["marketing"]}>
                 <OnboardingGuard>
                   <MarketingEmailPage />
                 </OnboardingGuard>
@@ -674,7 +800,7 @@ function App() {
           <Route
             path="/subplan"
             element={
-              <RequireAuth roles={["Super-Admin"]}>
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["billing"]}>
                 <OnboardingGuard>
                   <SubscriptionPlansPage />
                 </OnboardingGuard>
@@ -684,7 +810,7 @@ function App() {
           <Route
             path="/superadmin/billing-policy"
             element={
-              <RequireAuth roles={["Super-Admin"]}>
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["billing"]}>
                 <OnboardingGuard>
                   <BillingPolicyPage />
                 </OnboardingGuard>
@@ -694,7 +820,7 @@ function App() {
           <Route
             path="/superadmin/twilio-whatsapp"
             element={
-              <RequireAuth roles={["Super-Admin"]}>
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["support"]}>
                 <OnboardingGuard>
                   <TwilioWhatsappPage />
                 </OnboardingGuard>
@@ -704,7 +830,7 @@ function App() {
           <Route
             path="/blogs"
             element={
-              <RequireAuth roles={["Super-Admin"]}>
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["content"]}>
                 <OnboardingGuard>
                   <BlogsPage />
                 </OnboardingGuard>
@@ -714,7 +840,7 @@ function App() {
           <Route
             path="/testimonials"
             element={
-              <RequireAuth roles={["Super-Admin"]}>
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["content"]}>
                 <OnboardingGuard>
                   <TestimonialsPage />
                 </OnboardingGuard>
@@ -724,7 +850,7 @@ function App() {
           <Route
             path="/admin-users/view/:id"
             element={
-              <RequireAuth roles={["Super-Admin"]}>
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["support"]}>
                 <OnboardingGuard>
                   <AdminUserDetailsPage />
                 </OnboardingGuard>
@@ -757,7 +883,7 @@ function App() {
              <Route
             path="/user/profile"
             element={
-              <RequireAuth roles={["Student", "Parent", "Teacher", "Admin", "Bursar", "Super-Admin"]}>
+              <RequireAuth roles={["Student", "Parent", "Teacher", "Admin", "Bursar", "Super-Admin", "Platform-Staff", "Sales-Representative"]}>
                 <OnboardingGuard>
                   <ProfileSettingsPage />
                 </OnboardingGuard>
@@ -769,11 +895,27 @@ function App() {
      
 
         </Routes>
-
-        
+        </Suspense>
       </FeatureProvider>
     </BrowserRouter>
   );
 }
 
 export default App;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

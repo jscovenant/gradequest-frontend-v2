@@ -1,10 +1,11 @@
-import AdminDashboard from "../components/DashboardPages/AdminDasboard";
+﻿import AdminDashboard from "../components/DashboardPages/AdminDasboard";
 import TeacherDashboard from "../components/DashboardPages/TeacherDashboard";
 import StudentDashboard from "../components/DashboardPages/StudentDashboard";
 import { getUser } from "../utils/token";
 import SuperAdminDashboard from "../components/DashboardPages/SuperAdminDashboard";
 import ParentDashboardPage from "./Admin/Parent/ParentDashboardPage";
 import BursarDashboard from "../components/DashboardPages/BursarDashboard";
+import SalesDashboardPage from "./Sales/SalesDashboardPage";
 
 export default function Dashboard() {
   const user = getUser();
@@ -26,6 +27,7 @@ export default function Dashboard() {
       );
 
      case "Super-Admin":
+     case "Platform-Staff":
       return (
         <div className="pt-5">
           <SuperAdminDashboard />
@@ -59,6 +61,12 @@ export default function Dashboard() {
           <ParentDashboardPage />
         </div>
       );
+    case "Sales-Representative":
+      return (
+        <div className="pt-5">
+          <SalesDashboardPage />
+        </div>
+      );
 
     default:
       return (
@@ -68,3 +76,5 @@ export default function Dashboard() {
       );
   }
 }
+
+

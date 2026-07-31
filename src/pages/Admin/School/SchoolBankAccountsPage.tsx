@@ -61,11 +61,11 @@ export default function SchoolBankAccountsPage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [items, setItems] = useState<SchoolBankAccount[]>([]);
+  const [billingPaymentMode, setBillingPaymentMode] = useState<"online" | "offline">("offline");
   const [error, setError] = useState<string>("");
 
   // UI state
   const [query, setQuery] = useState("");
-  const [modeFilter, setModeFilter] = useState<'all' | 'online' | 'offline'>('all'); // NEW
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<SchoolBankAccount | null>(null);
 
@@ -108,7 +108,7 @@ export default function SchoolBankAccountsPage() {
     setAccountNumber(row.account_number || "");
     setCurrency(row.currency || "NGN");
     setIsActive(isTruthy(row.is_active));
-    setAcceptsOnlinePayment(acceptsOnline(row)); // NEW
+    setAcceptsOnlinePayment(billingPaymentMode === "online");
     setSortOrder(Number(row.sort_order?? 0));
     setVerified(true); // assume verified if editing existing
     setShowForm(true);
@@ -118,8 +118,16 @@ export default function SchoolBankAccountsPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await authApi.get<SchoolBankAccount[]>("/school/bank-accounts");
-      setItems(res.data || []);
+      const [accountsRes, billingRes] = await Promise.all([
+        authApi.get<SchoolBankAccount[]>("/school/bank-accounts"),
+        authApi.get("/school/billing/settings"),
+      ]);
+      const mode = billingRes.data?.settings?.payment_mode === "online" ? "online" : "offline";
+      setBillingPaymentMode(mode);
+      setItems((accountsRes.data || []).map((account) => ({
+        ...account,
+        online_payment_enabled: mode === "online" && isTruthy(account.is_active),
+      })));
     } catch (e: any) {
       console.error(e);
       setError(e?.response?.data?.message || "Failed to load bank accounts.");
@@ -176,13 +184,8 @@ export default function SchoolBankAccountsPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let data = items;
+
 
-    // NEW: Filter by payment mode
-    if (modeFilter === 'online') {
-      data = data.filter(x => acceptsOnline(x));
-    } else if (modeFilter === 'offline') {
-      data = data.filter(x =>!acceptsOnline(x));
-    }
 
     if (!q) return data;
     return data.filter((x) => {
@@ -191,12 +194,12 @@ export default function SchoolBankAccountsPage() {
        .toLowerCase();
       return hay.includes(q);
     });
-  }, [items, query, modeFilter]);
+  }, [items, query]);
 
   const activeCount = useMemo(() => items.filter((x) => isTruthy(x.is_active)).length, [items]);
   const inactiveCount = useMemo(() => items.filter((x) =>!isTruthy(x.is_active)).length, [items]);
-  const onlineCount = useMemo(() => items.filter((x) => acceptsOnline(x) && isTruthy(x.is_active)).length, [items]); // NEW
-  const offlineOnlyCount = useMemo(() => items.filter((x) =>!acceptsOnline(x) && isTruthy(x.is_active)).length, [items]); // NEW
+  const onlineCount = useMemo(() => billingPaymentMode === "online" ? activeCount : 0, [activeCount, billingPaymentMode]);
+  const offlineOnlyCount = useMemo(() => billingPaymentMode === "offline" ? activeCount : 0, [activeCount, billingPaymentMode]);
   const validateForm = () => {
     const errs: string[] = [];
     if (!bankName.trim()) errs.push("Bank name is required.");
@@ -272,17 +275,24 @@ export default function SchoolBankAccountsPage() {
     }
   };
 
-  // NEW: Toggle online payment
   const quickToggleOnline = async (row: SchoolBankAccount) => {
     setError("");
+    setSaving(true);
+    const targetMode = billingPaymentMode === "online" ? "offline" : "online";
     try {
-      await authApi.put(`/school/bank-accounts/${row.id}`, {
-        online_payment_enabled: !acceptsOnline(row),
-      });
+      if (targetMode === "online" && !row.paystack_subaccount_code) {
+        await authApi.put(`/school/bank-accounts/${row.id}`, {
+          online_payment_enabled: true,
+        });
+      } else {
+        await authApi.put("/school/billing/settings", { payment_mode: targetMode });
+      }
       await load();
     } catch (e: any) {
       console.error(e);
       setError(e?.response?.data?.message || "Unable to update payment mode.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -647,26 +657,10 @@ export default function SchoolBankAccountsPage() {
                   <div className="db-panel-head">
                     <div>
                       <p className="db-panel-title">Accounts</p>
-                      <p className="db-panel-sub">Search, toggle active, edit or delete.</p>
+                      <p className="db-panel-sub">Search, update account status, edit or delete.</p>
                     </div>
                     <div className="d-flex align-items-center gap-2 flex-wrap">
-                      {/* NEW: Mode filter */}
-                      <div className="db-segmented">
-                        <button
-                          className={modeFilter === 'all'? 'active' : ''}
-                          onClick={() => setModeFilter('all')}
-                        >All</button>
-                        <button
-                          className={modeFilter === 'online'? 'active' : ''}
-                          onClick={() => setModeFilter('online')}
-                        >Online</button>
-                        <button
-                          className={modeFilter === 'offline'? 'active' : ''}
-                          onClick={() => setModeFilter('offline')}
-                        >Offline</button>
-                      </div>
-
-                      <div className="input-group" style={{ width: 280 }}>
+<div className="input-group" style={{ width: 280 }}>
                         <span className="input-group-text bg-white" style={{ borderRadius: "10px 0 0 10px" }}>
                           <i className="bi bi-search" />
                         </span>
@@ -709,7 +703,7 @@ export default function SchoolBankAccountsPage() {
                       <div className="d-flex flex-column gap-2">
                         {filtered.map((row) => {
                           const active = isTruthy(row.is_active);
-                          const online = acceptsOnline(row);
+                          const online = billingPaymentMode === "online" && active;
                           return (
                             <div key={row.id} className="db-rowcard">
                               <div className="d-flex justify-content-between gap-3 flex-wrap">
@@ -721,21 +715,7 @@ export default function SchoolBankAccountsPage() {
                                     <div className="d-flex align-items-center gap-2 flex-wrap">
                                       <div className="db-strong" style={{ fontWeight: 900 }}>
                                         {row.bank_name}
-                                        {row.bank_code? <span className="db-mini"> • {row.bank_code}</span> : null}
                                       </div>
-                                      {/* NEW: Payment mode badge */}
-                                      <span
-                                        className="db-pill"
-                                        style={{
-                                          background: online? "rgba(99,102,241,0.14)" : "rgba(148,163,184,0.14)",
-                                          color: online? "#6366f1" : "#64748b",
-                                          fontSize: 10,
-                                          padding: "4px 8px"
-                                        }}
-                                      >
-                                        <i className={`bi ${online? "bi-lightning-charge" : "bi-cash"}`} />
-                                        {online? "ONLINE" : "OFFLINE"}
-                                      </span>
                                     </div>
                                     <div className="db-mini">
                                       Currency: <b style={{ color: "#1a1a2e" }}>{row.currency || "NGN"}</b> • Sort:{" "}
@@ -787,15 +767,15 @@ export default function SchoolBankAccountsPage() {
                                       className="db-refresh-btn"
                                       onClick={() => quickToggleOnline(row)}
                                       disabled={loading || saving || deletingId === row.id}
-                                      title="Toggle online payment"
+                                      title={online ? "Disable online payment collection" : "Enable online payment collection"}
                                       style={{
-                                        borderColor: online? "rgba(99,102,241,0.25)" : "rgba(148,163,184,0.25)",
-                                        background: online ? "rgba(99,102,241,0.06)" : "rgba(148,163,184,0.06)",
-                                        color: online ? "#6366f1" : "#64748b"
+                                        borderColor: online ? "rgba(99,102,241,0.25)" : "rgba(34,197,94,0.25)",
+                                        background: online ? "rgba(99,102,241,0.06)" : "rgba(34,197,94,0.06)",
+                                        color: online ? "#6366f1" : "#15803d"
                                       }}
                                     >
-                                      <i className={`bi ${online ? "bi-toggle-on" : "bi-toggle-off"}`} />
-                                      {online ? "Online" : "Offline"}
+                                      <i className={`bi ${online ? "bi-toggle-on" : "bi-lightning-charge"}`} />
+                                      {online ? "Disable online" : "Enable online"}
                                     </button>
 
                                     <button
@@ -947,18 +927,6 @@ export default function SchoolBankAccountsPage() {
                         </div>
 
                         <div className="col-12 col-md-6">
-                          <label className="form-label fw-semibold small mb-1">Bank code</label>
-                          <input
-                            className="form-control"
-                            value={bankCode}
-                            onChange={(e) => setBankCode(e.target.value)}
-                            placeholder="e.g. 058"
-                            style={{ borderRadius: 12 }}
-                            disabled={saving}
-                          />
-                        </div>
-
-                        <div className="col-12 col-md-6">
                           <label className="form-label fw-semibold small mb-1">Currency</label>
                           <input
                             className="form-control"
@@ -1039,19 +1007,6 @@ export default function SchoolBankAccountsPage() {
                                   style={{ width: 44, height: 24, cursor: 'pointer' }}
                                 />
                               </div>
-                            </div>
-                            <div className="d-flex align-items-center gap-2" style={{ 
-                              background: acceptsOnlinePayment ? "rgba(99,102,241,0.08)" : "rgba(148,163,184,0.08)",
-                              borderRadius: 8,
-                              padding: "8px 12px"
-                            }}>
-                              <i className={`bi ${acceptsOnlinePayment ? "bi-lightning-charge-fill" : "bi-cash"}`} 
-                                 style={{ color: acceptsOnlinePayment ? "#6366f1" : "#64748b" }} />
-                              <span className="db-mini" style={{ color: "#1a1a2e" }}>
-                                {acceptsOnlinePayment 
-                                  ? "This account will accept online card payments" 
-                                  : "Bank transfer only - parents upload receipt manually"}
-                              </span>
                             </div>
                           </div>
                         </div>
@@ -1172,3 +1127,10 @@ export default function SchoolBankAccountsPage() {
     </>
   );
 }
+
+
+
+
+
+
+

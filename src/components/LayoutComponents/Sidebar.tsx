@@ -1,9 +1,10 @@
-
+﻿
 
 
 
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
+import { useFeatures } from "../../contexts/FeatureContext";
 import { getUser } from "../../utils/token";
 
 interface SidebarProps {
@@ -15,7 +16,9 @@ interface MenuChild {
   label: string;
   href: string;
   roles?: string[];
-  featureKey?: string; 
+  featureKey?: string;
+  superAdminPermission?: string;
+  hideIfNoFeature?: boolean;
 }
 
 interface MenuItem {
@@ -27,9 +30,11 @@ interface MenuItem {
   roles: string[];
   badge?: string;
 
-  // ✅ Feature gating
-  featureKey?: string; 
+  // Ã¢Å“â€¦ Feature gating
+  featureKey?: string;
+  superAdminPermission?: string;
   lockIfNoFeature?: boolean; 
+  hideIfNoFeature?: boolean;
 
   // Existing
   disabled?: boolean;
@@ -38,6 +43,7 @@ interface MenuItem {
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
   const user = getUser();
+  const featureAccess = useFeatures();
   const [openMenus, setOpenMenus] = useState<string[]>([]);
   const [desktopCollapsed, setDesktopCollapsed] = useState(() => localStorage.getItem("gq_sidebar_collapsed") === "1");
 
@@ -72,7 +78,23 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
     }
   };
 
-  const isLockedByPlan = (_item: MenuItem) => false;
+  const superAdminPermissions = Array.isArray(user?.super_admin_permissions) ? user.super_admin_permissions : [];
+  const canUseSuperAdminArea = (permission?: string) => !permission || superAdminPermissions.includes("all") || superAdminPermissions.includes(permission);
+  const featureSet = new Set(
+    [
+      ...(Array.isArray(featureAccess.features) ? featureAccess.features : []),
+      ...(Array.isArray(user?.features) ? user.features : []),
+    ]
+      .map((feature: any) => {
+        if (typeof feature === "string") return feature;
+        return feature?.feature_key || feature?.key || "";
+      })
+      .filter(Boolean)
+      .map((key: string) => key.toLowerCase())
+  );
+  const canUseFeature = (featureKey?: string) => !featureKey || featureAccess.can(featureKey) || featureSet.has(featureKey.toLowerCase());
+  const isLockedByPlan = (item: MenuItem) => Boolean(item.lockIfNoFeature && item.featureKey && !canUseFeature(item.featureKey));
+  const shouldHideForPlan = (item: MenuItem | MenuChild) => Boolean(item.hideIfNoFeature && item.featureKey && !canUseFeature(item.featureKey));
 
   const ComingSoonBadge = () => (
     <span
@@ -111,7 +133,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
   );
 
   /**
-   * ✅ Add featureKey values that match what your plan->features uses.
+   * Ã¢Å“â€¦ Add featureKey values that match what your plan->features uses.
    * Examples used below: "fees", "results", "finance", "attendance"
    * Adjust to your real feature_key strings.
    */
@@ -120,7 +142,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       label: "Dashboard",
       icon: "speedometer2",
       href: "/dashboard",
-      roles: ["Admin", "Teacher", "Student", "Super-Admin", "Parent", "Bursar"],
+      roles: ["Admin", "Teacher", "Student", "Super-Admin", "Platform-Staff", "Parent", "Bursar", "Sales-Representative"],
     },
 
     {
@@ -192,6 +214,19 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
     // },
 
     {
+      label: "CBT",
+      icon: "pc-display-horizontal",
+      collapseId: "cbtMenu",
+      featureKey: "cbt_online",
+      lockIfNoFeature: true,
+      hideIfNoFeature: true,
+      children: [
+        { label: "CBT Exams", href: "/cbt/exams", roles: ["Admin", "Teacher"], featureKey: "cbt_online", hideIfNoFeature: true },
+      ],
+      roles: ["Admin", "Teacher"],
+    },
+
+    {
       label: "Fees",
       icon: "cash",
       collapseId: "feesMenu",
@@ -234,39 +269,57 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       roles: ["Admin", "Teacher"],
     },
 
+    {
+      label: "Sales Workspace",
+      icon: "briefcase",
+      collapseId: "salesWorkspaceMenu",
+      children: [
+        { label: "My Leads", href: "/sales/leads" },
+        { label: "My Commissions", href: "/sales/commissions" },
+        { label: "Payout Settings", href: "/sales/payout-settings" },
+      ],
+      roles: ["Sales-Representative"],
+    },
+
     // Super-Admin
     {
       label: "Subscribers & Billing",
       icon: "cash",
       collapseId: "billingMenu",
-      children: [{ label: "Subscribers", href: "/superadmin/subscribers" },
-        { label: "Billing Policy", href: "/superadmin/billing-policy" },
-        { label: "Twilio WhatsApp", href: "/superadmin/twilio-whatsapp" },
-        { label: "Bookings", href: "/demo-bookers" }
+      children: [{ label: "Platform Staff", href: "/superadmin/platform-staff", superAdminPermission: "staff" },
+        { label: "Subscribers", href: "/superadmin/subscribers", superAdminPermission: "billing" },
+        { label: "Billing Policy", href: "/superadmin/billing-policy", superAdminPermission: "billing" },
+        { label: "Twilio WhatsApp", href: "/superadmin/twilio-whatsapp", superAdminPermission: "support" },
+        { label: "Bookings", href: "/demo-bookers", superAdminPermission: "sales" }
       ],
       
-      roles: ["Super-Admin"],
+      roles: ["Super-Admin", "Platform-Staff"],
     },
     {
       label: "Marketing",
       icon: "megaphone",
       collapseId: "marketingMenu",
-      children: [{ label: "Broadcast", href: "/superadmin/send-message" }],
-      roles: ["Super-Admin"],
+      children: [
+        { label: "Sales Representatives", href: "/superadmin/sales-representatives", superAdminPermission: "sales" },
+        { label: "Sales Leads", href: "/superadmin/sales-leads", superAdminPermission: "sales" },
+        { label: "Sales Payouts", href: "/superadmin/sales-payouts", superAdminPermission: "finance" },
+        { label: "Broadcast", href: "/superadmin/send-message", superAdminPermission: "marketing" },
+      ],
+      roles: ["Super-Admin", "Platform-Staff"],
     },
     {
       label: "SubPlans",
       icon: "card-list",
       collapseId: "subPlansMenu",
-      children: [{ label: "Subscription-Plans", href: "/subplan" }],
-      roles: ["Super-Admin"],
+      children: [{ label: "Subscription-Plans", href: "/subplan", superAdminPermission: "billing" }],
+      roles: ["Super-Admin", "Platform-Staff"],
     },
     {
       label: "Media & Blogs",
       icon: "file-earmark-richtext",
       collapseId: "blogsMenu",
-      children: [{ label: "Blogs", href: "/blogs" }],
-      roles: ["Super-Admin"],
+      children: [{ label: "Blogs", href: "/blogs", superAdminPermission: "content" }],
+      roles: ["Super-Admin", "Platform-Staff"],
     },
     {
       label: "Results",
@@ -276,6 +329,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       lockIfNoFeature: true,
       children: [
         { label: "Prepare Term Results", href: "/students/results/batch", roles: ["Admin"], },
+        { label: "Review Results", href: "/results/review", roles: ["Admin"], },
         { label: "Enter Student Scores", href: "/students/results/add", roles: ["Admin", "Teacher"], },
         { label: "Monitor Results", href: "/result/monitor", roles: ["Admin"], },
         { label: "Result Design", href: "/results/design", roles: ["Admin"], },
@@ -344,7 +398,10 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       label: "Academics",
       icon: "book",
       collapseId: "studentAcademicsMenu",
-      children: [{ label: "My Subjects", href: "/student/my-subjects" }],
+      children: [
+        { label: "My Subjects", href: "/student/my-subjects" },
+        { label: "My CBT Exams", href: "/student/cbt/exams", featureKey: "cbt_online", hideIfNoFeature: true },
+      ],
       roles: ["Student"],
     },
     {
@@ -584,12 +641,26 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
             {/* NAVIGATION */}
             <ul className="nav flex-column gap-1">
               {menuItems
-                .filter((item) => item.roles.includes(user.role))
+                .filter((item) => {
+                  if (!item.roles.includes(user.role) || !canUseSuperAdminArea(item.superAdminPermission) || shouldHideForPlan(item)) {
+                    return false;
+                  }
+
+                  if (!item.children) {
+                    return true;
+                  }
+
+                  return item.children.some((child) => (
+                    (!child.roles || child.roles.includes(user.role))
+                    && canUseSuperAdminArea(child.superAdminPermission)
+                    && !shouldHideForPlan(child)
+                  ));
+                })
                 .map((item) => {
                   const lockedByPlan = isLockedByPlan(item);
                   const disabled = item.disabled;
 
-                  // If it’s a single link and gated, hide it
+                  // If itÃ¢â‚¬â„¢s a single link and gated, hide it
                   return (
                     <li key={item.label}>
                       {item.children ? (
@@ -643,7 +714,11 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
                             >
                               <div className="mt-1 mb-2">
                                 {item.children
-                                  .filter((child) => !child.roles || child.roles.includes(user.role))
+                                  .filter((child) => (
+                                    (!child.roles || child.roles.includes(user.role))
+                                    && canUseSuperAdminArea(child.superAdminPermission)
+                                    && !shouldHideForPlan(child)
+                                  ))
                                   .map((child) => (
                                     <NavLink
                                       key={child.label}
@@ -777,3 +852,11 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
     </>
   );
 }
+
+
+
+
+
+
+
+

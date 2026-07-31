@@ -61,6 +61,11 @@ type PlanForm = {
   newFeatureKey: string;
 };
 
+const FEATURE_PRESETS: FeatureDraft[] = [
+  { feature_name: "Online CBT", feature_key: "cbt_online", is_enabled: true },
+  { feature_name: "Offline CBT", feature_key: "cbt_offline", is_enabled: true },
+];
+
 /* =========================
    HELPERS
 ========================= */
@@ -282,6 +287,16 @@ export default function SubscriptionPlansPage() {
       features: [...p.features, { feature_name: name || key, feature_key: key, is_enabled: true }],
       newFeatureName: "",
       newFeatureKey: "",
+    }));
+  };
+
+  const addPresetFeature = (feature: FeatureDraft) => {
+    const exists = form.features.some((f) => (f.feature_key || "").toLowerCase() === feature.feature_key.toLowerCase());
+    if (exists) return showError(`${feature.feature_name} is already on this plan.`);
+
+    setForm((p) => ({
+      ...p,
+      features: [...p.features, feature],
     }));
   };
 
@@ -805,6 +820,27 @@ export default function SubscriptionPlansPage() {
                           </div>
 
                           <div className="row g-2 mt-2">
+                            <div className="col-md-12">
+                              <div className="d-flex flex-wrap gap-2 align-items-center p-2" style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12 }}>
+                                <span className="text-muted small fw-semibold me-1">Quick add:</span>
+                                {FEATURE_PRESETS.map((feature) => {
+                                  const exists = form.features.some((f) => (f.feature_key || "").toLowerCase() === feature.feature_key.toLowerCase());
+                                  return (
+                                    <button
+                                      key={feature.feature_key}
+                                      type="button"
+                                      className={`btn btn-sm ${exists ? "btn-success" : "btn-outline-primary"}`}
+                                      style={{ borderRadius: 999, fontWeight: 700 }}
+                                      disabled={exists}
+                                      onClick={() => addPresetFeature(feature)}
+                                    >
+                                      <i className={`bi ${exists ? "bi-check-circle" : "bi-plus-circle"} me-1`} />
+                                      {feature.feature_name}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
                             <div className="col-md-5">
                               <input
                                 className="form-control"
