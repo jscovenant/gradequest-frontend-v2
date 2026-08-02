@@ -65,7 +65,11 @@ type FeeAccessPolicy = {
   result_access_enabled: boolean;
   result_min_payment_percent: number;
   result_scope: "selected_period" | "all_outstanding";
+  cbt_access_enabled: boolean;
+  cbt_min_payment_percent: number;
+  cbt_scope: "selected_period" | "all_outstanding";
   message: string;
+  cbt_message: string;
 };
 
 type FeeAccessPolicyResponse = {
@@ -167,7 +171,11 @@ const [domainBusy,   setDomainBusy]   = useState(false);
     result_access_enabled: true,
     result_min_payment_percent: 100,
     result_scope: "selected_period",
+    cbt_access_enabled: false,
+    cbt_min_payment_percent: 100,
+    cbt_scope: "selected_period",
     message: "Result access is currently unavailable because the required school fee payment has not been completed.",
+    cbt_message: "Access denied. Complete the required school fee payment before starting this exam.",
   });
 
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -237,9 +245,15 @@ const [domainBusy,   setDomainBusy]   = useState(false);
       result_access_enabled: p.result_access_enabled !== false,
       result_min_payment_percent: clampInt(p.result_min_payment_percent, 0, 100, 100),
       result_scope: p.result_scope === "all_outstanding" ? "all_outstanding" : "selected_period",
+      cbt_access_enabled: !!p.cbt_access_enabled,
+      cbt_min_payment_percent: clampInt(p.cbt_min_payment_percent, 0, 100, 100),
+      cbt_scope: p.cbt_scope === "all_outstanding" ? "all_outstanding" : "selected_period",
       message:
         p.message ||
         "Result access is currently unavailable because the required school fee payment has not been completed.",
+      cbt_message:
+        p.cbt_message ||
+        "Access denied. Complete the required school fee payment before starting this exam.",
     });
   };
 
@@ -332,7 +346,11 @@ Promise.all([
         result_access_enabled: !!feeAccess.result_access_enabled,
         result_min_payment_percent: clampInt(feeAccess.result_min_payment_percent, 0, 100, 100),
         result_scope: feeAccess.result_scope,
+        cbt_access_enabled: !!feeAccess.cbt_access_enabled,
+        cbt_min_payment_percent: clampInt(feeAccess.cbt_min_payment_percent, 0, 100, 100),
+        cbt_scope: feeAccess.cbt_scope,
         message: feeAccess.message,
+        cbt_message: feeAccess.cbt_message,
       };
 
       const res = await authApi.put("/settings/fee-access-policy", payload);
@@ -1417,6 +1435,74 @@ const removeDomain = async () => {
                         </div>
 
                         <div className="col-12">
+                          <div className="db-kv">
+                            <div>
+                              <label className="d-block">Control CBT exam access</label>
+                              <b>{feeAccess.cbt_access_enabled ? "Full payment required" : "Students can start exams"}</b>
+                              <div className="db-muted" style={{ fontSize: 12, marginTop: 4 }}>
+                                When enabled, students must meet the fee requirement before starting CBT exams.
+                              </div>
+                            </div>
+
+                            <div className="form-check form-switch m-0">
+                              <input
+                                className="form-check-input"
+                                type="checkbox"
+                                role="switch"
+                                checked={feeAccess.cbt_access_enabled}
+                                onChange={(e) => setFeeAccess((p) => ({ ...p, cbt_access_enabled: e.target.checked }))}
+                                disabled={feeBusy || !feeAccess.enabled}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="col-12 col-md-6">
+                          <label className="form-label fw-semibold small mb-1">CBT payment required</label>
+                          <div className="input-group">
+                            <input
+                              type="number"
+                              className="form-control"
+                              min={0}
+                              max={100}
+                              value={feeAccess.cbt_min_payment_percent}
+                              onChange={(e) =>
+                                setFeeAccess((p) => ({
+                                  ...p,
+                                  cbt_min_payment_percent: clampInt(e.target.value, 0, 100, 100),
+                                }))
+                              }
+                              disabled={feeBusy || !feeAccess.enabled || !feeAccess.cbt_access_enabled}
+                            />
+                            <span className="input-group-text">%</span>
+                          </div>
+                          <div className="db-muted" style={{ fontSize: 12, marginTop: 6 }}>
+                            Set to 100 when students must fully pay before writing CBT.
+                          </div>
+                        </div>
+
+                        <div className="col-12 col-md-6">
+                          <label className="form-label fw-semibold small mb-1">CBT fees to check</label>
+                          <select
+                            className="form-select"
+                            value={feeAccess.cbt_scope}
+                            onChange={(e) =>
+                              setFeeAccess((p) => ({
+                                ...p,
+                                cbt_scope: e.target.value === "all_outstanding" ? "all_outstanding" : "selected_period",
+                              }))
+                            }
+                            disabled={feeBusy || !feeAccess.enabled || !feeAccess.cbt_access_enabled}
+                          >
+                            <option value="selected_period">Only this exam term/session</option>
+                            <option value="all_outstanding">All outstanding fees</option>
+                          </select>
+                          <div className="db-muted" style={{ fontSize: 12, marginTop: 6 }}>
+                            Use all outstanding fees when old debts should also stop exam access.
+                          </div>
+                        </div>
+
+                        <div className="col-12">
                           <label className="form-label fw-semibold small mb-1">Message shown to parents/students</label>
                           <textarea
                             className="form-control"
@@ -1425,6 +1511,18 @@ const removeDomain = async () => {
                             value={feeAccess.message}
                             onChange={(e) => setFeeAccess((p) => ({ ...p, message: e.target.value }))}
                             disabled={feeBusy || !feeAccess.enabled}
+                          />
+                        </div>
+
+                        <div className="col-12">
+                          <label className="form-label fw-semibold small mb-1">CBT message shown to students</label>
+                          <textarea
+                            className="form-control"
+                            rows={3}
+                            maxLength={255}
+                            value={feeAccess.cbt_message}
+                            onChange={(e) => setFeeAccess((p) => ({ ...p, cbt_message: e.target.value }))}
+                            disabled={feeBusy || !feeAccess.enabled || !feeAccess.cbt_access_enabled}
                           />
                         </div>
 

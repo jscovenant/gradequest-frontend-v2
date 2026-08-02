@@ -12,6 +12,15 @@
     "sass:watch": "sass --no-source-map --watch public/scss:public/css"
   },
   "dependencies": {
+    "@tiptap/extension-image": "^3.29.2",
+    "@tiptap/extension-placeholder": "^3.29.2",
+    "@tiptap/extension-table": "^3.29.2",
+    "@tiptap/extension-table-cell": "^3.29.2",
+    "@tiptap/extension-table-header": "^3.29.2",
+    "@tiptap/extension-table-row": "^3.29.2",
+    "@tiptap/extension-text-align": "^3.29.2",
+    "@tiptap/react": "^3.29.2",
+    "@tiptap/starter-kit": "^3.29.2",
     "@yudiel/react-qr-scanner": "^2.5.1",
     "aos": "^2.3.4",
     "axios": "^1.13.4",

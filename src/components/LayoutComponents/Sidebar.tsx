@@ -93,7 +93,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       .map((key: string) => key.toLowerCase())
   );
   const canUseFeature = (featureKey?: string) => !featureKey || featureAccess.can(featureKey) || featureSet.has(featureKey.toLowerCase());
-  const isLockedByPlan = (item: MenuItem) => Boolean(item.lockIfNoFeature && item.featureKey && !canUseFeature(item.featureKey));
   const shouldHideForPlan = (item: MenuItem | MenuChild) => Boolean(item.hideIfNoFeature && item.featureKey && !canUseFeature(item.featureKey));
 
   const ComingSoonBadge = () => (
@@ -111,24 +110,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       }}
     >
       Coming Soon
-    </span>
-  );
-
-  const UpgradeBadge = () => (
-    <span
-      className="badge ms-2"
-      style={{
-        background: "rgba(239, 68, 68, 0.15)",
-        border: "1px solid rgba(239, 68, 68, 0.3)",
-        color: "#fca5a5",
-        fontSize: "0.6rem",
-        padding: "2px 8px",
-        borderRadius: 999,
-        fontWeight: 700,
-        letterSpacing: "0.02em",
-      }}
-    >
-      Upgrade
     </span>
   );
 
@@ -657,7 +638,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
                   ));
                 })
                 .map((item) => {
-                  const lockedByPlan = isLockedByPlan(item);
                   const disabled = item.disabled;
 
                   // If itÃ¢â‚¬â„¢s a single link and gated, hide it
@@ -684,7 +664,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
                               <span className="gq-nav-text">{item.label}</span>
 
                               {item.comingSoon && <ComingSoonBadge />}
-                              {lockedByPlan && !item.comingSoon && <UpgradeBadge />}
 
                               {item.badge && (
                                 <span

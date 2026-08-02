@@ -84,6 +84,8 @@ const StudentCbtExamsPage = lazy(() => import("./pages/Student/CBT/StudentCbtExa
 const WhatsAppSettingsPage = lazy(() => import("./pages/Admin/School/WhatsAppSettingsPage"));
 const OnlinePayFeesPage = lazy(() => import("./pages/Admin/Billing/OnlinePayFeesPage"));
 const PublicFeePaymentPage = lazy(() => import("./pages/PublicFeePaymentPage"));
+const PublicCbtAccessPage = lazy(() => import("./pages/PublicCbtAccessPage"));
+const OfflineCbtRunnerPage = lazy(() => import("./pages/OfflineCbtRunnerPage"));
 const SalesLeadsPage = lazy(() => import("./pages/Sales/SalesLeadsPage"));
 const SalesCommissionsPage = lazy(() => import("./pages/Sales/SalesCommissionsPage"));
 const SalesPayoutSettingsPage = lazy(() => import("./pages/Sales/SalesPayoutSettingsPage"));
@@ -103,6 +105,8 @@ function App() {
           <Route path="/unauthorized" element={<Unauthorized />} />
           <Route path="/payment-instructions/" element={<PaymentInstructionsPage />} />
           <Route path="/pay-school-fee" element={<PublicFeePaymentPage />} />
+          <Route path="/cbt/access" element={<PublicCbtAccessPage />} />
+          <Route path="/cbt/offline-runner" element={<OfflineCbtRunnerPage />} />
           <Route path="/book-demo" element={<BookDemo />} />
            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
