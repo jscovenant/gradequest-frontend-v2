@@ -227,15 +227,16 @@ export default function CbtExamsPage() {
   const [sectionForm, setSectionForm] = useState(emptySection);
   const [groupForm, setGroupForm] = useState(emptyGroup);
   const [questionForm, setQuestionForm] = useState(emptyQuestion);
-  const [licenseDays, setLicenseDays] = useState(30);
+  const [licenseDays] = useState(365);
   const [offlineLicense, setOfflineLicense] = useState<any>(null);
-  const [licensePayload, setLicensePayload] = useState<any>(null);
   const [syncFile, setSyncFile] = useState<File | null>(null);
+  const [syncPayload, setSyncPayload] = useState<any>(null);
   const [syncResult, setSyncResult] = useState<any>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [licenseModalOpen, setLicenseModalOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
   const [questionImportModalOpen, setQuestionImportModalOpen] = useState(false);
   const [questionImportFile, setQuestionImportFile] = useState<File | null>(null);
   const [questionImportResult, setQuestionImportResult] = useState<WordImportResult | null>(null);
@@ -688,18 +689,31 @@ export default function CbtExamsPage() {
     }
   }
 
-  async function generateLicense() {
+  async function prepareAndDownloadOfflineBundle() {
     setSaving(true);
     setOfflineLicense(null);
-    setLicensePayload(null);
     setSyncResult(null);
     try {
-      const res = await authApi.post("/cbt/offline/licenses", { days: licenseDays });
-      setOfflineLicense(res.data?.license || null);
-      setLicensePayload(res.data?.download_payload || null);
-      showSuccess("Offline CBT license generated.");
+      const licenseRes = await authApi.post("/cbt/offline/licenses", { days: licenseDays });
+      const license = licenseRes.data?.license || null;
+      if (!license?.id) throw new Error("Offline CBT package could not be prepared.");
+      setOfflineLicense(license);
+
+      const exam = selectedExamId ? exams.find((item) => item.id === selectedExamId) : null;
+      const query = exam && ["offline", "hybrid"].includes(exam.delivery_mode) ? `?exam_ids[]=${exam.id}` : "";
+      const res = await authApi.get(`/cbt/offline/licenses/${license.id}/bundle${query}`, { responseType: "blob" });
+      const blob = new Blob([res.data], { type: "application/json" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `gradequest_offline_cbt_bundle_${license.id}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      showSuccess("Offline CBT bundle downloaded.");
     } catch (e: any) {
-      showError(e?.response?.data?.message || "Unable to generate offline license.");
+      showError(e?.response?.data?.message || e?.message || "Unable to download offline CBT bundle.");
     } finally {
       setSaving(false);
     }
@@ -755,12 +769,13 @@ export default function CbtExamsPage() {
   }
 
   async function syncOfflineResults() {
-    if (!offlineLicense?.id) {
-      showError("Generate or select an offline license first.");
+    const licenseId = Number(syncPayload?.license_id || syncPayload?.offline_license_id || offlineLicense?.id || 0);
+    if (!licenseId) {
+      showError("The result file does not contain a valid offline package reference.");
       return;
     }
 
-    if (!syncFile) {
+    if (!syncPayload) {
       showError("Choose the offline result file first.");
       return;
     }
@@ -768,20 +783,42 @@ export default function CbtExamsPage() {
     setSaving(true);
     setSyncResult(null);
     try {
-      const text = await syncFile.text();
-      const payload = JSON.parse(text);
-      const res = await authApi.post(`/cbt/offline/licenses/${offlineLicense.id}/sync-results`, {
-        sync_reference: payload.sync_reference || payload.reference || undefined,
-        attempts: Array.isArray(payload.attempts) ? payload.attempts : [],
+      const res = await authApi.post(`/cbt/offline/licenses/${licenseId}/sync-results`, {
+        sync_reference: syncPayload.sync_reference || syncPayload.reference || undefined,
+        attempts: Array.isArray(syncPayload.attempts) ? syncPayload.attempts : [],
       });
       setSyncResult(res.data?.summary || null);
       setSyncFile(null);
+      setSyncPayload(null);
       showSuccess(res.data?.message || "Offline CBT results synced.");
       if (selectedExamId) await loadExam(selectedExamId);
     } catch (e: any) {
       showError(e?.response?.data?.message || e?.message || "Unable to sync offline CBT results.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSyncFileSelected(file?: File | null) {
+    setSyncFile(file || null);
+    setSyncPayload(null);
+    setSyncResult(null);
+    if (!file) return;
+
+    try {
+      const payload = JSON.parse(await file.text());
+      if (!Array.isArray(payload.attempts)) {
+        throw new Error("This JSON file does not contain offline CBT attempts.");
+      }
+      setSyncPayload(payload);
+      if (payload.license_id || payload.offline_license_id) {
+        setOfflineLicense((current: any) => current?.id ? current : { id: payload.license_id || payload.offline_license_id });
+      }
+      showSuccess("Offline result file is ready to sync.");
+    } catch (e: any) {
+      setSyncFile(null);
+      setSyncPayload(null);
+      showError(e?.message || "Unable to read offline result file.");
     }
   }
 
@@ -794,6 +831,7 @@ export default function CbtExamsPage() {
   const currentUser = getUser();
   const schoolCode = currentUser?.role === "Admin" ? currentUser?.reg_no : currentUser?.school_code;
   const publicAccessUrl = `${window.location.origin}/cbt/access${schoolCode ? `?school_code=${encodeURIComponent(schoolCode)}` : ""}`;
+  const cbtManualUrl = "/docs/gradequest-cbt-online-offline-manual.pdf";
 
   const statusClass = (status?: string) => {
     const value = String(status || "").toLowerCase();
@@ -850,9 +888,10 @@ export default function CbtExamsPage() {
         .cbt-modal-head{padding:18px 22px;border-bottom:1px solid #e5e7eb;display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
         .cbt-modal-head h2{font-size:21px;font-weight:900;margin:0;color:#111827}.cbt-modal-head p{margin:4px 0 0;color:#64748b;font-size:13px}
         .cbt-modal-body{padding:20px 22px;overflow:auto}.cbt-preview-question{border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-bottom:12px;background:#fff}.cbt-preview-question h3{font-size:15px;font-weight:900;color:#111827;margin:0 0 10px}.cbt-preview-option{display:flex;gap:9px;align-items:flex-start;padding:7px 0;color:#334155}.cbt-preview-option strong{min-width:24px;color:#111827}
+        .cbt-manual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.cbt-manual-card{border:1px solid #e3e8f2;border-radius:14px;background:#fbfdff;padding:15px}.cbt-manual-card h3{font-size:16px;font-weight:900;color:#111827;margin:0 0 8px}.cbt-manual-card ol{margin:0;padding-left:18px;color:#334155;line-height:1.65;font-size:13px}.cbt-manual-card li{margin-bottom:7px}.cbt-note{border-left:4px solid var(--bs-primary,#d300b0);background:#fdf2fb;color:#581c50;border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.55}
         .cbt-setup-card,.cbt-license-panel,.cbt-settings-panel{display:none}.cbt-work-actions{display:flex;gap:10px;flex-wrap:wrap}.cbt-side-card{background:#fff;border:1px solid #e3e8f2;border-radius:14px;padding:16px;box-shadow:0 12px 32px rgba(15,23,42,.055)}.cbt-side-card h3{font-size:16px;font-weight:900;margin:0 0 6px;color:#111827}.cbt-side-card p{font-size:12px;color:#64748b;line-height:1.5;margin:0 0 12px}
         @media(max-width:1199px){.cbt-main{margin-left:0;width:100%;padding:92px 16px 28px}.cbt-grid,.cbt-builder{grid-template-columns:1fr}.cbt-hero{grid-template-columns:1fr}.cbt-hero-actions{justify-content:flex-start}.cbt-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.cbt-selected-strip{grid-template-columns:repeat(2,minmax(0,1fr))}}
-        @media(max-width:640px){.cbt-stats,.cbt-selected-strip,.cbt-mini-grid,.cbt-import-top,.cbt-import-guide,.cbt-import-summary{grid-template-columns:1fr}.cbt-row-actions .cbt-btn,.cbt-import-actions .cbt-btn{width:100%}.cbt-table{min-width:760px}}
+        @media(max-width:640px){.cbt-stats,.cbt-selected-strip,.cbt-mini-grid,.cbt-import-top,.cbt-import-guide,.cbt-import-summary,.cbt-manual-grid{grid-template-columns:1fr}.cbt-row-actions .cbt-btn,.cbt-import-actions .cbt-btn{width:100%}.cbt-table{min-width:760px}}
       `}</style>
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title="CBT Exams" />
       <PageTitle title="CBT Exams" />
@@ -870,6 +909,7 @@ export default function CbtExamsPage() {
                 </div>
                 <div className="cbt-hero-actions">
                   <a className="cbt-btn cbt-soft" href={publicAccessUrl} target="_blank" rel="noreferrer"><i className="bi bi-box-arrow-up-right" /> Public Access</a>
+                  <button className="cbt-btn cbt-soft" type="button" onClick={() => setManualOpen(true)}><i className="bi bi-question-circle" /> CBT Manual</button>
                   <button className="cbt-btn cbt-soft" type="button" disabled={saving} onClick={downloadOfflineInstaller}><i className="bi bi-windows" /> Download Offline App</button>
                   <button className="cbt-btn cbt-primary" type="button" onClick={() => setCreateModalOpen(true)}><i className="bi bi-plus-circle" /> New Exam</button>
                   <button className="cbt-btn cbt-gold" onClick={load}><i className="bi bi-arrow-repeat" /> Refresh</button>
@@ -1072,15 +1112,6 @@ export default function CbtExamsPage() {
                     </div>
                   </section>
 
-                  <section className="cbt-panel mt-3 cbt-license-panel">
-                    <div className="cbt-head"><h2>Offline CBT license</h2><p>Prepare a local server license for school WiFi exams.</p></div>
-                    <div className="cbt-body">
-                      <label className="cbt-label">License days</label>
-                      <input className="cbt-input" type="number" min={1} max={365} value={licenseDays} onChange={(e) => setLicenseDays(Number(e.target.value))} />
-                      <button className="cbt-btn cbt-primary" type="button" disabled={saving} onClick={generateLicense}><i className="bi bi-key" /> Generate Offline License</button>
-                      {licensePayload && <pre className="cbt-license">{JSON.stringify(licensePayload, null, 2)}</pre>}
-                    </div>
-                  </section>
                 </div>
               </section>
 
@@ -1473,13 +1504,13 @@ export default function CbtExamsPage() {
 
                   <div className="cbt-side-card">
                     <h3>Offline CBT</h3>
-                    <p>Download the Windows server app, then generate a signed license and bundle for school WiFi exams.</p>
+                    <p>Download the Windows server app, then prepare a signed exam package for school WiFi exams.</p>
                     <div className="d-flex flex-column gap-2">
                       <button className="cbt-btn cbt-primary w-100" type="button" disabled={saving} onClick={downloadOfflineInstaller}>
                         <i className="bi bi-download" /> Download Offline App
                       </button>
                       <button className="cbt-btn cbt-soft w-100" type="button" onClick={() => setLicenseModalOpen(true)}>
-                        <i className="bi bi-router" /> License and Bundle
+                        <i className="bi bi-router" /> Offline Package
                       </button>
                     </div>
                   </div>
@@ -1671,37 +1702,32 @@ export default function CbtExamsPage() {
         <div className="cbt-modal-backdrop" role="dialog" aria-modal="true">
           <div className="cbt-modal cbt-modal-sm">
             <div className="cbt-modal-head">
-              <div><h2>Offline CBT Setup</h2><p>Prepare a signed package for a local WiFi CBT server and sync results back after the exam.</p></div>
+              <div><h2>Offline CBT Package</h2><p>Download a signed exam package for the local WiFi CBT server and sync results back after the exam.</p></div>
               <button className="cbt-btn cbt-soft" type="button" onClick={() => setLicenseModalOpen(false)}><i className="bi bi-x-lg" /> Close</button>
             </div>
             <div className="cbt-modal-body">
               <div className="cbt-import-guide mb-3">
-                <code><strong>1. License</strong><br />Create a permission key for the school local server.</code>
-                <code><strong>2. Bundle</strong><br />Download published offline/hybrid exams with the latest fee access snapshot.</code>
-                <code><strong>3. Sync</strong><br />Upload completed attempts from the local server.</code>
+                <code><strong>1. Install</strong><br />Install the Windows offline CBT app on the server computer.</code>
+                <code><strong>2. Package</strong><br />Download published offline/hybrid exams with the latest fee access snapshot.</code>
+                <code><strong>3. Results</strong><br />Upload the completed result JSON exported from the offline server.</code>
               </div>
-              <div className="cbt-alert cbt-alert-info mb-3">
+              <div className="alert alert-info mb-3">
                 Download a fresh bundle close to exam time. The offline server uses the bundle snapshot to know which students are allowed to write.
-              </div>
-
-              <div className="cbt-field">
-                <label className="cbt-label">License days</label>
-                <input className="cbt-input" type="number" min={1} max={365} value={licenseDays} onChange={(e) => setLicenseDays(Number(e.target.value))} />
               </div>
 
               <div className="cbt-work-actions">
                 <button className="cbt-btn cbt-gold" type="button" disabled={saving} onClick={downloadOfflineInstaller}>
                   <i className="bi bi-windows" /> Download Windows App
                 </button>
-                <button className="cbt-btn cbt-primary" type="button" disabled={saving} onClick={generateLicense}>
-                  <i className="bi bi-key" /> Generate License
+                <button className="cbt-btn cbt-primary" type="button" disabled={saving} onClick={prepareAndDownloadOfflineBundle}>
+                  <i className="bi bi-download" /> Download Offline Package
                 </button>
                 <button className="cbt-btn cbt-soft" type="button" disabled={saving || !offlineLicense?.id} onClick={downloadOfflineBundle}>
-                  <i className="bi bi-download" /> Download Bundle
+                  <i className="bi bi-arrow-down-circle" /> Re-download Last Package
                 </button>
-                <a className="cbt-btn cbt-soft" href="/cbt/offline-runner" target="_blank" rel="noreferrer">
-                  <i className="bi bi-display" /> Open Runner
-                </a>
+                <button className="cbt-btn cbt-soft" type="button" onClick={() => setManualOpen(true)}>
+                  <i className="bi bi-question-circle" /> How to Use
+                </button>
               </div>
 
               {selectedExamId && (
@@ -1709,8 +1735,6 @@ export default function CbtExamsPage() {
                   Bundle download will include the selected exam when it is set to Offline/LAN or Hybrid. Without a selected offline exam, it includes available published offline exams.
                 </p>
               )}
-
-              {licensePayload && <pre className="cbt-license">{JSON.stringify(licensePayload, null, 2)}</pre>}
 
               <hr />
 
@@ -1720,16 +1744,92 @@ export default function CbtExamsPage() {
                   className="cbt-input"
                   type="file"
                   accept="application/json,.json"
-                  onChange={(e) => setSyncFile(e.target.files?.[0] || null)}
+                  onChange={(e) => void handleSyncFileSelected(e.target.files?.[0] || null)}
                 />
                 <div className="cbt-help">Use the JSON result file exported from the local CBT server after students finish.</div>
               </div>
 
-              <button className="cbt-btn cbt-primary" type="button" disabled={saving || !offlineLicense?.id || !syncFile} onClick={syncOfflineResults}>
+              {syncPayload && (
+                <div className="cbt-import-result mb-3">
+                  <div className="cbt-import-summary">
+                    <div><span>File</span><strong>{syncFile?.name || "Ready"}</strong></div>
+                    <div><span>Attempts</span><strong>{syncPayload.attempts?.length || 0}</strong></div>
+                    <div><span>Package</span><strong>{syncPayload.license_id || syncPayload.offline_license_id || offlineLicense?.id || "Missing"}</strong></div>
+                    <div><span>Reference</span><strong>{syncPayload.sync_reference ? "Found" : "Auto"}</strong></div>
+                  </div>
+                </div>
+              )}
+
+              <button className="cbt-btn cbt-primary" type="button" disabled={saving || !syncPayload || !(syncPayload.license_id || syncPayload.offline_license_id || offlineLicense?.id)} onClick={syncOfflineResults}>
                 <i className="bi bi-cloud-upload" /> Sync Results
               </button>
 
               {syncResult && <pre className="cbt-license">{JSON.stringify(syncResult, null, 2)}</pre>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {manualOpen && (
+        <div className="cbt-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="cbt-modal">
+            <div className="cbt-modal-head">
+              <div><h2>CBT Online and Offline Manual</h2><p>Simple steps for setting exams, running online tests, running offline LAN tests, and syncing scores.</p></div>
+              <button className="cbt-btn cbt-soft" type="button" onClick={() => setManualOpen(false)}><i className="bi bi-x-lg" /> Close</button>
+            </div>
+            <div className="cbt-modal-body">
+              <div className="cbt-note mb-3">
+                Use Online CBT when internet is stable. Use Offline CBT when students will write through a local WiFi router without relying on internet during the exam.
+              </div>
+              <div className="cbt-work-actions mb-3">
+                <a className="cbt-btn cbt-primary" href={cbtManualUrl} target="_blank" rel="noreferrer"><i className="bi bi-file-earmark-pdf" /> Download PDF Manual</a>
+                <a className="cbt-btn cbt-soft" href={publicAccessUrl} target="_blank" rel="noreferrer"><i className="bi bi-box-arrow-up-right" /> Open Online Access Page</a>
+                <button className="cbt-btn cbt-soft" type="button" disabled={saving} onClick={downloadOfflineInstaller}><i className="bi bi-windows" /> Download Offline App</button>
+              </div>
+              <div className="cbt-manual-grid">
+                <div className="cbt-manual-card">
+                  <h3>Online CBT</h3>
+                  <ol>
+                    <li>Create an exam and choose Online or Online and Offline as the mode.</li>
+                    <li>Select the class, section, department, subject, duration, and timetable.</li>
+                    <li>Add questions manually or import questions from Word, Excel, or CSV.</li>
+                    <li>Preview the exam, confirm the instructions, then publish it.</li>
+                    <li>Share the public access page or let students open CBT from their dashboard.</li>
+                    <li>After submission, view attempts and export scores from the exam workspace.</li>
+                  </ol>
+                </div>
+                <div className="cbt-manual-card">
+                  <h3>Offline CBT</h3>
+                  <ol>
+                    <li>Install the GradeQuest Offline CBT app on the server computer.</li>
+                    <li>Create and publish an exam with Offline/LAN or Online and Offline mode.</li>
+                    <li>Open Offline Package and click Download Offline Package close to exam time.</li>
+                    <li>Upload the downloaded JSON package inside the offline app on the server computer.</li>
+                    <li>Connect student computers to the same WiFi and share the link shown by the offline app.</li>
+                    <li>After the exam, export results from the offline app and sync the JSON here.</li>
+                  </ol>
+                </div>
+                <div className="cbt-manual-card">
+                  <h3>Question Setup</h3>
+                  <ol>
+                    <li>Use sections for papers, objectives, theory, or subject parts.</li>
+                    <li>Use passage/instruction groups for comprehension and shared instructions.</li>
+                    <li>Enable shuffle questions only when you want standalone questions randomized.</li>
+                    <li>Enable shuffle options when answer options should appear in a different order.</li>
+                    <li>Use the preview button before publishing so mistakes are caught early.</li>
+                  </ol>
+                </div>
+                <div className="cbt-manual-card">
+                  <h3>Important Checks</h3>
+                  <ol>
+                    <li>Only published Offline/LAN or Hybrid exams enter an offline package.</li>
+                    <li>Download a fresh package if fees, class list, timetable, or exam settings changed.</li>
+                    <li>Students must match the exam class, section, department, and fee access rule.</li>
+                    <li>Use Re-download Last Package only when the last package download failed or was lost.</li>
+                    <li>Sync each result file once to avoid duplicate upload errors.</li>
+                  </ol>
+                </div>
+              </div>
             </div>
           </div>
         </div>
