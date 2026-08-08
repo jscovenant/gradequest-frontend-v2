@@ -188,14 +188,43 @@ export default function ProfileSettingsPage() {
     }
   };
 
+  const profileStyles = `
+    .profile-main { min-height:100vh; margin-left:280px; width:calc(100% - 280px); padding:96px 26px 32px; background:#f6f8fb; color:#0f172a; }
+    .profile-shell { width:100%; max-width:1320px; margin:0 auto; }
+    .profile-hero { position:relative; overflow:hidden; display:flex; align-items:flex-end; justify-content:space-between; gap:20px; padding:26px; margin-bottom:20px; border-radius:18px; color:#fff; background:linear-gradient(135deg,#171222 0%,#3c1237 58%,#0f766e 130%); box-shadow:0 18px 45px rgba(23,18,34,.16); }
+    .profile-hero::after { content:""; position:absolute; width:220px; height:220px; right:-80px; top:-105px; border-radius:50%; background:rgba(250,204,21,.13); }
+    .profile-hero-copy,.profile-hero-actions { position:relative; z-index:1; }
+    .profile-eyebrow { display:inline-flex; align-items:center; gap:8px; color:#f7c948; font-size:11px; font-weight:900; letter-spacing:.14em; text-transform:uppercase; }
+    .profile-hero h1 { margin:8px 0 5px; font-size:clamp(28px,4vw,40px); font-weight:950; letter-spacing:-.03em; }
+    .profile-hero p { margin:0; max-width:680px; color:rgba(255,255,255,.76); line-height:1.6; }
+    .profile-refresh { border:1px solid rgba(255,255,255,.24)!important; background:rgba(255,255,255,.1)!important; color:#fff!important; font-weight:850!important; padding:10px 14px!important; }
+    .profile-grid { margin-top:0!important; }
+    .profile-card { height:100%; border:1px solid #e5e7eb!important; border-radius:16px!important; box-shadow:0 12px 30px rgba(15,23,42,.06)!important; overflow:hidden; }
+    .profile-section-icon { width:42px; height:42px; display:inline-flex; align-items:center; justify-content:center; border-radius:12px!important; }
+    .profile-main .form-label { color:#334155; font-size:12px; font-weight:850!important; }
+    .profile-main .form-control { min-height:44px; border:1px solid #dbe3ef; border-radius:11px; padding:10px 12px; box-shadow:none; }
+    .profile-main .form-control:focus { border-color:#0f766e; box-shadow:0 0 0 3px rgba(15,118,110,.11); }
+    .profile-main .form-control:disabled,.profile-main .form-control[readonly] { background:#f8fafc; color:#64748b; opacity:1; }
+    .profile-main .btn { font-weight:850; }
+    .profile-main .btn-primary { border-color:#0f766e; background:#0f766e; }
+    .profile-main .btn-primary:hover { border-color:#115e59; background:#115e59; }
+    .profile-main .btn-success { border-color:#166534; background:#166534; }
+    .profile-avatar { width:82px!important; height:82px!important; border-radius:18px!important; border:3px solid #fff!important; box-shadow:0 8px 24px rgba(15,23,42,.14); }
+    .profile-notice { margin:0 0 18px!important; border:1px solid #bae6fd; border-radius:13px!important; background:#f0f9ff; color:#075985; }
+    .profile-support { padding:13px 14px; border:1px solid #e5e7eb; border-radius:12px; background:#fff; }
+    @media(max-width:1199px) { .profile-main { margin-left:0; width:100%; padding:92px 18px 28px; } }
+    @media(max-width:767px) { .profile-main { padding:82px 14px 24px; } .profile-hero { align-items:flex-start; flex-direction:column; padding:21px; } .profile-hero-actions,.profile-refresh { width:100%; } .profile-card .card-body { padding:20px!important; } }
+  `;
+
   if (loading && !user) {
     return (
       <>
+        <style>{profileStyles}</style>
         <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
         <div className="container-fluid">
           <div className="row">
-            <Sidebar sidebarOpen={sidebarOpen} />
-            <main className="col-md-9 col-lg-10 ms-auto px-4 d-flex flex-column min-vh-100" style={{ backgroundColor: "#f8f9fa" }}>
+            <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+            <main className="profile-main d-flex flex-column">
               <div className="py-4">
                 <Loader message="Loading profile..." />
               </div>
@@ -209,47 +238,35 @@ export default function ProfileSettingsPage() {
 
   return (
     <>
+      <style>{profileStyles}</style>
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
       <div className="container-fluid">
         <div className="row">
-          <Sidebar sidebarOpen={sidebarOpen} />
+          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-          <main className="col-md-9 col-lg-10 ms-auto px-4 d-flex flex-column min-vh-100" style={{ backgroundColor: "#f8f9fa" }}>
+          <main className="profile-main d-flex flex-column">
             {(savingProfile || savingPassword) && <Loader message={savingProfile ? "Saving profile..." : "Updating password..."} />}
 
-            <div className="pt-4 pb-2 d-flex align-items-center justify-content-between flex-wrap gap-2">
-              <div>
-                <h4 className="mb-1" style={{ fontWeight: 900 }}>
-                  Profile Settings
-                </h4>
-                <div className="text-muted" style={{ fontSize: "0.95rem" }}>
-                  Manage your personal details and security settings.
-                </div>
-              </div>
-
-              <button className="btn btn-outline-secondary btn-sm" onClick={loadProfile} disabled={loading} style={{ borderRadius: 10 }}>
-                <i className="bi bi-arrow-clockwise me-1"></i>
-                Refresh
-              </button>
-            </div>
+            <div className="profile-shell">
+              <section className="profile-hero"><div className="profile-hero-copy"><span className="profile-eyebrow"><i className="bi bi-person-gear" /> Account settings</span><h1>Profile Settings</h1><p>Keep your personal information current and protect your GradeQuest account.</p></div><div className="profile-hero-actions"><button className="btn profile-refresh" onClick={loadProfile} disabled={loading}><i className="bi bi-arrow-clockwise me-1" /> Refresh Profile</button></div></section>
 
             {/* Student Notice: profile only */}
             {isStudent && (
-              <div className="alert alert-info mt-2" style={{ borderRadius: 12 }}>
+              <div className="alert alert-info profile-notice">
                 <i className="bi bi-info-circle me-2"></i>
                 Students cannot edit profile details (name, email, phone, address, photo). You can still change your password below.
               </div>
             )}
 
-            <div className="row g-4 mt-2">
+            <div className="row g-4 profile-grid">
               {/* Profile Card */}
               <div className="col-lg-7">
-                <div className="card border-0 shadow-sm" style={{ borderRadius: 14 }}>
+                <div className="card profile-card">
                   <div className="card-body p-4">
                     <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
                       <div className="d-flex align-items-center gap-2">
-                        <div className="p-2 rounded-2" style={{ backgroundColor: "#e0e7ff" }}>
+                        <div className="profile-section-icon" style={{ backgroundColor: "#e0e7ff" }}>
                           <i className="bi bi-person-circle" style={{ color: "#6366f1" }}></i>
                         </div>
                         <div>
@@ -269,8 +286,8 @@ export default function ProfileSettingsPage() {
                     <div className="d-flex align-items-center gap-3 mb-4 flex-wrap">
                       <div
                         style={{
-                          width: 68,
-                          height: 68,
+                          width: 82,
+                          height: 82,
                           borderRadius: 16,
                           background: "rgba(2,6,23,0.06)",
                           border: "1px solid rgba(2,6,23,0.10)",
@@ -278,7 +295,7 @@ export default function ProfileSettingsPage() {
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                        }}
+                        }} className="profile-avatar"
                       >
                         {photoPreview ? (
                           <img src={photoPreview} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -398,10 +415,10 @@ export default function ProfileSettingsPage() {
 
               {/* Password Card (enabled for ALL including students) */}
               <div className="col-lg-5">
-                <div className="card border-0 shadow-sm" style={{ borderRadius: 14 }}>
+                <div className="card profile-card">
                   <div className="card-body p-4">
                     <div className="d-flex align-items-center gap-2 mb-3">
-                      <div className="p-2 rounded-2" style={{ backgroundColor: "#dcfce7" }}>
+                      <div className="profile-section-icon" style={{ backgroundColor: "#dcfce7" }}>
                         <i className="bi bi-shield-lock-fill" style={{ color: "#16a34a" }}></i>
                       </div>
                       <div>
@@ -445,7 +462,7 @@ export default function ProfileSettingsPage() {
                   </div>
                 </div>
 
-                <div className="text-muted mt-3" style={{ fontSize: "0.85rem" }}>
+                <div className="text-muted mt-3 profile-support" style={{ fontSize: "0.85rem" }}>
                   Having issues? Contact your school admin or support.
                 </div>
               </div>
@@ -453,6 +470,7 @@ export default function ProfileSettingsPage() {
 
             <div className="mt-auto">
               <Footer />
+            </div>
             </div>
           </main>
         </div>

@@ -45,6 +45,15 @@ type SalesRepresentative = {
   commission_pending: number;
   commission_paid: number;
   last_activity?: string | null;
+  health_status?: "healthy" | "warning" | "critical" | "disabled";
+  activity_flags?: string[];
+  last_login_at?: string | null;
+  last_school_registered_at?: string | null;
+  login_inactive_3_months?: boolean;
+  login_inactive_1_year?: boolean;
+  dormant_no_school_1_year?: boolean;
+  auto_disabled_at?: string | null;
+  can_reactivate?: boolean;
 };
 
 type SalesForm = {
@@ -119,7 +128,7 @@ function statusClass(status?: string) {
   const normalized = (status || "").toLowerCase();
   if (normalized === "active") return "sr-badge sr-badge--ok";
   if (["paused", "under_review"].includes(normalized)) return "sr-badge sr-badge--warn";
-  if (["suspended", "terminated", "closed", "deceased"].includes(normalized)) return "sr-badge sr-badge--danger";
+  if (["suspended", "terminated", "closed", "deceased", "inactive"].includes(normalized)) return "sr-badge sr-badge--danger";
   return "sr-badge sr-badge--muted";
 }
 
@@ -142,6 +151,7 @@ export default function SalesRepresentativesPage() {
   const [statusForm, setStatusForm] = useState<StatusForm>({ status: "active", status_reason: "", final_settlement_status: "pending_review" });
   const [loginDetails, setLoginDetails] = useState<LoginDetails | null>(null);
   const [sendingLoginId, setSendingLoginId] = useState<number | null>(null);
+  const [reactivatingId, setReactivatingId] = useState<number | null>(null);
 
   const loadRepresentatives = async () => {
     setLoading(true);
@@ -251,6 +261,19 @@ export default function SalesRepresentativesPage() {
     }
   };
 
+  const reactivateRepresentative = async (rep: SalesRepresentative) => {
+    setReactivatingId(rep.id);
+    try {
+      const res = await authApi.post(`/superadmin/sales-representatives/${rep.id}/reactivate`);
+      showSuccess?.(res.data?.message || "Sales representative reactivated successfully.");
+      await loadRepresentatives();
+    } catch (err: any) {
+      showError?.(err?.response?.data?.message || "Could not reactivate this representative.");
+    } finally {
+      setReactivatingId(null);
+    }
+  };
+
   return <>
     <style>{`
       .sr-main { min-height: 100vh; background: #f6f8fb; color: #0f172a; overflow-x: hidden; }
@@ -273,13 +296,13 @@ export default function SalesRepresentativesPage() {
       .sr-stat strong { display:block; margin:4px 0 1px; font-size:21px; font-weight:950; overflow-wrap:anywhere; }
       .sr-stat small { color:#94a3b8; }
       .sr-layout { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(360px,.75fr); gap:18px; align-items:start; }
-      .sr-panel { overflow:hidden; }
+      .sr-panel { overflow:hidden; min-width:0; }
       .sr-toolbar { padding:16px; display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:1px solid #edf2f7; flex-wrap:wrap; }
       .sr-toolbar h2 { margin:0; font-size:18px; font-weight:950; }
       .sr-filters { display:flex; gap:9px; flex-wrap:wrap; }
       .sr-input, .sr-select { border:1px solid #dbe3ef; border-radius:10px; min-height:40px; padding:9px 11px; background:#fff; outline:0; min-width:0; }
-      .sr-list { display:grid; }
-      .sr-row { width:100%; border:0; background:#fff; display:grid; grid-template-columns:minmax(220px,1.2fr) repeat(4,minmax(105px,.65fr)); gap:12px; align-items:center; padding:15px 16px; text-align:left; border-bottom:1px solid #edf2f7; }
+      .sr-list { display:grid; min-width:0; overflow-x:auto; }
+      .sr-row { width:100%; min-width:720px; border:0; background:#fff; display:grid; grid-template-columns:minmax(200px,1.2fr) repeat(4,minmax(90px,.65fr)); gap:12px; align-items:center; padding:15px 16px; text-align:left; border-bottom:1px solid #edf2f7; }
       .sr-row:hover, .sr-row--active { background:#f8fafc; }
       .sr-person { display:flex; align-items:center; gap:12px; min-width:0; }
       .sr-avatar { width:42px; height:42px; border-radius:12px; background:#0f766e; color:#fff; display:inline-flex; align-items:center; justify-content:center; font-weight:950; flex:0 0 auto; }
@@ -290,7 +313,16 @@ export default function SalesRepresentativesPage() {
       .sr-badge--warn { background:#fef3c7; color:#92400e; }
       .sr-badge--danger { background:#fee2e2; color:#991b1b; }
       .sr-badge--muted { background:#e5e7eb; color:#475569; }
-      .sr-detail { padding:0; overflow:hidden; position:sticky; top:88px; }
+      .sr-health { display:flex; flex-wrap:wrap; gap:7px; margin-top:9px; }
+      .sr-health-flag { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:6px 9px; font-size:11px; font-weight:900; background:#fef3c7; color:#92400e; }
+      .sr-health-flag--danger { background:#fee2e2; color:#991b1b; }
+      .sr-health-flag--ok { background:#dcfce7; color:#166534; }
+      .sr-reactivate { width:100%; background:#166534; color:#fff; margin-top:10px; }
+      .sr-health-card { margin-bottom:18px; padding:14px 16px; background:#fff; border:1px solid #e5e7eb; border-radius:14px; display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; box-shadow:0 12px 30px rgba(15,23,42,.05); }
+      .sr-health-card h2 { margin:0 0 4px; font-size:15px; font-weight:950; }
+      .sr-health-card p { margin:0; color:#64748b; font-size:12px; }
+      .sr-health-card .sr-reactivate { width:auto; margin-top:0; }
+      .sr-detail { padding:0; overflow-x:hidden; overflow-y:auto; position:sticky; top:88px; max-height:calc(100vh - 108px); overscroll-behavior:contain; scrollbar-gutter:stable; }
       .sr-detail-head { padding:18px; background:linear-gradient(135deg,#0f172a,#0f766e); color:#fff; }
       .sr-detail-head h2 { margin:9px 0 4px; font-size:22px; font-weight:950; overflow-wrap:anywhere; }
       .sr-detail-head p { margin:0; color:rgba(255,255,255,.75); overflow-wrap:anywhere; }
@@ -314,8 +346,8 @@ export default function SalesRepresentativesPage() {
       .sr-login-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:8px; }
       .sr-login-item { background:rgba(255,255,255,.8); border-radius:9px; padding:9px; overflow-wrap:anywhere; }
       .sr-empty { padding:30px; text-align:center; color:#64748b; }
-      @media(max-width:1199px){.sr-stats{grid-template-columns:repeat(2,minmax(0,1fr));}.sr-layout{grid-template-columns:1fr;}.sr-detail{position:static;}.sr-create-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
-      @media(max-width:850px){.sr-row{grid-template-columns:1fr 1fr;}.sr-header{flex-direction:column;}.sr-actions{justify-content:flex-start;}.sr-filters{width:100%;}.sr-input,.sr-select{width:100%;}}
+      @media(max-width:1199px){.sr-stats{grid-template-columns:repeat(2,minmax(0,1fr));}.sr-layout{grid-template-columns:1fr;}.sr-detail{position:static;max-height:none;overflow:visible;scrollbar-gutter:auto;}.sr-create-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+      @media(max-width:850px){.sr-list{overflow-x:visible;}.sr-row{min-width:0;grid-template-columns:1fr 1fr;}.sr-header{flex-direction:column;}.sr-actions{justify-content:flex-start;}.sr-filters{width:100%;}.sr-input,.sr-select{width:100%;}}
       @media(max-width:560px){.sr-stats,.sr-row,.sr-info-grid,.sr-create-grid,.sr-login-grid{grid-template-columns:1fr;}.sr-main{padding-left:0!important;}}
     `}</style>
 
@@ -327,10 +359,11 @@ export default function SalesRepresentativesPage() {
         <div className="sr-shell">
           <section className="sr-header"><div><span className="sr-kicker"><i className="bi bi-person-workspace" /> Sales operations</span><h1 className="sr-title">Sales Representatives</h1><p className="sr-copy">Manage representative profiles, account restrictions, next-of-kin records, commission risk, and final settlement from one clean workspace.</p></div><div className="sr-actions"><button className="sr-btn sr-btn-muted" onClick={loadRepresentatives} disabled={loading}><i className="bi bi-arrow-repeat" /> Refresh</button><button className="sr-btn sr-btn-gold" onClick={() => setShowForm((value) => !value)}><i className="bi bi-plus-circle" /> Add Representative</button></div></section>
           <section className="sr-stats"><StatCard title="Representatives" value={summary.total_representatives} hint={`${summary.active_representatives} active`} icon="people" /><StatCard title="Assigned Leads" value={summary.assigned_leads} hint={`${summary.converted_leads} converted`} icon="building" /><StatCard title="Pipeline Value" value={currency.format(summary.pipeline_value)} hint="Open opportunity" icon="graph-up-arrow" /><StatCard title="Pending Commission" value={currency.format(summary.pending_commission)} hint={`${currency.format(summary.paid_commission)} paid`} icon="cash-coin" /></section>
+          {selectedRep && <section className="sr-health-card"><div><h2>Account Health: {selectedRep.name}</h2><p>Last login: {fmtDate(selectedRep.last_login_at)} · Last school registered: {fmtDate(selectedRep.last_school_registered_at)}</p><div className="sr-health">{selectedRep.login_inactive_3_months && !selectedRep.login_inactive_1_year && <span className="sr-health-flag"><i className="bi bi-clock-history" /> No login for 3 months</span>}{selectedRep.dormant_no_school_1_year && <span className="sr-health-flag"><i className="bi bi-building-exclamation" /> No school registered for 1 year</span>}{selectedRep.login_inactive_1_year && <span className="sr-health-flag sr-health-flag--danger"><i className="bi bi-person-lock" /> No login for 1 year</span>}{selectedRep.health_status === "healthy" && <span className="sr-health-flag sr-health-flag--ok"><i className="bi bi-check-circle" /> Activity is healthy</span>}</div></div>{selectedRep.can_reactivate && <button className="sr-btn sr-reactivate" type="button" onClick={() => reactivateRepresentative(selectedRep)} disabled={reactivatingId === selectedRep.id}><i className="bi bi-person-check" /> {reactivatingId === selectedRep.id ? "Reactivating..." : "Reactivate Representative"}</button>}</section>}
           <section className="sr-layout"><div className="sr-panel"><div className="sr-toolbar"><div><h2>Representative Directory</h2><p className="sr-copy">Select a representative to manage their account.</p></div><div className="sr-filters"><input className="sr-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, code, region..." /><select className="sr-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="active">Active</option><option value="suspended">Suspended</option><option value="under_review">Under review</option><option value="terminated">Terminated</option><option value="closed">Closed</option><option value="deceased">Deceased</option></select></div></div>
             {loginDetails && <div className="sr-login"><strong>Login details generated</strong><div className="sr-login-grid"><div className="sr-login-item"><small>Login URL</small><br />{loginDetails.login_url}</div><div className="sr-login-item"><small>Email</small><br />{loginDetails.email}</div><div className="sr-login-item"><small>Sales Code</small><br />{loginDetails.sales_code}</div><div className="sr-login-item"><small>Temporary Password</small><br />{loginDetails.temporary_password || "Sent by email"}</div></div>{loginDetails.email_error && <p style={{ margin: "10px 0 0", color: "#991b1b" }}>Email not sent: {loginDetails.email_error}</p>}</div>}
             {showForm && <form className="sr-create" onSubmit={submitRepresentative}><div className="sr-create-grid"><label>First Name<input value={form.firstname} onChange={(e) => setForm({ ...form, firstname: e.target.value })} required /></label><label>Surname<input value={form.surname} onChange={(e) => setForm({ ...form, surname: e.target.value })} /></label><label>Email<input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required /></label><label>Phone<input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label><label>Region<input value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })} /></label><label>Commission %<input type="number" min="0" max="100" step="0.01" value={form.commission_rate} onChange={(e) => setForm({ ...form, commission_rate: e.target.value })} /></label><label>Monthly Target Amount<input type="number" min="0" value={form.monthly_target_amount} onChange={(e) => setForm({ ...form, monthly_target_amount: e.target.value })} /></label><label>Monthly Target Schools<input type="number" min="0" value={form.monthly_target_schools} onChange={(e) => setForm({ ...form, monthly_target_schools: e.target.value })} /></label><div className="sr-note">Next-of-kin details are recommended before payout eligibility and final settlement handling.</div><label>Next of Kin Name<input value={form.next_of_kin_name} onChange={(e) => setForm({ ...form, next_of_kin_name: e.target.value })} /></label><label>Next of Kin Phone<input value={form.next_of_kin_phone} onChange={(e) => setForm({ ...form, next_of_kin_phone: e.target.value })} /></label><label>Relationship<input value={form.next_of_kin_relationship} onChange={(e) => setForm({ ...form, next_of_kin_relationship: e.target.value })} /></label><label style={{ display: "flex", alignItems: "center", gap: 9 }}><input type="checkbox" checked={form.send_login_email} onChange={(e) => setForm({ ...form, send_login_email: e.target.checked })} style={{ width: 18, minHeight: 18 }} /> Send login email</label><div className="sr-create-actions"><button className="sr-btn sr-btn-muted" type="button" onClick={() => setShowForm(false)} disabled={saving}>Cancel</button><button className="sr-btn sr-btn-primary" type="submit" disabled={saving}>{saving ? "Saving..." : "Save Representative"}</button></div></div></form>}
-            <div className="sr-list">{!loading && filteredRepresentatives.length === 0 && <div className="sr-empty">No representative found.</div>}{filteredRepresentatives.map((rep) => <button type="button" key={rep.id} className={`sr-row ${selectedRep?.id === rep.id ? "sr-row--active" : ""}`} onClick={() => setSelectedId(rep.id)}><div className="sr-person"><div className="sr-avatar">{initials(rep.name)}</div><div><strong>{rep.name || "Unnamed Representative"}</strong><small>{rep.email || "No email"} - {rep.code}</small></div></div><div><span className={statusClass(rep.status)}>{rep.status}</span></div><div className="sr-metric"><strong>{rep.assigned_leads}</strong><span>Leads</span></div><div className="sr-metric"><strong>{currency.format(rep.pipeline_value)}</strong><span>Pipeline</span></div><div className="sr-metric"><strong>{currency.format(rep.commission_pending)}</strong><span>Pending</span></div></button>)}</div></div>
+            <div className="sr-list">{!loading && filteredRepresentatives.length === 0 && <div className="sr-empty">No representative found.</div>}{filteredRepresentatives.map((rep) => <button type="button" key={rep.id} className={`sr-row ${selectedRep?.id === rep.id ? "sr-row--active" : ""}`} onClick={() => setSelectedId(rep.id)}><div className="sr-person"><div className="sr-avatar">{initials(rep.name)}</div><div><strong>{rep.name || "Unnamed Representative"}</strong><small>{rep.email || "No email"} - {rep.code}</small>{rep.health_status && rep.health_status !== "healthy" && <small style={{ color: ["disabled", "critical"].includes(rep.health_status) ? "#b91c1c" : "#a16207", fontWeight: 900 }}><i className="bi bi-exclamation-triangle" /> Activity review required</small>}</div></div><div><span className={statusClass(rep.status)}>{rep.status}</span></div><div className="sr-metric"><strong>{rep.assigned_leads}</strong><span>Leads</span></div><div className="sr-metric"><strong>{currency.format(rep.pipeline_value)}</strong><span>Pipeline</span></div><div className="sr-metric"><strong>{currency.format(rep.commission_pending)}</strong><span>Pending</span></div></button>)}</div></div>
             <aside className="sr-detail">{selectedRep ? <><div className="sr-detail-head"><span className={statusClass(selectedRep.status)}>{selectedRep.status}</span><h2>{selectedRep.name}</h2><p>{selectedRep.email || "No email"} - {selectedRep.code}</p></div><div className="sr-detail-body"><section className="sr-section"><h3>Profile</h3><div className="sr-info-grid"><div className="sr-info"><span>Phone</span><strong>{selectedRep.phone || "Not set"}</strong></div><div className="sr-info"><span>Region</span><strong>{selectedRep.region || "Not set"}</strong></div><div className="sr-info"><span>Joined</span><strong>{fmtDate(selectedRep.joined_at)}</strong></div><div className="sr-info"><span>Commission</span><strong>{selectedRep.commission_rate}%</strong></div></div></section><section className="sr-section"><h3>Next Of Kin</h3><div className="sr-info-grid"><div className="sr-info"><span>Name</span><strong>{selectedRep.next_of_kin_name || "Missing"}</strong></div><div className="sr-info"><span>Phone</span><strong>{selectedRep.next_of_kin_phone || "Missing"}</strong></div><div className="sr-info"><span>Relationship</span><strong>{selectedRep.next_of_kin_relationship || "Not set"}</strong></div><div className="sr-info"><span>Status</span><strong>{selectedRep.next_of_kin_name && selectedRep.next_of_kin_phone ? "Complete" : "Incomplete"}</strong></div></div></section><section className="sr-section"><h3>Account Action</h3><div className="sr-form-grid"><label>Status<select value={statusForm.status} onChange={(e) => setStatusForm({ ...statusForm, status: e.target.value })}><option value="active">Active</option><option value="suspended">Suspended</option><option value="under_review">Under review</option><option value="terminated">Terminated</option><option value="closed">Closed</option><option value="deceased">Deceased</option></select></label><label>Reason<input value={statusForm.status_reason} onChange={(e) => setStatusForm({ ...statusForm, status_reason: e.target.value })} placeholder="Required for restrictions" /></label><label>Settlement<select value={statusForm.final_settlement_status} onChange={(e) => setStatusForm({ ...statusForm, final_settlement_status: e.target.value })}><option value="pending_review">Pending review</option><option value="approved">Approved</option><option value="paid">Paid</option><option value="forfeited">Forfeited</option><option value="not_applicable">Not applicable</option></select></label><button className="sr-btn sr-btn-primary" type="button" disabled={saving} onClick={updateStatus}><i className="bi bi-shield-check" /> Apply Account Decision</button></div></section><section className="sr-section"><h3>Commission Snapshot</h3><div className="sr-info-grid"><div className="sr-info"><span>Pending</span><strong>{currency.format(selectedRep.commission_pending)}</strong></div><div className="sr-info"><span>Paid</span><strong>{currency.format(selectedRep.commission_paid)}</strong></div><div className="sr-info"><span>Leads</span><strong>{selectedRep.assigned_leads}</strong></div><div className="sr-info"><span>Converted</span><strong>{selectedRep.converted_leads}</strong></div></div><button className="sr-btn sr-btn-soft mt-3" type="button" onClick={() => sendLoginDetails(selectedRep)} disabled={sendingLoginId === selectedRep.id}><i className="bi bi-envelope" /> {sendingLoginId === selectedRep.id ? "Sending..." : "Send Login Details"}</button></section></div></> : <div className="sr-empty">Select a representative to view details.</div>}</aside>
           </section><Footer /></div></main></div></div>
   </>;
