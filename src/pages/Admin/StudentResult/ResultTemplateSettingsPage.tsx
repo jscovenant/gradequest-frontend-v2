@@ -8,7 +8,7 @@ import { authApi } from "../../../utils/axios";
 import { useToast } from "../../../contexts/ToastContext";
 import { getUser } from "../../../utils/token";
 
-type TemplateKey = "classic_academic" | "modern_scholar" | "premium_letterhead";
+type TemplateKey = "classic_academic" | "modern_scholar" | "premium_letterhead" | "custom_builder";
 
 type TemplateOption = {
   key: TemplateKey;
@@ -27,6 +27,20 @@ type DisplayOptions = {
   show_student_photo: boolean;
   show_watermark: boolean;
   report_column_rules: ReportColumnRule[];
+  custom_report_layout: CustomReportLayout;
+};
+
+type CustomReportBlock = {
+  id: string;
+  label: string;
+  type: string;
+  width: "full" | "half";
+  visible: boolean;
+};
+
+type CustomReportLayout = {
+  enabled: boolean;
+  blocks: CustomReportBlock[];
 };
 
 type ReportColumnOptions = {
@@ -77,6 +91,17 @@ const defaultOptions: DisplayOptions = {
   show_student_photo: true,
   show_watermark: true,
   report_column_rules: [],
+  custom_report_layout: {
+    enabled: false,
+    blocks: [
+      { id: "student_info", label: "Student Information", type: "student_info", width: "full", visible: true },
+      { id: "scores_table", label: "Subject Scores", type: "scores_table", width: "full", visible: true },
+      { id: "performance_chart", label: "Performance Chart", type: "performance_chart", width: "half", visible: true },
+      { id: "domains", label: "Affective and Psychomotor", type: "domains", width: "half", visible: true },
+      { id: "comments", label: "Comments and Remarks", type: "comments", width: "full", visible: true },
+      { id: "signature", label: "Signature and QR Code", type: "signature", width: "full", visible: true },
+    ],
+  },
 };
 
 const defaultReportColumnOptions: ReportColumnOptions = {
@@ -90,6 +115,11 @@ const defaultReportColumnOptions: ReportColumnOptions = {
 };
 
 const fallbackTemplates: TemplateOption[] = [
+  {
+    key: "custom_builder",
+    name: "Custom Builder",
+    description: "Arrange report-card blocks with a simple drag-and-drop builder.",
+  },
   {
     key: "classic_academic",
     name: "Classic Academic",
@@ -163,6 +193,7 @@ function readableText(bg: string) {
 }
 
 function templateClass(key: string) {
+  if (key === "custom_builder") return "rts-preview--custom";
   if (key === "modern_scholar") return "rts-preview--modern";
   if (key === "premium_letterhead") return "rts-preview--premium";
   return "rts-preview--classic";
@@ -208,6 +239,22 @@ function extractList<T = any>(payload: any): T[] {
   return [];
 }
 
+function normalizeCustomLayout(raw: any): CustomReportLayout {
+  const fallback = defaultOptions.custom_report_layout;
+  return {
+    enabled: Boolean(raw?.enabled),
+    blocks: extractList<CustomReportBlock>(raw?.blocks).length
+      ? extractList<CustomReportBlock>(raw.blocks).map((block) => ({
+          id: String(block.id),
+          label: String(block.label || "Report Block"),
+          type: String(block.type || "custom"),
+          width: block.width === "half" ? "half" : "full",
+          visible: block.visible !== false,
+        }))
+      : fallback.blocks,
+  };
+}
+
 export default function ResultTemplateSettingsPage() {
   const { showSuccess, showError } = useToast();
   const adminUser = getUser();
@@ -215,11 +262,6 @@ export default function ResultTemplateSettingsPage() {
   const schoolLogo = adminUser?.school?.logo || "/media/logo/gradequest-logo.png";
   const schoolName = adminUser?.school?.name || "GradeQuest International School";
   const studentAvatar = `${apiBaseUrl}/uploads/users/2411221407avatar-2.png`;
-  const today = new Date().toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -273,10 +315,11 @@ export default function ResultTemplateSettingsPage() {
             secondary_color: res.data.setting?.secondary_color || "#c9a84c",
             background_color: res.data.setting?.background_color || "#ffffff",
             font_family: res.data.setting?.font_family || "Arial",
-            display_options: {
+              display_options: {
               ...defaultOptions,
               ...displayOptions,
               report_column_rules: extractList(displayOptions.report_column_rules).map(normalizeRule),
+              custom_report_layout: normalizeCustomLayout(displayOptions.custom_report_layout),
             },
           });
         } else {
@@ -375,6 +418,7 @@ export default function ResultTemplateSettingsPage() {
           ...defaultOptions,
           ...displayOptions,
           report_column_rules: extractList(displayOptions.report_column_rules).map(normalizeRule),
+          custom_report_layout: normalizeCustomLayout(displayOptions.custom_report_layout),
         },
       });
       showSuccess(res.data.message || "Result design saved successfully.");
@@ -396,6 +440,188 @@ export default function ResultTemplateSettingsPage() {
   const showPreviewPosition = setting.display_options.show_position && activeReportColumns.show_position;
   const showPreviewGrade = setting.display_options.show_grade && activeReportColumns.show_grade;
   const showPreviewRemarks = setting.display_options.show_remarks && activeReportColumns.show_remarks;
+  const customBlocks = setting.template_key === "custom_builder"
+    ? setting.display_options.custom_report_layout.blocks.filter((block) => block.visible)
+    : [];
+
+  const moveCustomBlock = (from: number, to: number) => {
+    setSetting((current) => {
+      const blocks = [...current.display_options.custom_report_layout.blocks];
+      const [item] = blocks.splice(from, 1);
+      if (!item) return current;
+      blocks.splice(Math.max(0, Math.min(to, blocks.length)), 0, item);
+      return {
+        ...current,
+        display_options: {
+          ...current.display_options,
+          custom_report_layout: { ...current.display_options.custom_report_layout, enabled: true, blocks },
+        },
+      };
+    });
+  };
+
+  const updateCustomBlock = (id: string, changes: Partial<CustomReportBlock>) => {
+    setSetting((current) => ({
+      ...current,
+      display_options: {
+        ...current.display_options,
+        custom_report_layout: {
+          ...current.display_options.custom_report_layout,
+          enabled: true,
+          blocks: current.display_options.custom_report_layout.blocks.map((block) =>
+            block.id === id ? { ...block, ...changes } : block
+          ),
+        },
+      },
+    }));
+  };
+
+  const studentInfoPreview = (
+    <div className="rts-info">
+      <div><b>Name:</b> Amina Bello Grace</div>
+      <div><b>Admission No:</b> GQ872114</div>
+      <div><b>Class:</b> {selectedSectionName}</div>
+      <div><b>Session:</b> 2026/2027</div>
+      {setting.display_options.show_attendance && <div><b>Present:</b> 68 of 72 days</div>}
+      {showPreviewPosition && <div><b>Position:</b> 2nd of 35</div>}
+    </div>
+  );
+
+  const scoresTablePreview = (
+    <>
+      <table className="rts-table">
+        <thead>
+          <tr>
+            <th>Subject</th><th>CA1</th><th>CA2</th><th>Exam</th><th>Total</th>
+            {activeReportColumns.show_first_term && <th>First Term</th>}
+            {activeReportColumns.show_second_term && <th>Second Term</th>}
+            {activeReportColumns.show_cumulative_total && <th>Total Score</th>}
+            {activeReportColumns.show_cumulative_average && <th>Average</th>}
+            {showPreviewGrade && <th>Grade</th>}
+            {showPreviewRemarks && <th>Remark</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {sampleSubjects.map((row) => (
+            <tr key={row[0]}>
+              <td>{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td><td>{row[4]}</td>
+              {activeReportColumns.show_first_term && <td>{Math.max(40, Number(row[4]) - 6)}</td>}
+              {activeReportColumns.show_second_term && <td>{Math.max(40, Number(row[4]) - 2)}</td>}
+              {activeReportColumns.show_cumulative_total && <td>{Number(row[4]) + Math.max(40, Number(row[4]) - 6) + Math.max(40, Number(row[4]) - 2)}</td>}
+              {activeReportColumns.show_cumulative_average && <td>{Math.round((Number(row[4]) + Math.max(40, Number(row[4]) - 6) + Math.max(40, Number(row[4]) - 2)) / 3)}</td>}
+              {showPreviewGrade && <td>{row[5]}</td>}
+              {showPreviewRemarks && <td>{row[6]}</td>}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="rts-summary">
+        <span className="rts-chip">Average: 80.75%</span>
+        {showPreviewGrade && <span className="rts-chip">Grade: A</span>}
+        <span className="rts-chip">Status: Excellent</span>
+      </div>
+    </>
+  );
+
+  const performancePreview = (
+    <div className="rts-analytics">
+      <div className="rts-analytics-card">
+        <div className="rts-analytics-title">Subject performance</div>
+        {sampleSubjects.slice(0, 6).map((row, index) => (
+          <div className="rts-bar-row" key={row[0]}>
+            <span>{row[0]}</span>
+            <span className="rts-bar-track">
+              <span
+                className="rts-bar-fill"
+                style={{ width: `${row[4]}%`, background: chartColors[index % chartColors.length] }}
+              />
+            </span>
+            <b>{row[4]}%</b>
+          </div>
+        ))}
+      </div>
+      <div className="rts-analytics-card">
+        <div className="rts-analytics-title">Result analytics</div>
+        {[
+          ["A grades", 6, 40],
+          ["B grades", 6, 40],
+          ["C grades", 3, 20],
+          ["Attendance", 68, 94],
+        ].map(([label, value, percent], index) => (
+          <div className="rts-bar-row" key={label as string}>
+            <span>{label}</span>
+            <span className="rts-bar-track">
+              <span
+                className="rts-bar-fill"
+                style={{ width: `${percent}%`, background: analyticColors[index % analyticColors.length] }}
+              />
+            </span>
+            <b>{value}</b>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const domainsPreview = (
+    <div className="rts-domain-grid">
+      <table className="rts-domain-table">
+        <caption>Affective Domain</caption>
+        <tbody>
+          {sampleAffective.map(([label, rating]) => (
+            <tr key={label}>
+              <td>{label}</td>
+              <td>{rating}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <table className="rts-domain-table">
+        <caption>Psychomotor Skills</caption>
+        <tbody>
+          {samplePsychomotor.map(([label, rating]) => (
+            <tr key={label}>
+              <td>{label}</td>
+              <td>{rating}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  const remarksPreview = setting.display_options.show_remarks ? (
+    <div className="rts-remarks">
+      Teacher: Amina is focused and consistent. Principal: Excellent performance. Keep it up.
+    </div>
+  ) : null;
+
+  const signaturePreview = (
+    <div className="rts-foot">
+      {setting.display_options.show_signature ? (
+        <>
+          <span className="rts-signature">
+            <img src="/media/result/default-signature.svg" alt="Principal signature" />
+            <span style={{ display: "block", marginTop: 4 }}>Principal/HM</span>
+          </span>
+          <img className="rts-stamp" src="/media/result/default-stamp.svg" alt="School stamp" />
+        </>
+      ) : <span />}
+      {setting.display_options.show_qr_code && (
+        <img className="rts-qr" src="/media/result/default-qrcode.svg" alt="Default QR code" />
+      )}
+    </div>
+  );
+
+  const renderCustomBlock = (block: CustomReportBlock) => {
+    if (block.type === "student_info") return studentInfoPreview;
+    if (block.type === "scores_table") return scoresTablePreview;
+    if (block.type === "performance_chart") return performancePreview;
+    if (block.type === "domains") return setting.display_options.show_domains ? domainsPreview : null;
+    if (block.type === "comments") return remarksPreview;
+    if (block.type === "signature") return signaturePreview;
+    return <p className="rts-builder-note">This block is ready for school-specific content.</p>;
+  };
 
   return (
     <>
@@ -408,6 +634,7 @@ export default function ResultTemplateSettingsPage() {
 .rts-hero>*{position:relative;z-index:1}.rts-eyebrow{color:#c9a84c;font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px}.rts-title{font-family:Lora,Georgia,serif;font-size:clamp(24px,3vw,36px);font-weight:900;margin:0}.rts-sub{color:#94a3b8;max-width:760px;margin:8px 0 0;line-height:1.7;font-size:13.5px}
 .rts-grid{display:grid;grid-template-columns:minmax(310px,420px) minmax(0,1fr);gap:18px;align-items:start}.rts-panel{background:#fff;border:1px solid #ede8e0;border-radius:14px;overflow:hidden}.rts-panel-head{padding:16px 18px;border-bottom:1px solid rgba(0,0,0,.06)}.rts-panel-title{font-family:Lora,Georgia,serif;font-weight:900;color:#1a1a2e;margin:0}.rts-panel-sub{color:#9a8a7a;font-size:12px;margin:4px 0 0}.rts-panel-body{padding:16px 18px}
 .rts-template{width:100%;border:1px solid #e5ddd3;background:#faf8f5;border-radius:12px;padding:13px;text-align:left;margin-bottom:10px;cursor:pointer;transition:.2s}.rts-template:hover{transform:translateY(-1px);background:#fff}.rts-template--active{border-color:#0f172a;background:#0f172a;color:#fff}.rts-template b{display:block;font-size:13.5px}.rts-template span{display:block;font-size:12px;opacity:.72;margin-top:4px;line-height:1.5}
+.rts-builder{border:1px solid #e5ddd3;background:#faf8f5;border-radius:14px;padding:12px;margin:12px 0}.rts-builder-note{font-size:12px;color:#6b5d50;line-height:1.55;margin-bottom:10px}.rts-block-list{display:grid;gap:8px}.rts-block{border:1px solid #e5ddd3;background:#fff;border-radius:12px;padding:10px;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;cursor:grab}.rts-block b{display:block;font-size:12.5px;color:#1a1a2e}.rts-block span{font-size:11px;color:#9a8a7a}.rts-block-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.rts-mini-btn{border:1px solid #e5ddd3;background:#fff;border-radius:8px;min-height:30px;padding:0 8px;font-size:11px;font-weight:900;color:#1a1a2e}.rts-mini-btn--active{background:#0f172a;color:#fff;border-color:#0f172a}.rts-custom-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}.rts-custom-block{border:1px dashed color-mix(in srgb,var(--rts-primary),transparent 35%);background:rgba(255,255,255,.68);border-radius:12px;padding:10px;min-height:78px}.rts-custom-block--full{grid-column:1/-1}.rts-custom-title{font-size:11px;font-weight:900;color:var(--rts-primary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
 .rts-field{margin-top:13px}.rts-label{font-size:11px;font-weight:900;letter-spacing:.11em;text-transform:uppercase;color:#9a8a7a;margin-bottom:7px}.rts-color-row{display:flex;gap:9px;align-items:center}.rts-color-row input[type=color]{width:42px;height:40px;border:1px solid #e5ddd3;border-radius:10px;background:#fff;padding:4px}.rts-input,.rts-select{width:100%;border:1px solid #e5ddd3;background:#fff;border-radius:11px;min-height:40px;padding:9px 11px;font-size:13px;outline:none}.rts-input:focus,.rts-select:focus{border-color:rgba(201,168,76,.7);box-shadow:0 0 0 3px rgba(201,168,76,.15)}
 .rts-toggles{display:grid;grid-template-columns:1fr 1fr;gap:8px}.rts-toggle{display:flex;align-items:center;gap:8px;border:1px solid #ede8e0;border-radius:10px;padding:9px 10px;color:#1a1a2e;font-size:12.5px;background:#faf8f5}.rts-toggle input{accent-color:#0f172a}
 .rts-rule-panel{border:1px solid #ede8e0;background:#faf8f5;border-radius:12px;padding:12px;margin-top:10px}.rts-rule-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.rts-rule-actions{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:10px}.rts-rule-add{border:0;border-radius:10px;background:#0f172a;color:#fff;min-height:38px;padding:0 12px;font-weight:900}.rts-rule-remove{border:1px solid #fecaca;background:#fff1f2;color:#be123c;border-radius:9px;min-height:34px;padding:0 10px;font-weight:800}.rts-rule-list{display:grid;gap:10px;margin-top:12px}.rts-rule-card{border:1px solid #e5ddd3;border-radius:12px;background:#fff;padding:11px}.rts-rule-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px}.rts-rule-title{font-weight:900;color:#1a1a2e;font-size:12.5px}.rts-rule-sub{font-size:11px;color:#9a8a7a;margin-top:2px}.rts-rule-empty{border:1px dashed #d8cfc4;border-radius:12px;color:#9a8a7a;background:#fff;padding:12px;font-size:12px;line-height:1.6}
@@ -416,7 +643,7 @@ export default function ResultTemplateSettingsPage() {
 .rts-info{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.rts-info div{border:1px solid color-mix(in srgb,var(--rts-primary),transparent 45%);border-left:4px solid var(--rts-primary);border-radius:9px;padding:8px;font-size:11px;background:color-mix(in srgb,var(--rts-secondary),#fff 82%)}.rts-info b{color:var(--rts-primary)}
 .rts-layout-body{display:grid;grid-template-columns:1fr;gap:12px}.rts-preview--modern .rts-layout-body{grid-template-columns:minmax(0,1.25fr) minmax(245px,.75fr);align-items:start}.rts-preview--premium .rts-layout-body{border-top:1px solid color-mix(in srgb,var(--rts-primary),transparent 55%);margin-top:12px;padding-top:2px}.rts-score-area{min-width:0}.rts-insight-area{min-width:0}.rts-preview--modern .rts-insight-area{margin-top:12px}.rts-preview--modern .rts-analytics{grid-template-columns:1fr}.rts-preview--modern .rts-domain-grid{grid-template-columns:1fr}.rts-preview--premium .rts-insight-area{display:grid;grid-template-columns:1.2fr .8fr;gap:10px;align-items:start}.rts-preview--premium .rts-domain-grid{margin-top:0}.rts-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:10.5px}.rts-table th{background:var(--rts-primary);color:var(--rts-text);padding:7px 5px;border:1px solid var(--rts-primary)}.rts-table td{border:1px solid color-mix(in srgb,var(--rts-primary),transparent 45%);padding:6px 5px;text-align:center}.rts-table td:first-child{text-align:left;font-weight:700}.rts-summary{display:flex;gap:8px;flex-wrap:wrap;margin-top:11px}.rts-preview--premium .rts-summary{justify-content:center}.rts-chip{background:var(--rts-secondary);border:1px solid var(--rts-primary);border-radius:999px;padding:5px 9px;font-size:11px;font-weight:900}.rts-analytics{display:grid;grid-template-columns:1.2fr .8fr;gap:10px;margin-top:12px}.rts-analytics-card{border:1px solid color-mix(in srgb,var(--rts-primary),transparent 55%);border-radius:12px;padding:10px;background:rgba(255,255,255,.62)}.rts-analytics-title{font-size:11px;font-weight:900;color:var(--rts-primary);border-left:4px solid var(--rts-primary);padding-left:7px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em}.rts-bar-row{display:grid;grid-template-columns:105px 1fr 38px;gap:7px;align-items:center;font-size:10.5px;margin:6px 0}.rts-bar-track{height:8px;background:rgba(15,23,42,.08);border-radius:999px;overflow:hidden}.rts-bar-fill{display:block;height:100%;border-radius:999px}.rts-domain-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.rts-domain-table{width:100%;border-collapse:collapse;font-size:10.5px}.rts-domain-table caption{font-weight:900;color:var(--rts-primary);border-bottom:2px solid var(--rts-primary);padding-bottom:6px}.rts-domain-table td{border:1px solid color-mix(in srgb,var(--rts-primary),transparent 50%);padding:6px}.rts-domain-table td:last-child{text-align:center;font-weight:800}.rts-remarks{margin-top:12px;font-size:11px;line-height:1.6}.rts-remarks strong{color:var(--rts-primary)}.rts-foot{display:flex;justify-content:space-between;align-items:end;margin-top:16px;font-size:10.5px;color:var(--rts-primary);font-weight:900}.rts-preview--premium .rts-foot{border-top:1px solid color-mix(in srgb,var(--rts-primary),transparent 55%);padding-top:12px}.rts-signature{min-width:150px;text-align:center}.rts-signature img{width:130px;height:48px;object-fit:contain}.rts-stamp{width:68px;height:68px;object-fit:contain;transform:rotate(-8deg);opacity:.92}.rts-qr{width:58px;height:58px;object-fit:contain;border:2px solid var(--rts-primary);background:#fff}
 @media(max-width:1199.98px){.rts-grid{grid-template-columns:1fr}.rts-catalog{grid-template-columns:minmax(0,780px)}}@media(max-width:575.98px){.rts-toggles{grid-template-columns:1fr}.rts-preview{padding:12px}.rts-preview-head{grid-template-columns:46px 1fr 46px}.rts-logo,.rts-photo{width:46px;height:46px}.rts-school h3{font-size:14px}.rts-table{font-size:9.5px}.rts-table th,.rts-table td{padding:5px 3px}.rts-analytics,.rts-domain-grid{grid-template-columns:1fr}.rts-bar-row{grid-template-columns:88px 1fr 32px}}
-.rts-preview,.rts-preview *{box-sizing:border-box}.rts-preview{overflow:hidden}.rts-preview .rts-layout-body,.rts-preview .rts-insight-area,.rts-preview .rts-score-area,.rts-preview .rts-analytics-card,.rts-preview .rts-domain-table{min-width:0;max-width:100%}.rts-preview--modern .rts-layout-body{grid-template-columns:1fr}.rts-preview--modern .rts-insight-area{margin-top:0}.rts-preview--premium .rts-insight-area{display:block}.rts-preview--premium .rts-domain-grid{margin-top:12px}.rts-preview .rts-analytics{grid-template-columns:repeat(2,minmax(0,1fr))}.rts-preview .rts-domain-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.rts-preview .rts-bar-row{grid-template-columns:minmax(0,96px) minmax(70px,1fr) 34px}.rts-preview .rts-bar-row span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rts-preview .rts-domain-table{table-layout:fixed}.rts-preview .rts-domain-table td{word-break:break-word}.rts-preview .rts-table{table-layout:fixed}.rts-preview .rts-table th,.rts-preview .rts-table td{word-break:break-word}@media(max-width:900px){.rts-preview .rts-analytics,.rts-preview .rts-domain-grid{grid-template-columns:1fr}.rts-preview .rts-info{grid-template-columns:1fr}.rts-preview .rts-foot{gap:10px;flex-wrap:wrap}.rts-preview .rts-signature{min-width:120px}}
+.rts-preview,.rts-preview *{box-sizing:border-box}.rts-preview{overflow:hidden}.rts-preview .rts-layout-body,.rts-preview .rts-insight-area,.rts-preview .rts-score-area,.rts-preview .rts-analytics-card,.rts-preview .rts-domain-table{min-width:0;max-width:100%}.rts-preview--modern .rts-layout-body{grid-template-columns:1fr}.rts-preview--modern .rts-insight-area{margin-top:0}.rts-preview--premium .rts-insight-area{display:block}.rts-preview--premium .rts-domain-grid{margin-top:12px}.rts-preview .rts-analytics{grid-template-columns:repeat(2,minmax(0,1fr))}.rts-preview .rts-domain-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.rts-preview .rts-bar-row{grid-template-columns:minmax(0,96px) minmax(70px,1fr) 34px}.rts-preview .rts-bar-row span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rts-preview .rts-domain-table{table-layout:fixed}.rts-preview .rts-domain-table td{word-break:break-word}.rts-preview .rts-table{table-layout:fixed}.rts-preview .rts-table th,.rts-preview .rts-table td{word-break:break-word}@media(max-width:900px){.rts-preview .rts-analytics,.rts-preview .rts-domain-grid,.rts-custom-grid{grid-template-columns:1fr}.rts-preview .rts-info{grid-template-columns:1fr}.rts-preview .rts-foot{gap:10px;flex-wrap:wrap}.rts-preview .rts-signature{min-width:120px}}
       `}</style>
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       <PageTitle title="Result Design" />
@@ -447,12 +674,60 @@ export default function ResultTemplateSettingsPage() {
                     <button
                       key={template.key}
                       className={`rts-template ${setting.template_key === template.key ? "rts-template--active" : ""}`}
-                      onClick={() => setSetting((current) => ({ ...current, template_key: template.key }))}
+                      onClick={() => setSetting((current) => ({
+                        ...current,
+                        template_key: template.key,
+                        display_options: {
+                          ...current.display_options,
+                          custom_report_layout: {
+                            ...current.display_options.custom_report_layout,
+                            enabled: template.key === "custom_builder",
+                          },
+                        },
+                      }))}
                     >
                       <b>{template.name}</b>
                       <span>{template.description}</span>
                     </button>
                   ))}
+
+                  {setting.template_key === "custom_builder" && (
+                    <div className="rts-builder">
+                      <div className="rts-label">Custom report blocks</div>
+                      <p className="rts-builder-note">
+                        Arrange the report card using school-safe blocks. Drag a block over another block to reorder it,
+                        then choose full or half width.
+                      </p>
+                      <div className="rts-block-list">
+                        {setting.display_options.custom_report_layout.blocks.map((block, index) => (
+                          <div
+                            className="rts-block"
+                            key={block.id}
+                            draggable
+                            onDragStart={(event) => event.dataTransfer.setData("text/plain", String(index))}
+                            onDragOver={(event) => event.preventDefault()}
+                            onDrop={(event) => {
+                              event.preventDefault();
+                              const from = Number(event.dataTransfer.getData("text/plain"));
+                              if (!Number.isNaN(from)) moveCustomBlock(from, index);
+                            }}
+                          >
+                            <div>
+                              <b>{block.label}</b>
+                              <span>{block.visible ? `${block.width} width` : "Hidden from result"}</span>
+                            </div>
+                            <div className="rts-block-actions">
+                              <button className="rts-mini-btn" type="button" disabled={index === 0} onClick={() => moveCustomBlock(index, index - 1)}>Up</button>
+                              <button className="rts-mini-btn" type="button" disabled={index === setting.display_options.custom_report_layout.blocks.length - 1} onClick={() => moveCustomBlock(index, index + 1)}>Down</button>
+                              <button className={`rts-mini-btn ${block.width === "full" ? "rts-mini-btn--active" : ""}`} type="button" onClick={() => updateCustomBlock(block.id, { width: "full" })}>Full</button>
+                              <button className={`rts-mini-btn ${block.width === "half" ? "rts-mini-btn--active" : ""}`} type="button" onClick={() => updateCustomBlock(block.id, { width: "half" })}>Half</button>
+                              <button className="rts-mini-btn" type="button" onClick={() => updateCustomBlock(block.id, { visible: !block.visible })}>{block.visible ? "Hide" : "Show"}</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {[
                     ["primary_color", "Primary color"],
@@ -634,7 +909,7 @@ export default function ResultTemplateSettingsPage() {
                           </div>
                           <div className="rts-school">
                             <h3>{schoolName}</h3>
-                            <p>12 School Road, Lagos • 08030000000</p>
+                            <p>12 School Road, Lagos | 08030000000</p>
                           </div>
                           {setting.display_options.show_student_photo ? (
                             <div className="rts-photo">
@@ -643,135 +918,36 @@ export default function ResultTemplateSettingsPage() {
                           ) : <div />}
                         </div>
                         <div className="rts-band">{(previewTerm === "all" ? "TERM" : previewTerm).toUpperCase()} REPORT SHEET</div>
-                        <div className="rts-info">
-                          <div><b>Name:</b> Amina Bello Grace</div>
-                          <div><b>Admission No:</b> GQ872114</div>
-                          <div><b>Class:</b> {selectedSectionName}</div>
-                          <div><b>Session:</b> 2026/2027</div>
-                          {setting.display_options.show_attendance && <div><b>Present:</b> 68 of 72 days</div>}
-                          {showPreviewPosition && <div><b>Position:</b> 2nd of 35</div>}
-                        </div>
-                        <div className="rts-layout-body">
-                          <section className="rts-score-area">
-                        <table className="rts-table">
-                          <thead>
-                            <tr>
-                              <th>Subject</th><th>CA1</th><th>CA2</th><th>Exam</th><th>Total</th>
-                              {activeReportColumns.show_first_term && <th>First Term</th>}
-                              {activeReportColumns.show_second_term && <th>Second Term</th>}
-                              {activeReportColumns.show_cumulative_total && <th>Total Score</th>}
-                              {activeReportColumns.show_cumulative_average && <th>Average</th>}
-                              {showPreviewGrade && <th>Grade</th>}
-                              {showPreviewRemarks && <th>Remark</th>}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {sampleSubjects.map((row) => (
-                              <tr key={row[0]}>
-                                <td>{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td><td>{row[4]}</td>
-                                {activeReportColumns.show_first_term && <td>{Math.max(40, Number(row[4]) - 6)}</td>}
-                                {activeReportColumns.show_second_term && <td>{Math.max(40, Number(row[4]) - 2)}</td>}
-                                {activeReportColumns.show_cumulative_total && <td>{Number(row[4]) + Math.max(40, Number(row[4]) - 6) + Math.max(40, Number(row[4]) - 2)}</td>}
-                                {activeReportColumns.show_cumulative_average && <td>{Math.round((Number(row[4]) + Math.max(40, Number(row[4]) - 6) + Math.max(40, Number(row[4]) - 2)) / 3)}</td>}
-                                {showPreviewGrade && <td>{row[5]}</td>}
-                                {showPreviewRemarks && <td>{row[6]}</td>}
-                              </tr>
+                        {setting.template_key === "custom_builder" ? (
+                          <div className="rts-custom-grid">
+                            {customBlocks.map((block) => (
+                              <section
+                                className={`rts-custom-block ${block.width === "full" ? "rts-custom-block--full" : ""}`}
+                                key={block.id}
+                              >
+                                <div className="rts-custom-title">{block.label}</div>
+                                {renderCustomBlock(block)}
+                              </section>
                             ))}
-                          </tbody>
-                        </table>
-                        <div className="rts-summary">
-                          <span className="rts-chip">Average: 80.75%</span>
-                          {showPreviewGrade && <span className="rts-chip">Grade: A</span>}
-                          <span className="rts-chip">Status: Excellent</span>
-                        </div>
-                          </section>
-                          <aside className="rts-insight-area">
-                        {setting.display_options.show_domains && (
+                          </div>
+                        ) : (
                           <>
-                            <div className="rts-analytics">
-                              <div className="rts-analytics-card">
-                                <div className="rts-analytics-title">Subject performance</div>
-                                {sampleSubjects.slice(0, 6).map((row, index) => (
-                                  <div className="rts-bar-row" key={row[0]}>
-                                    <span>{row[0]}</span>
-                                    <span className="rts-bar-track">
-                                      <span
-                                        className="rts-bar-fill"
-                                        style={{ width: `${row[4]}%`, background: chartColors[index % chartColors.length] }}
-                                      />
-                                    </span>
-                                    <b>{row[4]}%</b>
-                                  </div>
-                                ))}
-                              </div>
-                              <div className="rts-analytics-card">
-                                <div className="rts-analytics-title">Result analytics</div>
-                                {[
-                                  ["A grades", 6, 40],
-                                  ["B grades", 6, 40],
-                                  ["C grades", 3, 20],
-                                  ["Attendance", 68, 94],
-                                ].map(([label, value, percent], index) => (
-                                  <div className="rts-bar-row" key={label as string}>
-                                    <span>{label}</span>
-                                    <span className="rts-bar-track">
-                                      <span
-                                        className="rts-bar-fill"
-                                        style={{ width: `${percent}%`, background: analyticColors[index % analyticColors.length] }}
-                                      />
-                                    </span>
-                                    <b>{value}</b>
-                                  </div>
-                                ))}
-                              </div>
+                            {studentInfoPreview}
+                            <div className="rts-layout-body">
+                              <section className="rts-score-area">{scoresTablePreview}</section>
+                              <aside className="rts-insight-area">
+                                {setting.display_options.show_domains && (
+                                  <>
+                                    {performancePreview}
+                                    {domainsPreview}
+                                  </>
+                                )}
+                              </aside>
                             </div>
-                            <div className="rts-domain-grid">
-                              <table className="rts-domain-table">
-                                <caption>Affective Domain</caption>
-                                <tbody>
-                                  {sampleAffective.map(([label, rating]) => (
-                                    <tr key={label}>
-                                      <td>{label}</td>
-                                      <td>{rating}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                              <table className="rts-domain-table">
-                                <caption>Psychomotor Skills</caption>
-                                <tbody>
-                                  {samplePsychomotor.map(([label, rating]) => (
-                                    <tr key={label}>
-                                      <td>{label}</td>
-                                      <td>{rating}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
+                            {remarksPreview}
+                            {signaturePreview}
                           </>
                         )}
-                          </aside>
-                        </div>
-                        {setting.display_options.show_remarks && (
-                          <div className="rts-remarks">
-                            Teacher: Amina is focused and consistent. Principal: Excellent performance. Keep it up.
-                          </div>
-                        )}
-                        <div className="rts-foot">
-                          {setting.display_options.show_signature ? (
-                            <>
-                              <span className="rts-signature">
-                                <img src="/media/result/default-signature.svg" alt="Principal signature" />
-                                <span style={{ display: "block", marginTop: 4 }}>Date: {today}</span>
-                              </span>
-                              <img className="rts-stamp" src="/media/result/default-stamp.svg" alt="School stamp" />
-                            </>
-                          ) : <span />}
-                          {setting.display_options.show_qr_code && (
-                            <img className="rts-qr" src="/media/result/default-qrcode.svg" alt="Default QR code" />
-                          )}
-                        </div>
                       </div>
                     </div>
                   </div>

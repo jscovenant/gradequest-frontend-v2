@@ -64,6 +64,7 @@ type PlanForm = {
 const FEATURE_PRESETS: FeatureDraft[] = [
   { feature_name: "Online CBT", feature_key: "cbt_online", is_enabled: true },
   { feature_name: "Offline CBT", feature_key: "cbt_offline", is_enabled: true },
+  { feature_name: "Report Card Designer", feature_key: "report_card_designer", is_enabled: true },
 ];
 
 /* =========================
