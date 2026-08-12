@@ -184,17 +184,17 @@ export default function ResultBatchSetupPage() {
 
   const selectedClassName = useMemo(() => {
     if (!classId) return "—";
-    return classes.find((c) => c.id === classId)?.name ?? "—";
+    return classes.find((c) => c.id === classId)?.name ?? "-";
   }, [classId, classes]);
 
   const selectedDeptName = useMemo(() => {
     if (!departmentId) return "—";
-    return departments.find((d) => d.id === departmentId)?.name ?? "—";
+    return departments.find((d) => d.id === departmentId)?.name ?? "-";
   }, [departmentId, departments]);
 
   const selectedSectionName = useMemo(() => {
     if (!sectionId) return "—";
-    return sections.find((s) => s.id === sectionId)?.name ?? "—";
+    return sections.find((s) => s.id === sectionId)?.name ?? "-";
   }, [sectionId, sections]);
 
   const clearSavedContext = () => {

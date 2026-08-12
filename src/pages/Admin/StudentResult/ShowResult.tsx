@@ -135,8 +135,20 @@ interface ResultTemplateSetting {
     show_student_photo?: boolean;
     show_watermark?: boolean;
     report_column_rules?: ReportColumnRule[];
+    custom_report_layout?: {
+      enabled?: boolean;
+      blocks?: CustomReportBlock[];
+    };
   };
 }
+
+type CustomReportBlock = {
+  id?: string;
+  label?: string;
+  type: string;
+  width?: "full" | "half";
+  visible?: boolean;
+};
 
 type ReportColumnOptions = {
   show_position: boolean;
@@ -402,6 +414,22 @@ const mixHexWithWhite = (color: string, whitePercent = 82) => {
   const resultFont = resultTemplate.font_family || "Arial";
   const isModernTemplate = templateKey === "modern_scholar";
   const isPremiumTemplate = templateKey === "premium_letterhead";
+  const customReportLayout = displayOptions.custom_report_layout;
+  const isCustomTemplate = templateKey === "custom_builder" && customReportLayout?.enabled !== false;
+  const customBlocks = customReportLayout?.blocks || [];
+  const customBlockStyle = (type: string): React.CSSProperties => {
+    if (!isCustomTemplate) return {};
+
+    const index = customBlocks.findIndex((block) => block.type === type);
+    const block = index >= 0 ? customBlocks[index] : undefined;
+
+    return {
+      order: index >= 0 ? index : customBlocks.length,
+      gridColumn: block?.width === "half" ? "span 1" : "1 / -1",
+      display: block?.visible === false ? "none" : undefined,
+      minWidth: 0,
+    };
+  };
   const headerTextColor = getTextColor(themePrimary);
 
   const borderColor = themePrimary;
@@ -737,6 +765,14 @@ const mixHexWithWhite = (color: string, whitePercent = 82) => {
             ) : null}
           </div>
 
+          <div
+            style={isCustomTemplate ? {
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: 12,
+              alignItems: "start",
+            } : undefined}
+          >
           {/* Student Info */}
           <div
             style={{
@@ -744,6 +780,7 @@ const mixHexWithWhite = (color: string, whitePercent = 82) => {
               gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
               gap: 8,
               marginTop: 12,
+              ...customBlockStyle("student_info"),
             }}
           >
             {[
@@ -787,8 +824,8 @@ const mixHexWithWhite = (color: string, whitePercent = 82) => {
             ))}
           </div>
 
-          <div style={resultLayoutStyle}>
-            <section style={{ minWidth: 0 }}>
+          <div style={isCustomTemplate ? { display: "contents" } : resultLayoutStyle}>
+            <section style={{ minWidth: 0, ...customBlockStyle("scores_table") }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px", marginTop: 12 }}>
             <thead>
               <tr style={{ background: themePrimary, color: headerTextColor }}>
@@ -877,8 +914,8 @@ const mixHexWithWhite = (color: string, whitePercent = 82) => {
                         {showCumulativeTotal && (
                           <td style={tdStyle}>
                             {getValue(
-                              (subject as V2SubjectResult).cumulative_total ??
-                                (parseCarry((subject as V2SubjectResult).carry_over_json)?.cumulative_total ??
+                              (subject as V2SubjectResult).cumulative_total 
+                                (parseCarry((subject as V2SubjectResult).carry_over_json)?.cumulative_total 
                                   (subject as V2SubjectResult).carry_over?.cumulative_total),
                               ""
                             )}
@@ -888,8 +925,8 @@ const mixHexWithWhite = (color: string, whitePercent = 82) => {
                         {showCumulativeAverage && (
                           <td style={tdStyle}>
                             {getValue(
-                              (subject as V2SubjectResult).cumulative_average ??
-                                (parseCarry((subject as V2SubjectResult).carry_over_json)?.cumulative_average ??
+                              (subject as V2SubjectResult).cumulative_average 
+                                (parseCarry((subject as V2SubjectResult).carry_over_json)?.cumulative_average 
                                   (subject as V2SubjectResult).carry_over?.cumulative_average),
                               ""
                             )}
@@ -953,10 +990,10 @@ const mixHexWithWhite = (color: string, whitePercent = 82) => {
           </div>
             </section>
 
-            <aside style={insightPanelStyle}>
+            <aside style={isCustomTemplate ? { display: "contents" } : insightPanelStyle}>
 
           {displayOptions.show_domains && (
-            <div style={analyticsGridStyle}>
+            <div style={{ ...analyticsGridStyle, ...customBlockStyle("performance_chart") }}>
               <div
                 style={{
                   border: `1px solid ${themePrimary}`,
@@ -1051,7 +1088,7 @@ const mixHexWithWhite = (color: string, whitePercent = 82) => {
 
           {/* Domains */}
           {displayOptions.show_domains && (affective_domains.length > 0 || psychomotor_domains.length > 0) && (
-            <div style={domainsGridStyle}>
+            <div style={{ ...domainsGridStyle, ...customBlockStyle("domains") }}>
               {affective_domains.length > 0 && (
                 <div>
                   <table style={domainTableStyle}>
@@ -1095,6 +1132,7 @@ const mixHexWithWhite = (color: string, whitePercent = 82) => {
           {/* Remarks */}
           {displayOptions.show_remarks && <div
             style={{
+              ...customBlockStyle("comments"),
               marginTop: "12px",
               border: `1px solid ${themePrimary}55`,
               borderRadius: 12,
@@ -1123,6 +1161,7 @@ const mixHexWithWhite = (color: string, whitePercent = 82) => {
               alignItems: "center",
               borderTop: isPremiumTemplate ? `1px solid ${themePrimary}55` : undefined,
               paddingTop: isPremiumTemplate ? 12 : undefined,
+              ...customBlockStyle("signature"),
             }}
           >
             {displayOptions.show_signature ? (
@@ -1151,6 +1190,7 @@ const mixHexWithWhite = (color: string, whitePercent = 82) => {
               <img src={qrDataUrl || "/media/result/default-qrcode.svg"} alt="QR Code" style={{ width: "100px", height: "100px" }} />
               <p style={{ margin: 0, color: themePrimary, fontWeight: 700 }}>Verify Result</p>
             </div> : <div />}
+          </div>
           </div>
         </div>
       </div>

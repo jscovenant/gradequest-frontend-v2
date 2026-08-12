@@ -143,7 +143,7 @@ export default function LevelsPage() {
      DERIVED
   ========================= */
   const sectionName = (level: StudentClass) =>
-    level.section?.name ?? sections.find((s) => s.id === level.section_id)?.name ?? "—";
+      level.section?.name ?? sections.find((s) => s.id === level.section_id)?.name ?? "-";
 
   const filteredLevels = useMemo(() => {
     const q = query.trim().toLowerCase();

@@ -11,6 +11,12 @@ import { authApi } from "../../../utils/axios";
 import { getUser } from "../../../utils/token";
 import { useToast } from "../../../contexts/ToastContext";
 
+const safeAiError = (message: string | undefined, fallback: string) => {
+  const text = String(message || fallback);
+  return /openai|api key|quota|billing|organization|insufficient_quota|provider/i.test(text)
+    ? "Something went wrong while processing this AI request. Please try again later."
+    : text;
+};
 type CbtExam = {
   id: number;
   title: string;
@@ -69,6 +75,29 @@ type Subject = {
   department_id?: number | null;
   section_id?: number | null;
   class_id?: number | null;
+};
+
+const normalizeSubjectName = (name: string | undefined | null) => String(name || "").trim().toLowerCase();
+
+const preferGeneralSubjects = (items: Subject[]) => {
+  const chosen = new Map<string, Subject>();
+  [...items]
+    .sort((a, b) => {
+      const byName = normalizeSubjectName(a.name).localeCompare(normalizeSubjectName(b.name));
+      if (byName !== 0) return byName;
+
+      const aGeneral = !a.department_id;
+      const bGeneral = !b.department_id;
+      if (aGeneral !== bGeneral) return aGeneral ? -1 : 1;
+
+      return Number(a.id || 0) - Number(b.id || 0);
+    })
+    .forEach((subject) => {
+      const key = normalizeSubjectName(subject.name);
+      if (key && !chosen.has(key)) chosen.set(key, subject);
+    });
+
+  return Array.from(chosen.values()).sort((a, b) => a.name.localeCompare(b.name));
 };
 
 type CbtOption = {
@@ -131,6 +160,28 @@ type CbtExamDetail = CbtExam & {
   attempts?: CbtAttempt[];
 };
 
+type AiQuestionDraft = {
+  sections?: {
+    title?: string;
+    instructions?: string;
+    questions?: any[];
+    groups?: { title?: string; group_type?: string; passage?: string; questions?: any[] }[];
+  }[];
+  summary?: {
+    questions_detected?: number;
+    sections_detected?: number;
+    groups_detected?: number;
+  };
+};
+
+const emptyAiForm = {
+  topics: "",
+  source_text: "",
+  question_count: 20,
+  difficulty: "normal",
+  marks_per_question: 1,
+  formats: ["single_choice", "comprehension"],
+};
 type WordImportResult = {
   message?: string;
   preview?: boolean;
@@ -241,6 +292,12 @@ export default function CbtExamsPage() {
   const [questionImportFile, setQuestionImportFile] = useState<File | null>(null);
   const [questionImportResult, setQuestionImportResult] = useState<WordImportResult | null>(null);
   const [questionImporting, setQuestionImporting] = useState(false);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiImporting, setAiImporting] = useState(false);
+  const [aiFile, setAiFile] = useState<File | null>(null);
+  const [aiForm, setAiForm] = useState(emptyAiForm);
+  const [aiDraft, setAiDraft] = useState<AiQuestionDraft | null>(null);
 
   const groups = useMemo(() => {
     const fromSections = (examDetail?.sections || []).flatMap((section) =>
@@ -277,12 +334,14 @@ export default function CbtExamsPage() {
     const selectedSection = values.section_id ? Number(values.section_id) : null;
     const selectedClass = values.class_id ? Number(values.class_id) : null;
 
-    return subjects.filter((subject) => {
-      if (selectedDepartment && subject.department_id && Number(subject.department_id) !== selectedDepartment) return false;
+    return preferGeneralSubjects(subjects.filter((subject) => {
+      const subjectDepartment = Number(subject.department_id || 0);
+      if (selectedDepartment && subjectDepartment > 0 && subjectDepartment !== selectedDepartment) return false;
+      if (!selectedDepartment && subjectDepartment > 0) return false;
       if (selectedSection && subject.section_id && Number(subject.section_id) !== selectedSection) return false;
       if (selectedClass && subject.class_id && Number(subject.class_id) !== selectedClass) return false;
       return true;
-    });
+    }));
   };
 
   const createSubjects = useMemo(() => visibleSubjectsFor(form), [subjects, form.department_id, form.section_id, form.class_id]);
@@ -315,14 +374,14 @@ export default function CbtExamsPage() {
       const subjectMap = new Map<number, Subject>();
       subjectResponses.forEach((response, index) => {
         readList<Subject>(response.data).forEach((subject) => {
-          subjectMap.set(subject.id, { ...subject, department_id: subject.department_id ?? departmentList[index]?.id ?? null });
+          subjectMap.set(subject.id, { ...subject, department_id: subject.department_id ?? null });
         });
       });
       setExams(Array.isArray(examRes.data?.exams?.data) ? examRes.data.exams.data : []);
       setClasses(Array.isArray(classRes.data) ? classRes.data : []);
       setSections(readList<SchoolSection>(sectionRes.data));
       setDepartments(departmentList);
-      setSubjects(Array.from(subjectMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
+      setSubjects(preferGeneralSubjects(Array.from(subjectMap.values())));
     } catch (e: any) {
       showError(e?.response?.data?.message || "Unable to load CBT exams.");
     } finally {
@@ -689,6 +748,60 @@ export default function CbtExamsPage() {
     }
   }
 
+  function toggleAiFormat(format: string) {
+    setAiForm((current) => {
+      const exists = current.formats.includes(format);
+      const formats = exists ? current.formats.filter((item) => item !== format) : [...current.formats, format];
+      return { ...current, formats: formats.length ? formats : [format] };
+    });
+  }
+
+  async function generateAiQuestions() {
+    if (!selectedExamId) return showError("Select an exam first.");
+    if (!aiFile && !aiForm.topics.trim() && !aiForm.source_text.trim()) return showError("Upload a note or enter topics first.");
+
+    setAiGenerating(true);
+    setAiDraft(null);
+    try {
+      const payload = new FormData();
+      if (aiFile) payload.append("source_file", aiFile);
+      payload.append("topics", aiForm.topics);
+      payload.append("source_text", aiForm.source_text);
+      payload.append("question_count", String(aiForm.question_count));
+      payload.append("difficulty", aiForm.difficulty);
+      payload.append("marks_per_question", String(aiForm.marks_per_question));
+      aiForm.formats.forEach((format) => payload.append("formats[]", format));
+
+      const res = await authApi.post("/cbt/exams/" + selectedExamId + "/questions/ai-generate", payload, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setAiDraft(res.data?.draft || null);
+      showSuccess(res.data?.message || "AI draft generated.");
+    } catch (e: any) {
+      showError(safeAiError(e?.response?.data?.message, "Unable to generate AI questions."));
+    } finally {
+      setAiGenerating(false);
+    }
+  }
+
+  async function importAiDraft() {
+    if (!selectedExamId || !aiDraft) return showError("Generate and review AI questions first.");
+
+    setAiImporting(true);
+    try {
+      const res = await authApi.post("/cbt/exams/" + selectedExamId + "/questions/ai-import", { draft: aiDraft });
+      showSuccess(res.data?.message || "AI questions imported.");
+      setAiDraft(null);
+      setAiFile(null);
+      setAiModalOpen(false);
+      await load();
+      await loadExam(selectedExamId);
+    } catch (e: any) {
+      showError(e?.response?.data?.message || "Unable to import AI questions.");
+    } finally {
+      setAiImporting(false);
+    }
+  }
   async function prepareAndDownloadOfflineBundle() {
     setSaving(true);
     setOfflineLicense(null);
@@ -878,7 +991,7 @@ export default function CbtExamsPage() {
         .cbt-option-row{display:grid;grid-template-columns:54px minmax(0,1fr) 86px;gap:8px;align-items:center;margin-bottom:8px}.cbt-option-check{display:flex;gap:6px;align-items:center;font-size:12px;font-weight:800;color:#475569}
         .cbt-toggle{display:flex;align-items:flex-start;gap:9px;border:1px solid #e5e7eb;border-radius:10px;padding:10px 11px;margin-bottom:8px;background:#fbfdff}.cbt-toggle input{margin-top:3px}.cbt-toggle strong{display:block;color:#111827;font-size:13px}.cbt-toggle span{display:block;color:#64748b;font-size:12px;line-height:1.42}
         .cbt-question-card{border:1px solid #e5e7eb;border-radius:12px;padding:13px;margin-bottom:10px;background:#fff}.cbt-question-card h3{font-size:14px;font-weight:900;margin:0 0 6px;color:#111827;line-height:1.5}.cbt-question-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.cbt-empty{border:1px dashed #cbd5e1;border-radius:14px;padding:24px;text-align:center;color:#64748b;background:#f8fafc}
-        .cbt-import-box{border:1px solid #dbe3ef;border-radius:13px;background:#fbfdff;padding:14px;margin-bottom:14px}.cbt-import-top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:end}.cbt-import-file{position:relative;border:1px dashed #cbd5e1;border-radius:12px;background:#fff;padding:12px;min-height:62px;display:flex;align-items:center;gap:10px}.cbt-import-file i{font-size:22px;color:var(--bs-primary,#d300b0)}.cbt-import-file strong{display:block;color:#111827;font-size:13px}.cbt-import-file span{display:block;color:#64748b;font-size:12px;line-height:1.35}.cbt-import-file input{position:absolute;inset:0;opacity:0;cursor:pointer}.cbt-import-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.cbt-import-guide{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.cbt-import-guide code{display:block;background:#fff;border:1px solid #e5e7eb;border-radius:9px;padding:8px;color:#334155;font-size:11px;white-space:normal}.cbt-import-result{border-top:1px solid #e5e7eb;margin-top:12px;padding-top:12px}.cbt-import-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px}.cbt-import-summary div{background:#fff;border:1px solid #e7ecf4;border-radius:10px;padding:9px}.cbt-import-summary span{display:block;color:#64748b;font-size:10px;font-weight:900;text-transform:uppercase}.cbt-import-summary strong{display:block;color:#111827;font-size:16px}.cbt-import-errors{border:1px solid #fecaca;background:#fff1f2;color:#991b1b;border-radius:10px;padding:10px;font-size:12px}.cbt-import-preview{display:grid;gap:8px;max-height:260px;overflow:auto}.cbt-import-preview-item{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px}.cbt-import-preview-item strong{display:block;color:#111827;font-size:13px;line-height:1.45}.cbt-import-preview-item span{display:inline-flex;margin:6px 6px 0 0}
+        .cbt-ai-format-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px}.cbt-ai-check{border:1px solid #dbe3ef;background:#fff;border-radius:10px;padding:10px;display:flex;gap:8px;align-items:center;font-size:12px;font-weight:900;color:#334155}.cbt-ai-check input{accent-color:var(--bs-primary,#d300b0)}.cbt-import-box{border:1px solid #dbe3ef;border-radius:13px;background:#fbfdff;padding:14px;margin-bottom:14px}.cbt-import-top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:end}.cbt-import-file{position:relative;border:1px dashed #cbd5e1;border-radius:12px;background:#fff;padding:12px;min-height:62px;display:flex;align-items:center;gap:10px}.cbt-import-file i{font-size:22px;color:var(--bs-primary,#d300b0)}.cbt-import-file strong{display:block;color:#111827;font-size:13px}.cbt-import-file span{display:block;color:#64748b;font-size:12px;line-height:1.35}.cbt-import-file input{position:absolute;inset:0;opacity:0;cursor:pointer}.cbt-import-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.cbt-import-guide{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.cbt-import-guide code{display:block;background:#fff;border:1px solid #e5e7eb;border-radius:9px;padding:8px;color:#334155;font-size:11px;white-space:normal}.cbt-import-result{border-top:1px solid #e5e7eb;margin-top:12px;padding-top:12px}.cbt-import-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px}.cbt-import-summary div{background:#fff;border:1px solid #e7ecf4;border-radius:10px;padding:9px}.cbt-import-summary span{display:block;color:#64748b;font-size:10px;font-weight:900;text-transform:uppercase}.cbt-import-summary strong{display:block;color:#111827;font-size:16px}.cbt-import-errors{border:1px solid #fecaca;background:#fff1f2;color:#991b1b;border-radius:10px;padding:10px;font-size:12px}.cbt-import-preview{display:grid;gap:8px;max-height:260px;overflow:auto}.cbt-import-preview-item{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px}.cbt-import-preview-item strong{display:block;color:#111827;font-size:13px;line-height:1.45}.cbt-import-preview-item span{display:inline-flex;margin:6px 6px 0 0}
         .cbt-rich-editor{border:1px solid #d8e1ee;border-radius:12px;background:#fff;margin-bottom:12px;overflow:hidden}.cbt-rich-editor.is-disabled{opacity:.7}.cbt-rich-toolbar{display:flex;gap:6px;flex-wrap:wrap;padding:8px;border-bottom:1px solid #e5e7eb;background:#f8fafc}.cbt-rich-toolbar button{width:34px;height:32px;border:1px solid #dbe3ef;background:#fff;color:#334155;border-radius:8px;display:grid;place-items:center}.cbt-rich-toolbar button.is-active{background:var(--bs-primary,#d300b0);border-color:var(--bs-primary,#d300b0);color:#fff}.cbt-rich-toolbar button:disabled{opacity:.45;cursor:not-allowed}.cbt-rich-content{padding:12px}.cbt-rich-content .ProseMirror{outline:none;min-height:inherit}.cbt-rich-content .ProseMirror p.is-editor-empty:first-child:before{content:attr(data-placeholder);float:left;color:#94a3b8;pointer-events:none;height:0}
         .cbt-html{color:#111827;line-height:1.55}.cbt-html p{margin:0 0 10px}.cbt-html table,.cbt-rich-content table{width:100%;border-collapse:collapse;margin:10px 0;table-layout:fixed}.cbt-html th,.cbt-html td,.cbt-rich-content th,.cbt-rich-content td{border:1px solid #cbd5e1;padding:8px;vertical-align:top}.cbt-html th,.cbt-rich-content th{background:#f1f5f9;font-weight:900}.cbt-html img,.cbt-rich-content img{max-width:100%;height:auto;border-radius:10px;border:1px solid #e5e7eb;margin:8px 0}.cbt-html ul,.cbt-html ol{padding-left:20px;margin:8px 0}.cbt-html blockquote{border-left:4px solid var(--bs-primary,#d300b0);padding-left:12px;color:#475569}
         .cbt-builder-title{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -891,7 +1004,7 @@ export default function CbtExamsPage() {
         .cbt-manual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.cbt-manual-card{border:1px solid #e3e8f2;border-radius:14px;background:#fbfdff;padding:15px}.cbt-manual-card h3{font-size:16px;font-weight:900;color:#111827;margin:0 0 8px}.cbt-manual-card ol{margin:0;padding-left:18px;color:#334155;line-height:1.65;font-size:13px}.cbt-manual-card li{margin-bottom:7px}.cbt-note{border-left:4px solid var(--bs-primary,#d300b0);background:#fdf2fb;color:#581c50;border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.55}
         .cbt-setup-card,.cbt-license-panel,.cbt-settings-panel{display:none}.cbt-work-actions{display:flex;gap:10px;flex-wrap:wrap}.cbt-side-card{background:#fff;border:1px solid #e3e8f2;border-radius:14px;padding:16px;box-shadow:0 12px 32px rgba(15,23,42,.055)}.cbt-side-card h3{font-size:16px;font-weight:900;margin:0 0 6px;color:#111827}.cbt-side-card p{font-size:12px;color:#64748b;line-height:1.5;margin:0 0 12px}
         @media(max-width:1199px){.cbt-main{margin-left:0;width:100%;padding:92px 16px 28px}.cbt-grid,.cbt-builder{grid-template-columns:1fr}.cbt-hero{grid-template-columns:1fr}.cbt-hero-actions{justify-content:flex-start}.cbt-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.cbt-selected-strip{grid-template-columns:repeat(2,minmax(0,1fr))}}
-        @media(max-width:640px){.cbt-stats,.cbt-selected-strip,.cbt-mini-grid,.cbt-import-top,.cbt-import-guide,.cbt-import-summary,.cbt-manual-grid{grid-template-columns:1fr}.cbt-row-actions .cbt-btn,.cbt-import-actions .cbt-btn{width:100%}.cbt-table{min-width:760px}}
+        @media(max-width:640px){.cbt-stats,.cbt-selected-strip,.cbt-mini-grid,.cbt-import-top,.cbt-import-guide,.cbt-import-summary,.cbt-manual-grid,.cbt-ai-format-grid{grid-template-columns:1fr}.cbt-row-actions .cbt-btn,.cbt-import-actions .cbt-btn{width:100%}.cbt-table{min-width:760px}}
       `}</style>
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title="CBT Exams" />
       <PageTitle title="CBT Exams" />
@@ -950,14 +1063,14 @@ export default function CbtExamsPage() {
                       <div className="cbt-field">
                         <label className="cbt-label">Department</label>
                         <select className="cbt-select" value={form.department_id} onChange={(e) => setForm((p) => ({ ...p, department_id: e.target.value, subject_id: "" }))}>
-                          <option value="">All departments</option>
+                          <option value="">General Department / Common Subjects</option>
                           {departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                         </select>
                       </div>
                       <div className="cbt-field">
                         <label className="cbt-label">Subject</label>
                         <select className="cbt-select" value={form.subject_id} onChange={(e) => setForm((p) => ({ ...p, subject_id: e.target.value }))}>
-                          <option value="">No subject selected</option>
+                          <option value="">Select subject</option>
                           {createSubjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                         </select>
                       </div>
@@ -1080,15 +1193,13 @@ export default function CbtExamsPage() {
                                   <button className="cbt-btn cbt-soft" type="button" disabled={saving} onClick={() => loadExam(exam.id)}><i className="bi bi-pencil-square" /> Builder</button>
                                   <button className="cbt-btn cbt-primary" type="button" disabled={saving || exam.status === "published"} title={exam.status === "published" ? "Reopen this exam before importing questions." : "Import questions from Word or Excel"} onClick={() => openWordImport(exam.id)}><i className="bi bi-file-earmark-arrow-up" /> Import File</button>
                                   <button className="cbt-btn cbt-soft" type="button" disabled={saving} onClick={() => previewExam(exam.id)}><i className="bi bi-eye" /> Preview</button>
-                                  <button className="cbt-btn cbt-soft" type="button" disabled={saving || (exam.attempts_count ?? 0) === 0} title={(exam.attempts_count ?? 0) === 0 ? "No student attempt to export yet." : "Export student CBT scores"} onClick={() => exportScores(exam)}><i className="bi bi-file-earmark-excel" /> Export Scores</button>
+                                    disabled={saving || (exam.attempts_count ?? 0) > 0}
                                   {exam.status === "draft" ? (
                                     <button className="cbt-btn cbt-gold" type="button" disabled={saving} onClick={() => publishExam(exam.id)}><i className="bi bi-send" /> Publish</button>
                                   ) : exam.status === "published" ? (
                                     <button
                                       className="cbt-btn cbt-ghost"
                                       type="button"
-                                      disabled={saving || (exam.attempts_count ?? 0) > 0}
-                                      title={(exam.attempts_count ?? 0) > 0 ? "Students have already accessed this exam." : "Reopen exam for editing"}
                                       onClick={() => reopenExam(exam.id)}
                                     >
                                       <i className="bi bi-unlock" /> Reopen
@@ -1097,8 +1208,6 @@ export default function CbtExamsPage() {
                                   <button
                                     className="cbt-btn cbt-danger"
                                     type="button"
-                                    disabled={saving || (exam.attempts_count ?? 0) > 0}
-                                    title={(exam.attempts_count ?? 0) > 0 ? "Students have already started this exam." : "Delete exam"}
                                     onClick={() => deleteExam(exam)}
                                   >
                                     <i className="bi bi-trash" /> Delete
@@ -1136,13 +1245,20 @@ export default function CbtExamsPage() {
                       }}>
                         <i className="bi bi-file-earmark-arrow-up" /> Import File
                       </button>
+                      <button className="cbt-btn cbt-gold" type="button" disabled={!examDetail || selectedIsPublished} onClick={() => {
+                        setAiDraft(null);
+                        setAiFile(null);
+                        setAiModalOpen(true);
+                      }}>
+                        <i className="bi bi-stars" /> Generate with AI
+                      </button>
                     </div>
                   </div>
                   {examDetail && (
                     <div className="cbt-selected-strip">
                       <div><span>Status</span><strong>{examDetail.status}</strong></div>
                       <div><span>Class</span><strong>{examDetail.class?.name || "All classes"}</strong></div>
-                      <div><span>Department</span><strong>{examDetail.department?.name || "All departments"}</strong></div>
+                      <div><span>Department</span><strong>{examDetail.department?.name || "General Department / Common Subjects"}</strong></div>
                       <div><span>Subject</span><strong>{examDetail.subject?.name || "No subject"}</strong></div>
                       <div><span>Schedule</span><strong>{selectedSchedule?.exam_date ? `${String(selectedSchedule.exam_date).slice(0, 10)} ${selectedSchedule.starts_at?.slice(0, 5) || ""}` : "Not set"}</strong></div>
                       <div><span>Access</span><strong>{examDetail.access_code_required ? "Code required" : "Open access"}</strong></div>
@@ -1413,14 +1529,14 @@ export default function CbtExamsPage() {
                         <div className="cbt-field">
                           <label className="cbt-label">Department</label>
                           <select className="cbt-select" value={settingsForm.department_id} disabled={!examDetail || selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, department_id: e.target.value, subject_id: "" }))}>
-                            <option value="">All departments</option>
+                            <option value="">General Department / Common Subjects</option>
                             {departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                           </select>
                         </div>
                         <div className="cbt-field">
                           <label className="cbt-label">Subject</label>
                           <select className="cbt-select" value={settingsForm.subject_id} disabled={!examDetail || selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, subject_id: e.target.value }))}>
-                            <option value="">No subject selected</option>
+                            <option value="">Select subject</option>
                             {settingsSubjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                           </select>
                         </div>
@@ -1586,14 +1702,14 @@ export default function CbtExamsPage() {
                 <div className="cbt-field">
                   <label className="cbt-label">Department</label>
                   <select className="cbt-select" value={form.department_id} onChange={(e) => setForm((p) => ({ ...p, department_id: e.target.value, subject_id: "" }))}>
-                    <option value="">All departments</option>
+                    <option value="">General Department / Common Subjects</option>
                     {departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                   </select>
                 </div>
                 <div className="cbt-field">
                   <label className="cbt-label">Subject</label>
                   <select className="cbt-select" value={form.subject_id} onChange={(e) => setForm((p) => ({ ...p, subject_id: e.target.value }))}>
-                    <option value="">No subject selected</option>
+                    <option value="">Select subject</option>
                     {createSubjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                   </select>
                 </div>
@@ -1667,8 +1783,8 @@ export default function CbtExamsPage() {
                 <div className="cbt-field cbt-field-full"><label className="cbt-label">Exam title</label><input className="cbt-input" value={settingsForm.title} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, title: e.target.value }))} required /></div>
                 <div className="cbt-field"><label className="cbt-label">Class</label><select className="cbt-select" value={settingsForm.class_id} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, class_id: e.target.value }))}><option value="">All classes</option>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
                 <div className="cbt-field"><label className="cbt-label">Section</label><select className="cbt-select" value={settingsForm.section_id} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, section_id: e.target.value, subject_id: "" }))}><option value="">All sections</option>{sections.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
-                <div className="cbt-field"><label className="cbt-label">Department</label><select className="cbt-select" value={settingsForm.department_id} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, department_id: e.target.value, subject_id: "" }))}><option value="">All departments</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
-                <div className="cbt-field"><label className="cbt-label">Subject</label><select className="cbt-select" value={settingsForm.subject_id} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, subject_id: e.target.value }))}><option value="">No subject selected</option>{settingsSubjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
+                <div className="cbt-field"><label className="cbt-label">Department</label><select className="cbt-select" value={settingsForm.department_id} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, department_id: e.target.value, subject_id: "" }))}><option value="">General Department / Common Subjects</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
+                <div className="cbt-field"><label className="cbt-label">Subject</label><select className="cbt-select" value={settingsForm.subject_id} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, subject_id: e.target.value }))}><option value="">{settingsForm.department_id ? "Select subject" : "Select general subject"}</option>{settingsSubjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
                 <div className="cbt-field"><label className="cbt-label">Mode</label><select className="cbt-select" value={settingsForm.delivery_mode} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, delivery_mode: e.target.value as any }))}><option value="online">Online</option><option value="offline">Offline/LAN</option><option value="hybrid">Online and Offline</option></select></div>
                 <div className="cbt-field"><label className="cbt-label">Duration</label><input className="cbt-input" type="number" min={1} value={settingsForm.duration_minutes} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, duration_minutes: Number(e.target.value) }))} /></div>
               </div>
@@ -1835,6 +1951,113 @@ export default function CbtExamsPage() {
         </div>
       )}
 
+      {aiModalOpen && examDetail && (
+        <div className="cbt-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="cbt-modal">
+            <div className="cbt-modal-head">
+              <div>
+                <h2>Generate Questions with AI</h2>
+                <p>{examDetail.title} - {examDetail.subject?.name || "No subject selected"} - {examDetail.class?.name || "All classes"}</p>
+              </div>
+              <button className="cbt-btn cbt-soft" type="button" disabled={aiGenerating || aiImporting} onClick={() => setAiModalOpen(false)}>
+                <i className="bi bi-x-lg" /> Close
+              </button>
+            </div>
+            <div className="cbt-modal-body">
+              <div className="cbt-import-box">
+                <div className="row g-3">
+                  <div className="col-md-6">
+                    <label className="cbt-label">Teacher note / manual</label>
+                    <label className="cbt-import-file">
+                      <i className="bi bi-file-earmark-text" />
+                      <span>
+                        <strong>{aiFile ? aiFile.name : "Upload Word note or text file"}</strong>
+                        <span>.docx or .txt. AI will use this with the selected topics.</span>
+                      </span>
+                      <input type="file" accept=".docx,.txt,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" disabled={aiGenerating || aiImporting} onChange={(e) => setAiFile(e.target.files?.[0] || null)} />
+                    </label>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="cbt-label">Topics</label>
+                    <textarea className="cbt-textarea" rows={4} placeholder="Nouns, verbs, comprehension, concord" value={aiForm.topics} disabled={aiGenerating || aiImporting} onChange={(e) => setAiForm((p) => ({ ...p, topics: e.target.value }))} />
+                  </div>
+                  <div className="col-12">
+                    <label className="cbt-label">Extra instruction or pasted note</label>
+                    <textarea className="cbt-textarea" rows={4} placeholder="Paste teacher note here if you do not want to upload a file." value={aiForm.source_text} disabled={aiGenerating || aiImporting} onChange={(e) => setAiForm((p) => ({ ...p, source_text: e.target.value }))} />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="cbt-label">Number of questions</label>
+                    <input className="cbt-input" type="number" min={1} max={80} value={aiForm.question_count} disabled={aiGenerating || aiImporting} onChange={(e) => setAiForm((p) => ({ ...p, question_count: Number(e.target.value) || 1 }))} />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="cbt-label">Marks per question</label>
+                    <input className="cbt-input" type="number" min={0.5} step={0.5} value={aiForm.marks_per_question} disabled={aiGenerating || aiImporting} onChange={(e) => setAiForm((p) => ({ ...p, marks_per_question: Number(e.target.value) || 1 }))} />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="cbt-label">Difficulty</label>
+                    <select className="cbt-select" value={aiForm.difficulty} disabled={aiGenerating || aiImporting} onChange={(e) => setAiForm((p) => ({ ...p, difficulty: e.target.value }))}>
+                      <option value="easy">Easy</option>
+                      <option value="normal">Normal</option>
+                      <option value="hard">Hard</option>
+                      <option value="mixed">Mixed</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="cbt-ai-format-grid">
+                  {[
+                    ["single_choice", "Objective"],
+                    ["multiple_choice", "Multiple answer"],
+                    ["true_false", "True / False"],
+                    ["fill_blank", "Fill in the gap"],
+                    ["theory", "Theory"],
+                    ["comprehension", "Comprehension"],
+                  ].map(([key, label]) => (
+                    <label className="cbt-ai-check" key={key}>
+                      <input type="checkbox" checked={aiForm.formats.includes(key)} disabled={aiGenerating || aiImporting} onChange={() => toggleAiFormat(key)} />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="cbt-import-actions justify-content-start mt-3">
+                  <button className="cbt-btn cbt-gold" type="button" disabled={aiGenerating || aiImporting} onClick={generateAiQuestions}>
+                    <i className="bi bi-stars" /> {aiGenerating ? "Generating..." : "Generate Draft"}
+                  </button>
+                  <button className="cbt-btn cbt-primary" type="button" disabled={!aiDraft || aiGenerating || aiImporting} onClick={importAiDraft}>
+                    <i className="bi bi-cloud-upload" /> {aiImporting ? "Importing..." : "Import Approved Draft"}
+                  </button>
+                </div>
+              </div>
+
+              {aiDraft && (
+                <div className="cbt-import-result">
+                  <div className="cbt-import-summary">
+                    <div><span>Questions</span><strong>{aiDraft.summary?.questions_detected || 0}</strong></div>
+                    <div><span>Sections</span><strong>{aiDraft.summary?.sections_detected || 0}</strong></div>
+                    <div><span>Groups</span><strong>{aiDraft.summary?.groups_detected || 0}</strong></div>
+                    <div><span>Status</span><strong>Draft</strong></div>
+                  </div>
+                  <div className="cbt-import-preview">
+                    {(aiDraft.sections || []).map((section, sectionIndex) => (
+                      <div className="cbt-import-preview-item" key={`${section.title}-${sectionIndex}`}>
+                        <strong>{section.title || "AI Generated Questions"}</strong>
+                        {(section.groups || []).map((group, groupIndex) => (
+                          <div className="mt-2" key={`${group.title}-${groupIndex}`}>
+                            <span className="cbt-pill cbt-pill-gold">{group.group_type || "group"}</span>
+                            <div className="cbt-sub">{group.title || "Passage"} - {(group.questions || []).length} question(s)</div>
+                          </div>
+                        ))}
+                        {(section.questions || []).slice(0, 4).map((question: any, qIndex: number) => (
+                          <div className="cbt-sub mt-2" key={`${question.question_text}-${qIndex}`}>{qIndex + 1}. {question.question_text}</div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {questionImportModalOpen && examDetail && (
         <div className="cbt-modal-backdrop" role="dialog" aria-modal="true">
           <div className="cbt-modal">

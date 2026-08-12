@@ -14,6 +14,13 @@ type Policy = {
   offline_grace_days: number;
   offline_school_block_enabled: boolean;
   platform_fee_per_student: string | number;
+  whatsapp_credit_unit_price: string | number;
+  legacy_plus_ai_credits: number;
+  ai_result_comment_credit_cost: number;
+  ai_cbt_question_credit_cost: number;
+  ai_lesson_plan_credit_cost: number;
+  ai_fee_collection_credit_cost: number;
+  ai_credit_unit_price: string | number;
   legacy_subscription_honor_enabled: boolean;
   per_student_billing_starts_at?: string | null;
   temporary_access_min_days: number;
@@ -60,6 +67,13 @@ const defaultPolicy: Policy = {
   offline_grace_days: 7,
   offline_school_block_enabled: true,
   platform_fee_per_student: 1000,
+  whatsapp_credit_unit_price: 10,
+  legacy_plus_ai_credits: 100,
+  ai_result_comment_credit_cost: 1,
+  ai_cbt_question_credit_cost: 5,
+  ai_lesson_plan_credit_cost: 3,
+  ai_fee_collection_credit_cost: 2,
+  ai_credit_unit_price: 25,
   legacy_subscription_honor_enabled: true,
   per_student_billing_starts_at: "",
   temporary_access_min_days: 3,
@@ -142,6 +156,13 @@ export default function BillingPolicyPage() {
         online_minimum_coverage_percent: Number(policy.online_minimum_coverage_percent || 0),
         offline_grace_days: Number(policy.offline_grace_days || 0),
         platform_fee_per_student: Number(policy.platform_fee_per_student || 0),
+        whatsapp_credit_unit_price: Number(policy.whatsapp_credit_unit_price || 0),
+        legacy_plus_ai_credits: Number(policy.legacy_plus_ai_credits || 0),
+        ai_result_comment_credit_cost: Number(policy.ai_result_comment_credit_cost || 1),
+        ai_cbt_question_credit_cost: Number(policy.ai_cbt_question_credit_cost || 1),
+        ai_lesson_plan_credit_cost: Number(policy.ai_lesson_plan_credit_cost || 1),
+        ai_fee_collection_credit_cost: Number(policy.ai_fee_collection_credit_cost || 1),
+        ai_credit_unit_price: Number(policy.ai_credit_unit_price || 0),
         legacy_subscription_honor_enabled: asBool(policy.legacy_subscription_honor_enabled),
         per_student_billing_starts_at: policy.per_student_billing_starts_at || null,
         temporary_access_min_days: Number(policy.temporary_access_min_days || 1),
@@ -319,6 +340,26 @@ export default function BillingPolicyPage() {
                     </Field>
                     <Field label="Platform fee per student">
                       <input className="bp-input" type="number" min={0} value={policy.platform_fee_per_student} onChange={(e)=>setPolicy((p)=>({...p, platform_fee_per_student:e.target.value}))} />
+                    </Field>
+                    <Field label="WhatsApp price per credit (NGN)">
+                      <input className="bp-input" type="number" min={0.01} step="0.01" value={policy.whatsapp_credit_unit_price} onChange={(e)=>setPolicy((p)=>({...p, whatsapp_credit_unit_price:e.target.value}))} />
+                    </Field>
+                    <Field label="AI credits allocated on Plus upgrade">
+                      <input className="bp-input" type="number" min={0} value={policy.legacy_plus_ai_credits} onChange={(e)=>setPolicy((p)=>({...p, legacy_plus_ai_credits:Number(e.target.value)}))} />
+                    </Field>
+                    <Field label="AI result comment cost (credits)">
+                      <input className="bp-input" type="number" min={1} value={policy.ai_result_comment_credit_cost} onChange={(e)=>setPolicy((p)=>({...p, ai_result_comment_credit_cost:Number(e.target.value)}))} />
+                    </Field>
+                    <Field label="AI CBT question cost (credits)">
+                      <input className="bp-input" type="number" min={1} value={policy.ai_cbt_question_credit_cost} onChange={(e)=>setPolicy((p)=>({...p, ai_cbt_question_credit_cost:Number(e.target.value)}))} />
+                    </Field>
+                    <Field label="AI lesson plan cost (credits)">
+                      <input className="bp-input" type="number" min={1} value={policy.ai_lesson_plan_credit_cost} onChange={(e)=>setPolicy((p)=>({...p, ai_lesson_plan_credit_cost:Number(e.target.value)}))} />
+                    </Field>                    <Field label="AI fee collection cost (credits)">
+                      <input className="bp-input" type="number" min={1} value={policy.ai_fee_collection_credit_cost} onChange={(e)=>setPolicy((p)=>({...p, ai_fee_collection_credit_cost:Number(e.target.value)}))} />
+                    </Field>
+                    <Field label="AI credit price (NGN)">
+                      <input className="bp-input" type="number" min={0.01} step="0.01" value={policy.ai_credit_unit_price} onChange={(e)=>setPolicy((p)=>({...p, ai_credit_unit_price:e.target.value}))} />
                     </Field>
                     <Field label="Per-student billing starts">
                       <input
@@ -525,3 +566,6 @@ export default function BillingPolicyPage() {
     </>
   );
 }
+
+
+

@@ -8,6 +8,12 @@ import Sidebar from "../../../components/LayoutComponents/Sidebar";
 import Footer from "../../../components/LayoutComponents/Footer";
 import PageTitle from "../../../components/PageTitle";
 
+const safeAiError = (message: string | undefined, fallback: string) => {
+  const text = String(message || fallback);
+  return /openai|api key|quota|billing|organization|insufficient_quota|provider/i.test(text)
+    ? "Something went wrong while processing this AI request. Please try again later."
+    : text;
+};
 type Subject = { id: number; name: string };
 
 type Student = {
@@ -216,6 +222,7 @@ export default function AddResultV2Page() {
 
   const [saving, setSaving] = useState(false);
   const [computing, setComputing] = useState(false);
+  const [aiCommenting, setAiCommenting] = useState(false);
 
   const overallAverage = useMemo(() => {
   // no scores yet
@@ -693,7 +700,7 @@ export default function AddResultV2Page() {
 
       for (const k of keys) {
         const subj = subjects.find((s) => s.name === k);
-        const prevRow = prev[k] ?? (subj ? { subject_id: subj.id, ca: {}, exam: 0, total: 0, grade: "", remark: "" } : undefined);
+        const prevRow = prev[k]  (subj ? { subject_id: subj.id, ca: {}, exam: 0, total: 0, grade: "", remark: "" } : undefined);
         if (!prevRow) continue;
 
         const newCa: Record<string, number> = {};
@@ -801,6 +808,63 @@ export default function AddResultV2Page() {
       ...row,
       [field]: field === "grade" ? value.toUpperCase() : value,
     }));
+  };
+
+
+  const generateAiComments = async () => {
+    if (!student) return showWarning("Search a student first.");
+    if (!batchId) return showWarning("Prepare the result batch first.");
+
+    const hasExistingComments = Boolean(
+      summary.general_remark || summary.principal_comment || summary.class_teacher_comment
+    );
+
+    if (hasExistingComments && !window.confirm("Replace the current comments with AI suggestions?")) {
+      return;
+    }
+
+    setAiCommenting(true);
+    try {
+      const subjectsPayload = Object.entries(scores).map(([subject_name, row]) => ({
+        subject_name,
+        subject_id: row.subject_id,
+        ca: row.ca,
+        exam: row.exam ?? null,
+        total: row.total ?? null,
+        grade: row.grade ?? null,
+        remark: row.remark ?? null,
+      }));
+
+      const res = await authApi.post(`/result-batches/${batchId}/students/${student.id}/ai-comments`, {
+        summary: {
+          total_average: overallAverage || null,
+          total_grade: summary.total_grade || null,
+          position: summary.position || null,
+          class_size: summary.class_size || null,
+        },
+        subjects: subjectsPayload,
+        attendance: summary.meta,
+        behavior_notes: "",
+        performance_trend:
+          includeCarryOver && carryOverAllowed
+            ? "Cumulative result columns are enabled for this report."
+            : "Use current term scores only.",
+      });
+
+      const comments = res.data?.comments || {};
+      setSummary((p) => ({
+        ...p,
+        general_remark: comments.general_remark ?? p.general_remark,
+        principal_comment: comments.principal_comment ?? p.principal_comment,
+        class_teacher_comment: comments.class_teacher_comment ?? p.class_teacher_comment,
+      }));
+
+      showSuccess(res.data?.ai_credits ? `AI comments generated. ${res.data.ai_credits.charged} credit(s) used, ${res.data.ai_credits.remaining} remaining.` : "AI comments generated. Review them before saving.");
+    } catch (e: any) {
+      showError(safeAiError(e?.response?.data?.message, "Unable to generate AI comments."));
+    } finally {
+      setAiCommenting(false);
+    }
   };
 
   // -----------------------------
@@ -1100,7 +1164,7 @@ export default function AddResultV2Page() {
                                       <input
                                         type="number"
                                         className="form-control"
-                                        value={row?.ca?.[`ca${idx}`] ?? ""}
+                                      value={row?.ca?.[`ca${idx}`] ?? ""}
                                         onChange={(e) => handleCaChange(subj.name, `ca${idx}`, e.target.value, max)}
                                         onFocus={() => handleCaFocus(subj.name, `ca${idx}`)}
                                       />
@@ -1178,9 +1242,29 @@ export default function AddResultV2Page() {
                       {/* Summary */}
                       <div className="card mt-4">
                         <div className="card-body">
-                          <div className="d-flex align-items-center justify-content-between">
-                            <h5 className="mb-0">Summary</h5>
-                            <span className="badge text-bg-primary">Overall Average: {overallAverage || "—"}</span>
+                          <div className="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+                            <div>
+                              <h5 className="mb-0">Summary</h5>
+                              <div className="text-muted small">Generate draft comments, then review before saving.</div>
+                            </div>
+                            <div className="d-flex align-items-center justify-content-end gap-2 flex-wrap">
+                              <button
+                                type="button"
+                                className="btn btn-outline-primary btn-sm"
+                                onClick={generateAiComments}
+                                disabled={!student || !batchId || aiCommenting || saving}
+                              >
+                                {aiCommenting ? (
+                                  <>
+                                    <span className="spinner-border spinner-border-sm me-2" />
+                                    Generating...
+                                  </>
+                                ) : (
+                                  "Generate Comments with AI"
+                                )}
+                              </button>
+                              <span className="badge text-bg-primary">Overall Average: {overallAverage || "N/A"}</span>
+                            </div>
                           </div>
 
                           <div className="row g-3 mt-2">
@@ -1445,3 +1529,6 @@ export default function AddResultV2Page() {
     </>
   );
 }
+
+
+

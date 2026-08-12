@@ -41,8 +41,8 @@ const NAV_LINKS = {
     { label: "Book a Demo",      href: "#" },
     { label: "WhatsApp Support", href: "#" },
     { label: "System Status",    href: "#" },
-    { label: "Privacy Policy",   href: "#" },
-    { label: "Terms of Service", href: "#" },
+    { label: "Privacy Policy",   href: "/privacy-policy" },
+    { label: "Terms of Service", href: "/terms-and-conditions" },
   ],
 };
 
@@ -551,8 +551,8 @@ export default function Footer() {
             </span>
 
             <div className="ft-bottom-links d-flex flex-wrap gap-4">
-              <a href="#">Privacy</a>
-              <a href="#">Terms</a>
+              <a href="/privacy-policy">Privacy</a>
+              <a href="/terms-and-conditions">Terms</a>
               <a href="#">Cookies</a>
               <a href="#">Sitemap</a>
             </div>

@@ -132,10 +132,9 @@ export default function Signup() {
   });
 
   const [errors, setErrors] = useState<FieldErrors>({});
-
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 800);
-    return () => clearTimeout(t);
+    const timer = window.setTimeout(() => setLoading(false), 800);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const strength = getStrength(form.password);
@@ -712,7 +711,7 @@ export default function Signup() {
                     {errors.general}
                   </div>
                 )}
-    
+
                 <form onSubmit={handleSubmit} noValidate>
     
                   {/* ─── STEP 1 ─── */}

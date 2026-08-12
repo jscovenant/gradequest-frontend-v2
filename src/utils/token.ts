@@ -1,4 +1,6 @@
 ﻿// src/utils/token.ts
+import { portalLoginUrl } from "./portal";
+
 const TOKEN_KEY = "gradequest_token";
 const USER_KEY = "gradequest_user";
 
@@ -91,7 +93,7 @@ export const clearUser = () => {
 export const logout = () => {
   clearToken();
   clearUser();
-  window.location.href = "/login"; 
+  window.location.assign(portalLoginUrl());
 };
 
 

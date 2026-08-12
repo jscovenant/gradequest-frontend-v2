@@ -195,11 +195,11 @@ export default function TeacherDashboard() {
 
     Promise.all([fetchSessionTerm, fetchCounts, fetchPerformance, fetchAccess, fetchActionCenter, fetchStudentPerformance])
       .then(([sessionRes, countsRes, perfRes, accessRes, actionRes, studentPerfRes]) => {
-        // ✅ Session & Term
+        //  Session & Term
         setAcademicSession(sessionRes.data.session);
         setCurrentTerm(sessionRes.data.term);
 
-        // ✅ Counts
+        //  Counts
         const counts = countsRes.data;
         setStats([
           { title: "My Students", value: counts.students, icon: "people" },
@@ -208,12 +208,12 @@ export default function TeacherDashboard() {
           { title: "Results Completion", value: counts.results_uploaded, icon: "check-circle" },
         ]);
 
-        // ✅ Performance stats
+        //  Performance stats
         const perfData = perfRes.data.data || [];
         setPerformanceLabels(perfData.map((d: any) => d.term));
         setPerformanceData(perfData.map((d: any) => Number(d.average || 0)));
 
-        // ✅ Access stats
+        //  Access stats
         setAccessLabels(accessRes.data.labels || ["Mon", "Tue", "Wed", "Thu", "Fri"]);
         setAccessData(accessRes.data.data || [0, 0, 0, 0, 0]);
 
@@ -813,7 +813,7 @@ export default function TeacherDashboard() {
                       }}
                     >
                       <i className="bi bi-calendar-check me-1"></i>
-                      {academicSession || "Loading..."} — {currentTerm || "..."}
+                      {academicSession || "Loading..."} - {currentTerm || "..."}
                     </span>
 
                     <span
@@ -831,10 +831,10 @@ export default function TeacherDashboard() {
                     </span>
                   </div>
 
-                  <h2 className="fw-bold text-white mb-2">{getGreeting()}, Teacher! 👋</h2>
+                  <h2 className="fw-bold text-white mb-2">{getGreeting()}, Teacher! </h2>
 
                   <p className="text-white mb-4" style={{ opacity: 0.9, fontSize: "1rem" }}>
-                    Here’s your teaching overview — classes, subjects, students and results activity.
+                    Here's your teaching overview - classes, subjects, students and results activity.
                   </p>
 
                   <div className="d-flex gap-2 flex-wrap">
@@ -864,6 +864,20 @@ export default function TeacherDashboard() {
                     >
                       <i className="bi bi-clipboard-check"></i>
                       Take Attendance
+                    </button>
+                    <button
+                      className="teacher-db-btn-outline"
+                      style={{
+                        borderRadius: "10px",
+                        fontWeight: "500",
+                        backgroundColor: "rgba(255, 255, 255, 0.2)",
+                        color: "#fff",
+                        border: "1px solid rgba(255, 255, 255, 0.3)",
+                      }}
+                      onClick={() => navigate("/settings/ai-lesson-plans")}
+                    >
+                      <i className="bi bi-journal-text"></i>
+                      AI Lesson Planner
                     </button>
                   </div>
                 </div>
@@ -1414,3 +1428,4 @@ export default function TeacherDashboard() {
     </>
   );
 }
+

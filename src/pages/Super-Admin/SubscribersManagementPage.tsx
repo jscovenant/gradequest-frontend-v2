@@ -484,12 +484,12 @@ export default function SubscribersManagementPage() {
                     <div className="text-white" style={{ opacity: 0.95 }}>
                       <div className="d-flex justify-content-between">
                         <span style={{ opacity: 0.85 }}>Total</span>
-                        <b>{subs?.total ?? "—"}</b>
+                        <b>{subs?.total ?? "-"}</b>
                       </div>
                       <div className="d-flex justify-content-between">
                         <span style={{ opacity: 0.85 }}>Page</span>
                         <b>
-                          {subs?.current_page ?? "—"} / {subs?.last_page ?? "—"}
+                          {subs?.current_page ?? "-"} / {subs?.last_page ?? "-"}
                         </b>
                       </div>
 

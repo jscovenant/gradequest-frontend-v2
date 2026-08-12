@@ -1,190 +1,79 @@
-// src/components/ui/dashboardLoader.tsx
-import React from "react";
-
 interface LoaderProps {
   message?: string;
+  eyebrow?: string;
 }
 
-const Loader: React.FC<LoaderProps> = ({ message = "Loading…" }) => {
+export default function Loader({ message = "Loading…", eyebrow = "GradeQuest workspace" }: LoaderProps) {
   return (
-    <>
+    <div className="gql-overlay" role="status" aria-live="polite" aria-label={message}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Lora:wght@700&family=DM+Sans:wght@300;400&display=swap');
-
-        .gq-loader-overlay {
-          position: fixed;
-          inset: 0;
-          z-index: 9999;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: rgba(10, 15, 30, 0.55);
-          backdrop-filter: blur(6px);
-          -webkit-backdrop-filter: blur(6px);
-          pointer-events: none;
-          animation: gqOverlayIn .2s ease both;
+        .gql-overlay {
+          --gql-gold:#f3c969; --gql-ink:#07101f; --gql-blue:#60a5fa;
+          position:fixed; inset:0; z-index:9999; display:grid; place-items:center;
+          padding:24px; overflow:hidden; isolation:isolate;
+          background:rgba(4,10,22,.74); backdrop-filter:blur(14px) saturate(120%);
+          -webkit-backdrop-filter:blur(14px) saturate(120%); animation:gql-fade .22s ease-out both;
         }
-        @keyframes gqOverlayIn {
-          from { opacity: 0; }
-          to   { opacity: 1; }
-        }
-
-        .gq-loader-card {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 0;
-          background: #fff;
-          border: 1px solid rgba(0,0,0,.07);
-          border-radius: 20px;
-          padding: 36px 44px 32px;
-          box-shadow: 0 24px 64px rgba(0,0,0,.22), 0 4px 16px rgba(0,0,0,.1);
-          min-width: 220px;
-          animation: gqCardIn .3s cubic-bezier(.34,1.2,.64,1) both;
-        }
-        @keyframes gqCardIn {
-          from { opacity: 0; transform: scale(.92) translateY(10px); }
-          to   { opacity: 1; transform: scale(1)  translateY(0); }
-        }
-
-        /* Logo mark */
-        .gq-loader-mark {
-          width: 48px;
-          height: 48px;
-          border-radius: 13px;
-          background: linear-gradient(135deg, #c9a84c, #e8c97a);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-bottom: 20px;
-          box-shadow: 0 4px 14px rgba(201,168,76,.35);
-          animation: gqMarkPulse 2.4s ease-in-out infinite;
-        }
-        @keyframes gqMarkPulse {
-          0%,100% { box-shadow: 0 4px 14px rgba(201,168,76,.35); }
-          50%      { box-shadow: 0 4px 24px rgba(201,168,76,.6); }
-        }
-
-        /* Ring spinner */
-        .gq-loader-ring-wrap {
-          position: relative;
-          width: 52px;
-          height: 52px;
-          margin-bottom: 20px;
-        }
-
-        .gq-loader-ring {
-          position: absolute;
-          inset: 0;
-          border-radius: 50%;
-          border: 3px solid transparent;
-        }
-
-        .gq-loader-ring--track {
-          border-color: #f0ebe3;
-        }
-
-        .gq-loader-ring--spin {
-          border-top-color: #c9a84c;
-          border-right-color: rgba(201,168,76,.3);
-          animation: gqRingSpin .9s linear infinite;
-        }
-
-        .gq-loader-ring--inner {
-          inset: 8px;
-          border-top-color: #1a1a2e;
-          border-right-color: transparent;
-          animation: gqRingSpin .6s linear infinite reverse;
-        }
-
-        @keyframes gqRingSpin {
-          to { transform: rotate(360deg); }
-        }
-
-        /* Center dot */
-        .gq-loader-dot {
-          position: absolute;
-          top: 50%; left: 50%;
-          transform: translate(-50%,-50%);
-          width: 8px; height: 8px;
-          border-radius: 50%;
-          background: #c9a84c;
-          animation: gqDotBeat 1.2s ease-in-out infinite;
-        }
-        @keyframes gqDotBeat {
-          0%,100% { transform: translate(-50%,-50%) scale(1);   opacity: 1; }
-          50%      { transform: translate(-50%,-50%) scale(1.5); opacity: .7; }
-        }
-
-        /* Message */
-        .gq-loader-msg {
-          font-family: 'DM Sans', sans-serif;
-          font-size: 13.5px;
-          font-weight: 400;
-          color: #7a6a5a;
-          letter-spacing: .01em;
-          white-space: nowrap;
-          animation: gqMsgPulse 1.8s ease-in-out infinite;
-        }
-        @keyframes gqMsgPulse {
-          0%,100% { opacity: 1; }
-          50%      { opacity: .55; }
-        }
-
-        /* Dots trail */
-        .gq-loader-dots {
-          display: flex;
-          gap: 5px;
-          margin-top: 14px;
-        }
-        .gq-loader-dots span {
-          width: 5px; height: 5px;
-          border-radius: 50%;
-          background: #e5ddd3;
-          animation: gqDotTrail 1.2s ease-in-out infinite;
-        }
-        .gq-loader-dots span:nth-child(1) { animation-delay: 0s;    }
-        .gq-loader-dots span:nth-child(2) { animation-delay: .18s;  }
-        .gq-loader-dots span:nth-child(3) { animation-delay: .36s;  }
-        @keyframes gqDotTrail {
-          0%,80%,100% { background: #e5ddd3; transform: scale(1);    }
-          40%          { background: #c9a84c; transform: scale(1.4);  }
-        }
+        .gql-overlay::before { content:""; position:absolute; inset:-35%; z-index:-2;
+          background:radial-gradient(circle at 35% 40%,rgba(59,130,246,.16),transparent 28%),
+                     radial-gradient(circle at 68% 60%,rgba(243,201,105,.15),transparent 25%);
+          animation:gql-aurora 8s ease-in-out infinite alternate; }
+        .gql-overlay::after { content:""; position:absolute; inset:0; z-index:-1; opacity:.22;
+          background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+          background-size:42px 42px; mask-image:radial-gradient(circle,#000 10%,transparent 72%); }
+        .gql-card { position:relative; width:min(390px,100%); padding:30px 30px 27px; overflow:hidden;
+          border:1px solid rgba(255,255,255,.13); border-radius:26px;
+          background:linear-gradient(145deg,rgba(18,30,52,.94),rgba(8,16,31,.96));
+          box-shadow:0 32px 90px rgba(0,0,0,.46),inset 0 1px rgba(255,255,255,.08);
+          animation:gql-rise .38s cubic-bezier(.2,.8,.2,1) both; }
+        .gql-card::before { content:""; position:absolute; width:180px; height:180px; top:-110px; right:-65px;
+          border-radius:50%; background:rgba(243,201,105,.12); filter:blur(35px); }
+        .gql-brand { display:flex; align-items:center; gap:11px; position:relative; }
+        .gql-logo { width:40px; height:40px; padding:7px; border-radius:12px; object-fit:contain;
+          background:#fff; box-shadow:0 8px 24px rgba(0,0,0,.24); }
+        .gql-brand-name { color:#fff; font-size:15px; font-weight:800; letter-spacing:.01em; }
+        .gql-brand-tag { color:rgba(255,255,255,.42); font-size:10px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; margin-top:2px; }
+        .gql-stage { display:grid; place-items:center; min-height:178px; position:relative; }
+        .gql-orbit { position:relative; width:104px; height:104px; display:grid; place-items:center; }
+        .gql-ring { position:absolute; inset:0; border-radius:50%; border:1px solid rgba(255,255,255,.09); }
+        .gql-ring-one { border-top-color:var(--gql-gold); border-right-color:rgba(243,201,105,.38); animation:gql-spin 1.8s linear infinite; }
+        .gql-ring-two { inset:12px; border-left-color:var(--gql-blue); animation:gql-spin 2.6s linear infinite reverse; }
+        .gql-ring-three { inset:26px; background:radial-gradient(circle at 35% 30%,#fff,var(--gql-gold) 20%,#bb7c22 72%);
+          border:0; box-shadow:0 0 0 8px rgba(243,201,105,.06),0 0 35px rgba(243,201,105,.34); animation:gql-breathe 1.8s ease-in-out infinite; }
+        .gql-satellite { position:absolute; inset:-5px; animation:gql-spin 3.6s linear infinite; }
+        .gql-satellite::after { content:""; position:absolute; left:50%; top:-2px; width:7px; height:7px; border-radius:50%;
+          background:#fff; box-shadow:0 0 14px var(--gql-blue); }
+        .gql-copy { position:relative; text-align:center; }
+        .gql-eyebrow { color:var(--gql-gold); font-size:10px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; }
+        .gql-message { margin:7px 0 0; color:#f8fafc; font-size:16px; font-weight:700; letter-spacing:-.01em; }
+        .gql-progress { height:4px; margin-top:20px; border-radius:999px; overflow:hidden; background:rgba(255,255,255,.07); }
+        .gql-progress::after { content:""; display:block; width:42%; height:100%; border-radius:inherit;
+          background:linear-gradient(90deg,transparent,var(--gql-blue),var(--gql-gold),transparent); animation:gql-slide 1.45s ease-in-out infinite; }
+        .gql-foot { display:flex; justify-content:center; gap:5px; margin-top:14px; }
+        .gql-foot span { width:4px; height:4px; border-radius:50%; background:rgba(255,255,255,.22); animation:gql-dot 1.2s ease-in-out infinite; }
+        .gql-foot span:nth-child(2){animation-delay:.15s}.gql-foot span:nth-child(3){animation-delay:.3s}
+        @keyframes gql-fade{from{opacity:0}to{opacity:1}} @keyframes gql-rise{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+        @keyframes gql-spin{to{transform:rotate(360deg)}} @keyframes gql-breathe{50%{transform:scale(.86);filter:brightness(1.12)}}
+        @keyframes gql-slide{from{transform:translateX(-110%)}to{transform:translateX(340%)}} @keyframes gql-dot{50%{background:var(--gql-gold);transform:translateY(-3px)}}
+        @keyframes gql-aurora{to{transform:translate3d(5%,3%,0) rotate(4deg)}}
+        @media(max-width:480px){.gql-card{padding:24px 22px 23px;border-radius:22px}.gql-stage{min-height:160px}.gql-orbit{transform:scale(.9)}}
+        @media(prefers-reduced-motion:reduce){.gql-overlay,.gql-card,.gql-overlay::before,.gql-ring,.gql-satellite,.gql-ring-three,.gql-progress::after,.gql-foot span{animation-duration:3s;animation-iteration-count:1}}
       `}</style>
-
-      <div className="gq-loader-overlay" role="status" aria-live="polite" aria-label={message}>
-        <div className="gq-loader-card">
-
-          {/* Logo mark */}
-          <div className="gq-loader-mark">
-            <svg width="22" height="22" viewBox="0 0 20 20" fill="none">
-              <path d="M10 2L17 6v8l-7 4-7-4V6l7-4z"
-                stroke="#0f172a" strokeWidth="1.6" strokeLinejoin="round"/>
-              <path d="M10 10l7-4M10 10v8M10 10L3 6"
-                stroke="#0f172a" strokeWidth="1.4" strokeLinecap="round"/>
-            </svg>
-          </div>
-
-          {/* Dual-ring spinner */}
-          <div className="gq-loader-ring-wrap">
-            <div className="gq-loader-ring gq-loader-ring--track" />
-            <div className="gq-loader-ring gq-loader-ring--spin" />
-            <div className="gq-loader-ring gq-loader-ring--inner" />
-            <div className="gq-loader-dot" />
-          </div>
-
-          {/* Message */}
-          <span className="gq-loader-msg">{message}</span>
-
-          {/* Trailing dots */}
-          <div className="gq-loader-dots" aria-hidden="true">
-            <span /><span /><span />
-          </div>
-
+      <section className="gql-card">
+        <div className="gql-brand">
+          <img className="gql-logo" src="/media/logo/gradequest-logo.png" alt="" />
+          <div><div className="gql-brand-name">GradeQuest</div><div className="gql-brand-tag">School intelligence</div></div>
         </div>
-      </div>
-    </>
+        <div className="gql-stage" aria-hidden="true">
+          <div className="gql-orbit">
+            <span className="gql-ring gql-ring-one" /><span className="gql-ring gql-ring-two" />
+            <span className="gql-ring gql-ring-three" /><span className="gql-satellite" />
+          </div>
+        </div>
+        <div className="gql-copy"><div className="gql-eyebrow">{eyebrow}</div><p className="gql-message">{message}</p></div>
+        <div className="gql-progress" aria-hidden="true" />
+        <div className="gql-foot" aria-hidden="true"><span/><span/><span/></div>
+      </section>
+    </div>
   );
-};
-
-export default Loader;
+}

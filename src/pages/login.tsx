@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import FrontendLoader from "../components/ui/FrontendLoader";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../utils/api";
@@ -67,9 +67,9 @@ console.log(response.data);
           .lg-left  { display: none; }
         }
 
-        /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        /* 
            LEFT PANEL
-        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+         */
         .lg-left {
           position: relative;
           background: #0a0f1e;
@@ -262,9 +262,9 @@ console.log(response.data);
           margin-right: 8px;
         }
 
-        /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+        /* 
            RIGHT PANEL
-        â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+         */
         .lg-right {
           background: #faf8f5;
           display: flex;
@@ -643,7 +643,7 @@ console.log(response.data);
       <PageTitle title="Login" />
       <div className="lg-page">
 
-        {/* â•â• LEFT PANEL â•â• */}
+        {/*  LEFT PANEL  */}
         <div className="lg-left">
           <div className="lg-orbit"><div className="lg-orbit-dot" /></div>
           <div className="lg-orbit" />
@@ -669,7 +669,7 @@ console.log(response.data);
               <em>fully in control.</em>
             </h1>
             <p className="lg-tagline">
-              Manage results, fees, attendance, and parent communication â€”
+              Manage results, fees, attendance, and parent communication 
               all from one intelligent dashboard built for Nigerian schools.
             </p>
 
@@ -707,12 +707,12 @@ console.log(response.data);
             </p>
             <span className="lg-quote-author">
               <span className="lg-quote-line" />
-              Mrs. Adaeze Okonkwo Â· Greenfield Model School, Enugu
+              Mrs. Adaeze Okonkwo  Greenfield Model School, Enugu
             </span>
           </div>
         </div>
 
-        {/* â•â• RIGHT PANEL â•â• */}
+        {/*  RIGHT PANEL  */}
         <div className="lg-right">
           <div className="lg-form-wrap">
 
@@ -798,7 +798,7 @@ console.log(response.data);
                     id="password"
                     type={showPass ? "text" : "password"}
                     className="lg-input"
-                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                    placeholder=""
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     autoComplete="current-password"
@@ -845,7 +845,7 @@ console.log(response.data);
                 {buttonLoading ? (
                   <>
                     <span className="lg-spinner" />
-                    Signing inâ€¦
+                    Signing in
                   </>
                 ) : (
                   <>
@@ -875,17 +875,17 @@ console.log(response.data);
             {/* Signup */}
             <p className="lg-signup">
               New school on GradeQuest?{" "}
-              <Link to="/book-demo">Book a demo â†’</Link>
+              <Link to="/book-demo">Book a demo </Link>
             </p>
           </div>
 
           {/* Footer */}
           <div className="lg-right-footer">
             <a href="/privacy">Privacy</a>
-            {" Â· "}
+            {"  "}
             <a href="/terms">Terms</a>
-            {" Â· "}
-            Â© {new Date().getFullYear()} GradeQuest
+            {"  "}
+             {new Date().getFullYear()} GradeQuest
           </div>
         </div>
 

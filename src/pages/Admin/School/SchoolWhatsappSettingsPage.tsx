@@ -99,9 +99,9 @@ export default function SchoolWhatsappSettingsPage() {
 
   // ── Derived credit values ──────────────────────────────────────────────────
   const statusCfg    = useMemo(() => getStatusConfig(account?.status), [account?.status]);
-  const allocated    = credits?.allocated_credits ?? 0;
-  const used         = credits?.used_credits      ?? 0;
-  const remaining    = credits?.remaining_credits ?? 0;
+  const allocated    = credits?.allocated_credits  0;
+  const used         = credits?.used_credits       0;
+  const remaining    = credits?.remaining_credits  0;
   const usagePct     = allocated > 0 ? Math.min(100, Math.round((used      / allocated) * 100)) : 0;
   const remainingPct = allocated > 0 ? Math.min(100, Math.round((remaining / allocated) * 100)) : 0;
 

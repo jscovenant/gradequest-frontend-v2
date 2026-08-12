@@ -1592,13 +1592,13 @@ export default function TeachersPage() {
                       {teacherDetails?.teacher ? fullName(teacherDetails.teacher) : fullName(selectedTeacher)}
                     </p>
                     <p className="db-modal-sub">
-                      Staff ID: <b style={{ color: "#fff" }}>{teacherDetails?.teacher?.reg_no ?? selectedTeacher.reg_no ?? "—"}</b>{" "}
+                      Staff ID: <b style={{ color: "#fff" }}>{teacherDetails?.teacher?.reg_no ?? selectedTeacher.reg_no ?? "-"}</b>{" "}
                       · Class:{" "}
                       <b style={{ color: "#fff" }}>
                         {teacherDetails?.teacher?.teacher_enrollment?.level?.name ??
                           teacherDetails?.teacher?.level?.name ??
                           selectedTeacher.level?.name ??
-                          "—"}
+                          "-"}
                       </b>
                     </p>
                   </div>
@@ -1840,7 +1840,7 @@ export default function TeachersPage() {
                             </div>
                             <div className="db-kv">
                               <div className="db-kv-label">Staff ID</div>
-                              <div className="db-kv-val">{teacherDetails.teacher?.reg_no || "N/A"}</div>
+                            <div className="db-kv-val">{teacherDetails.teacher?.reg_no ?? "-"}</div>
                             </div>
                             <div className="db-kv">
                               <div className="db-kv-label">Status</div>
@@ -1890,11 +1890,11 @@ export default function TeachersPage() {
                         <div className="db-kv-grid">
                           <div className="db-kv">
                             <div className="db-kv-label">Username</div>
-                            <div className="db-kv-val">{teacherDetails.teacher?.username ?? "—"}</div>
+                            <div className="db-kv-val">{teacherDetails.teacher?.username ?? "-"}</div>
                           </div>
                           <div className="db-kv">
                             <div className="db-kv-label">Staff ID (Reg No)</div>
-                            <div className="db-kv-val">{teacherDetails.teacher?.reg_no ?? "—"}</div>
+                            <div className="db-kv-val">{teacherDetails.teacher?.reg_no ?? "-"}</div>
                           </div>
                           <div className="db-kv" style={{ gridColumn: "1 / -1" }}>
                             <div className="db-kv-label">Default password</div>

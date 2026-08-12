@@ -1,10 +1,12 @@
 // src/utils/axios.ts
 import axios from "axios";
 import { getToken, logout } from "./token";
+import { isCustomPortalHost } from "./portal";
 
-const rawBaseUrl =
-  import.meta.env.VITE_API_URL ||
-  (import.meta.env.PROD ? "https://gradequest.com.ng" : "http://localhost:8000");
+const rawBaseUrl = isCustomPortalHost()
+  ? window.location.origin
+  : import.meta.env.VITE_API_URL ||
+    (import.meta.env.PROD ? "https://gradequest.com.ng" : "http://localhost:8000");
 
 const normalizedBaseUrl = rawBaseUrl.replace(/\/+$/, "");
 const BASE_URL = normalizedBaseUrl.endsWith("/api")

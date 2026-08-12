@@ -1,4 +1,4 @@
-// src/pages/Admin/Academics/SubjectsPage.tsx
+// src/pages/Admin/Academics - SubjectsPage.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import TopNav from "../../../components/LayoutComponents/TopNav";
 import Sidebar from "../../../components/LayoutComponents/Sidebar";
@@ -11,13 +11,14 @@ import PageTitle from "../../../components/PageTitle";
    TYPES
 ========================= */
 type Department = { id: number; name: string };
+const GENERAL_DEPARTMENT_ID = "general";
 type Section = { id: number; name: string };
 
 type Subject = {
   id: number;
   name: string;
   subject_id?: string; // backend generates "SCI001" style
-  department_id: number;
+  department_id?: number | null;
   section_id?: number | null;
   school_id?: number;
   created_at?: string;
@@ -91,10 +92,12 @@ export default function SubjectsPage() {
 
   // create
   const [createName, setCreateName] = useState("");
+  const [createAsGeneral, setCreateAsGeneral] = useState(false);
 
   // edit
   const [editId, setEditId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
+  const [editAsGeneral, setEditAsGeneral] = useState(false);
 
   // assign-section
   const [selectedIds, setSelectedIds] = useState<Record<number, boolean>>({});
@@ -140,12 +143,13 @@ export default function SubjectsPage() {
 
     try {
       setLoadingSubjects(true);
-      const res = await authApi.get<Subject[]>(`/departments/${depId}/subjects`, { params: showArchived ? { archived: 1 } : undefined });
+      const params = showArchived ? { archived: 1 } : { include_general: 1 };
+      const res = await authApi.get<Subject[]>(`/departments/${depId}/subjects`, { params });
       const list = Array.isArray(res.data) ? res.data : [];
 
       setSubjects(list);
 
-      // ✅ pre-check if subject already assigned to ANY section
+      //  pre-check if subject already assigned to ANY section
       const nextSelected: Record<number, boolean> = {};
       list.forEach((s) => {
         nextSelected[s.id] = s.section_id != null;
@@ -180,19 +184,19 @@ export default function SubjectsPage() {
      DERIVED
   ========================= */
   const selectedDepartment = useMemo(
-    () => departments.find((d) => String(d.id) === String(departmentId)),
+    () => departmentId === GENERAL_DEPARTMENT_ID ? { id: 0, name: "General Department" } : departments.find((d) => String(d.id) === String(departmentId)),
     [departments, departmentId]
   );
 
   const sectionName = (s: Subject) =>
-    s.section?.name ?? sections.find((x) => x.id === s.section_id)?.name ?? "—";
+    s.section?.name ?? sections.find((x) => x.id === s.section_id)?.name ?? "-";
 
   const filteredSubjects = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return subjects;
     return subjects.filter((s) => {
       const secName = sectionName(s);
-      const hay = `${s.name ?? ""} ${s.subject_id ?? ""} ${secName}`.toLowerCase();
+      const hay = `${s.name ?? ""} ${s.subject_id ?? "-"} ${secName}`.toLowerCase();
       return hay.includes(q);
     });
   }, [subjects, query, sections]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -225,17 +229,20 @@ export default function SubjectsPage() {
      ACTIONS
   ========================= */
   async function createSubject() {
-    if (!departmentId) return showError("Please select a department first.");
+    if (!departmentId) return showError("Please select General Department or a department first.");
+    const willCreateGeneral = createAsGeneral || departmentId === GENERAL_DEPARTMENT_ID;
     const name = createName.trim();
     if (!name) return showError("Please enter a subject name.");
 
     try {
       setBusyKey("subject:create");
-      const res = await authApi.post(`/departments/${departmentId}/subjects`, { name });
+      const targetDepartmentId = willCreateGeneral ? GENERAL_DEPARTMENT_ID : departmentId;
+      const res = await authApi.post(`/departments/${targetDepartmentId}/subjects`, { name, is_general: willCreateGeneral });
       const code = res.data?.subject_code ? ` (${res.data.subject_code})` : "";
       showSuccess((res.data?.message ?? "Subject added successfully") + code);
 
       setCreateName("");
+      setCreateAsGeneral(departmentId === GENERAL_DEPARTMENT_ID);
       setShowCreate(false);
       await fetchSubjects(departmentId);
     } catch (err: any) {
@@ -248,6 +255,7 @@ export default function SubjectsPage() {
   function openEdit(subject: Subject) {
     setEditId(subject.id);
     setEditName(subject.name ?? "");
+    setEditAsGeneral(subject.department_id == null);
     setShowEdit(true);
   }
 
@@ -258,12 +266,13 @@ export default function SubjectsPage() {
 
     try {
       setBusyKey(`subject:update:${editId}`);
-      const res = await authApi.put(`/subjects/${editId}`, { name });
+      const res = await authApi.put(`/subjects/${editId}`, { name, is_general: editAsGeneral });
       showSuccess(res.data?.message ?? "Subject updated successfully.");
 
       setShowEdit(false);
       setEditId(null);
       setEditName("");
+      setEditAsGeneral(false);
       if (departmentId) await fetchSubjects(departmentId);
     } catch (err: any) {
       showError(getErrorMessage(err));
@@ -351,7 +360,7 @@ export default function SubjectsPage() {
      STYLES (AdminDashboard template family)
   ========================= */
   const STAT_META = [
-    { color: "#b45309", bg: "#fef3c7", label: "total in department" },
+    { color: "#b45309", bg: "#fef3c7", label: departmentId === GENERAL_DEPARTMENT_ID ? "general subjects" : "department + general" },
     { color: "#065f46", bg: "#d1fae5", label: "selected for bulk" },
     { color: "#1e40af", bg: "#dbeafe", label: "departments loaded" },
     { color: "#7c3aed", bg: "#ede9fe", label: "sections loaded" },
@@ -896,6 +905,21 @@ export default function SubjectsPage() {
 
         .db-muted { color: #9a8a7a; }
         .db-checkbox { width: 16px; height: 16px; cursor: pointer; accent-color: #c9a84c; }
+        .db-option-card {
+          margin-top: 14px;
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          padding: 14px;
+          border: 1px solid #e5ddd3;
+          border-radius: 14px;
+          background: #faf8f5;
+          cursor: pointer;
+        }
+        .db-option-card:hover { border-color: rgba(201,168,76,0.55); background: #fffaf0; }
+        .db-option-card input { width: 18px; height: 18px; margin-top: 2px; accent-color: #c9a84c; cursor: pointer; flex-shrink: 0; }
+        .db-option-title { display:block; font-size: 13px; font-weight: 900; color: #1a1a2e; line-height: 1.25; }
+        .db-option-help { display:block; margin-top: 4px; font-size: 12px; color: #7a6a5a; line-height: 1.35; }
         .db-badge-code {
           display:inline-flex;
           align-items:center;
@@ -920,7 +944,6 @@ export default function SubjectsPage() {
           <main className="col-md-9 col-lg-10 ms-auto db-main">
             {loadingPage && <Loader message="Loading subjects..." />}
 
-            {/* ===== HERO ===== */}
             <div className="db-hero">
               <div className="db-hero-glow" aria-hidden="true" />
               <div className="db-hero-glow2" aria-hidden="true" />
@@ -929,7 +952,7 @@ export default function SubjectsPage() {
                 <div>
                   <div className="db-session-badge">
                     <span className="db-session-dot" />
-                    Academics • Subjects
+                    Academics - Subjects
                   </div>
 
                   <h1 className="db-greeting">
@@ -944,7 +967,7 @@ export default function SubjectsPage() {
                   <div className="db-hero-btns">
                     <button
                       className="db-btn-gold"
-                      onClick={() => setShowCreate(true)}
+                      onClick={() => { setCreateAsGeneral(departmentId === GENERAL_DEPARTMENT_ID); setShowCreate(true); }}
                       disabled={showArchived || !departmentId || busyKey !== null}
                       title={!departmentId ? "Select a department first" : ""}
                       type="button"
@@ -1007,17 +1030,17 @@ export default function SubjectsPage() {
                   <div className="db-hero-stat-row">
                     <div className="db-hero-stat-item">
                       <span className="db-hero-stat-label">Departments</span>
-                      <span className="db-hero-stat-val">{loadingDepartments ? "…" : departments.length}</span>
+                      <span className="db-hero-stat-val">{loadingDepartments ? "..." : departments.length}</span>
                     </div>
                     <div className="db-hero-stat-sep" />
                     <div className="db-hero-stat-item">
                       <span className="db-hero-stat-label">Sections</span>
-                      <span className="db-hero-stat-val">{loadingSections ? "…" : sections.length}</span>
+                      <span className="db-hero-stat-val">{loadingSections ? "..." : sections.length}</span>
                     </div>
                     <div className="db-hero-stat-sep" />
                     <div className="db-hero-stat-item">
-                      <span className="db-hero-stat-label">Subjects (dept)</span>
-                      <span className="db-hero-stat-val">{departmentId ? totalSubjects : "—"}</span>
+                      <span className="db-hero-stat-label">Subjects</span>
+                      <span className="db-hero-stat-val">{departmentId ? totalSubjects : "-"}</span>
                     </div>
                   </div>
 
@@ -1034,10 +1057,10 @@ export default function SubjectsPage() {
             {/* ===== STAT CARDS ===== */}
             <div className="db-stats">
               {[
-                { title: "Total Subjects", value: departmentId ? totalSubjects : "—", hint: "total in department" },
+                { title: "Total Subjects", value: departmentId ? totalSubjects : "-", hint: departmentId === GENERAL_DEPARTMENT_ID ? "general subjects" : "department + general" },
                 { title: "Selected", value: selectedCount, hint: "marked for bulk" },
-                { title: "Departments", value: loadingDepartments ? "…" : departments.length, hint: "loaded" },
-                { title: "Sections", value: loadingSections ? "…" : sections.length, hint: "loaded" },
+                { title: "Departments", value: loadingDepartments ? "..." : departments.length, hint: "loaded" },
+                { title: "Sections", value: loadingSections ? "..." : sections.length, hint: "loaded" },
               ].map((c, i) => {
                 const m = STAT_META[i];
                 const icons = [
@@ -1099,7 +1122,7 @@ export default function SubjectsPage() {
                   </div>
                   <div>
                     <p className="db-panel-title">Subjects</p>
-                    <p className="db-panel-sub">Filter by department • Search • Bulk assign</p>
+                    <p className="db-panel-sub">Filter by department - Search - Bulk assign</p>
                   </div>
                 </div>
 
@@ -1115,6 +1138,7 @@ export default function SubjectsPage() {
                     title="Select department"
                   >
                     <option value="">Select Department</option>
+                    <option value={GENERAL_DEPARTMENT_ID}>General Department</option>
                     {departments.map((d) => (
                       <option key={d.id} value={d.id}>
                         {d.name}
@@ -1128,7 +1152,7 @@ export default function SubjectsPage() {
                       <path d="M11 11l3 3" stroke="#9a8a7a" strokeWidth="1.4" strokeLinecap="round" />
                     </svg>
                     <input
-                      placeholder="Search subjects…"
+                      placeholder="Search subjects..."
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                       disabled={!departmentId}
@@ -1166,7 +1190,7 @@ export default function SubjectsPage() {
                     <>
                       <button
                         className="db-chip-btn"
-                        onClick={() => setShowCreate(true)}
+                        onClick={() => { setCreateAsGeneral(departmentId === GENERAL_DEPARTMENT_ID); setShowCreate(true); }}
                         disabled={!departmentId || busyKey !== null}
                         title={!departmentId ? "Select a department first" : ""}
                         type="button"
@@ -1203,13 +1227,13 @@ export default function SubjectsPage() {
                 <div className="db-helper-row">
                   <div className="db-helper-left">
                     <span>
-                      Department: <b style={{ color: "#1a1a2e" }}>{selectedDepartment?.name ?? "—"}</b>
+                      Department: <b style={{ color: "#1a1a2e" }}>{selectedDepartment?.name ?? "-"}</b>
                     </span>
-                    <span style={{ opacity: 0.6 }}>•</span>
+                    <span style={{ opacity: 0.6 }}>-</span>
                     <span>
                       Selected: <b style={{ color: "#1a1a2e" }}>{selectedCount}</b>
                     </span>
-                    <span style={{ opacity: 0.6 }}>•</span>
+                    <span style={{ opacity: 0.6 }}>-</span>
                     <span>
                       Total: <b style={{ color: "#1a1a2e" }}>{totalSubjects}</b>
                     </span>
@@ -1246,6 +1270,7 @@ export default function SubjectsPage() {
                       </th>
                       <th>Subject</th>
                       <th style={{ width: 160 }}>Code</th>
+                      <th style={{ width: 170 }}>Department</th>
                       <th style={{ width: 220 }}>Section</th>
                       <th style={{ width: 210, textAlign: "right" }}>Actions</th>
                     </tr>
@@ -1254,23 +1279,23 @@ export default function SubjectsPage() {
                   <tbody>
                     {!departmentId ? (
                       <tr>
-                        <td colSpan={5} style={{ padding: 34, textAlign: "center", color: "#9a8a7a" }}>
+                        <td colSpan={6} style={{ padding: 34, textAlign: "center", color: "#9a8a7a" }}>
                           <div style={{ fontWeight: 900, color: "#1a1a2e" }}>Select a department</div>
                           <div style={{ marginTop: 6 }}>Choose a department to load its subjects.</div>
                         </td>
                       </tr>
                     ) : loadingSubjects ? (
                       <tr>
-                        <td colSpan={5} style={{ padding: 28, textAlign: "center", color: "#9a8a7a" }}>
+                        <td colSpan={6} style={{ padding: 28, textAlign: "center", color: "#9a8a7a" }}>
                           <span className="spinner-border spinner-border-sm" />{" "}
-                          <span style={{ marginLeft: 8 }}>Loading subjects…</span>
+                          <span style={{ marginLeft: 8 }}>Loading subjects...</span>
                         </td>
                       </tr>
                     ) : pageRows.length === 0 ? (
                       <tr>
-                        <td colSpan={5} style={{ padding: 34, textAlign: "center", color: "#9a8a7a" }}>
+                        <td colSpan={6} style={{ padding: 34, textAlign: "center", color: "#9a8a7a" }}>
                           <div style={{ fontWeight: 900, color: "#1a1a2e" }}>No subjects found</div>
-                          <div style={{ marginTop: 6 }}>Click “Add” to create one.</div>
+                          <div style={{ marginTop: 6 }}>Click "Add" to create one.</div>
                         </td>
                       </tr>
                     ) : (
@@ -1297,7 +1322,13 @@ export default function SubjectsPage() {
                             </td>
 
                             <td>
-                              <span className="db-badge-code">{s.subject_id ?? "—"}</span>
+                              <span className="db-badge-code">{s.subject_id ?? "-"}</span>
+                            </td>
+
+                            <td>
+                              <span className="db-pill" style={s.department_id == null ? { background: "#ecfdf5", color: "#047857" } : undefined}>
+                                {s.department_id == null ? "General" : selectedDepartment?.name ?? "-"}
+                              </span>
                             </td>
 
                             <td>
@@ -1352,7 +1383,7 @@ export default function SubjectsPage() {
                                       <path d="M12 7A5 5 0 112 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
                                       <path d="M12 3v4h-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
                                     </svg>
-                                    Saving…
+                                    Saving...
                                   </span>
                                 )}
                               </div>
@@ -1369,7 +1400,7 @@ export default function SubjectsPage() {
               {departmentId ? (
                 <div className="db-pagination">
                   <div className="db-page-info">
-                    Showing <b>{pageRows.length}</b> of <b>{filteredSubjects.length}</b> results • Page <b>{safePage}</b> of{" "}
+                    Showing <b>{pageRows.length}</b> of <b>{filteredSubjects.length}</b> results - Page <b>{safePage}</b> of{" "}
                     <b>{totalPages}</b>
                   </div>
 
@@ -1413,7 +1444,7 @@ export default function SubjectsPage() {
                       <div>
                         <h3 className="db-modal-title">Add Subject</h3>
                         <p className="db-modal-sub">
-                          Department: <b>{selectedDepartment?.name ?? "—"}</b>
+                          Department: <b>{createAsGeneral ? "General Department" : selectedDepartment?.name ?? "-"}</b>
                         </p>
                       </div>
 
@@ -1433,6 +1464,18 @@ export default function SubjectsPage() {
                             Subject Name <span style={{ color: "#ef4444" }}>*</span>
                           </label>
                           <input placeholder="e.g. Mathematics" value={createName} onChange={(e) => setCreateName(e.target.value)} />
+                          <label className="db-option-card">
+                            <input
+                              type="checkbox"
+                              checked={createAsGeneral || departmentId === GENERAL_DEPARTMENT_ID}
+                              onChange={(e) => setCreateAsGeneral(e.target.checked)}
+                              disabled={departmentId === GENERAL_DEPARTMENT_ID}
+                            />
+                            <span>
+                              <span className="db-option-title">General subject</span>
+                              <span className="db-option-help">Use this for common subjects like Mathematics or English that should appear for all departments.</span>
+                            </span>
+                          </label>
                           <div className="db-help">A code will be generated automatically (e.g. SCI001).</div>
                         </div>
                       </div>
@@ -1447,7 +1490,7 @@ export default function SubjectsPage() {
                       {isBusy("subject:create") ? (
                         <>
                           <span className="spinner-border spinner-border-sm" role="status" style={{ width: 14, height: 14 }} />
-                          Saving…
+                          Saving...
                         </>
                       ) : (
                         <>
@@ -1479,7 +1522,7 @@ export default function SubjectsPage() {
                     <div className="db-modal-head-inner">
                       <div>
                         <h3 className="db-modal-title">Edit Subject</h3>
-                        <p className="db-modal-sub">Update subject name.</p>
+                        <p className="db-modal-sub">Update subject name and department availability.</p>
                       </div>
 
                       <button className="db-modal-close" onClick={() => setShowEdit(false)} disabled={busyKey !== null} type="button" aria-label="Close">
@@ -1498,6 +1541,17 @@ export default function SubjectsPage() {
                             Subject Name <span style={{ color: "#ef4444" }}>*</span>
                           </label>
                           <input value={editName} onChange={(e) => setEditName(e.target.value)} />
+                          <label className="db-option-card">
+                            <input
+                              type="checkbox"
+                              checked={editAsGeneral}
+                              onChange={(e) => setEditAsGeneral(e.target.checked)}
+                            />
+                            <span>
+                              <span className="db-option-title">General subject</span>
+                              <span className="db-option-help">When enabled, this subject will be available to all departments.</span>
+                            </span>
+                          </label>
                         </div>
                       </div>
                     </div>
@@ -1511,7 +1565,7 @@ export default function SubjectsPage() {
                       {isBusy(`subject:update:${editId}`) ? (
                         <>
                           <span className="spinner-border spinner-border-sm" role="status" style={{ width: 14, height: 14 }} />
-                          Saving…
+                          Saving...
                         </>
                       ) : (
                         <>
@@ -1597,7 +1651,7 @@ export default function SubjectsPage() {
                       {isBusy("subject:assign") ? (
                         <>
                           <span className="spinner-border spinner-border-sm" role="status" style={{ width: 14, height: 14 }} />
-                          Assigning…
+                          Assigning...
                         </>
                       ) : (
                         <>

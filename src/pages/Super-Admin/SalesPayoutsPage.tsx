@@ -77,6 +77,11 @@ type PolicyForm = {
   large_commission_review_threshold: number;
 };
 
+type PayoutAuthorization = {
+  can_manage_policy: boolean;
+  can_authorize_transfers: boolean;
+};
+
 const defaultSummary: Summary = {
   pending_commissions: 0,
   approved_commissions: 0,
@@ -130,8 +135,8 @@ function repName(batch: Batch) {
 function statusClass(status?: string) {
   const value = (status || "").toLowerCase();
   if (value === "paid") return "sales-pill-active";
-  if (["processing", "queued"].includes(value)) return "sales-pill-paused";
-  if (["failed", "held"].includes(value)) return "sales-pill-muted";
+  if (["processing", "queued", "requires_otp", "awaiting_approval"].includes(value)) return "sales-pill-paused";
+  if (["failed", "held", "reversed"].includes(value)) return "sales-pill-muted";
   return "sales-pill-soft";
 }
 
@@ -149,6 +154,7 @@ export default function SalesPayoutsPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [policyForm, setPolicyForm] = useState<PolicyForm>(defaultPolicy);
   const [automation, setAutomation] = useState<Automation>(defaultAutomation);
+  const [authorization, setAuthorization] = useState<PayoutAuthorization>({ can_manage_policy: false, can_authorize_transfers: false });
   const [selectedRepId, setSelectedRepId] = useState<number | "">("");
   const [bankForm, setBankForm] = useState({ bank_name: "", bank_code: "", account_number: "" });
 
@@ -165,6 +171,7 @@ export default function SalesPayoutsPage() {
       const nextPolicy = policyRes.data?.policy || payoutRes.data?.policy || defaultPolicy;
       setSummary({ ...defaultSummary, ...(payoutRes.data?.summary || {}) });
       setBatches(payoutRes.data?.batches?.data || []);
+      setAuthorization({ can_manage_policy: false, can_authorize_transfers: false, ...(payoutRes.data?.authorization || {}) });
       setRepresentatives(repsRes.data?.representatives || []);
       setAutomation({ ...defaultAutomation, ...(policyRes.data?.automation || payoutRes.data?.automation || {}) });
       setPolicyForm({
@@ -189,12 +196,13 @@ export default function SalesPayoutsPage() {
     setBankForm({
       bank_name: selectedRep.bank_name || "",
       bank_code: selectedRep.bank_code || "",
-      account_number: selectedRep.account_number || "",
+      account_number: "",
     });
   }, [selectedRep]);
 
   const savePolicy = async (event: FormEvent) => {
     event.preventDefault();
+    if (!authorization.can_manage_policy) return;
     setSaving(true);
     try {
       const res = await authApi.put("/superadmin/sales-payout-policy", policyForm);
@@ -249,19 +257,6 @@ export default function SalesPayoutsPage() {
     }
   };
 
-  const approvePending = async (rep: Rep) => {
-    setSaving(true);
-    try {
-      const res = await authApi.post(`/superadmin/sales-representatives/${rep.id}/commissions/approve`);
-      showSuccess?.(res.data?.message || "Pending commissions approved.");
-      await load();
-    } catch (err: any) {
-      showError?.(err?.response?.data?.message || "Could not approve pending commissions.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const createBatch = async (rep: Rep) => {
     setSaving(true);
     try {
@@ -288,14 +283,14 @@ export default function SalesPayoutsPage() {
     }
   };
 
-  const markPaid = async (batch: Batch) => {
+  const reconcile = async (batch: Batch) => {
     setSaving(true);
     try {
-      const res = await authApi.post(`/superadmin/sales-payouts/${batch.id}/mark-paid`);
-      showSuccess?.(res.data?.message || "Payout marked paid.");
+      const res = await authApi.post(`/superadmin/sales-payouts/${batch.id}/reconcile`);
+      showSuccess?.(res.data?.message || "Transfer status refreshed from Paystack.");
       await load();
     } catch (err: any) {
-      showError?.(err?.response?.data?.message || "Could not mark payout paid.");
+      showError?.(err?.response?.data?.message || "Could not refresh transfer status.");
     } finally {
       setSaving(false);
     }
@@ -304,6 +299,7 @@ export default function SalesPayoutsPage() {
   return <>
     <style>{`
       .sales-main { min-height: 100vh; background: #f5f7fb; overflow-x: hidden; }
+      form[data-readonly="true"] .sales-policy-grid { pointer-events:none; opacity:.65; }
       .sales-shell { width: 100%; max-width: 1360px; margin: 0 auto; }
       .sales-hero { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 20px; align-items: center; padding: 24px; border-radius: 16px; color: #fff; background: linear-gradient(135deg,#0f172a 0%,#1e3a5f 54%,#0f766e 100%); box-shadow: 0 18px 48px rgba(15,23,42,.14); margin-bottom: 18px; }
       .sales-eyebrow { display:inline-flex; align-items:center; gap:8px; font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:#a7f3d0; }
@@ -381,13 +377,13 @@ export default function SalesPayoutsPage() {
               {representatives.map((rep) => <article className="sales-rep-card" key={rep.id}>
                 <div className="sales-rep-top"><div><h3>{rep.name}</h3><p>{rep.email} - {rep.code}</p></div><span className={rep.paystack_recipient_code ? "sales-pill-active" : "sales-pill-muted"}>{rep.paystack_recipient_code ? "Bank verified" : "No payout account"}</span></div>
                 <div className="sales-meta-grid"><div className="sales-meta"><span>Pending</span><strong>{currency.format(rep.pending_commission)}</strong></div><div className="sales-meta"><span>Approved</span><strong>{currency.format(rep.approved_commission)}</strong></div><div className="sales-meta"><span>Paid</span><strong>{currency.format(rep.paid_commission)}</strong></div><div className="sales-meta"><span>Account</span><strong>{rep.account_name || "Not set"}</strong></div><div className="sales-meta"><span>Bank</span><strong>{rep.bank_name || "Not set"}</strong></div><div className="sales-meta"><span>Verified</span><strong>{fmtDate(rep.payout_verified_at)}</strong></div></div>
-                <div className="d-flex gap-2 flex-wrap justify-content-end"><button className="sales-btn sales-btn-soft" onClick={() => setSelectedRepId(rep.id)}><i className="bi bi-pencil-square" /> Bank Details</button><button className="sales-btn sales-btn-primary" disabled={saving || rep.pending_commission <= 0} onClick={() => approvePending(rep)}><i className="bi bi-check2-square" /> Approve Pending</button><button className="sales-btn sales-btn-success" disabled={saving || !rep.paystack_recipient_code || rep.approved_commission <= 0} onClick={() => createBatch(rep)}><i className="bi bi-box-seam" /> Manual Batch</button></div>
+                <div className="d-flex gap-2 flex-wrap justify-content-end"><button className="sales-btn sales-btn-soft" onClick={() => setSelectedRepId(rep.id)}><i className="bi bi-pencil-square" /> Bank Details</button><button className="sales-btn sales-btn-success" disabled={saving || !rep.paystack_recipient_code || rep.approved_commission <= 0} onClick={() => createBatch(rep)}><i className="bi bi-box-seam" /> Manual Batch</button></div>
               </article>)}
             </div>
             <aside className="sales-panel"><div className="sales-panel-head"><div><h2>Payout Bank</h2><p>Verify a sales rep bank account and create their Paystack recipient.</p></div></div><form onSubmit={saveBank}><div className="sales-form-grid"><div className="span-2"><label className="sales-label">Sales representative</label><select className="sales-select" value={selectedRepId} onChange={(e) => setSelectedRepId(e.target.value ? Number(e.target.value) : "")}><option value="">Select representative</option>{representatives.map((rep) => <option key={rep.id} value={rep.id}>{rep.name} - {rep.code}</option>)}</select></div><div><label className="sales-label">Bank name</label><input className="sales-input" value={bankForm.bank_name} onChange={(e) => setBankForm((p) => ({ ...p, bank_name: e.target.value }))} required /></div><div><label className="sales-label">Bank code</label><input className="sales-input" value={bankForm.bank_code} onChange={(e) => setBankForm((p) => ({ ...p, bank_code: e.target.value }))} required /></div><div className="span-2"><label className="sales-label">Account number</label><input className="sales-input" value={bankForm.account_number} maxLength={10} onChange={(e) => setBankForm((p) => ({ ...p, account_number: e.target.value }))} required /></div></div><button className="sales-btn sales-btn-primary w-100 mt-3" disabled={saving || !selectedRep}>Verify & Save Recipient</button></form></aside>
           </section>
         </>}
-        <section className="sales-panel"><div className="sales-panel-head"><div><h2>Payout History</h2><p>Monthly batches, Paystack transfers, and manual confirmations.</p></div></div><div className="sales-table-wrap"><table className="sales-table"><thead><tr><th>Reference</th><th>Sales Rep</th><th>Period</th><th>Status</th><th>Amount</th><th>Items</th><th>Initiated</th><th>Paid</th><th>Action</th></tr></thead><tbody>{batches.map((batch) => <tr key={batch.id}><td><strong>{batch.reference}</strong><br /><small>{batch.paystack_transfer_code || batch.failure_reason || batch.batch_type || "No transfer yet"}</small></td><td>{repName(batch)}</td><td>{batch.payout_month || `${fmtDate(batch.period_start)} - ${fmtDate(batch.period_end)}`}</td><td><span className={statusClass(batch.status)}>{batch.status}</span></td><td><strong>{currency.format(Number(batch.total_amount || 0))}</strong></td><td>{batch.commission_count}</td><td>{fmtDate(batch.initiated_at)}</td><td>{fmtDate(batch.paid_at)}</td><td><div className="d-flex gap-2"><button className="sales-btn sales-btn-success" disabled={saving || !["pending", "failed"].includes(batch.status)} onClick={() => initiate(batch)}>Paystack</button><button className="sales-btn sales-btn-soft" disabled={saving || batch.status === "paid"} onClick={() => markPaid(batch)}>Mark Paid</button></div></td></tr>)}</tbody></table>{!loading && batches.length === 0 ? <div className="text-center text-muted py-4">No payout batch has been created.</div> : null}</div></section>
+        <section className="sales-panel"><div className="sales-panel-head"><div><h2>Payout History</h2><p>Finance prepares payout batches. Only the owner authorizes transfers. Paid status comes from Paystack verification, never a manual confirmation.</p></div></div><div className="sales-table-wrap"><table className="sales-table"><thead><tr><th>Reference</th><th>Sales Rep</th><th>Period</th><th>Status</th><th>Amount</th><th>Items</th><th>Initiated</th><th>Paid</th><th>Action</th></tr></thead><tbody>{batches.map((batch) => <tr key={batch.id}><td><strong>{batch.reference}</strong><br /><small>{batch.paystack_transfer_code || batch.failure_reason || batch.batch_type || "No transfer yet"}</small></td><td>{repName(batch)}</td><td>{batch.payout_month || `${fmtDate(batch.period_start)} - ${fmtDate(batch.period_end)}`}</td><td><span className={statusClass(batch.status)}>{batch.status.replaceAll("_", " ")}</span></td><td><strong>{currency.format(Number(batch.total_amount || 0))}</strong></td><td>{batch.commission_count}</td><td>{fmtDate(batch.initiated_at)}</td><td>{fmtDate(batch.paid_at)}</td><td><div className="d-flex gap-2">{authorization.can_authorize_transfers && <><button className="sales-btn sales-btn-success" disabled={saving || !["pending", "failed", "reversed"].includes(batch.status)} onClick={() => initiate(batch)}>Authorize</button><button className="sales-btn sales-btn-soft" disabled={saving || !["processing", "requires_otp", "awaiting_approval"].includes(batch.status)} onClick={() => reconcile(batch)}>Refresh status</button></>}</div></td></tr>)}</tbody></table>{!loading && batches.length === 0 ? <div className="text-center text-muted py-4">No payout batch has been created.</div> : null}</div></section>
       </div><Footer />
     </main>
   </>;

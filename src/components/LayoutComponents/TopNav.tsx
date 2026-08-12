@@ -13,6 +13,7 @@ interface TopNavProps {
   setSidebarOpen?: (value: boolean) => void;
   toggleSidebar?: () => void;
   title?: string;
+  onToggleSidebar?: () => void;
 }
 
 function invoiceBadgeStyle(status?: string) {
@@ -44,7 +45,7 @@ function asArray<T>(value: unknown): T[] {
 }
 
 
-export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSidebar, title }: TopNavProps) {
+export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSidebar, onToggleSidebar, title }: TopNavProps) {
   const navigate = useNavigate();
 
     // invoice notifications
@@ -182,6 +183,7 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
         <button
           className="gq-icon-btn d-md-none"
           onClick={() => {
+            if (onToggleSidebar) return onToggleSidebar();
             if (toggleSidebar) return toggleSidebar();
             if (setSidebarOpen) return setSidebarOpen(!sidebarOpen);
           }}

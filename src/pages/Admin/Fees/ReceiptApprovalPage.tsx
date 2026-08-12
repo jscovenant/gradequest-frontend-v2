@@ -83,7 +83,7 @@ function statusPillClass(status: string) {
  */
 function publicBaseUrl() {
   const b = String(authApi.defaults.baseURL || "").replace(/\/+$/, "");
-  return b.replace(/\/api\/?$/, "");
+  return b.replace(/\/api\/-$/, "");
 }
 
 /**
@@ -104,10 +104,10 @@ function normalizeReceiptUrl(raw: string) {
 }
 
 function guessIsPdf(url: string) {
-  return url.split("?")[0].toLowerCase().endsWith(".pdf");
+  return url.split("-")[0].toLowerCase().endsWith(".pdf");
 }
 function guessIsImage(url: string) {
-  const u = url.split("?")[0].toLowerCase();
+  const u = url.split("-")[0].toLowerCase();
   return u.endsWith(".png") || u.endsWith(".jpg") || u.endsWith(".jpeg") || u.endsWith(".webp");
 }
 
@@ -185,9 +185,15 @@ export default function ReceiptApprovalPage() {
     return receipts.filter((r) => {
       const st = (r.status || "").toLowerCase();
       if (statusFilter && st !== statusFilter) return false;
-
       if (!q) return true;
-      const hay = `${fullName(r.student)} ${r.student?.reg_no ?? ""} ${r.payment_method ?? ""} ${r.payment_id}`
+      const hay = [
+        fullName(r.student),
+        r.student?.reg_no ?? "",
+        r.payment_method ?? "",
+        r.status ?? "",
+        String(r.amount ?? r.amount_paid ?? ""),
+      ]
+        .join(" ")
         .toLowerCase()
         .trim();
       return hay.includes(q);
@@ -642,13 +648,13 @@ export default function ReceiptApprovalPage() {
                       className="db-btn-gold"
                       onClick={fetchReceipts}
                       disabled={busyKey !== null || loadingReceipts}
-                      title={busyKey ? "Busy…" : ""}
+                      title={busyKey ? "Busy..." : ""}
                     >
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                         <path d="M12 7A5 5 0 112 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
                         <path d="M12 3v4h-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
                       </svg>
-                      {loadingReceipts ? "Refreshing…" : "Refresh receipts"}
+                      {loadingReceipts ? "Refreshing..." : "Refresh receipts"}
                     </button>
 
                     <button
@@ -824,7 +830,7 @@ export default function ReceiptApprovalPage() {
                       </thead>
 
                       <tbody>
-                        {loadingReceipts ? (
+                    {loadingReceipts ? (
                           <tr>
                             <td colSpan={7} style={{ padding: 18 }}>
                               <div className="db-skeleton" style={{ width: "60%", marginBottom: 10 }} />
@@ -832,7 +838,7 @@ export default function ReceiptApprovalPage() {
                               <div className="db-skeleton" style={{ width: "75%" }} />
                             </td>
                           </tr>
-                        ) : filtered.length === 0 ? (
+                    ) : filtered.length === 0 ? (
                           <tr>
                             <td colSpan={7} style={{ padding: 18, textAlign: "center", color: "#9a8a7a" }}>
                               No receipts found. Try adjusting your filters.
@@ -846,15 +852,15 @@ export default function ReceiptApprovalPage() {
                                 <div style={{ fontWeight: 700, color: "#1a1a2e" }}>{fullName(r.student)}</div>
                                 <div style={{ fontSize: 12, color: "#9a8a7a" }}>Receipt ID: {r.payment_id}</div>
                               </td>
-                              <td style={{ color: "#6b7280" }}>{r.student?.reg_no ?? "—"}</td>
+                              <td style={{ color: "#6b7280" }}>{r.student?.reg_no ?? "-"}</td>
                               <td>
-                                <span className="db-pill">{r.payment_method || "—"}</span>
+                                <span className="db-pill">{r.payment_method || "-"}</span>
                               </td>
                               <td>
                                 <span className={statusPillClass(r.status)}>{(r.status || "pending").toUpperCase()}</span>
                               </td>
                               <td>
-                                <span className="db-pill db-pill--violet">{Array.isArray(r.receipts) ? r.receipts.length : 0}</span>
+                                  <span className="db-pill db-pill--violet">{Array.isArray(r.receipts) ? r.receipts.length : 0}</span>
                               </td>
                               <td style={{ textAlign: "right" }}>
                                 <button className="db-refresh-btn" onClick={() => openReview(r)} disabled={busyKey !== null}>
@@ -947,7 +953,7 @@ export default function ReceiptApprovalPage() {
                   zIndex: 1100,
                   padding: 12,
                 }}
-                onClick={() => (busyKey ? null : setShowModal(false))}
+                  onClick={() => (busyKey ? null : setShowModal(false))}
               >
                 <div
                   className="db-panel"
@@ -965,7 +971,7 @@ export default function ReceiptApprovalPage() {
                       <div>
                         <p className="db-panel-title">Review receipt</p>
                         <p className="db-panel-sub">
-                          {fullName(active.student)} • {active.student?.reg_no ?? "—"} • {active.payment_method}
+                          {fullName(active.student)} | {active.student?.reg_no ?? "-"} | {active.payment_method}
                         </p>
                       </div>
                     </div>
@@ -987,7 +993,7 @@ export default function ReceiptApprovalPage() {
                       <div className="col-12 col-lg-7">
                         <div style={{ fontWeight: 700, color: "#1a1a2e", marginBottom: 10 }}>Uploaded files</div>
 
-                        {Array.isArray(active.receipts) && active.receipts.length > 0 ? (
+                    {Array.isArray(active.receipts) && active.receipts.length > 0 ? (
                           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                             {active.receipts.map((p, i) => (
                               <div
@@ -1010,7 +1016,7 @@ export default function ReceiptApprovalPage() {
                                 </div>
 
                                 <button className="db-refresh-btn" onClick={() => openReceipt(p)} disabled={busyKey !== null}>
-                                  {isBusy(`receipt:open:${p}`) ? "Opening…" : "Open"}
+                                  {isBusy(`receipt:open:${p}`) ? "Opening..." : "Open"}
                                 </button>
                               </div>
                             ))}
@@ -1065,7 +1071,7 @@ export default function ReceiptApprovalPage() {
                               disabled={busyKey !== null}
                               style={{ borderRadius: 10, padding: "9px 14px" }}
                             >
-                              {isBusy(`receipt:update:${active.payment_id}`) ? "Saving…" : "Save status"}
+                              {isBusy(`receipt:update:${active.payment_id}`) ? "Saving..." : "Save status"}
                             </button>
                           </div>
 

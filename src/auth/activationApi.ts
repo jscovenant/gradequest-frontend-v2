@@ -4,6 +4,9 @@ export type OnboardingStatus = {
   email_verified: boolean;
   current_session: boolean;
   all_terms_exist: boolean;
+  terms_accepted: boolean;
+  terms_version: string;
+  terms_accepted_at?: string | null;
   bonus_given: boolean;
 };
 
@@ -70,4 +73,9 @@ export async function activateBonus() {
 export async function checkOnboardingComplete(): Promise<{ complete: boolean }> {
   const res = await authApi.get("/user/onboarding-complete");
   return res.data as { complete: boolean };
+}
+
+export async function acceptTerms() {
+  const res = await authApi.post("/accept-terms", { accepted: true });
+  return res.data;
 }

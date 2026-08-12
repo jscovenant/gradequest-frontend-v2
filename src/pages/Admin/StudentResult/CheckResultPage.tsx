@@ -133,8 +133,20 @@ interface ResultTemplateSetting {
     show_student_photo?: boolean;
     show_watermark?: boolean;
     report_column_rules?: ReportColumnRule[];
+    custom_report_layout?: {
+      enabled?: boolean;
+      blocks?: CustomReportBlock[];
+    };
   };
 }
+
+type CustomReportBlock = {
+  id?: string;
+  label?: string;
+  type: string;
+  width?: "full" | "half";
+  visible?: boolean;
+};
 
 type ReportColumnOptions = {
   show_position: boolean;
@@ -352,7 +364,7 @@ export default function CheckResultPage() {
 
       setData(res.data);
 
-      // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ QR Code (same style as ShowResult)
+      //  QR Code (same style as ShowResult)
       const term = (res.data.average as any)?.term;
       const session = (res.data.average as any)?.session;
 
@@ -441,6 +453,22 @@ export default function CheckResultPage() {
   const resultFont = resultTemplate.font_family || "Arial";
   const isModernTemplate = templateKey === "modern_scholar";
   const isPremiumTemplate = templateKey === "premium_letterhead";
+  const customReportLayout = displayOptions.custom_report_layout;
+  const isCustomTemplate = templateKey === "custom_builder" && customReportLayout?.enabled !== false;
+  const customBlocks = customReportLayout?.blocks || [];
+  const customBlockStyle = (type: string): React.CSSProperties => {
+    if (!isCustomTemplate) return {};
+
+    const index = customBlocks.findIndex((block) => block.type === type);
+    const block = index >= 0 ? customBlocks[index] : undefined;
+
+    return {
+      order: index >= 0 ? index : customBlocks.length,
+      gridColumn: block?.width === "half" ? "span 1" : "1 / -1",
+      display: block?.visible === false ? "none" : undefined,
+      minWidth: 0,
+    };
+  };
   const headerTextColor = getTextColor(themePrimary);
 
   const borderColor = themePrimary;
@@ -951,6 +979,14 @@ export default function CheckResultPage() {
                       ) : null}
                     </div>
 
+                    <div
+                      style={isCustomTemplate ? {
+                        display: "grid",
+                        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                        gap: 12,
+                        alignItems: "start",
+                      } : undefined}
+                    >
                     {/* Student Info */}
                     <div
                       style={{
@@ -958,6 +994,7 @@ export default function CheckResultPage() {
                         gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
                         gap: 8,
                         marginTop: 12,
+                        ...customBlockStyle("student_info"),
                       }}
                     >
                       {[
@@ -1001,8 +1038,8 @@ export default function CheckResultPage() {
                       ))}
                     </div>
 
-                    <div style={resultLayoutStyle}>
-                      <section style={{ minWidth: 0 }}>
+                    <div style={isCustomTemplate ? { display: "contents" } : resultLayoutStyle}>
+                      <section style={{ minWidth: 0, ...customBlockStyle("scores_table") }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px", marginTop: 12 }}>
                       <thead>
                         <tr style={{ background: themePrimary, color: headerTextColor }}>
@@ -1017,7 +1054,7 @@ export default function CheckResultPage() {
                           <th style={thStyle}>Exam (60)</th>
                           <th style={thStyle}>Total</th>
 
-                          {/* ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ V2 carry columns */}
+                          {/*  V2 carry columns */}
                           {isV2 && showV2CarryCols && (
                             <>
                               {selectedV2CarryTermNames.map((t) => (
@@ -1070,7 +1107,7 @@ export default function CheckResultPage() {
                               <td style={tdStyle}>{(subject as any).exam}</td>
                               <td style={tdStyle}>{(subject as any).total}</td>
 
-                              {/* ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ V2 carry values */}
+                              {/*  V2 carry values */}
                               {isV2 && showV2CarryCols && (
                                 <>
                                   {selectedV2CarryTermNames.map((t) => {
@@ -1091,8 +1128,8 @@ export default function CheckResultPage() {
                                   {showCumulativeTotal && (
                                     <td style={tdStyle}>
                                       {getValue(
-                                        (subject as V2SubjectResult).cumulative_total ??
-                                          (parseCarry((subject as V2SubjectResult).carry_over_json)?.cumulative_total ??
+                                        (subject as V2SubjectResult).cumulative_total 
+                                          (parseCarry((subject as V2SubjectResult).carry_over_json)?.cumulative_total 
                                             (subject as V2SubjectResult).carry_over?.cumulative_total),
                                         ""
                                       )}
@@ -1102,8 +1139,8 @@ export default function CheckResultPage() {
                                   {showCumulativeAverage && (
                                     <td style={tdStyle}>
                                       {getValue(
-                                        (subject as V2SubjectResult).cumulative_average ??
-                                          (parseCarry((subject as V2SubjectResult).carry_over_json)?.cumulative_average ??
+                                        (subject as V2SubjectResult).cumulative_average 
+                                          (parseCarry((subject as V2SubjectResult).carry_over_json)?.cumulative_average 
                                             (subject as V2SubjectResult).carry_over?.cumulative_average),
                                         ""
                                       )}
@@ -1167,10 +1204,10 @@ export default function CheckResultPage() {
                     </div>
                       </section>
 
-                      <aside style={insightPanelStyle}>
+                      <aside style={isCustomTemplate ? { display: "contents" } : insightPanelStyle}>
 
                     {displayOptions.show_domains && (
-                      <div style={analyticsGridStyle}>
+                      <div style={{ ...analyticsGridStyle, ...customBlockStyle("performance_chart") }}>
                         <div
                           style={{
                             border: `1px solid ${themePrimary}`,
@@ -1265,7 +1302,7 @@ export default function CheckResultPage() {
 
                     {/* Domains */}
                     {displayOptions.show_domains && (affective_domains.length > 0 || psychomotor_domains.length > 0) && (
-                      <div style={domainsGridStyle}>
+                      <div style={{ ...domainsGridStyle, ...customBlockStyle("domains") }}>
                         {affective_domains.length > 0 && (
                           <div>
                             <table style={domainTableStyle}>
@@ -1309,6 +1346,7 @@ export default function CheckResultPage() {
                     {/* Remarks */}
                     {displayOptions.show_remarks && <div
                       style={{
+                        ...customBlockStyle("comments"),
                         marginTop: "12px",
                         border: `1px solid ${themePrimary}55`,
                         borderRadius: 12,
@@ -1337,6 +1375,7 @@ export default function CheckResultPage() {
                         alignItems: "center",
                         borderTop: isPremiumTemplate ? `1px solid ${themePrimary}55` : undefined,
                         paddingTop: isPremiumTemplate ? 12 : undefined,
+                        ...customBlockStyle("signature"),
                       }}
                     >
                       {displayOptions.show_signature ? (
@@ -1365,6 +1404,7 @@ export default function CheckResultPage() {
                         <img src={qrDataUrl || "/media/result/default-qrcode.svg"} alt="QR Code" style={{ width: "100px", height: "100px" }} />
                         <p style={{ margin: 0, color: themePrimary, fontWeight: 700 }}>Verify Result</p>
                       </div> : <div />}
+                    </div>
                     </div>
                   </div>
                 </div>

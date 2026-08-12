@@ -1,4 +1,4 @@
-﻿
+
 
 
 
@@ -8,8 +8,10 @@ import { useFeatures } from "../../contexts/FeatureContext";
 import { getUser } from "../../utils/token";
 
 interface SidebarProps {
-  sidebarOpen: boolean;
+  sidebarOpen?: boolean;
   setSidebarOpen?: (value: boolean) => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 interface MenuChild {
@@ -30,7 +32,7 @@ interface MenuItem {
   roles: string[];
   badge?: string;
 
-  // Ã¢Å“â€¦ Feature gating
+  //  Feature gating
   featureKey?: string;
   superAdminPermission?: string;
   lockIfNoFeature?: boolean; 
@@ -41,7 +43,8 @@ interface MenuItem {
   comingSoon?: boolean;
 }
 
-export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
+export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }: SidebarProps) {
+  const resolvedSidebarOpen = sidebarOpen ?? isOpen ?? false;
   const user = getUser();
   const featureAccess = useFeatures();
   const [openMenus, setOpenMenus] = useState<string[]>([]);
@@ -73,8 +76,9 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
   };
 
   const handleLinkClick = () => {
-    if (setSidebarOpen && window.innerWidth < 768) {
-      setSidebarOpen(false);
+    if (window.innerWidth < 768) {
+      if (setSidebarOpen) setSidebarOpen(false);
+      else onClose?.();
     }
   };
 
@@ -92,7 +96,18 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       .filter(Boolean)
       .map((key: string) => key.toLowerCase())
   );
-  const canUseFeature = (featureKey?: string) => !featureKey || featureAccess.can(featureKey) || featureSet.has(featureKey.toLowerCase());
+  const featureAliases: Record<string, string[]> = {
+    ai_lesson_plan_generator: ["ai_lesson_plan_generator", "support_ai_lesson_plan_generator", "lesson_plan_ai", "ai_lesson_planner", "gradequest_plus"],
+    ai_fee_collection_assistant: ["ai_fee_collection_assistant", "support_ai_fee_collection_assistant", "ai_fee_assistant", "fee_collection_ai", "gradequest_plus"],
+    ai_result_comment_generator: ["ai_result_comment_generator", "support_ai_result_comment_generator", "ai_result_comments", "result_comment_ai", "gradequest_plus"],
+    ai_cbt_question_generator: ["ai_cbt_question_generator", "support_ai_cbt_question_generator", "ai_question_generator", "cbt_ai", "gradequest_plus"],
+  };
+
+  const canUseFeature = (featureKey?: string) => {
+    if (!featureKey) return true;
+    const keys = featureAliases[featureKey.toLowerCase()] || [featureKey];
+    return keys.some((key) => featureAccess.can(key) || featureSet.has(key.toLowerCase()));
+  };
   const shouldHideForPlan = (item: MenuItem | MenuChild) => Boolean(item.hideIfNoFeature && item.featureKey && !canUseFeature(item.featureKey));
 
   const ComingSoonBadge = () => (
@@ -114,7 +129,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
   );
 
   /**
-   * Ã¢Å“â€¦ Add featureKey values that match what your plan->features uses.
+   *  Add featureKey values that match what your plan->features uses.
    * Examples used below: "fees", "results", "finance", "attendance"
    * Adjust to your real feature_key strings.
    */
@@ -124,6 +139,35 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       icon: "speedometer2",
       href: "/dashboard",
       roles: ["Admin", "Teacher", "Student", "Super-Admin", "Platform-Staff", "Parent", "Bursar", "Sales-Representative"],
+    },
+    {
+      label: "Support",
+      icon: "life-preserver",
+      href: "/support",
+      roles: ["Admin"],
+    },
+    {
+      label: "Hostel Management",
+      icon: "buildings",
+      href: "/hostels",
+      roles: ["Admin"],
+      featureKey: "hostel_management",
+      hideIfNoFeature: true,
+    },
+    {
+      label: "Transport Management",
+      icon: "bus-front",
+      href: "/transport",
+      roles: ["Admin"],
+      featureKey: "transport_management",
+      hideIfNoFeature: true,
+    },
+    {
+      label: "Support Desk",
+      icon: "headset",
+      href: "/superadmin/support",
+      roles: ["Super-Admin", "Platform-Staff"],
+      superAdminPermission: "support",
     },
 
     {
@@ -208,6 +252,14 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
     },
 
     {
+      label: "AI Lesson Planner",
+      icon: "journal-text",
+      href: "/settings/ai-lesson-plans",
+      roles: ["Admin", "Teacher"],
+      featureKey: "ai_lesson_plan_generator",
+      hideIfNoFeature: true,
+    },
+    {
       label: "Fees",
       icon: "cash",
       collapseId: "feesMenu",
@@ -219,6 +271,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
         { label: "Student Payments", href: "/fees/payments" },
         { label: "Receipt Approvals", href: "/fees/receipts/approval" },
         { label: "Financial Records", href: "/fees/report" },
+        { label: "AI Fee Collection", href: "/fees/ai-collection", roles: ["Admin"], featureKey: "ai_fee_collection_assistant", hideIfNoFeature: true },
       ],
       roles: ["Admin", "Bursar"],
     },
@@ -240,8 +293,9 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       label: "Staff Attendance",
       icon: "calendar-check",
       collapseId: "staffAttendanceMenu",
-      featureKey: "support_staff_attendance",
+      featureKey: "staff_attendance",
       lockIfNoFeature: true,
+      hideIfNoFeature: true,
       children: [
         { label: "Staff Attendance", href: "/scan-qr", roles: ["Admin", "Teacher"] },
         { label: "Staff Attendance Logs", href: "/attendance/logs", roles: ["Admin"] },
@@ -256,6 +310,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       collapseId: "salesWorkspaceMenu",
       children: [
         { label: "My Leads", href: "/sales/leads" },
+        { label: "Marketing Kit & Sales Page", href: "/sales/marketing-kit" },
         { label: "My Commissions", href: "/sales/commissions" },
         { label: "Payout Settings", href: "/sales/payout-settings" },
       ],
@@ -283,6 +338,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       children: [
         { label: "Sales Representatives", href: "/superadmin/sales-representatives", superAdminPermission: "sales" },
         { label: "Sales Leads", href: "/superadmin/sales-leads", superAdminPermission: "sales" },
+        { label: "Marketing Materials", href: "/superadmin/sales-marketing-materials", superAdminPermission: "marketing" },
         { label: "Sales Payouts", href: "/superadmin/sales-payouts", superAdminPermission: "finance" },
         { label: "Broadcast", href: "/superadmin/send-message", superAdminPermission: "marketing" },
       ],
@@ -312,9 +368,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
         { label: "Prepare Term Results", href: "/students/results/batch", roles: ["Admin"], },
         { label: "Review Results", href: "/results/review", roles: ["Admin"], },
         { label: "Enter Student Scores", href: "/students/results/add", roles: ["Admin", "Teacher"], },
+        { label: "AI Lesson Planner", href: "/settings/ai-lesson-plans", roles: ["Admin", "Teacher"], featureKey: "ai_lesson_plan_generator", hideIfNoFeature: true },
         { label: "Monitor Results", href: "/result/monitor", roles: ["Admin"], },
         { label: "Result Design", href: "/results/design", roles: ["Admin"], },
         { label: "Generate PIN", href: "/results/pins", roles: ["Admin"], },
+        { label: "Withdrawn Result Archive", href: "/results/withdrawn-archive", roles: ["Admin"], },
+        { label: "Student Transcripts", href: "/transcripts", roles: ["Admin"], },
       ],
       roles: ["Admin", "Teacher"],
     },
@@ -364,7 +423,9 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
         { label: "School Profile", href: "/school/settings" },
         { label: "Bank Accounts", href: "/school/bank-account-setting" },
           { label: "Result Deadline Setting", href: "/results/deadlines" },
-          {label: "WhatsApp Notification Settings", href: "/settings/whatsapp"}
+          { label: "AI Credits", href: "/settings/ai-credits", featureKey: "ai_result_comment_generator", hideIfNoFeature: true },
+          { label: "AI Lesson Planner", href: "/settings/ai-lesson-plans", featureKey: "ai_lesson_plan_generator", hideIfNoFeature: true },
+          {label: "WhatsApp Notification Settings", href: "/settings/whatsapp", featureKey: "gradequest_plus", hideIfNoFeature: true}
 
         
         
@@ -481,7 +542,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
         `}
       </style>
 
-      {sidebarOpen && (
+      {resolvedSidebarOpen && (
         <div
           className="gq-sidebar-overlay d-md-none"
           onClick={() => setSidebarOpen?.(false)}
@@ -498,12 +559,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       )}
 
       <aside
-        className={`sidebar gq-sidebar ${sidebarOpen ? "show" : ""} ${desktopCollapsed ? "is-collapsed" : ""}`}
+        className={`sidebar gq-sidebar ${resolvedSidebarOpen ? "show" : ""} ${desktopCollapsed ? "is-collapsed" : ""}`}
         style={{
           minHeight: "100vh",
           position: "fixed",
           top: 0,
-          left: sidebarOpen ? 0 : "-100%",
+          left: resolvedSidebarOpen ? 0 : "-100%",
           width: "280px",
           maxWidth: "80vw",
           zIndex: 1050,
@@ -640,7 +701,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
                 .map((item) => {
                   const disabled = item.disabled;
 
-                  // If itÃ¢â‚¬â„¢s a single link and gated, hide it
+                  // If it's a single link and gated, hide it
                   return (
                     <li key={item.label}>
                       {item.children ? (
@@ -831,6 +892,10 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
     </>
   );
 }
+
+
+
+
 
 
 

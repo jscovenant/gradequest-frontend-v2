@@ -1549,11 +1549,11 @@ export default function FeeMethodsPage() {
                                   <tr key={f.id}>
                                     <td>
                                       <div style={{ fontWeight: 600, color: "#1a1a2e" }}>
-                                        {f.fee_type?.name ?? `FeeType #${f.fee_type_id}`}
+                                    {f.fee_type?.name ?? `FeeType #${f.fee_type_id}`}
                                       </div>
                                       <div style={{ fontSize: 12, color: "#9a8a7a", display: "flex", gap: 6, alignItems: "center", marginTop: 2, flexWrap: "wrap" }}>
                                         <span>
-                                          {f.session?.name ?? `Session #${f.session_id}`} • {f.term?.name ?? `Term #${f.term_id}`}
+                                    {f.session?.name ?? `Session #${f.session_id}`} - {f.term?.name ?? `Term #${f.term_id}`}
                                         </span>
                                         {f.status && (
                                           <span className="db-pill" style={{ fontSize: 10.5, padding: "1px 8px", ...statusPillStyle(f.status) }}>

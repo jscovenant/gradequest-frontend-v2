@@ -169,7 +169,7 @@ export default function InvoiceNotificationDetailsPage() {
   const totalBalance = summary?.total_balance ?? 0;
   const studentCount = summary?.student_count ?? children.length ?? 0;
   const itemCount =
-    summary?.item_count ??
+    summary?.item_count 
     children.reduce((acc, child) => acc + (child.items?.length ?? 0), 0);
 
   return (
@@ -363,8 +363,8 @@ export default function InvoiceNotificationDetailsPage() {
                                         <td className="fw-bold text-danger">
                                           {money(item.balance)}
                                         </td>
-                                        <td>{item.term_id ?? "—"}</td>
-                                        <td>{item.session_id ?? "—"}</td>
+                                        <td>{item.term_id ?? "-"}</td>
+                                        <td>{item.session_id ?? "-"}</td>
                                       </tr>
                                     ))
                                   )}

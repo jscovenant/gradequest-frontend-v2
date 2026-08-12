@@ -1103,11 +1103,11 @@ export default function StaffQrAttendancePage() {
 
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div className="db-strong" style={{ fontSize: 14 }}>
-                              {lastUser ? `${lastUser.firstname ?? ""} ${lastUser.surname ?? ""}`.trim() : "—"}
+                              {lastUser ? `${lastUser.firstname ?? ""} ${lastUser.surname ?? ""}`.trim() : "-"}
                             </div>
-                            <div className="db-muted" style={{ fontSize: 12 }}>{lastUser?.email || "—"}</div>
+                            <div className="db-muted" style={{ fontSize: 12 }}>{lastUser?.email || "-"}</div>
                             <div className="db-muted" style={{ fontSize: 12 }}>
-                              Reg No: <b>{lastUser?.reg_no || "—"}</b>
+                              Reg No: <b>{lastUser?.reg_no || "-"}</b>
                             </div>
                           </div>
 
@@ -1192,11 +1192,11 @@ export default function StaffQrAttendancePage() {
                           <button
                             className="db-refresh-btn"
                             onClick={() => {
-                              const name = lastUser ? `${lastUser.firstname ?? ""} ${lastUser.surname ?? ""}`.trim() : "-";
+                              const staffName = lastUser ? `${lastUser.firstname ?? ""} ${lastUser.surname ?? ""}`.trim() : "-";
                               const details = [
-                                `Name: ${name}`,
-                                `Reg No: ${lastUser?.reg_no ?? "-"}`,
-                                `Email: ${lastUser?.email ?? "-"}`,
+                                `Name: ${staffName || "-"}`,
+                                `Reg No: ${lastUser?.reg_no || "-"}`,
+                                `Email: ${lastUser?.email || "-"}`,
                                 `Action: ${lastAction || "-"}`,
                                 `Date: ${lastAttendance?.att_date ?? "-"}`,
                                 `Check-in: ${lastAttendance?.check_in_at ?? "-"}`,
@@ -1250,7 +1250,7 @@ export default function StaffQrAttendancePage() {
                     ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 380, overflow: "auto" }}>
                         {logs.map((l) => {
-                          const name = l.user ? `${l.user.firstname ?? ""} ${l.user.surname ?? ""}`.trim() : "Unknown staff";
+                              const name = l.user ? `${l.user.firstname ?? ""} ${l.user.surname ?? ""}`.trim() : "Unknown staff";
                           const actionBadge = badgeForAction(l.action);
 
                           const ok = l.status === "success";

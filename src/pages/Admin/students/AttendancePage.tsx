@@ -29,6 +29,9 @@ interface StudentClass {
   name: string;
 }
 
+interface AcademicWeek { number: number; start_date: string; end_date: string; label: string; }
+interface AcademicCalendar { configured: boolean; session?: string | null; weeks: AcademicWeek[]; current_week?: AcademicWeek | null; }
+
 type Role = "admin" | "teacher" | "other";
 
 function getGreeting() {
@@ -54,6 +57,8 @@ export default function AttendancePage() {
   const [classes, setClasses] = useState<StudentClass[]>([]);
   const [classId, setClassId] = useState<string>("");
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [calendar, setCalendar] = useState<AcademicCalendar>({ configured: false, weeks: [] });
+  const [weekNumber, setWeekNumber] = useState<string>("");
 
   // data
   const [students, setStudents] = useState<Student[]>([]);
@@ -108,6 +113,9 @@ export default function AttendancePage() {
 
       const cls: StudentClass[] = payload.classes || payload || [];
       setClasses(cls);
+      const academicCalendar: AcademicCalendar = payload.academic_calendar || { configured: false, weeks: [] };
+      setCalendar(academicCalendar);
+      if (academicCalendar.current_week) setWeekNumber(String(academicCalendar.current_week.number));
 
       const r = String(payload.role || "").toLowerCase();
       setRole(r === "admin" ? "admin" : r === "teacher" ? "teacher" : "other");
@@ -127,7 +135,7 @@ export default function AttendancePage() {
 
   /* ================= LOAD STUDENTS ================= */
   const loadStudents = async () => {
-    if (!classId) {
+    if (!classId || !weekNumber) {
       setStudents([]);
       return;
     }
@@ -135,7 +143,7 @@ export default function AttendancePage() {
     setLoadingStudents(true);
     try {
       const res = await authApi.get("/attendance", {
-        params: { class_id: classId, date },
+        params: { class_id: classId, date, week_number: Number(weekNumber) },
       });
 
       const data: Student[] = (res.data || []).map((stu: any) => ({
@@ -166,6 +174,7 @@ export default function AttendancePage() {
       await authApi.post("/attendance", {
         class_id: classId,
         date,
+        week_number: Number(weekNumber),
         students: students.map((stu) => ({
           student_id: stu.id,
           status: stu.attendances?.[0]?.status || "absent",
@@ -208,7 +217,13 @@ export default function AttendancePage() {
   useEffect(() => {
     loadStudents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [classId, date]);
+  }, [classId, date, weekNumber]);
+
+  const selectWeek = (value: string) => {
+    setWeekNumber(value);
+    const week = calendar.weeks.find((item) => String(item.number) === value);
+    if (week && (date < week.start_date || date > week.end_date)) setDate(week.start_date);
+  };
 
   /* ================= UI HELPERS ================= */
   const statusPill = (s?: AttendanceStatus) => {
@@ -778,11 +793,25 @@ export default function AttendancePage() {
                 <div>
                   <div style={{ fontWeight: 700, color: "#1a1a2e" }}>Filters</div>
                   <div style={{ fontSize: 12.5, color: "#9a8a7a" }}>
-                    Select class & date. {isTeacher ? "Your class may be locked." : "Admins can switch classes."}
+                    Select the academic week, class and attendance date. {isTeacher ? "Your class may be locked." : "Admins can switch classes."}
                   </div>
                 </div>
 
                 <div className="db-field">
+                  <select
+                    className="db-select"
+                    value={weekNumber}
+                    onChange={(e) => selectWeek(e.target.value)}
+                    disabled={loadingStudents || loadingPage || !calendar.configured}
+                    title="Select academic week"
+                  >
+                    <option value="">{calendar.configured ? "Select Week" : "Set session dates first"}</option>
+                    {calendar.weeks.map((week) => (
+                      <option key={week.number} value={week.number}>
+                        {week.label} · {week.start_date} to {week.end_date}
+                      </option>
+                    ))}
+                  </select>
                   <select
                     className="db-select"
                     value={classId}
@@ -804,6 +833,8 @@ export default function AttendancePage() {
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
                     disabled={loadingStudents || loadingPage}
+                    min={calendar.weeks.find((week) => String(week.number) === weekNumber)?.start_date}
+                    max={calendar.weeks.find((week) => String(week.number) === weekNumber)?.end_date}
                   />
 
                   <button className="db-mini-btn" onClick={loadStudents} disabled={loadingStudents || !classId}>
@@ -833,7 +864,7 @@ export default function AttendancePage() {
                     )}
                   </button>
 
-                  <button className="db-mini-btn db-mini-btn--g" onClick={saveAttendance} disabled={saving || !classId || students.length === 0}>
+                  <button className="db-mini-btn db-mini-btn--g" onClick={saveAttendance} disabled={saving || !classId || !weekNumber || students.length === 0}>
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                       <path d="M13.5 4.5l-6.5 7L2.5 7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -977,7 +1008,7 @@ export default function AttendancePage() {
                 <button
                   className="db-mini-btn db-mini-btn--g"
                   onClick={saveAttendance}
-                  disabled={saving || !classId || students.length === 0}
+                  disabled={saving || !classId || !weekNumber || students.length === 0}
                   type="button"
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">

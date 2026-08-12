@@ -1175,8 +1175,8 @@ export default function AcademicCalendarPage() {
               {[
                 { title: "Total Sessions", value: totalSessions, hint: "All sessions" },
                 { title: "Total Terms", value: totalTerms, hint: "All terms" },
-                { title: "Current Session", value: currentSession?.name ?? "—", hint: "In use" },
-                { title: "Active Term", value: activeTerm?.name ?? "—", hint: "In use" },
+                { title: "Current Session", value: currentSession?.name ?? "-", hint: "In use" },
+                { title: "Active Term", value: activeTerm?.name ?? "-", hint: "In use" },
               ].map((c, i) => {
                 const m = STAT_META[i];
                 const icons = [

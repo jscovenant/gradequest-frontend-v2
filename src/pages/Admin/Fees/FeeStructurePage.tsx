@@ -188,9 +188,9 @@ export default function FeeStructurePage() {
     return { count: feeTypes.length, sum };
   }, [feeTypes]);
 
-  const sectionName = (f: FeeType) => f.section?.name ?? sections.find((s) => s.id === f.section_id)?.name ?? "—";
-  const sessionName = (f: FeeType) => f.session?.name ?? sessions.find((s) => s.id === f.session_id)?.name ?? "—";
-  const termName = (f: FeeType) => f.term?.name ?? terms.find((t) => t.id === f.term_id)?.name ?? "—";
+  const sectionName = (f: FeeType) => f.section?.name ?? sections.find((s) => s.id === f.section_id)?.name ?? "-";
+  const sessionName = (f: FeeType) => f.session?.name ?? sessions.find((s) => s.id === f.session_id)?.name ?? "-";
+  const termName = (f: FeeType) => f.term?.name ?? terms.find((t) => t.id === f.term_id)?.name ?? "-";
 
   /* =========================
      CREATE

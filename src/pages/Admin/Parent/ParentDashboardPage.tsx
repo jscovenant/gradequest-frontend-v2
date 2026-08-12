@@ -73,7 +73,7 @@ const emptyDashboard: DashboardResponse = {
 
 function normalizeDashboardPayload(rawPayload: any): DashboardResponse {
   const payload: Partial<DashboardResponse> | null | undefined = rawPayload?.data ?? rawPayload;
-  const children = Array.isArray(payload?.children) ? payload.children : [];
+  const children = data?.children ?? [];
   const firstChildId = children[0]?.id ?? 0;
   const stats = payload?.stats || {};
 
@@ -579,7 +579,7 @@ export default function ParentDashboardPage() {
                     </button>
                     <button className="btn btn-outline-secondary" style={{ borderRadius: 10, fontWeight: 700 }} onClick={copyPaymentLink}>
                       <i className="bi bi-clipboard me-1" />
-                      {paymentLinkCopied ? "Copied" : "Copy"}
+                {paymentLinkCopied ? "Copied" : "Copy"}
                     </button>
                   </div>
                 </div>
@@ -741,7 +741,7 @@ export default function ParentDashboardPage() {
                       }}
                     >
                       <div className="d-flex justify-content-between">
-                        <div className="fw-semibold">{n.data?.message ?? "Notification"}</div>
+                    <div className="fw-semibold">{n.data?.message ?? "Notification"}</div>
                         <small className="text-muted">{new Date(n.created_at).toLocaleString()}</small>
                       </div>
                       {n.data?.type && <small className="text-muted">Type: {n.data.type}</small>}

@@ -420,13 +420,13 @@ export default function ParentPaymentSummaryPage() {
                         <tr key={p.id}>
                           <td className="fw-semibold">{p.reference}</td>
                           <td>{money(Number(p.amount || 0))}</td>
-                          <td>{(p.payment_method || "—").toUpperCase()}</td>
-                          <td>{p.fee_type_name ?? "—"}</td>
-                          <td>{p.session_name ?? "—"}</td>
-                          <td>{p.term_name ?? "—"}</td>
+                          <td>{(p.payment_method || "-").toUpperCase()}</td>
+                          <td>{p.fee_type_name ?? "-"}</td>
+                          <td>{p.session_name ?? "-"}</td>
+                          <td>{p.term_name ?? "-"}</td>
                           <td>
                             <span className="badge bg-light text-dark" style={{ borderRadius: 20 }}>
-                              {p.fee_status ?? "—"}
+                              {p.fee_status ?? "-"}
                             </span>
                           </td>
                           <td>{p.created_at ? new Date(p.created_at).toLocaleString() : "—"}</td>

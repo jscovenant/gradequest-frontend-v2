@@ -22,6 +22,13 @@
 .sales-work-head p { margin: 4px 0 0; color: #64748b; }
 .sales-work-search { min-width: 240px; border: 1px solid #dbe3ef; background: #f8fafc; border-radius: 10px; padding: 10px 12px; outline: 0; }
 .sales-work-list { display: grid; gap: 12px; }
+.sales-page-share { padding: 14px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 18px; align-items: center; }
+.sales-page-qr { width: 132px; height: 132px; padding: 6px; border-radius: 10px; background: #fff; box-shadow: 0 0 0 1px #e5e7eb; flex: 0 0 auto; }
+.sales-page-qr svg { display: block; width: 120px; height: 120px; }
+.sales-page-details { min-width: 0; }
+.sales-page-details h3 { margin: 0; font-size: 16px; font-weight: 900; color: #0f172a; overflow-wrap: anywhere; }
+.sales-page-details p { margin: 4px 0 0; color: #64748b; }
+.sales-page-details .sales-work-actions { justify-content: flex-start; margin-top: 12px; }
 .sales-work-row { padding: 14px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; }
 .sales-work-row h3 { margin: 0; font-size: 16px; font-weight: 900; color: #0f172a; overflow-wrap: anywhere; }
 .sales-work-row p { margin: 4px 0 0; color: #64748b; overflow-wrap: anywhere; }
@@ -40,7 +47,7 @@
 .sales-work-table td:last-child { border-right: 1px solid #e5e7eb; border-radius: 0 12px 12px 0; }
 @media (max-width: 1199px) { .sales-work-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sales-work-content { grid-template-columns: 1fr; } }
 @media (max-width: 991px) { .sales-work-hero, .sales-work-row { grid-template-columns: 1fr; } .sales-work-actions { justify-content: flex-start; } }
-@media (max-width: 575px) { .sales-work-grid, .sales-work-form { grid-template-columns: 1fr; } .sales-work-head { align-items: stretch; flex-direction: column; } .sales-work-search { min-width: 0; width: 100%; } .sales-work-hero { padding: 18px; } }
+@media (max-width: 575px) { .sales-work-grid, .sales-work-form, .sales-page-share { grid-template-columns: 1fr; } .sales-page-qr { justify-self: center; } .sales-work-head { align-items: stretch; flex-direction: column; } .sales-work-search { min-width: 0; width: 100%; } .sales-work-hero { padding: 18px; } }
 
 .sales-work-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 14px; margin-bottom: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; }
 .sales-work-form label { display: grid; gap: 6px; color: #334155; font-size: 12px; font-weight: 800; }

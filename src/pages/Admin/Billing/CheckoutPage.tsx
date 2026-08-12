@@ -11,6 +11,7 @@ import PageTitle from "../../../components/PageTitle";
 
 type Plan = {
   id: number;
+  is_active?: boolean | number;
   name: string;
   price: number;
   price_per_student?: number;
@@ -21,6 +22,15 @@ type Plan = {
   limit_exceeded?: boolean;
   duration_in_days: number;
   max_students?: number | null;
+  can_select?: boolean;
+  disabled_reason?: string | null;
+  subscription_action?: "purchase" | "renewal" | "upgrade";
+  upgrade_credit_amount?: number;
+  current_package_value?: number;
+  used_value_amount?: number;
+  payable_amount?: number | null;
+  carried_days?: number;
+  projected_expiry?: string | null;
 };
 
 type SubDetails = {
@@ -32,6 +42,12 @@ type SubDetails = {
   end_date?: string | null;
   duration?: number | null;
   auto_renew_source?: "wallet" | "paystack" | "card" | string;
+  subscription_plan_id?: number | null;
+  is_unexpired?: boolean;
+  days_used?: number;
+  days_remaining?: number;
+  unused_value?: number;
+  used_value?: number;
 };
 
 function fmtNaira(n: number) {
@@ -123,11 +139,16 @@ export default function CheckoutPage() {
     return subtotal * YEARLY_DISCOUNT_RATE;
   }, [subtotal, yearlyBilling, yearlyEligible]);
 
-  const totalAmount = useMemo(() => subtotal - discountAmount, [subtotal, discountAmount]);
+  const amountBeforeUpgradeCredit = useMemo(() => subtotal - discountAmount, [subtotal, discountAmount]);
+  const upgradeCredit = Number(selectedPlan?.upgrade_credit_amount || 0);
+  const totalAmount = useMemo(
+    () => Math.max(0, amountBeforeUpgradeCredit - upgradeCredit),
+    [amountBeforeUpgradeCredit, upgradeCredit]
+  );
 
   const totalDurationDays = useMemo(() => {
     if (!selectedPlan) return 0;
-    return selectedPlan.duration_in_days * billingCycles;
+    return selectedPlan.duration_in_days * billingCycles + Number(selectedPlan.carried_days || 0);
   }, [selectedPlan, billingCycles]);
 
   const expiryDate = useMemo(() => {
@@ -152,12 +173,23 @@ export default function CheckoutPage() {
   useEffect(() => {
     const fetchAll = async () => {
       setPageLoading(true);
+      const [profileResult, detailsResult, plansResult] = await Promise.allSettled([
+        authApi.get("/subscription/user"),
+        authApi.get("/user/subscription/details"),
+        authApi.get("/subscription/plans"),
+      ]);
+
+      const profileRes = profileResult.status === "fulfilled" ? profileResult.value : null;
+      const detailsRes = detailsResult.status === "fulfilled" ? detailsResult.value : null;
+      const plansRes = plansResult.status === "fulfilled" ? plansResult.value : null;
+      const fetchedPlans = (Array.isArray(plansRes?.data) ? plansRes.data : [])
+        .filter((plan: Plan) => plan.is_active === undefined || plan.is_active === true || Number(plan.is_active) === 1);
+
+      // A successful plans response must never be cleared because optional
+      // profile or current-subscription metadata is malformed/unavailable.
+      setPlans(fetchedPlans);
+
       try {
-        const [profileRes, detailsRes, plansRes] = await Promise.all([
-          authApi.get("/subscription/user"),
-          authApi.get("/user/subscription/details").catch(() => null),
-          authApi.get("/subscription/plans"),
-        ]);
 
         const email = profileRes?.data?.email || "";
         setUserEmail(email);
@@ -175,13 +207,10 @@ export default function CheckoutPage() {
           }
         }
 
-        const fetchedPlans = Array.isArray(plansRes.data) ? plansRes.data : [];
-        setPlans(fetchedPlans);
-
         if (planFromQuery && fetchedPlans.length) {
           const normalizedQueryPlan = planFromQuery.toLowerCase().replace(/[^a-z0-9]+/g, "");
           const queryMatch = fetchedPlans.find((p: Plan) => p.name.toLowerCase().replace(/[^a-z0-9]+/g, "") === normalizedQueryPlan);
-          if (queryMatch) {
+          if (queryMatch?.can_select !== false) {
             setSelectedPlanId(String(queryMatch.id));
             return;
           }
@@ -190,13 +219,16 @@ export default function CheckoutPage() {
         const currentPlanName = detailsRes?.data?.subscription_type;
         if (currentPlanName && fetchedPlans.length) {
           const match = fetchedPlans.find((p: Plan) => p.name === currentPlanName);
-          if (match) {
+          if (match?.can_select !== false) {
             setSelectedPlanId(String(match.id));
+            return;
           }
         }
+
+        const firstAvailable = fetchedPlans.find((p: Plan) => p.can_select !== false && !p.limit_exceeded);
+        if (firstAvailable) setSelectedPlanId(String(firstAvailable.id));
       } catch (err: any) {
         console.error(err);
-        showError?.(err?.response?.data?.message || "Failed to load subscription checkout data.");
       } finally {
         setPageLoading(false);
       }
@@ -259,6 +291,11 @@ export default function CheckoutPage() {
 
     if (!userEmail) {
       showError?.("User email not found.");
+      return;
+    }
+
+    if (selectedPlan.can_select === false) {
+      showError?.(selectedPlan.disabled_reason || "This package cannot be selected while your current subscription is active.");
       return;
     }
 
@@ -787,15 +824,18 @@ export default function CheckoutPage() {
                     <div className="row g-3">
                       {plans.map((p) => {
                         const active = String(p.id) === selectedPlanId;
+                        const disabled = p.can_select === false || !!p.limit_exceeded;
 
                         return (
                           <div className="col-12 col-md-6" key={p.id}>
                             <div
                               className={`db-radio ${active ? "active" : ""}`}
                               role="button"
-                              onClick={() => setSelectedPlanId(String(p.id))}
+                              onClick={() => !disabled && setSelectedPlanId(String(p.id))}
                               aria-pressed={active}
-                              style={{ userSelect: "none" }}
+                              aria-disabled={disabled}
+                              title={disabled ? (p.disabled_reason || "This plan cannot support the school's current students.") : ""}
+                              style={{ userSelect: "none", opacity: disabled ? 0.55 : 1, cursor: disabled ? "not-allowed" : "pointer", filter: disabled ? "grayscale(0.35)" : "none" }}
                             >
                               <div
                                 style={{
@@ -814,7 +854,11 @@ export default function CheckoutPage() {
                                   </div>
                                 </div>
 
-                                {active ? (
+                                {disabled ? (
+                                  <span className="db-pill" style={{ background: "rgba(239,68,68,0.10)", color: "#dc2626" }}>
+                                    <i className="bi bi-lock-fill me-1" /> Unavailable
+                                  </span>
+                                ) : active ? (
                                   <span
                                     className="db-pill"
                                     style={{ background: "rgba(201,168,76,0.16)", color: "#c9a84c" }}
@@ -837,7 +881,7 @@ export default function CheckoutPage() {
                                     color: "#1a1a2e",
                                   }}
                                 >
-                                  {fmtNaira(Number(p.price_per_student ?? p.price ?? 0))}
+                                {fmtNaira(Number(p.price_per_student ?? p.price ?? 0))}
                                 </div>
                                 <div className="db-muted" style={{ fontSize: 12 }}>
                                   per student / {p.billing_interval || `${p.duration_in_days} days`}
@@ -847,6 +891,18 @@ export default function CheckoutPage() {
                               <div className="db-muted" style={{ fontSize: 12, marginTop: 4 }}>
                                 {Number(p.billable_students ?? p.active_students ?? 0).toLocaleString()} billable students = {fmtNaira(Number(p.current_amount ?? 0))}
                               </div>
+
+                              {disabled && (
+                                <div style={{ marginTop: 10, padding: "9px 10px", borderRadius: 9, background: "rgba(239,68,68,0.07)", color: "#b91c1c", fontSize: 11.5 }}>
+                                  {p.disabled_reason || "Your active student count exceeds this package limit."}
+                                </div>
+                              )}
+
+                              {!disabled && p.subscription_action === "upgrade" && (
+                                <div style={{ marginTop: 10, padding: "9px 10px", borderRadius: 9, background: "rgba(34,197,94,0.08)", color: "#166534", fontSize: 11.5 }}>
+                                  Upgrade available: {Number(p.carried_days || 0)} remaining days and {fmtNaira(Number(p.upgrade_credit_amount || 0))} unused value will be carried forward.
+                                </div>
+                              )}
 
                               <div
                                 style={{
@@ -897,7 +953,7 @@ export default function CheckoutPage() {
                           >
                             <div className="db-strong">No plans available</div>
                             <div className="db-muted" style={{ fontSize: 12.5, marginTop: 4 }}>
-                              Confirm your <code>/subscription/plans</code> endpoint returns an array of plans.
+                              There are currently no active subscription plans. Please check again later or contact GradeQuest Support.
                             </div>
                           </div>
                         </div>
@@ -938,7 +994,7 @@ export default function CheckoutPage() {
                         <span className="db-muted" style={{ fontSize: 12 }}>Duration</span>
                         <span className="db-strong" style={{ fontWeight: 800 }}>
                           {selectedPlan
-                            ? `${totalDurationDays} days${yearlyBilling && yearlyEligible ? ` (${billingCycles} cycles)` : ""}`
+                            ? `${totalDurationDays} days${Number(selectedPlan.carried_days || 0) > 0 ? ` (${selectedPlan.duration_in_days * billingCycles} new + ${selectedPlan.carried_days} carried)` : yearlyBilling && yearlyEligible ? ` (${billingCycles} cycles)` : ""}`
                             : "—"}
                         </span>
                       </div>
@@ -983,9 +1039,9 @@ export default function CheckoutPage() {
                       >
                         <span className="db-muted" style={{ fontSize: 12 }}>Amount</span>
                         <span style={{ textAlign: "right" }}>
-                          {discountAmount > 0 && (
+                          {(discountAmount > 0 || upgradeCredit > 0) && (
                             <div className="db-muted" style={{ fontSize: 11.5, textDecoration: "line-through" }}>
-                              {fmtNaira(subtotal)}
+                              {fmtNaira(amountBeforeUpgradeCredit)}
                             </div>
                           )}
                           <span className="db-strong" style={{ fontFamily: "Lora, serif", fontSize: 18 }}>
@@ -1001,6 +1057,22 @@ export default function CheckoutPage() {
                             − {fmtNaira(discountAmount)}
                           </span>
                         </div>
+                      )}
+
+                      {upgradeCredit > 0 && (
+                        <>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 6 }}>
+                            <span className="db-muted" style={{ fontSize: 12 }}>Unused current-plan value</span>
+                            <span style={{ fontWeight: 800, color: "#16a34a", fontSize: 12.5 }}>− {fmtNaira(upgradeCredit)}</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 6 }}>
+                            <span className="db-muted" style={{ fontSize: 12 }}>Remaining days carried forward</span>
+                            <span className="db-strong" style={{ fontSize: 12.5 }}>+ {Number(selectedPlan?.carried_days || 0)} days</span>
+                          </div>
+                          <div className="db-note" style={{ marginTop: 10 }}>
+                            Current package used: {Number(subDetails?.days_used || 0)} days ({fmtNaira(Number(selectedPlan?.used_value_amount ?? subDetails?.used_value ?? 0))}). Remaining: {Number(subDetails?.days_remaining || 0)} days ({fmtNaira(upgradeCredit)}). You pay the higher package price minus the unused value; your remaining days are added to its duration.
+                          </div>
+                        </>
                       )}
                     </div>
 
@@ -1114,7 +1186,7 @@ export default function CheckoutPage() {
                       <button
                         className="db-btn-gold db-pay-btn"
                         onClick={handlePay}
-                        disabled={processing || !selectedPlan}
+                        disabled={processing || !selectedPlan || selectedPlan.can_select === false || !!selectedPlan.limit_exceeded}
                         title={!selectedPlan ? "Select a plan first" : ""}
                       >
                         {processing ? (

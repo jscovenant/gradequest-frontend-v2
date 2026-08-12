@@ -319,14 +319,14 @@ export default function AdminUserDetailsPage() {
                       <div className="col-md-6">
                         <div className="p-3 rounded-3" style={{ background: "#f8fafc" }}>
                           <div className="text-muted small">Status</div>
-                          <div className="fw-bold">{admin?.status ?? "—"}</div>
+                          <div className="fw-bold">{admin?.status ?? "-"}</div>
                         </div>
                       </div>
 
                       <div className="col-md-6">
                         <div className="p-3 rounded-3" style={{ background: "#f8fafc" }}>
                           <div className="text-muted small">User ID</div>
-                          <div className="fw-bold">{admin?.id ?? "—"}</div>
+                          <div className="fw-bold">{admin?.id ?? "-"}</div>
                         </div>
                       </div>
 

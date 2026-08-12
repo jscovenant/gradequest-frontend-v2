@@ -109,7 +109,7 @@ export default function SchoolBankAccountsPage() {
     setCurrency(row.currency || "NGN");
     setIsActive(isTruthy(row.is_active));
     setAcceptsOnlinePayment(billingPaymentMode === "online");
-    setSortOrder(Number(row.sort_order?? 0));
+    setSortOrder(Number(row.sort_order ?? 0));
     setVerified(true); // assume verified if editing existing
     setShowForm(true);
   };
@@ -184,7 +184,7 @@ export default function SchoolBankAccountsPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let data = items;
-
+
 
 
     if (!q) return data;
@@ -719,7 +719,7 @@ export default function SchoolBankAccountsPage() {
                                     </div>
                                     <div className="db-mini">
                                       Currency: <b style={{ color: "#1a1a2e" }}>{row.currency || "NGN"}</b> • Sort:{" "}
-                                      <b style={{ color: "#1a1a2e" }}>{row.sort_order?? 0}</b>
+                                      <b style={{ color: "#1a1a2e" }}>{row.sort_order ?? 0}</b>
                                     </div>
                                     <div style={{ marginTop: 10 }}>
                                       <div className="db-mini">Account name</div>

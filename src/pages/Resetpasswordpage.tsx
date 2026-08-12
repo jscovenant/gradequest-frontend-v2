@@ -13,8 +13,8 @@ export default function ResetPasswordPage() {
   const location = useLocation();
 
   const prefillEmail =
-    (location.state as any)?.email ??
-    sessionStorage.getItem("reset_email") ??
+    (location.state as any)?.email 
+    sessionStorage.getItem("reset_email") 
     "";
 
   const [email, setEmail] = useState(prefillEmail);

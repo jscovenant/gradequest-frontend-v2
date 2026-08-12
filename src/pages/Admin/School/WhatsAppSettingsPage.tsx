@@ -74,6 +74,10 @@ export default function WhatsAppSettingsPage() {
   const [saving,       setSaving]       = useState(false);
   const [testing,      setTesting]      = useState(false);
   const [broadcasting, setBroadcasting] = useState(false);
+  const [buyingCredits, setBuyingCredits] = useState(false);
+  const [creditQuantity, setCreditQuantity] = useState(100);
+  const [creditUnitPrice, setCreditUnitPrice] = useState(0);
+  const [walletBalance, setWalletBalance] = useState(0);
 
   const [settings, setSettings] = useState<WhatsAppSettings>({
     whatsapp_enabled:       false,
@@ -105,8 +109,9 @@ export default function WhatsAppSettingsPage() {
       authApi.get("/sessions"),
       authApi.get("/terms"),
       authApi.get("/settings/whatsapp/queue-stats").catch(() => ({ data: null })),
+      authApi.get("/whatsapp/credits/quote?quantity=100").catch(() => ({ data: null })),
     ])
-      .then(([waRes, classRes, sessionRes, termRes, queueRes]) => {
+      .then(([waRes, classRes, sessionRes, termRes, queueRes, creditRes]) => {
         const d = waRes.data?.data ?? waRes.data;
         setSettings({
           whatsapp_enabled:       !!d?.whatsapp_enabled,
@@ -121,11 +126,50 @@ export default function WhatsAppSettingsPage() {
         setSessions(sessionRes.data?.data ?? sessionRes.data ?? []);
         setTerms(termRes.data?.data ?? termRes.data ?? []);
         if (queueRes.data) setQueueStats(queueRes.data);
+        if (creditRes.data) {
+          setCreditUnitPrice(Number(creditRes.data.unit_price || 0));
+          setWalletBalance(Number(creditRes.data.wallet_balance || 0));
+        }
       })
       .catch((err) => { showError?.("Failed to load WhatsApp settings."); console.error(err); })
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const reference = new URLSearchParams(window.location.search).get("reference");
+    if (!reference) return;
+
+    setBuyingCredits(true);
+    authApi.get(`/whatsapp/credits/verify/${encodeURIComponent(reference)}`)
+      .then((res) => {
+      showSuccess?.(res.data?.message ?? "WhatsApp setting updated.");
+        window.history.replaceState({}, "", window.location.pathname);
+        window.location.reload();
+      })
+      .catch((err) => showError?.(parseBackendError(err)))
+      .finally(() => setBuyingCredits(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const buyCredits = async (method: "wallet" | "online") => {
+    if (creditQuantity < 1) return showError?.("Enter at least one credit.");
+    setBuyingCredits(true);
+    try {
+      if (method === "wallet") {
+        const res = await authApi.post("/whatsapp/credits/buy-wallet", { quantity: creditQuantity });
+      showSuccess?.(res.data?.message ?? "WhatsApp setting updated.");
+        window.location.reload();
+      } else {
+        const res = await authApi.post("/whatsapp/credits/initialize-online", { quantity: creditQuantity });
+        if (!res.data?.authorization_url) throw new Error("Paystack authorization URL was not returned.");
+        window.location.href = res.data.authorization_url;
+      }
+    } catch (err: any) {
+      showError?.(parseBackendError(err));
+      setBuyingCredits(false);
+    }
+  };
 
   // ✅ Simple toggle — calls /settings/whatsapp/toggle
   const toggleWhatsApp = async (next: boolean) => {
@@ -149,7 +193,7 @@ export default function WhatsAppSettingsPage() {
     setTesting(true);
     try {
       const res = await authApi.post("/settings/whatsapp/test", { phone: testPhone.trim() });
-      showSuccess?.(res.data?.message ?? "Test message sent!");
+      showSuccess?.(res.data?.message ?? "WhatsApp setting updated.");
     } catch (err: any) {
       showError?.(parseBackendError(err));
     } finally {
@@ -179,7 +223,7 @@ export default function WhatsAppSettingsPage() {
       } else {
         res = await authApi.post("/whatsapp/broadcast/custom", { message: customMessage.trim() });
       }
-      showSuccess?.(res.data?.message ?? "Broadcast queued successfully.");
+      showSuccess?.(res.data?.message ?? "WhatsApp setting updated.");
     } catch (err: any) {
       showError?.(parseBackendError(err));
     } finally {
@@ -389,16 +433,23 @@ export default function WhatsAppSettingsPage() {
                           role="switch"
                           checked={settings.whatsapp_enabled}
                           onChange={(e) => toggleWhatsApp(e.target.checked)}
-                          disabled={loading || saving || settings.whatsapp_monthly_limit === 0}
+                          disabled={loading || saving || !settings.whatsapp_has_access || settings.whatsapp_remaining === 0}
                         />
                       </div>
                     </div>
 
                     {/* ✅ Quota warning if on a limited plan */}
-                    {settings.whatsapp_monthly_limit === 0 && (
+                    {!settings.whatsapp_has_access && (
                       <div className="wa-callout wa-callout-warn mt-3">
                         <i className="bi bi-lock me-1" />
                         WhatsApp is not included in your current plan. Please upgrade to enable this feature.
+                      </div>
+                    )}
+
+                    {settings.whatsapp_has_access && settings.whatsapp_remaining === 0 && (
+                      <div className="wa-callout wa-callout-warn mt-3">
+                        <i className="bi bi-exclamation-triangle me-1" />
+                        Your WhatsApp credits are exhausted. Buy more credits to continue sending messages.
                       </div>
                     )}
 
@@ -417,7 +468,7 @@ export default function WhatsAppSettingsPage() {
                 </div>
 
                 {/* Usage panel */}
-                {settings.whatsapp_monthly_limit !== 0 && (
+                {settings.whatsapp_has_access && (
                   <>
                     <SectionHeading icon="bar-chart" title="Usage This Month" subtitle="Track how many WhatsApp messages have been sent." />
                     <div className="db-panel">
@@ -466,6 +517,30 @@ export default function WhatsAppSettingsPage() {
                               </div>
                             )}
                           </>
+                        )}
+
+                        {!isUnlimited && creditUnitPrice > 0 && (
+                          <div className="mt-4 pt-3" style={{ borderTop:"1px solid rgba(0,0,0,0.08)" }}>
+                            <div className="db-strong mb-1">Buy additional credits</div>
+                            <div className="db-muted mb-3" style={{ fontSize:12 }}>
+                              Each credit costs ₦{creditUnitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}. Purchased credits are added immediately to this billing cycle.
+                            </div>
+                            <label className="form-label fw-semibold small">Number of credits</label>
+                            <input className="form-control" type="number" min={1} max={1000000} value={creditQuantity}
+                              onChange={(e) => setCreditQuantity(Math.max(1, Number(e.target.value || 1)))} disabled={buyingCredits} />
+                            <div className="d-flex justify-content-between mt-2 mb-3 db-muted" style={{ fontSize:12 }}>
+                              <span>Total: ₦{(creditQuantity * creditUnitPrice).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                              <span>Wallet: ₦{walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            </div>
+                            <div className="d-flex gap-2 flex-wrap">
+                              <button type="button" className="db-btn-green" disabled={buyingCredits || walletBalance < creditQuantity * creditUnitPrice} onClick={() => buyCredits("wallet")}>
+                                <i className="bi bi-wallet2" /> Pay from wallet
+                              </button>
+                              <button type="button" className="db-btn-gold" disabled={buyingCredits} onClick={() => buyCredits("online")}>
+                                <i className="bi bi-credit-card" /> Pay online
+                              </button>
+                            </div>
+                          </div>
                         )}
                       </div>
                     </div>

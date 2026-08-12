@@ -1,19 +1,19 @@
-﻿// src/pages/Auth/OnboardingPage.tsx
+// src/pages/Auth/OnboardingPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../../contexts/ToastContext";
 import {
-  activateBonus, createAllTerms, getOnboardingStatus,
+  acceptTerms, activateBonus, createAllTerms, getOnboardingStatus,
   resendEmailCode, setCurrentSession, verifyEmailCode,
   type OnboardingStatus,
 } from "../../auth/activationApi";
 import PageTitle from "../../components/PageTitle";
 
-type StepKey = "email" | "session" | "terms" | "bonus";
+type StepKey = "email" | "session" | "terms" | "agreement" | "bonus";
 
 function percentFromStatus(s: OnboardingStatus | null) {
   if (!s) return 0;
-  const checks = [s.email_verified, s.current_session, s.all_terms_exist, s.bonus_given];
+  const checks = [s.email_verified, s.current_session, s.all_terms_exist, s.terms_accepted, s.bonus_given];
   return Math.round((checks.filter(Boolean).length / checks.length) * 100);
 }
 
@@ -21,10 +21,11 @@ function nextStepFromStatus(s: OnboardingStatus): StepKey {
   if (!s.email_verified) return "email";
   if (!s.current_session) return "session";
   if (!s.all_terms_exist) return "terms";
+  if (!s.terms_accepted) return "agreement";
   return "bonus";
 }
 
-/* â”€â”€ Step card â”€â”€ defined outside to avoid remount */
+/*  Step card  defined outside to avoid remount */
 function StepCard({
   number, title, subtitle, done, active, children,
 }: {
@@ -58,7 +59,7 @@ function StepCard({
             <p className="ob-step-sub">{subtitle}</p>
           </div>
 
-          {/* Body â€” always mounted, hidden via display */}
+          {/* Body  always mounted, hidden via display */}
           <div style={{ display: (active || done) && children ? "block" : "none" }}
             className="ob-step-body">
             {children}
@@ -69,7 +70,7 @@ function StepCard({
   );
 }
 
-/* â”€â”€ Skeleton loader â”€â”€ */
+/*  Skeleton loader  */
 function Skeleton() {
   return (
     <div className="ob-skeleton-wrap">
@@ -118,6 +119,10 @@ export default function OnboardingPage() {
   const [makeCurrentTerm, setMakeCurrentTerm] = useState(true);
   const [creatingTerms, setCreatingTerms] = useState(false);
 
+  // Terms and Conditions
+  const [termsChecked, setTermsChecked] = useState(false);
+  const [acceptingTerms, setAcceptingTerms] = useState(false);
+
   // Bonus
   const [claiming, setClaiming] = useState(false);
 
@@ -130,7 +135,7 @@ export default function OnboardingPage() {
       const s = await getOnboardingStatus();
       setStatus(s);
       if (s.bonus_given) {
-        showToast("Activation complete ðŸŽ‰ Redirectingâ€¦", "success");
+        showToast("Activation complete. Redirecting", "success");
         navigate("/dashboard", { replace: true });
       }
     } catch (e: any) {
@@ -148,7 +153,7 @@ export default function OnboardingPage() {
     setVerifying(true);
     try {
       await verifyEmailCode(code.trim());
-      showToast("Email verified âœ…", "success");
+      showToast("Email verified.", "success");
       setCode(""); await refresh();
     } catch (e: any) { showToast(e?.response?.data?.message || "Invalid code.", "error"); }
     finally { setVerifying(false); }
@@ -158,7 +163,7 @@ export default function OnboardingPage() {
     setResending(true);
     try {
       await resendEmailCode();
-      showToast("Code resent â€” check your inbox.", "success");
+      showToast("Code resent  check your inbox.", "success");
     } catch (e: any) { showToast(e?.response?.data?.message || "Failed to resend.", "error"); }
     finally { setResending(false); }
   };
@@ -174,7 +179,7 @@ export default function OnboardingPage() {
     setSettingSession(true);
     try {
       await setCurrentSession({ name: sessionName.trim(), start_date: sessionStartDate||undefined, end_date: sessionEndDate||undefined, make_current: makeCurrentSession });
-      showToast(makeCurrentSession ? "Session saved & set as current âœ…" : "Session saved âœ…", "success");
+      showToast(makeCurrentSession ? "Session saved and set as current." : "Session saved.", "success");
       await refresh();
     } catch (e: any) { showToast(e?.response?.data?.message || "Failed to save session.", "error"); }
     finally { setSettingSession(false); }
@@ -184,7 +189,7 @@ export default function OnboardingPage() {
     setCreatingTerms(true);
     try {
       await createAllTerms({ terms: [...DEFAULT_TERMS], make_current: makeCurrentTerm, current_term: currentTerm });
-      showToast(makeCurrentTerm ? "Terms created & current set âœ…" : "Terms created âœ…", "success");
+      showToast(makeCurrentTerm ? "Terms created and current term set." : "Terms created.", "success");
       await refresh();
     } catch (e: any) { showToast(e?.response?.data?.message || "Failed to create terms.", "error"); }
     finally { setCreatingTerms(false); }
@@ -194,10 +199,21 @@ export default function OnboardingPage() {
     setClaiming(true);
     try {
       const res = await activateBonus();
-      showToast(res?.message || "Bonus activated âœ…", "success");
+      showToast(res?.message || "Bonus activated.", "success");
       await refresh();
     } catch (e: any) { showToast(e?.response?.data?.message || "Complete all steps first.", "error"); }
     finally { setClaiming(false); }
+  };
+
+  const handleAcceptTerms = async () => {
+    if (!termsChecked) { showToast("Please confirm that you accept the Terms and Conditions.", "error"); return; }
+    setAcceptingTerms(true);
+    try {
+      await acceptTerms();
+      showToast("Terms and Conditions accepted.", "success");
+      await refresh();
+    } catch (e: any) { showToast(e?.response?.data?.message || "Unable to record your acceptance.", "error"); }
+    finally { setAcceptingTerms(false); }
   };
 
   return (
@@ -221,7 +237,7 @@ export default function OnboardingPage() {
           .ob-sidebar { display: none !important; }
         }
 
-        /* â•â•â•â•â•â•â•â•â•â• LEFT SIDEBAR â•â•â•â•â•â•â•â•â•â• */
+        /*  LEFT SIDEBAR  */
         .ob-sidebar {
           background: #0f172a;
           min-height: 100vh;
@@ -362,7 +378,7 @@ export default function OnboardingPage() {
         .ob-quote-author { font-size:11.5px; color:#334155; }
         .ob-quote-line { display:inline-block; width:16px; height:1px; background:#c9a84c; opacity:0.5; vertical-align:middle; margin-right:6px; }
 
-        /* â•â•â•â•â•â•â•â•â•â• MAIN AREA â•â•â•â•â•â•â•â•â•â• */
+        /*  MAIN AREA  */
         .ob-main {
           padding: 48px 52px;
           max-width: 680px;
@@ -419,7 +435,7 @@ export default function OnboardingPage() {
         .ob-refresh:hover { background:#ede8e0; }
         .ob-refresh:disabled { opacity:0.45; cursor:not-allowed; }
 
-        /* â”€â”€ Steps â”€â”€ */
+        /*  Steps  */
         .ob-steps { display:flex; flex-direction:column; position:relative; }
 
         .ob-step {
@@ -494,7 +510,7 @@ export default function OnboardingPage() {
           padding:22px;
         }
 
-        /* â”€â”€ Form elements â”€â”€ */
+        /*  Form elements  */
         .ob-label {
           display:block; font-size:12px; font-weight:500; color:#4a4a5a;
           margin-bottom:7px; letter-spacing:0.02em;
@@ -641,7 +657,7 @@ export default function OnboardingPage() {
         .ob-footer { text-align:center; font-size:12px; font-weight:300; color:#b5a090; margin-top:36px; }
         .ob-footer a { color:#b45309; text-decoration:none; }
 
-        /* â”€â”€ Skeleton â”€â”€ */
+        /*  Skeleton  */
         .ob-skeleton-wrap { padding:12px 0; }
         .ob-skel {
           border-radius:6px; background:#ece8e0;
@@ -658,7 +674,7 @@ export default function OnboardingPage() {
   <PageTitle title="Onboarding" />
       <div className="ob-page">
 
-        {/* â•â• LEFT SIDEBAR â•â• */}
+        {/*  LEFT SIDEBAR  */}
         <aside className="ob-sidebar" style={{ display:"flex" }}>
           <div className="ob-sidebar-glow" aria-hidden="true" />
           <div className="ob-sidebar-inner">
@@ -687,7 +703,7 @@ export default function OnboardingPage() {
                 <em>ready to go.</em>
               </h2>
               <p className="ob-sidebar-sub">
-                Four quick steps and your school management platform is fully live.
+                Five quick steps and your school management platform is fully live.
               </p>
             </div>
 
@@ -718,12 +734,14 @@ export default function OnboardingPage() {
                 { key:"email",   label:"Verify email" },
                 { key:"session", label:"Set academic session" },
                 { key:"terms",   label:"Create term structure" },
+                { key:"agreement", label:"Accept Terms & Conditions" },
                 { key:"bonus",   label:"Claim welcome bonus" },
               ] as { key:StepKey; label:string }[]).map((s, i) => {
                 const done   = status ? nextStepFromStatus(status) !== s.key && (
                   (s.key==="email"   && status.email_verified)   ||
                   (s.key==="session" && status.current_session)  ||
                   (s.key==="terms"   && status.all_terms_exist)  ||
+                  (s.key==="agreement" && status.terms_accepted) ||
                   (s.key==="bonus"   && status.bonus_given)
                 ) : false;
                 const active = activeStep === s.key;
@@ -750,13 +768,13 @@ export default function OnboardingPage() {
               </p>
               <span className="ob-quote-author">
                 <span className="ob-quote-line"/>
-                Mr. Tunde Balogun Â· Sunrise Academy, Abuja
+                Mr. Tunde Balogun  Sunrise Academy, Abuja
               </span>
             </div>
           </div>
         </aside>
 
-        {/* â•â• MAIN â•â• */}
+        {/*  MAIN  */}
         <main className="ob-main">
 
           {/* Mobile logo */}
@@ -776,14 +794,14 @@ export default function OnboardingPage() {
               <div>
                 <div className="ob-eyebrow">
                   <span className="ob-eyebrow-line"/>
-                  Step {loading ? "â€“" : status ? (["email","session","terms","bonus"].indexOf(activeStep||"bonus")+1) : "â€“"} of 4
+                  Step {loading ? "" : status ? (["email","session","terms","agreement","bonus"].indexOf(activeStep||"bonus")+1) : ""} of 5
                 </div>
                 <h1 className="ob-title">
                   Activate your<br/>
                   <em>GradeQuest school.</em>
                 </h1>
                 <p className="ob-subtitle">
-                  Complete four steps and unlock your <strong style={{ color:"#b45309" }}>₦5,000 GradeQuestPlus wallet credit</strong>.
+                  Complete four steps and unlock your <strong style={{ color:"#b45309" }}>5,000 GradeQuestPlus wallet credit</strong>.
                 </p>
               </div>
               <button className="ob-refresh" onClick={refresh} disabled={loading}>
@@ -792,7 +810,7 @@ export default function OnboardingPage() {
                   <path d="M12 7A5 5 0 112 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
                   <path d="M12 3v4h-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                {loading ? "Refreshingâ€¦" : "Refresh"}
+                {loading ? "Refreshing" : "Refresh"}
               </button>
             </div>
           </div>
@@ -807,7 +825,7 @@ export default function OnboardingPage() {
                 </svg>
               </div>
               <div className="ob-bonus-text">
-                <div className="ob-bonus-title">₦5,000 GradeQuestPlus wallet credit waiting for you</div>
+                <div className="ob-bonus-title">5,000 GradeQuestPlus wallet credit waiting for you</div>
                 <div className="ob-bonus-sub">Complete all steps to claim. Credit goes directly to your school wallet and expires after 30 days if unused.</div>
               </div>
             </div>
@@ -820,7 +838,7 @@ export default function OnboardingPage() {
           {status && (
             <div className="ob-steps">
 
-              {/* â”€â”€ Step 1: Email â”€â”€ */}
+              {/*  Step 1: Email  */}
               <StepCard number={1} title="Verify your email address"
                 subtitle="Enter the 5-digit code we sent to your registered email."
                 done={status.email_verified} active={activeStep === "email"}>
@@ -832,7 +850,7 @@ export default function OnboardingPage() {
                         className="ob-otp"
                         inputMode="numeric"
                         maxLength={5}
-                        placeholder="â€¢ â€¢ â€¢ â€¢ â€¢"
+                        placeholder="    "
                         value={code}
                         onChange={e => setCode(e.target.value.replace(/\D/g,""))}
                         onFocus={() => setCodeFocused(true)}
@@ -842,7 +860,7 @@ export default function OnboardingPage() {
                       <p className="ob-hint">Check your spam folder if you don't see it.</p>
                     </div>
                     <button className="ob-btn-primary" onClick={handleVerify} disabled={verifying || code.length<5}>
-                      {verifying ? <><span className="ob-spinner"/>&nbsp;Verifyingâ€¦</> : <>
+                      {verifying ? <><span className="ob-spinner"/>&nbsp;Verifying</> : <>
                         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                           <path d="M2 7l3.5 3.5 6.5-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
@@ -852,14 +870,14 @@ export default function OnboardingPage() {
                     <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
                       <span style={{ fontSize:12.5, color:"#9a8a7a", fontWeight:300 }}>Didn't receive the code?</span>
                       <button className="ob-btn-link" onClick={handleResend} disabled={resending}>
-                        {resending ? "Sendingâ€¦" : "Resend code â†’"}
+                        {resending ? "Sending" : "Resend code "}
                       </button>
                     </div>
                   </div>
                 )}
               </StepCard>
 
-              {/* â”€â”€ Step 2: Session â”€â”€ */}
+              {/*  Step 2: Session  */}
               <StepCard number={2} title="Set your academic session"
                 subtitle="This drives your result sheets, reports, and term structure."
                 done={status.current_session} active={activeStep === "session"}>
@@ -903,7 +921,7 @@ export default function OnboardingPage() {
                     </label>
 
                     <button className="ob-btn-primary" onClick={handleSetSession} disabled={settingSession || !sessionName.trim()}>
-                      {settingSession ? <><span className="ob-spinner"/>Savingâ€¦</> : <>
+                      {settingSession ? <><span className="ob-spinner"/>Saving</> : <>
                         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                           <path d="M1 7h12M7 1l6 6-6 6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
@@ -914,9 +932,9 @@ export default function OnboardingPage() {
                 )}
               </StepCard>
 
-              {/* â”€â”€ Step 3: Terms â”€â”€ */}
+              {/*  Step 3: Terms  */}
               <StepCard number={3} title="Create your term structure"
-                subtitle="We'll create First, Second, and Third Term â€” choose which is active now."
+                subtitle="We'll create First, Second, and Third Term  choose which is active now."
                 done={status.all_terms_exist} active={activeStep === "terms"}>
                 {!status.all_terms_exist && (
                   <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
@@ -945,7 +963,7 @@ export default function OnboardingPage() {
                     </label>
 
                     <button className="ob-btn-primary" onClick={handleCreateTerms} disabled={creatingTerms}>
-                      {creatingTerms ? <><span className="ob-spinner"/>Creating termsâ€¦</> : <>
+                      {creatingTerms ? <><span className="ob-spinner"/>Creating terms</> : <>
                         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                           <path d="M1 7h12M7 1l6 6-6 6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
@@ -956,25 +974,47 @@ export default function OnboardingPage() {
                 )}
               </StepCard>
 
-              {/* â”€â”€ Step 4: Bonus â”€â”€ */}
-              <StepCard number={4} title="Claim your welcome bonus"
-                subtitle={"All steps complete - your ₦5,000 GradeQuestPlus wallet credit is ready."}
+              <StepCard number={4} title="Accept the Terms and Conditions"
+                subtitle={`Review and accept the current GradeQuest terms (${status.terms_version}).`}
+                done={status.terms_accepted} active={activeStep === "agreement"}>
+                {!status.terms_accepted && (
+                  <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+                    <label className="ob-toggle-row" htmlFor="acceptTermsCheckbox">
+                      <span className="ob-toggle-label">
+                        I am authorized to bind this school and I accept the{" "}
+                        <a href="/terms-and-conditions" target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
+                          GradeQuest Terms and Conditions
+                        </a>.
+                      </span>
+                      <input id="acceptTermsCheckbox" type="checkbox" checked={termsChecked}
+                        onChange={(e) => setTermsChecked(e.target.checked)} />
+                    </label>
+                    <button className="ob-btn-primary" onClick={handleAcceptTerms} disabled={!termsChecked || acceptingTerms}>
+                      {acceptingTerms ? <><span className="ob-spinner"/>Recording acceptance</> : "Accept Terms and Continue"}
+                    </button>
+                  </div>
+                )}
+              </StepCard>
+
+              {/*  Step 5: Bonus  */}
+              <StepCard number={5} title="Claim your welcome bonus"
+                subtitle={"All steps complete - your 5,000 GradeQuestPlus wallet credit is ready."}
                 done={status.bonus_given} active={activeStep === "bonus"}>
                 {!status.bonus_given && (
                   <div className="ob-bonus-claim">
-                    <div style={{ fontSize:32 }} aria-hidden="true">ðŸŽ‰</div>
-                    <div className="ob-bonus-amount">₦5,000</div>
+                    <div style={{ fontSize:32 }} aria-hidden="true"></div>
+                    <div className="ob-bonus-amount">5,000</div>
                     <p className="ob-bonus-desc">
                       Credited directly to your school wallet for GradeQuestPlus subscription. It expires after 30 days if it is not used.
                     </p>
                     <button className="ob-btn-claim" onClick={handleClaimBonus} disabled={claiming}
                       style={{ maxWidth:280 }}>
-                      {claiming ? <><span className="ob-spinner ob-spinner--dark"/>Activatingâ€¦</> : <>
+                      {claiming ? <><span className="ob-spinner ob-spinner--dark"/>Activating</> : <>
                         <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
                           <path d="M8 2l2 4h4l-3 2.6 1.2 4L8 10.3 3.8 12.6 5 8.6 2 6h4z"
                             stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
                         </svg>
-                        Claim ₦5,000 &amp; Activate
+                        Claim 5,000 &amp; Activate
                       </>}
                     </button>
                   </div>

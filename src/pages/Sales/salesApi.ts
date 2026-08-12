@@ -8,6 +8,7 @@ export type SalesRepresentative = {
   phone?: string | null;
   region?: string | null;
   status: string;
+  sales_page_url?: string;
   commission_rate: number;
   monthly_target_amount: number;
   monthly_target_schools: number;
@@ -17,6 +18,21 @@ export type SalesRepresentative = {
   pipeline_value: number;
   commission_pending: number;
   commission_paid: number;
+};
+
+export type SalesMarketingMaterial = {
+  id: number;
+  title: string;
+  description?: string | null;
+  type: "banner" | "flyer" | "video" | "copy";
+  asset_url?: string | null;
+  external_url?: string | null;
+  share_caption?: string | null;
+  cta_label?: string | null;
+  cta_url?: string | null;
+  is_active: boolean;
+  starts_at?: string | null;
+  ends_at?: string | null;
 };
 
 export type SalesSummary = {
@@ -29,6 +45,8 @@ export type SalesSummary = {
   paid_commission: number;
   monthly_target_amount: number;
   monthly_target_schools: number;
+  sales_page_views?: number;
+  sales_page_leads?: number;
 };
 
 export type SalesLead = {
@@ -74,6 +92,7 @@ export const salesApi = {
   leads: async (params?: Record<string, any>) => (await authApi.get("/sales/leads", { params })).data,
   commissions: async (params?: Record<string, any>) => (await authApi.get("/sales/commissions", { params })).data,
   createLead: async (payload: Record<string, any>) => (await authApi.post("/sales/leads", payload)).data,
+  materials: async () => (await authApi.get("/sales/marketing-materials")).data,
 };
 
 export const currency = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 });

@@ -135,15 +135,27 @@ export default function SettingsPage() {
   type DomainRecord = {
   id: number;
   domain: string;
-  status: "pending" | "verified" | "active" | "rejected";
+  status: "pending" | "verified" | "active" | "disabled" | "rejected";
   verification_token: string | null;
   verified_at: string | null;
+  ownership_verified_at?: string | null;
+  routing_verified_at?: string | null;
+  activated_at?: string | null;
+  last_checked_at?: string | null;
+  last_error?: string | null;
+};
+
+type DomainInstructions = {
+  ownership: { type: "TXT"; host: string; value: string };
+  routing: { type: "CNAME"; host: string; value: string };
+  portal_url: string;
 };
 
 // Add these to your component state
 const [domainRecord, setDomainRecord] = useState<DomainRecord | null>(null);
 const [domainInput,  setDomainInput]  = useState("");
 const [domainBusy,   setDomainBusy]   = useState(false);
+const [domainInstructions, setDomainInstructions] = useState<DomainInstructions | null>(null);
 
   const [school, setSchool] = useState<SchoolSettings>({
     schoolName: "",
@@ -271,7 +283,7 @@ Promise.all([
   authApi.get<SettingsResponse>("/get-settings"),
   authApi.get<FeeReminderResponse>("/settings/fee-reminders"),
   authApi.get<FeeAccessPolicyResponse>("/settings/fee-access-policy"),
-  authApi.get<{ data: DomainRecord | null }>("/settings/domain").catch(() => ({ data: { data: null } })),
+  authApi.get<{ data: DomainRecord | null; instructions: DomainInstructions | null }>("/settings/domain").catch(() => ({ data: { data: null, instructions: null } })),
 ])
   .then(([settingsRes, feeRes, feeAccessRes, domainRes]) => {
     mapSettingsFromResponse(settingsRes.data);
@@ -281,6 +293,7 @@ Promise.all([
     const dr = domainRes.data?.data ?? null;
     setDomainRecord(dr);
     setDomainInput(dr?.domain ?? "");
+    setDomainInstructions(domainRes.data?.instructions ?? null);
   })
       .catch((err: any) => {
         console.error(err);
@@ -391,11 +404,6 @@ Promise.all([
       fd.append("background_color", app.reportBackgroundColor);
       fd.append("auto_admission", app.autoGenerateAdmissionNo ? "1" : "0");
 
-      // WhatsApp settings -> backend expects snake_case
-      fd.append("whatsapp_enabled", app.whatsapp.enabled ? "1" : "0");
-      fd.append("whatsapp_fee_reminders", app.whatsapp.feeReminders ? "1" : "0");
-      fd.append("whatsapp_activity_notices", app.whatsapp.activityNotices ? "1" : "0");
-
       if (logoFile) fd.append("logo", logoFile);
       if (signatureFile) fd.append("principal_signature", signatureFile);
 
@@ -474,11 +482,12 @@ Promise.all([
   if (!domainInput.trim()) return;
   setDomainBusy(true);
   try {
-    const res = await authApi.post<{ data: DomainRecord }>("/settings/domain", {
+    const res = await authApi.post<{ data: DomainRecord; instructions: DomainInstructions }>("/settings/domain", {
       domain: domainInput.trim(),
     });
     setDomainRecord(res.data.data);
-    showSuccess?.("Domain registered. Add the TXT record to your DNS then click Verify.");
+    setDomainInstructions(res.data.instructions);
+    showSuccess?.("Domain registered. Add the TXT and CNAME records shown below.");
   } catch (err: any) {
     const { msg } = parseBackendError(err);
     showError?.(msg);
@@ -491,11 +500,31 @@ const verifyDomain = async () => {
   if (!domainRecord) return;
   setDomainBusy(true);
   try {
-    const res = await authApi.post<{ data: DomainRecord }>("/settings/domain/verify", {
+    const res = await authApi.post<{ data: DomainRecord; instructions: DomainInstructions }>("/settings/domain/verify", {
       domain_id: domainRecord.id,
     });
     setDomainRecord(res.data.data);
-    showSuccess?.("Domain verified successfully!");
+    setDomainInstructions(res.data.instructions);
+    showSuccess?.("Ownership verified. Activate the portal after the CNAME has propagated.");
+  } catch (err: any) {
+    const { msg } = parseBackendError(err);
+    showError?.(msg);
+  } finally {
+    setDomainBusy(false);
+  }
+};
+
+const activateDomain = async () => {
+  if (!domainRecord) return;
+  setDomainBusy(true);
+  try {
+    const res = await authApi.post<{ data: DomainRecord; instructions: DomainInstructions }>("/settings/domain/activate", {
+      domain_id: domainRecord.id,
+    });
+    setDomainRecord(res.data.data);
+    setDomainInstructions(res.data.instructions);
+    showSuccess?.("Domain activated. Redirecting to the school portal login.");
+    window.location.assign(`${res.data.instructions.portal_url.replace(/\/+$/, "")}/login`);
   } catch (err: any) {
     const { msg } = parseBackendError(err);
     showError?.(msg);
@@ -511,6 +540,7 @@ const removeDomain = async () => {
     await authApi.delete(`/settings/domain/${domainRecord.id}`);
     setDomainRecord(null);
     setDomainInput("");
+    setDomainInstructions(null);
     showSuccess?.("Domain removed.");
   } catch (err: any) {
     const { msg } = parseBackendError(err);
@@ -839,18 +869,18 @@ const removeDomain = async () => {
                         className="db-pill"
                         style={{
                           background:
-                            domainRecord.status === "verified" ? "rgba(34,197,94,0.14)"
-                            : domainRecord.status === "pending"  ? "rgba(245,158,11,0.14)"
+                            domainRecord.status === "active" ? "rgba(34,197,94,0.14)"
+                            : ["pending", "verified"].includes(domainRecord.status) ? "rgba(245,158,11,0.14)"
                             : "rgba(239,68,68,0.14)",
                           color:
-                            domainRecord.status === "verified" ? "#16a34a"
-                            : domainRecord.status === "pending"  ? "#d97706"
+                            domainRecord.status === "active" ? "#16a34a"
+                            : ["pending", "verified"].includes(domainRecord.status) ? "#d97706"
                             : "#dc2626",
                         }}
                       >
                         <i className={`bi bi-${
-                          domainRecord.status === "verified" ? "shield-check"
-                          : domainRecord.status === "pending" ? "hourglass-split"
+                          domainRecord.status === "active" ? "shield-check"
+                          : ["pending", "verified"].includes(domainRecord.status) ? "hourglass-split"
                           : "x-circle"
                         } me-1`} />
                         {domainRecord.status.charAt(0).toUpperCase() + domainRecord.status.slice(1)}
@@ -892,7 +922,7 @@ const removeDomain = async () => {
                   </div>
 
                   {/* TXT record instructions — shown when pending */}
-                  {domainRecord?.status === "pending" && domainRecord.verification_token && (
+                  {domainRecord && domainRecord.status !== "active" && domainInstructions && (
                     <div
                       style={{
                         marginTop: 12,
@@ -905,14 +935,15 @@ const removeDomain = async () => {
                     >
                       <div style={{ fontWeight: 700, marginBottom: 8, color: "#92400e" }}>
                         <i className="bi bi-info-circle me-1" />
-                        Add this DNS TXT record at your domain registrar, then click Verify:
+                        Add both DNS records at your domain registrar:
                       </div>
 
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         {[
-                          { label: "Type",  value: "TXT" },
-                          { label: "Host",  value: domainRecord.domain },
-                          { label: "Value", value: domainRecord.verification_token },
+                          { label: "TXT host", value: domainInstructions.ownership.host },
+                          { label: "TXT value", value: domainInstructions.ownership.value },
+                          { label: "CNAME host", value: domainInstructions.routing.host },
+                          { label: "CNAME value", value: domainInstructions.routing.value },
                         ].map(({ label, value }) => (
                           <div
                             key={label}
@@ -926,7 +957,7 @@ const removeDomain = async () => {
                               padding: "6px 10px",
                             }}
                           >
-                            <span style={{ width: 40, fontSize: 11, color: "#9a8a7a", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                            <span style={{ width: 86, fontSize: 10, color: "#9a8a7a", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                               {label}
                             </span>
                             <code style={{ flex: 1, fontSize: 12, wordBreak: "break-all", color: "#1a1a2e" }}>
@@ -944,7 +975,7 @@ const removeDomain = async () => {
                         ))}
                       </div>
 
-                      <button
+                      {domainRecord.status === "pending" ? <button
                         type="button"
                         className="db-btn-gold"
                         style={{ marginTop: 12, width: "100%", justifyContent: "center", borderRadius: 10 }}
@@ -955,12 +986,23 @@ const removeDomain = async () => {
                           ? <><span className="spinner-border spinner-border-sm me-2" />Verifying…</>
                           : <><i className="bi bi-patch-check me-1" />Verify domain</>
                         }
-                      </button>
+                      </button> : <button
+                        type="button"
+                        className="db-btn-gold"
+                        style={{ marginTop: 12, width: "100%", justifyContent: "center", borderRadius: 10 }}
+                        onClick={activateDomain}
+                        disabled={domainBusy}
+                      >
+                        {domainBusy
+                          ? <><span className="spinner-border spinner-border-sm me-2" />Checking routing…</>
+                          : <><i className="bi bi-globe-check me-1" />Activate portal domain</>
+                        }
+                      </button>}
                     </div>
                   )}
 
                   {/* Success state */}
-                  {domainRecord?.status === "verified" && (
+                  {domainRecord?.status === "active" && (
                     <div
                       style={{
                         marginTop: 8,
@@ -977,7 +1019,7 @@ const removeDomain = async () => {
                     >
                       <i className="bi bi-shield-check" />
                       <span>
-                        <strong>{domainRecord.domain}</strong> is verified. Users can now log in via this domain.
+                        <strong>{domainRecord.domain}</strong> is active. Users can now open the GradeQuest portal through this domain.
                       </span>
                     </div>
                   )}
@@ -1222,6 +1264,7 @@ const removeDomain = async () => {
                   <SectionHeading icon="chat-dots" title="Notifications" subtitle="Control channels and what messages get sent." />
 
                   {/* WhatsApp */}
+                  {false && (
                   <div className="db-panel">
                     <div className="db-panel-head">
                       <div>
@@ -1330,6 +1373,35 @@ const removeDomain = async () => {
                       <div className="db-muted" style={{ marginTop: 12, fontSize: 12.5 }}>
                         <i className="bi bi-info-circle me-1" />
                         WhatsApp sending typically requires approved templates and sufficient wallet balance.
+                      </div>
+                    </div>
+                  </div>
+                  )}
+
+                  <div className="db-panel">
+                    <div className="db-panel-head">
+                      <div>
+                        <p className="db-panel-title">WhatsApp notifications</p>
+                        <p className="db-panel-sub">Connection, access and message credits are managed in WhatsApp Settings.</p>
+                      </div>
+                      <span className="db-pill" style={{ background: whatsappEnabled ? "rgba(34,197,94,0.12)" : "rgba(245,158,11,0.12)", color: whatsappEnabled ? "#15803d" : "#b45309" }}>
+                        <i className="bi bi-whatsapp me-1" />
+                        {whatsappEnabled ? "Connected" : "Disabled"}
+                      </span>
+                    </div>
+                    <div style={{ padding: 16 }}>
+                      <div className="db-kv">
+                        <div>
+                          <label className="d-block">One WhatsApp configuration</label>
+                          <b>Twilio with subscription message credits</b>
+                        </div>
+                        <a className="db-btn-gold" href="/settings/whatsapp">
+                          <i className="bi bi-gear me-1" /> Manage WhatsApp
+                        </a>
+                      </div>
+                      <div className="db-muted" style={{ marginTop: 12, fontSize: 12.5 }}>
+                        <i className="bi bi-info-circle me-1" />
+                        Select WhatsApp as a fee-reminder channel in the automation section below.
                       </div>
                     </div>
                   </div>
@@ -1656,7 +1728,7 @@ const removeDomain = async () => {
                                 </div>
                               </div>
 
-                              {/* <div className="col-12">
+                              <div className="col-12">
                                 <div className="db-kv">
                                   <div>
                                     <label className="d-block">Send WhatsApp reminders</label>
@@ -1671,9 +1743,8 @@ const removeDomain = async () => {
                                       onChange={(e) => {
                                         const next = e.target.checked;
 
-                                        // If enabling WhatsApp reminders, ensure WhatsApp is enabled at app level
                                         if (next && !whatsappEnabled) {
-                                          showError?.("Enable WhatsApp notifications first before turning on WhatsApp fee reminders.");
+                                          showError?.("Enable WhatsApp from WhatsApp Settings before using this channel.");
                                           return;
                                         }
 
@@ -1688,7 +1759,7 @@ const removeDomain = async () => {
                                     WhatsApp is currently disabled. Turn on WhatsApp above to enable this channel.
                                   </div>
                                 ) : null}
-                              </div> */}
+                              </div>
                             </div>
                           </div>
                         </div>

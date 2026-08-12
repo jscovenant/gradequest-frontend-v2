@@ -586,7 +586,7 @@ export default function StudentFeePaymentPage() {
                         <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
                         <path d="M11 11l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                       </svg>
-                      {loadingDetails ? "Fetching…" : "Fetch Fees"}
+                      {loadingDetails ? "Fetching..." : "Fetch Fees"}
                     </button>
 
                     <button
@@ -668,7 +668,7 @@ export default function StudentFeePaymentPage() {
                         <path d="M12 7A5 5 0 112 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
                         <path d="M12 3v4h-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
                       </svg>
-                      {loadingDetails ? "Fetching…" : "Fetch"}
+                      {loadingDetails ? "Fetching..." : "Fetch Fees"}
                     </button>
                   </div>
 
@@ -692,7 +692,7 @@ export default function StudentFeePaymentPage() {
                           value={sessionId}
                           onChange={(e) => setSessionId(e.target.value)}
                           disabled={busyKey !== null || loadingMeta}
-                          title={!sessions.length ? "Optional (endpoint may not exist)" : ""}
+                        title={!sessions.length ? "Optional (endpoint may not exist)" : ""}
                         >
                           <option value="">All Sessions</option>
                           {sessions.map((s) => (
@@ -846,14 +846,14 @@ export default function StudentFeePaymentPage() {
                                     className="db-refresh-btn"
                                     onClick={() => openPayModal(f)}
                                     disabled={busyKey !== null || fullyPaid}
-                                    title={fullyPaid ? "Already fully paid" : "Pay fee"}
+                                      title={fullyPaid ? "Already fully paid" : "Pay fee"}
                                     style={{
                                       background: fullyPaid ? "#f5f1eb" : "rgba(201,168,76,0.16)",
                                       borderColor: fullyPaid ? "#e5ddd3" : "rgba(201,168,76,0.26)",
                                       color: fullyPaid ? "#7a6a5a" : "#1a1a2e",
                                     }}
                                   >
-                                    {actionBusy ? (
+                                      {actionBusy ? (
                                       <>
                                         <span className="spinner-border spinner-border-sm" style={{ width: 14, height: 14 }} />
                                         Paying…
@@ -917,7 +917,7 @@ export default function StudentFeePaymentPage() {
                 </div>
 
                 <div style={{ padding: 18 }}>
-                  {!student ? (
+                        {!student ? (
                     <div style={{ color: "#9a8a7a" }}>
                       No student loaded yet. Use the search to load fee details.
                     </div>
@@ -985,7 +985,7 @@ export default function StudentFeePaymentPage() {
                   zIndex: 1100,
                   padding: 12,
                 }}
-                onClick={() => (busyKey ? null : setShowPay(false))}
+                  onClick={() => (busyKey ? null : setShowPay(false))}
               >
                 <div
                   className="db-panel"
@@ -1084,7 +1084,7 @@ export default function StudentFeePaymentPage() {
                         {isBusy(`fee:pay:${payFeeId}`) ? (
                           <>
                             <span className="spinner-border spinner-border-sm me-2" />
-                            Processing…
+                            Processing...
                           </>
                         ) : (
                           "Confirm Payment"
@@ -1104,6 +1104,6 @@ export default function StudentFeePaymentPage() {
 
 /**
  * Routes used:
- * - GET  /fees/student/details?reg_no=...&session_id=...&term_id=...
+ * - GET  /fees/student/details-reg_no=...&session_id=...&term_id=...
  * - POST /fees/pay  { student_fee_id, amount, payment_method }
  */

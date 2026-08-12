@@ -1,833 +1,200 @@
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { publicApi } from "../../utils/axios";
 
-type Feature = {
-  text: string;
-  note: string | null;
-};
-
+type Feature = { text: string; note?: string | null };
 type Plan = {
   id: string;
   name: string;
   price: string;
   raw_price: number;
   period: string;
-  tagline: string;
-  popular: boolean;
-  cta: string;
-  paystack_plan_code: string | null;
-  max_teachers: number | null;
-  max_students: number | null;
-  duration_in_days: number;
-  currency: string;
-  features: Feature[];
+  tagline?: string;
+  duration_in_days?: number;
+  max_students?: number | null;
+  features?: Feature[];
 };
 
-const ACCENT: { color: string; colorBg: string }[] = [
-  { color: "rgb(59,130,246)", colorBg: "rgba(59,130,246,0.12)" },
-  { color: "rgb(255,200,87)", colorBg: "rgba(255,200,87,0.15)" },
-  { color: "rgb(34,197,94)", colorBg: "rgba(34,197,94,0.12)" },
-  { color: "rgb(168,85,247)", colorBg: "rgba(168,85,247,0.12)" },
-  { color: "rgb(251,146,60)", colorBg: "rgba(251,146,60,0.12)" },
+const CORE_FEATURES = [
+  "Student, teacher, parent and bursar records",
+  "Results, report cards and PIN access",
+  "Fee management and online payments",
+  "Student attendance and school settings",
+  "Staff attendance and QR clock-in",
 ];
 
-function PlanIcon({ index }: { index: number }) {
-  const i = index % 3;
+const PLUS_FALLBACK_FEATURES = [
+  "Everything in GradeQuest Core",
+  "WhatsApp notifications and communication tools",
+  "CBT examinations and advanced result workflows",
+  "Hostel and transport management",
+  "Custom report-card designer and premium support",
+];
 
-  if (i === 0) {
-    return (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-        <path
-          d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinejoin="round"
-        />
-        <path d="M9 22V12h6v10" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-      </svg>
-    );
-  }
+const COMPARISON = [
+  ["Student and staff records", true, true],
+  ["Results, fees and attendance", true, true],
+  ["Online school-fee collection", true, true],
+  ["WhatsApp communication", false, true],
+  ["Staff QR attendance", true, true],
+  ["CBT, hostel and transport", false, true],
+  ["Custom report-card designer", false, true],
+] as const;
 
-  if (i === 1) {
-    return (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-        <path
-          d="M12 2l3 6.3L22 9.3l-5 4.9 1.2 6.8L12 18l-6.2 3 1.2-6.8L2 9.3l7-1z"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinejoin="round"
-        />
-      </svg>
-    );
-  }
-
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-      <rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M12 12v4M10 14h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
+function normalize(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
-function useReveal(ref: React.RefObject<HTMLElement | null>, delay = 0) {
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setTimeout(() => el.classList.add("pr-visible"), delay);
-          io.disconnect();
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    io.observe(el);
-    return () => io.disconnect();
-  }, [ref, delay]);
-}
-
-function SkeletonCard() {
-  return (
-    <div className="pr-card pr-card--skeleton pr-visible" aria-hidden="true">
-      <div className="pr-skel pr-skel--icon mb-3" />
-      <div className="pr-skel pr-skel--name mb-2" />
-      <div className="pr-skel pr-skel--tag mb-4" />
-      <div className="pr-skel pr-skel--price mb-3" />
-      <div className="pr-skel pr-skel--meta mb-4" />
-      <div className="pr-skel pr-skel--btn mb-4" />
-      <hr className="pr-rule mb-4" />
-      {[80, 65, 90, 70, 55].map((w, i) => (
-        <div key={i} className="d-flex align-items-center gap-2 mb-3">
-          <div className="pr-skel pr-skel--check" />
-          <div className="pr-skel" style={{ height: 11, width: `${w}%`, borderRadius: 4 }} />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function formatFeatureLabel(value?: string | null) {
-  if (!value) return "";
-
-  return value
+function cleanFeature(value?: string | null) {
+  return String(value || "")
     .replace(/_/g, " ")
     .replace(/\s+/g, " ")
     .trim()
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+    .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-function formatPlanMeta(plan: Plan) {
-  const items: string[] = [];
-
-  if (plan.duration_in_days) {
-    if (plan.duration_in_days === 7) items.push("7-day access");
-    else if (plan.duration_in_days === 30) items.push("30-day access");
-    else if (plan.duration_in_days === 90) items.push("90-day access");
-    else items.push(`${plan.duration_in_days}-day access`);
-  }
-
-  if ((plan.max_students ?? 0) > 0) {
-    items.push(`Up to ${plan.max_students} students`);
-  } else {
-    items.push("Unlimited students");
-  }
-
-  if ((plan.max_teachers ?? 0) > 0) {
-    items.push(`Up to ${plan.max_teachers} teachers`);
-  } else {
-    items.push("Unlimited teachers");
-  }
-
-  return items;
-}
-
-function sanitizePlans(plans: Plan[]): Plan[] {
-  return plans.map((plan) => ({
-    ...plan,
-    tagline:
-      plan.tagline && plan.tagline.trim().length > 0
-        ? plan.tagline
-        : "A flexible subscription plan for your school.",
-    features: (plan.features || [])
-      .map((feature) => ({
-        text: formatFeatureLabel(feature?.text),
-        note: null,
-      }))
-      .filter((feature) => feature.text.length > 0),
-  }));
-}
-
-function PriceCard({ plan, index }: { plan: Plan; index: number }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useReveal(ref, 120 + index * 120);
-
-  const { color, colorBg } = ACCENT[index % ACCENT.length];
-  const ctaHref = plan.paystack_plan_code ? `#subscribe?plan=${plan.paystack_plan_code}` : "#contact";
-  const metaItems = formatPlanMeta(plan);
-
-  return (
-    <div
-      ref={ref}
-      className={`pr-card ${plan.popular ? "pr-card--popular" : ""}`}
-      data-pr-reveal=""
-      style={{ "--c": color, "--c-bg": colorBg } as React.CSSProperties}
-    >
-      {plan.popular && (
-        <div className="pr-popular-badge">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-            <path
-              d="M6 1l1.4 3.6H11L8.2 6.9l1.1 3.5L6 8.5 2.7 10.4l1.1-3.5L1 4.6h3.6z"
-              fill="var(--pr-dark)"
-            />
-          </svg>
-          Most popular
-        </div>
-      )}
-
-      <div className="pr-card-head mb-4">
-        <div className="pr-plan-icon mb-3">
-          <PlanIcon index={index} />
-        </div>
-        <h3 className="pr-plan-name mb-1">{plan.name}</h3>
-        <p className="pr-plan-tagline mb-0">{plan.tagline}</p>
-      </div>
-
-      <div className="d-flex align-items-baseline gap-2 mb-3">
-        <span className="pr-price">{plan.price}</span>
-        <span className="pr-period">{plan.period}</span>
-      </div>
-
-      <div className="pr-meta-wrap mb-4">
-        {metaItems.map((item) => (
-          <span key={item} className="pr-meta-pill">
-            {item}
-          </span>
-        ))}
-      </div>
-
-      <a
-        href={ctaHref}
-        className={`btn pr-cta w-100 d-flex align-items-center justify-content-center gap-2 mb-4 ${
-          plan.popular ? "pr-cta--primary" : "pr-cta--ghost"
-        }`}
-      >
-        {plan.cta}
-        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-          <path
-            d="M1 7h12M7 1l6 6-6 6"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </a>
-
-      <hr className="pr-rule mb-4" />
-
-      <div className="pr-feature-head mb-3">
-        <span className="pr-feature-headline">Included features</span>
-      </div>
-
-      <ul className="pr-features d-flex flex-column gap-3">
-        {plan.features.map((f, i) => (
-          <li key={i} className="pr-feature d-flex align-items-start gap-2">
-            <span className="pr-feature-check flex-shrink-0">
-              <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
-                <path
-                  d="M1.5 5l2.5 2.5 4.5-4"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </span>
-            <span className="pr-feature-text">{f.text}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function GlobeIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M3 12h18" stroke="currentColor" strokeWidth="1.6" />
-      <path
-        d="M12 3c2.5 2.5 4 5.8 4 9s-1.5 6.5-4 9c-2.5-2.5-4-5.8-4-9s1.5-6.5 4-9z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      />
-    </svg>
-  );
-}
-
-const CUSTOM_DOMAIN_FEATURES = [
-  "Your own domain (e.g. yourschool.com)",
-  "Fully branded school website",
-  "Custom design to match your school's identity",
-  "Dedicated setup & onboarding support",
-  "Tailored pricing for your school's needs",
-];
-
-function CustomDomainCard({ index }: { index: number }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useReveal(ref, 120 + index * 120);
-
-  const color = "rgb(211,0,176)";
-  const colorBg = "rgba(211,0,176,0.12)";
-
-  return (
-    <div
-      ref={ref}
-      className="pr-card"
-      data-pr-reveal=""
-      style={{ "--c": color, "--c-bg": colorBg } as React.CSSProperties}
-    >
-      <div className="pr-card-head mb-4">
-        <div className="pr-plan-icon mb-3">
-          <GlobeIcon />
-        </div>
-        <h3 className="pr-plan-name mb-1">Custom Domain &amp; Website</h3>
-        <p className="pr-plan-tagline mb-0">
-          Want your own domain and a fully branded website for your school? Let's build it together.
-        </p>
-      </div>
-
-      <div className="d-flex align-items-baseline gap-2 mb-3">
-        <span className="pr-price pr-price--talk">Let's Talk</span>
-      </div>
-
-      <div className="pr-meta-wrap mb-4">
-        <span className="pr-meta-pill">Tailored to your school</span>
-      </div>
-
-      <a
-        href="#contact"
-        className="btn pr-cta w-100 d-flex align-items-center justify-content-center gap-2 mb-4 pr-cta--primary"
-      >
-        Let's Talk
-        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-          <path
-            d="M1 7h12M7 1l6 6-6 6"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </a>
-
-      <hr className="pr-rule mb-4" />
-
-      <div className="pr-feature-head mb-3">
-        <span className="pr-feature-headline">What's included</span>
-      </div>
-
-      <ul className="pr-features d-flex flex-column gap-3">
-        {CUSTOM_DOMAIN_FEATURES.map((text, i) => (
-          <li key={i} className="pr-feature d-flex align-items-start gap-2">
-            <span className="pr-feature-check flex-shrink-0">
-              <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
-                <path
-                  d="M1.5 5l2.5 2.5 4.5-4"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </span>
-            <span className="pr-feature-text">{text}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
+function Check({ included = true }: { included?: boolean }) {
+  return included ? (
+    <span className="pr-check" aria-label="Included">
+      <i className="bi bi-check-lg" />
+    </span>
+  ) : (
+    <span className="pr-not-included" aria-label="Not included">-</span>
   );
 }
 
 export default function Pricing() {
-  const headerRef = useRef<HTMLDivElement>(null);
-  const footerRef = useRef<HTMLDivElement>(null);
-
-  useReveal(headerRef, 0);
-  useReveal(footerRef, 300);
-
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(false);
 
   const fetchPlans = useCallback(async () => {
+    setLoading(true);
+    setError(false);
     try {
-      setLoading(true);
-      setError(null);
-
-      const res = await publicApi.get("/frontend/subscription-plans");
-      const data = res.data?.data ?? res.data ?? [];
-
-      setPlans(sanitizePlans(data));
-    } catch (err: any) {
-      console.error("[Pricing] fetch failed:", err?.response?.data || err?.message);
-      setError("Unable to load plans right now. Please try again shortly.");
+      const response = await publicApi.get("/frontend/subscription-plans");
+      setPlans(Array.isArray(response.data?.data) ? response.data.data : []);
+    } catch {
+      setError(true);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchPlans();
-  }, [fetchPlans]);
+  useEffect(() => { void fetchPlans(); }, [fetchPlans]);
+
+  const plusPlan = useMemo(() => {
+    const namedPlus = plans.find((plan) => {
+      const name = normalize(plan.name);
+      return name.includes("gradequestplus") || name === "legacyplus";
+    });
+    return namedPlus || plans.find((plan) => Number(plan.raw_price) > 0) || null;
+  }, [plans]);
+
+  const plusFeatures = useMemo(() => {
+    const configured = (plusPlan?.features || [])
+      .map((feature) => cleanFeature(feature.text))
+      .filter(Boolean);
+    return configured.length ? configured.slice(0, 7) : PLUS_FALLBACK_FEATURES;
+  }, [plusPlan]);
+
+  const plusPrice = loading ? "Loading..." : plusPlan?.price || "Talk to us";
+  const plusPeriod = plusPlan?.period || "";
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500&display=swap');
-
-        :root {
-          --pr-dark:     var(--bs-dark,      #050008);
-          --pr-light:    var(--bs-light,     #fcf8f8);
-          --pr-accent:   var(--bs-secondary, rgb(255,200,87));
-          --pr-magenta:  var(--bs-primary,   rgb(211,0,176));
-          --pr-success:  var(--bs-success,   rgb(34,197,94));
-          --pr-info:     var(--bs-info,      rgb(59,130,246));
-          --pr-slate:    rgba(255,255,255,0.45);
-          --pr-surface:  rgba(255,255,255,0.04);
-          --pr-border:   rgba(255,255,255,0.07);
-          --pr-accent-glow:   rgba(255,200,87,0.08);
-          --pr-accent-border: rgba(255,200,87,0.25);
-          --pr-magenta-glow:  rgba(211,0,176,0.08);
-        }
-
-        .pr-wave { display:block; width:100%; overflow:hidden; line-height:0; background:#f0ece5; }
-        .pr-wave svg { display:block; width:100%; height:56px; }
-
-        .pr-section {
-          background: var(--pr-dark);
-          padding: 108px 0 128px;
-          position: relative;
-          overflow: hidden;
-          font-family: 'DM Sans', sans-serif;
-        }
-        .pr-section::before {
-          content: '';
-          position: absolute; top:-10%; left:50%; transform:translateX(-50%);
-          width:900px; height:600px; border-radius:50%;
-          background: radial-gradient(ellipse, rgba(255,200,87,0.07) 0%, transparent 70%);
-          pointer-events: none; z-index: 0;
-        }
-        .pr-section-glow-b {
-          position: absolute; bottom:-10%; left:50%; transform:translateX(-50%);
-          width:600px; height:400px; border-radius:50%;
-          background: radial-gradient(ellipse, rgba(211,0,176,0.06) 0%, transparent 70%);
-          pointer-events: none; z-index: 0;
-        }
-        .pr-section::after {
-          content: ''; position:absolute; inset:0;
-          background-image: radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px);
-          background-size: 28px 28px; pointer-events:none; z-index:0;
-        }
-        .pr-inner { position: relative; z-index: 1; }
-
-        .pr-kicker {
-          display: inline-flex; align-items: center; gap: 8px;
-          font-size: 11px; font-weight: 500; letter-spacing: 0.2em;
-          text-transform: uppercase; color: var(--pr-accent);
-        }
-        .pr-kicker__dot {
-          width:5px; height:5px; border-radius:50%;
-          background: var(--pr-magenta);
-          animation: prPulse 2s ease infinite;
-        }
-        @keyframes prPulse {
-          0%,100% { opacity:1; transform:scale(1); }
-          50% { opacity:.35; transform:scale(1.6); }
-        }
-
-        .pr-title {
-          font-family: 'Playfair Display', Georgia, serif;
-          font-size: clamp(34px, 4.5vw, 56px); font-weight: 900;
-          color: #ffffff; line-height: 1.1;
-        }
-        .pr-title em { font-style:italic; color: var(--pr-accent); }
-        .pr-subtitle {
-          font-size: 16px; font-weight: 300;
-          color: var(--pr-slate); max-width: 540px; line-height: 1.8;
-        }
-
-        .pr-trust-item {
-          display: flex; align-items: center; gap: 7px;
-          font-size: 13px; font-weight: 400; color: rgba(255,255,255,0.35);
-        }
-        .pr-trust-item svg { color: var(--pr-accent); }
-        .pr-trust-sep {
-          width:3px; height:3px; border-radius:50%; background:rgba(255,255,255,0.12);
-        }
-
-        .pr-card {
-          background: rgba(255,255,255,0.04); border:1px solid var(--pr-border);
-          border-radius: 18px; padding:32px 28px; position:relative; height:100%;
-          opacity: 0; transform: translateY(22px);
-          transition: opacity .65s ease, transform .65s ease, box-shadow .3s ease, border-color .3s;
-        }
-        .pr-card.pr-visible { opacity:1; transform:translateY(0); }
-        .pr-card:hover { box-shadow:0 20px 60px rgba(0,0,0,0.4); border-color:rgba(255,255,255,0.12); }
-
-        .pr-card--popular {
-          background: var(--pr-light); border-color: var(--pr-accent-border);
-          box-shadow: 0 8px 40px rgba(0,0,0,0.3), 0 0 0 1px var(--pr-accent-border);
-          transform: translateY(-10px) scale(1.015); z-index: 2;
-        }
-        .pr-card--popular.pr-visible { transform:translateY(-10px) scale(1.015); }
-        .pr-card--popular:hover {
-          box-shadow: 0 24px 64px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,200,87,0.4);
-          border-color: rgba(255,200,87,0.45);
-        }
-
-        .pr-popular-badge {
-          position:absolute; top:-13px; left:50%; transform:translateX(-50%);
-          display:inline-flex; align-items:center; gap:5px;
-          background: var(--pr-accent); border:1px solid rgba(255,200,87,0.5);
-          color: var(--pr-dark); font-size:11px; font-weight:500; letter-spacing:.08em;
-          padding:4px 14px; border-radius:100px; white-space:nowrap;
-        }
-
-        .pr-plan-icon {
-          width:40px; height:40px; border-radius:10px;
-          background: var(--c-bg); color: var(--c);
-          display:flex; align-items:center; justify-content:center;
-        }
-        .pr-plan-name {
-          font-family:'Playfair Display',serif; font-size:20px; font-weight:700;
-          color:rgba(255,255,255,0.92); line-height:1;
-        }
-        .pr-card--popular .pr-plan-name { color: var(--pr-dark); }
-
-        .pr-plan-tagline {
-          font-size:13px; font-weight:300; color:var(--pr-slate); line-height:1.6;
-          min-height: 42px;
-        }
-        .pr-card--popular .pr-plan-tagline { color:rgba(5,0,8,0.55); }
-
-        .pr-price {
-          font-family:'Playfair Display',serif; font-size:36px;
-          font-weight:700; color:#ffffff; line-height:1;
-        }
-        .pr-card--popular .pr-price { color: var(--pr-dark); }
-        .pr-period { font-size:13px; font-weight:300; color:var(--pr-slate); }
-        .pr-card--popular .pr-period { color:rgba(5,0,8,0.45); }
-        .pr-price--talk { font-size:28px; }
-
-        .pr-meta-wrap {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-        }
-        .pr-meta-pill {
-          display: inline-flex;
-          align-items: center;
-          padding: 6px 10px;
-          border-radius: 999px;
-          font-size: 11.5px;
-          font-weight: 500;
-          color: rgba(255,255,255,0.78);
-          background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.08);
-        }
-        .pr-card--popular .pr-meta-pill {
-          color: rgba(5,0,8,0.72);
-          background: rgba(5,0,8,0.05);
-          border-color: rgba(5,0,8,0.08);
-        }
-
-        .pr-cta {
-          border-radius:10px; font-family:'DM Sans',sans-serif;
-          font-size:14px; font-weight:500;
-          transition: background .2s, transform .2s, box-shadow .2s; padding:13px 20px;
-        }
-        .pr-cta--primary {
-          background:var(--pr-dark); color:#ffffff; border-color:var(--pr-dark);
-          box-shadow: 0 2px 12px rgba(0,0,0,0.2);
-        }
-        .pr-cta--primary:hover {
-          background:#1a001f; border-color:#1a001f; color:#ffffff;
-          transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,0.3);
-        }
-        .pr-cta--ghost {
-          background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.75);
-          border:1px solid rgba(255,255,255,0.10);
-        }
-        .pr-cta--ghost:hover {
-          background:rgba(255,255,255,0.09); color:#ffffff;
-          border-color:rgba(255,255,255,0.2); transform:translateY(-2px);
-        }
-
-        .pr-rule { border:none; height:1px; background:var(--pr-border); }
-        .pr-card--popular .pr-rule { background:rgba(5,0,8,0.08); }
-
-        .pr-feature-head {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-        .pr-feature-headline {
-          font-size: 12px;
-          font-weight: 600;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          color: var(--pr-accent);
-        }
-        .pr-card--popular .pr-feature-headline {
-          color: rgb(120,80,0);
-        }
-
-        .pr-features { list-style:none; padding:0; margin:0; }
-        .pr-feature {
-          font-size:13.5px; color:var(--pr-slate); line-height:1.45;
-          padding-bottom: 2px;
-        }
-        .pr-card--popular .pr-feature { color:rgba(5,0,8,0.68); }
-
-        .pr-feature-check {
-          width:18px; height:18px; border-radius:50%;
-          background:rgba(255,255,255,0.06); color:var(--c);
-          display:flex; align-items:center; justify-content:center; margin-top:1px;
-        }
-        .pr-card--popular .pr-feature-check { background:var(--c-bg); color:var(--c); }
-
-        .pr-feature-text { flex:1; }
-
-        .pr-card--skeleton { pointer-events:none; }
-        .pr-skel {
-          display: block;
-          background: linear-gradient(90deg,
-            rgba(255,255,255,.06) 25%,
-            rgba(255,255,255,.12) 50%,
-            rgba(255,255,255,.06) 75%);
-          background-size: 200% 100%;
-          border-radius: 6px;
-          animation: prShimmer 1.5s ease infinite;
-        }
-        @keyframes prShimmer {
-          from { background-position: 200% 0; }
-          to   { background-position: -200% 0; }
-        }
-        .pr-skel--icon  { width:40px;  height:40px; border-radius:10px; }
-        .pr-skel--name  { height:18px; width:55%; }
-        .pr-skel--tag   { height:12px; width:80%; }
-        .pr-skel--price { height:36px; width:45%; }
-        .pr-skel--meta  { height:28px; width:85%; }
-        .pr-skel--btn   { height:48px; border-radius:8px; }
-        .pr-skel--check { width:18px;  height:18px; border-radius:50%; flex-shrink:0; }
-
-        .pr-error-state {
-          display:flex; flex-direction:column; align-items:center;
-          gap:16px; padding:64px 24px; text-align:center;
-        }
-        .pr-error-icon {
-          width:52px; height:52px; border-radius:50%;
-          background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.2);
-          display:flex; align-items:center; justify-content:center; color:#ef4444;
-        }
-        .pr-error-title {
-          font-family:'Playfair Display',serif; font-size:18px;
-          font-weight:700; color:#fff; margin:0;
-        }
-        .pr-error-msg {
-          font-size:14px; font-weight:300; color:var(--pr-slate);
-          max-width:340px; margin:0;
-        }
-        .pr-retry-btn {
-          display:inline-flex; align-items:center; gap:8px;
-          font-family:'DM Sans',sans-serif; font-size:13.5px; font-weight:500;
-          color:var(--pr-dark); background:var(--pr-accent); border:none;
-          border-radius:8px; padding:11px 22px; cursor:pointer;
-          transition:background .2s, transform .2s;
-        }
-        .pr-retry-btn:hover { background:#ffe0a0; transform:translateY(-1px); }
-
-        .pr-empty-state {
-          text-align:center; padding:64px 24px;
-          font-size:15px; font-weight:300; color:var(--pr-slate);
-        }
-
-        .pr-footer {
-          border-radius:14px; padding:36px 40px;
-          background:var(--pr-surface); border:1px solid var(--pr-border);
-          opacity:0; transform:translateY(18px);
-          transition:opacity .65s ease, transform .65s ease;
-        }
-        .pr-footer.pr-visible { opacity:1; transform:translateY(0); }
-        .pr-footer-text {
-          font-size:15px; font-weight:300; color:var(--pr-slate);
-          max-width:480px; line-height:1.7;
-        }
-        .pr-footer-text strong { color:rgba(255,255,255,0.82); font-weight:500; }
-        .pr-footer-link {
-          display:inline-flex; align-items:center; gap:7px;
-          font-size:14px; font-weight:500; color:var(--pr-accent);
-          text-decoration:none; border-bottom:1px solid rgba(255,200,87,0.3);
-          padding-bottom:1px; white-space:nowrap; flex-shrink:0;
-          transition:color .2s, border-color .2s;
-        }
-        .pr-footer-link:hover { color:#ffe0a0; border-color:#ffe0a0; }
-
-        [data-pr-reveal] {
-          opacity:0; transform:translateY(20px);
-          transition:opacity .65s ease, transform .65s ease;
-        }
-        [data-pr-reveal].pr-visible { opacity:1; transform:translateY(0); }
-
-        @media (max-width: 640px) {
-          .pr-section { padding:72px 0 88px; }
-          .pr-footer  { padding:28px 24px; }
-          .pr-card--popular { transform:none; }
-          .pr-card--popular.pr-visible { transform:none; }
-        }
+        :root{--pr-ink:#1d151f;--pr-dark:#050008;--pr-magenta:#d300b0;--pr-gold:#ffc857;--pr-cream:#fcf8f8;--pr-muted:#786c79;--pr-line:rgba(29,21,31,.11);--pr-green:#16a34a}
+        .pr-wave{display:block;background:#f0ece5;line-height:0;overflow:hidden}.pr-wave svg{display:block;width:100%;height:54px}
+        .pr-section{position:relative;overflow:hidden;background:linear-gradient(180deg,#fbf8f5 0%,#f5efe9 100%);padding:96px 0 112px;color:var(--pr-ink)}
+        .pr-section:before{content:"";position:absolute;width:620px;height:620px;border-radius:50%;right:-230px;top:-280px;background:radial-gradient(circle,rgba(211,0,176,.1),transparent 68%);pointer-events:none}
+        .pr-section:after{content:"";position:absolute;width:540px;height:540px;border-radius:50%;left:-260px;bottom:-300px;background:radial-gradient(circle,rgba(255,200,87,.18),transparent 68%);pointer-events:none}
+        .pr-shell{position:relative;z-index:1;max-width:1180px}
+        .pr-kicker{display:inline-flex;align-items:center;gap:9px;color:var(--pr-magenta);font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase}.pr-kicker:before{content:"";width:24px;height:2px;background:var(--pr-magenta)}
+        .pr-title{font-family:'Playfair Display',Georgia,serif;font-size:clamp(38px,5.2vw,66px);font-weight:900;line-height:1.02;letter-spacing:-.035em;max-width:850px;margin:18px auto 0}.pr-title em{font-style:italic;color:var(--pr-magenta)}
+        .pr-subtitle{max-width:720px;margin:22px auto 0;color:var(--pr-muted);font-size:16px;line-height:1.75}
+        .pr-model{display:inline-flex;align-items:center;gap:10px;margin-top:26px;padding:9px 14px;border:1px solid rgba(29,21,31,.1);border-radius:999px;background:rgba(255,255,255,.72);color:#665a67;font-size:12px;font-weight:700}.pr-model i{color:var(--pr-green)}
+        .pr-path-label{display:flex;align-items:center;justify-content:center;gap:12px;margin:42px 0 22px;color:#8d7e8c;font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}.pr-path-label:before,.pr-path-label:after{content:"";height:1px;max-width:180px;flex:1;background:var(--pr-line)}
+        .pr-grid{display:grid;grid-template-columns:1fr 1.08fr;gap:20px;align-items:stretch}
+        .pr-card{position:relative;border:1px solid var(--pr-line);border-radius:24px;background:rgba(255,255,255,.86);padding:34px;box-shadow:0 18px 55px rgba(45,28,43,.08);display:flex;flex-direction:column;min-width:0}
+        .pr-card-plus{background:linear-gradient(145deg,#1d151f 0%,#321b34 58%,#50103f 100%);border-color:rgba(211,0,176,.32);color:#fff;box-shadow:0 28px 70px rgba(29,21,31,.24)}
+        .pr-recommended{position:absolute;right:22px;top:20px;border-radius:999px;background:var(--pr-gold);color:#251a00;padding:6px 11px;font-size:9px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+        .pr-card-kicker{font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--pr-magenta);margin-bottom:14px}.pr-card-plus .pr-card-kicker{color:var(--pr-gold)}
+        .pr-card-title{font-family:'Playfair Display',Georgia,serif;font-size:31px;font-weight:900;line-height:1.05;margin:0}.pr-card-copy{color:var(--pr-muted);font-size:13.5px;line-height:1.65;margin:12px 0 0;max-width:480px}.pr-card-plus .pr-card-copy{color:rgba(255,255,255,.68)}
+        .pr-price-row{display:flex;align-items:flex-end;gap:8px;margin:28px 0 8px}.pr-price{font-family:'Playfair Display',Georgia,serif;font-size:38px;font-weight:900;line-height:1;letter-spacing:-.03em}.pr-period{color:var(--pr-muted);font-size:12px;padding-bottom:4px}.pr-card-plus .pr-period{color:rgba(255,255,255,.48)}
+        .pr-billing-note{min-height:42px;color:#796d79;font-size:11.5px;line-height:1.55}.pr-card-plus .pr-billing-note{color:rgba(255,255,255,.54)}
+        .pr-divider{height:1px;background:var(--pr-line);margin:24px 0}.pr-card-plus .pr-divider{background:rgba(255,255,255,.1)}
+        .pr-feature-title{font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;margin-bottom:16px}.pr-features{list-style:none;padding:0;margin:0 0 28px;display:grid;gap:12px}.pr-features li{display:flex;align-items:flex-start;gap:10px;font-size:12.5px;line-height:1.45;color:#5f535f}.pr-card-plus .pr-features li{color:rgba(255,255,255,.82)}
+        .pr-check{width:19px;height:19px;flex:0 0 19px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:rgba(22,163,74,.12);color:var(--pr-green);font-size:11px}.pr-card-plus .pr-check{background:rgba(255,200,87,.13);color:var(--pr-gold)}
+        .pr-cta{min-height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:9px;text-decoration:none;font-size:13px;font-weight:900;margin-top:auto;transition:.2s}.pr-cta-core{border:1px solid var(--pr-ink);color:var(--pr-ink);background:#fff}.pr-cta-core:hover{background:var(--pr-ink);color:#fff}.pr-cta-plus{background:var(--pr-gold);color:#251a00}.pr-cta-plus:hover{background:#ffda88;color:#251a00;transform:translateY(-1px)}
+        .pr-route{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:18px;margin:22px 0 0;padding:18px 20px;border:1px solid var(--pr-line);border-radius:16px;background:rgba(255,255,255,.68)}.pr-route-item{display:flex;gap:12px;align-items:center}.pr-route-icon{width:38px;height:38px;border-radius:11px;background:rgba(211,0,176,.08);color:var(--pr-magenta);display:flex;align-items:center;justify-content:center;font-size:17px}.pr-route strong{display:block;font-size:12.5px}.pr-route small{display:block;color:var(--pr-muted);font-size:11px;margin-top:2px}.pr-route-arrow{color:#a597a4}
+        .pr-compare{margin-top:24px;border:1px solid var(--pr-line);border-radius:20px;background:rgba(255,255,255,.76);overflow:hidden}.pr-compare-head,.pr-compare-row{display:grid;grid-template-columns:minmax(0,1fr) 140px 170px;align-items:center}.pr-compare-head{background:var(--pr-ink);color:#fff}.pr-compare-head>div,.pr-compare-row>div{padding:15px 20px}.pr-compare-head>div:not(:first-child),.pr-compare-row>div:not(:first-child){text-align:center}.pr-compare-head strong{font-size:12px}.pr-compare-row{border-top:1px solid var(--pr-line);font-size:12.5px}.pr-compare-row>div:first-child{color:#5f535f}.pr-not-included{color:#b5aab3;font-weight:700}
+        .pr-addon{display:grid;grid-template-columns:auto 1fr auto;gap:18px;align-items:center;margin-top:24px;padding:22px 24px;border-radius:18px;background:#fff;border:1px solid var(--pr-line);box-shadow:0 12px 35px rgba(45,28,43,.05)}.pr-addon-icon{width:48px;height:48px;border-radius:14px;background:rgba(211,0,176,.09);color:var(--pr-magenta);display:flex;align-items:center;justify-content:center;font-size:21px}.pr-addon h3{font-size:15px;font-weight:900;margin:0}.pr-addon p{font-size:12px;color:var(--pr-muted);margin:4px 0 0}.pr-addon a{font-size:12px;font-weight:900;color:var(--pr-magenta);text-decoration:none;white-space:nowrap}
+        .pr-error{margin-top:18px;color:#a33b3b;font-size:12px}.pr-error button{border:0;background:none;color:var(--pr-magenta);font-weight:800;padding:0 0 0 5px}
+        @media(max-width:900px){.pr-grid{grid-template-columns:1fr}.pr-card{padding:28px}.pr-compare-head,.pr-compare-row{grid-template-columns:minmax(0,1fr) 88px 104px}.pr-compare-head>div,.pr-compare-row>div{padding:13px 12px}.pr-route{grid-template-columns:1fr}.pr-route-arrow{transform:rotate(90deg);justify-self:center}.pr-addon{grid-template-columns:auto 1fr}.pr-addon a{grid-column:2}}
+        @media(max-width:560px){.pr-section{padding:74px 0 84px}.pr-title{font-size:38px}.pr-card{padding:24px 20px;border-radius:19px}.pr-recommended{position:static;align-self:flex-start;margin-bottom:14px}.pr-compare-head,.pr-compare-row{grid-template-columns:minmax(0,1fr) 66px 76px}.pr-compare-head>div,.pr-compare-row>div{padding:12px 8px;font-size:10.5px}.pr-addon{padding:18px}.pr-addon-icon{display:none}.pr-addon{grid-template-columns:1fr}.pr-addon a{grid-column:1}}
       `}</style>
 
-      <div className="pr-wave">
-        <svg viewBox="0 0 1440 56" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-          <path
-            d="M0,20 C240,56 480,0 720,28 C960,56 1200,10 1440,24 L1440,56 L0,56 Z"
-            fill="var(--pr-dark, #050008)"
-          />
-        </svg>
+      <div className="pr-wave" aria-hidden="true">
+        <svg viewBox="0 0 1440 54" preserveAspectRatio="none"><path d="M0 15C260 55 470 0 720 28c250 28 455-15 720 0v26H0z" fill="#fbf8f5" /></svg>
       </div>
 
       <section className="pr-section" id="pricing">
-        <div className="pr-section-glow-b" aria-hidden="true" />
+        <div className="container-xl pr-shell">
+          <header className="text-center">
+            <span className="pr-kicker">Simple package structure</span>
+            <h2 className="pr-title">Choose how your school wants to <em>run GradeQuest.</em></h2>
+            <p className="pr-subtitle">Start with Core for essential school operations, or choose GradeQuestPlus for the complete platform and advanced automation.</p>
+            <span className="pr-model"><i className="bi bi-check-circle-fill" /> No setup fee • Free onboarding • Cancel at renewal</span>
+          </header>
 
-        <div className="pr-inner container-xl">
-          <div
-            ref={headerRef}
-            data-pr-reveal=""
-            className="d-flex flex-column align-items-center text-center mb-5"
-            style={{ paddingBottom: "2rem" }}
-          >
-            <div className="pr-kicker mb-3">
-              <span className="pr-kicker__dot" />
-              Pricing
-            </div>
+          <div className="pr-path-label">Two clear access options</div>
 
-            <h2 className="pr-title mb-3">
-              Pay for what you use.
-              <br />
-              <em>Stop when you want.</em>
-            </h2>
+          <div className="pr-grid">
+            <article className="pr-card">
+              <div className="pr-card-kicker">Essential operations</div>
+              <h3 className="pr-card-title">GradeQuest Core</h3>
+              <p className="pr-card-copy">For schools that need the essential management system and want platform costs tied to active students.</p>
+              <div className="pr-price-row"><span className="pr-price">₦1,000</span><span className="pr-period">/ active student / term</span></div>
+              <div className="pr-billing-note">Use GradeQuest online fee collection, or receive a term invoice based on active student records.</div>
+              <div className="pr-divider" />
+              <div className="pr-feature-title">Core includes</div>
+              <ul className="pr-features">{CORE_FEATURES.map((feature) => <li key={feature}><Check />{feature}</li>)}</ul>
+              <Link to="/register" className="pr-cta pr-cta-core">Start with Core <i className="bi bi-arrow-right" /></Link>
+            </article>
 
-            <p className="pr-subtitle mb-4">
-              Clear school pricing, no hidden charges, flexible billing, and all your core modules explained up front.
-            </p>
-
-            <div className="d-flex align-items-center flex-wrap justify-content-center gap-3">
-              {["No setup fee", "Simple pricing", "Cancel any time", "Free onboarding"].map((t, i, arr) => (
-                <div key={t} className="d-flex align-items-center gap-3">
-                  <span className="pr-trust-item">
-                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                      <path
-                        d="M2 7l3.5 3.5 6.5-6"
-                        stroke="currentColor"
-                        strokeWidth="1.7"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    {t}
-                  </span>
-                  {i < arr.length - 1 && <span className="pr-trust-sep" />}
-                </div>
-              ))}
-            </div>
+            <article className="pr-card pr-card-plus">
+              <div className="pr-recommended">Complete platform</div>
+              <div className="pr-card-kicker">Advanced automation</div>
+              <h3 className="pr-card-title">GradeQuestPlus</h3>
+              <p className="pr-card-copy">For schools ready to automate more departments, strengthen communication and unlock premium operational tools.</p>
+              <div className="pr-price-row"><span className="pr-price">{plusPrice}</span>{plusPeriod && <span className="pr-period">{plusPeriod}</span>}</div>
+              <div className="pr-billing-note">One subscription package. Existing active GradeQuestPlus subscriptions remain protected until their renewal date.</div>
+              <div className="pr-divider" />
+              <div className="pr-feature-title">GradeQuestPlus includes</div>
+              <ul className="pr-features">{plusFeatures.map((feature) => <li key={feature}><Check />{feature}</li>)}</ul>
+              <Link to="/register" className="pr-cta pr-cta-plus">Get GradeQuestPlus <i className="bi bi-arrow-right" /></Link>
+            </article>
           </div>
 
-          {loading ? (
-            <div className="row g-4 align-items-start justify-content-center">
-              {[0, 1].map((i) => (
-                <div key={i} className="col-12 col-md-6 col-lg-4">
-                  <SkeletonCard />
-                </div>
-              ))}
-            </div>
-          ) : error ? (
-            <div className="row g-4 align-items-start justify-content-center">
-              <div className="col-12 col-md-6 col-lg-4">
-                <div className="pr-card pr-visible h-100 d-flex align-items-center">
-                  <div className="pr-error-state mx-auto">
-                    <div className="pr-error-icon">
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
-                        <path d="M12 7v5M12 15.5v.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                      </svg>
-                    </div>
-                    <p className="pr-error-title">Could not load plans</p>
-                    <p className="pr-error-msg">{error}</p>
-                    <button className="pr-retry-btn" onClick={fetchPlans}>
-                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                        <path d="M14 8A6 6 0 112 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                        <path d="M14 4v4h-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                      Try again
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div className="col-12 col-md-6 col-lg-4">
-                <CustomDomainCard index={1} />
-              </div>
-            </div>
-          ) : (
-            <div className="row g-4 align-items-start justify-content-center">
-              {plans.length === 0 ? (
-                <div className="col-12 col-md-6 col-lg-4">
-                  <div className="pr-card pr-visible h-100 d-flex align-items-center">
-                    <p className="pr-empty-state mb-0 mx-auto">
-                      No plans are currently available. Please check back soon.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                plans.map((plan, i) => (
-                  <div key={plan.id} className="col-12 col-md-6 col-lg-4">
-                    <PriceCard plan={plan} index={i} />
-                  </div>
-                ))
-              )}
-              <div className="col-12 col-md-6 col-lg-4">
-                <CustomDomainCard index={plans.length} />
-              </div>
-            </div>
-          )}
+          <div className="pr-route">
+            <div className="pr-route-item"><span className="pr-route-icon"><i className="bi bi-credit-card" /></span><div><strong>Collect fees online?</strong><small>Core access is supported through the online payment model.</small></div></div>
+            <i className="bi bi-arrow-right pr-route-arrow" />
+            <div className="pr-route-item"><span className="pr-route-icon"><i className="bi bi-stars" /></span><div><strong>Need the full suite?</strong><small>Choose GradeQuestPlus for premium modules and automation.</small></div></div>
+          </div>
 
-          {!loading && !error && plans.length > 0 && (
-            <div
-              ref={footerRef}
-              data-pr-reveal=""
-              className="pr-footer d-flex align-items-center justify-content-between flex-wrap gap-4 mt-5"
-            >
-              <p className="pr-footer-text mb-0">
-                <strong>Not sure which plan fits?</strong> Compare student limits, teacher limits, and included modules to choose the right plan for your school.
-              </p>
-              <a href="#contact" className="pr-footer-link">
-                Talk to us about the right plan
-                <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                  <path
-                    d="M1 7h12M7 1l6 6-6 6"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </a>
-            </div>
-          )}
+          <div className="pr-compare">
+            <div className="pr-compare-head"><div><strong>Feature comparison</strong></div><div><strong>Core</strong></div><div><strong>GradeQuestPlus</strong></div></div>
+            {COMPARISON.map(([label, core, plus]) => <div className="pr-compare-row" key={label}><div>{label}</div><div><Check included={core} /></div><div><Check included={plus} /></div></div>)}
+          </div>
+
+          <div className="pr-addon">
+            <span className="pr-addon-icon"><i className="bi bi-globe2" /></span>
+            <div><h3>Optional service: custom school website and domain</h3><p>This is a separate branding and implementation service—not another GradeQuest subscription plan.</p></div>
+            <a href="#contact">Request a quote <i className="bi bi-arrow-right" /></a>
+          </div>
+
+          {error && <div className="pr-error text-center">Live GradeQuestPlus pricing could not be loaded.<button onClick={fetchPlans}>Try again</button></div>}
         </div>
       </section>
     </>

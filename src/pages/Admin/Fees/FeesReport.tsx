@@ -332,7 +332,7 @@ export default function SchoolFinancialReportDashboardPage() {
     const paid = Number(summary?.total_paid ?? 0);
     const partialPaid = Number(summary?.total_partially_paid ?? 0);
     const unpaid = Number(summary?.total_unpaid ?? 0);
-    const balance = Number(summary?.total_balance_remaining ?? 0);
+        const balance = Number(summary?.total_balance_remaining ?? 0);
 
     return [
       { title: "Total Assigned", value: money(assigned), hint: "Total fee value assigned", icon: "bi-cash-stack", tone: "gold" as const },
@@ -1066,11 +1066,11 @@ export default function SchoolFinancialReportDashboardPage() {
                             <td>{displayIndex}</td>
                             <td>
                               <div style={{ fontWeight: 800, color: "#1a1a2e" }}>
-                                {((r.student?.firstname ?? "") + " " + (r.student?.surname ?? "")).trim() || "—"}
+                                {((r.student?.firstname ?? "") + " " + (r.student?.surname ?? "")).trim() || "-"}
                               </div>
                               <div style={{ fontSize: 12, color: "#9a8a7a" }}>Student ID: {r.student_id}</div>
                             </td>
-                            <td style={{ color: "#6b7280" }}>{r.student?.reg_no ?? "—"}</td>
+                            <td style={{ color: "#6b7280" }}>{r.student?.reg_no ?? "-"}</td>
                             <td>{fee?.name ?? `Fee #${r.fee_type_id}`}</td>
                             <td style={{ textAlign: "right" }}>{money(r.total_amount)}</td>
                             <td style={{ textAlign: "right" }}>{money(r.amount_paid)}</td>

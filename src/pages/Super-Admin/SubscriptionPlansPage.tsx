@@ -608,10 +608,10 @@ export default function SubscriptionPlansPage() {
                             <td className="text-muted">{p.duration_in_days ? `${p.duration_in_days} days` : "—"}</td>
                             <td className="text-muted">
                               <div>
-                                Teachers: <b>{p.max_teachers ?? "—"}</b>
+                                Teachers: <b>{p.max_teachers ?? "-"}</b>
                               </div>
                               <div>
-                                Students: <b>{p.max_students ?? "—"}</b>
+                                Students: <b>{p.max_students ?? "-"}</b>
                               </div>
                             </td>
                             <td>

@@ -498,7 +498,7 @@ export default function BroadsheetPage() {
 
                     <div className="mt-3 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.18)" }}>
                       <small className="text-white" style={{ opacity: 0.9 }}>
-                        Batch: <b>#{data?.batch.id ?? batchId ?? "—"}</b> • Rank by: <b>{rankBy}</b>
+                        Batch: <b>#{data?.batch.id ?? batchId ?? "-"}</b> | Rank by: <b>{rankBy}</b>
                       </small>
                     </div>
                   </div>
