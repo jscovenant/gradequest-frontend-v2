@@ -160,6 +160,15 @@ type CbtExamDetail = CbtExam & {
   attempts?: CbtAttempt[];
 };
 
+type LessonNoteSource = {
+  id: number;
+  title: string;
+  subject: string;
+  class_name: string;
+  topic: string;
+  status: string;
+};
+
 type AiQuestionDraft = {
   sections?: {
     title?: string;
@@ -175,6 +184,8 @@ type AiQuestionDraft = {
 };
 
 const emptyAiForm = {
+  lesson_note_id: "",
+  lesson_note_ids: [] as string[],
   topics: "",
   source_text: "",
   question_count: 20,
@@ -296,6 +307,8 @@ export default function CbtExamsPage() {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiImporting, setAiImporting] = useState(false);
   const [aiFile, setAiFile] = useState<File | null>(null);
+  const [lessonNoteSources, setLessonNoteSources] = useState<LessonNoteSource[]>([]);
+  const [lessonNotesLoading, setLessonNotesLoading] = useState(false);
   const [aiForm, setAiForm] = useState(emptyAiForm);
   const [aiDraft, setAiDraft] = useState<AiQuestionDraft | null>(null);
 
@@ -755,16 +768,57 @@ export default function CbtExamsPage() {
       return { ...current, formats: formats.length ? formats : [format] };
     });
   }
+  async function loadLessonNoteSources() {
+    setLessonNotesLoading(true);
+    try {
+      const res = await authApi.get("/admin/ai/lessons/workspace");
+      const rows = Array.isArray(res.data?.lesson_notes) ? res.data.lesson_notes : [];
+      setLessonNoteSources(rows.filter((item: LessonNoteSource) => item.status === "published" || item.status === "draft"));
+    } catch {
+      setLessonNoteSources([]);
+    } finally {
+      setLessonNotesLoading(false);
+    }
+  }
+
+  function toggleLessonNoteSource(id: string) {
+    const selected = lessonNoteSources.find((item) => String(item.id) === id);
+    setAiForm((current) => {
+      const currentLessonNoteIds = Array.isArray(current.lesson_note_ids) ? current.lesson_note_ids : [];
+      const exists = currentLessonNoteIds.includes(id);
+      const lesson_note_ids = exists ? currentLessonNoteIds.filter((item) => item !== id) : [...currentLessonNoteIds, id];
+      const selectedTopics = lessonNoteSources
+        .filter((item) => lesson_note_ids.includes(String(item.id)))
+        .map((item) => item.topic)
+        .filter(Boolean)
+        .join(", ");
+      return {
+        ...current,
+        lesson_note_id: lesson_note_ids[0] || "",
+        lesson_note_ids,
+        topics: selectedTopics || selected?.topic || current.topics,
+      };
+    });
+  }
+
+  function openAiGenerator() {
+    setAiDraft(null);
+    setAiFile(null);
+    setAiModalOpen(true);
+    loadLessonNoteSources();
+  }
 
   async function generateAiQuestions() {
     if (!selectedExamId) return showError("Select an exam first.");
-    if (!aiFile && !aiForm.topics.trim() && !aiForm.source_text.trim()) return showError("Upload a note or enter topics first.");
+    const selectedLessonNoteIds = Array.isArray(aiForm.lesson_note_ids) ? aiForm.lesson_note_ids : [];
+    if (!aiFile && selectedLessonNoteIds.length === 0 && !aiForm.topics.trim() && !aiForm.source_text.trim()) return showError("Select one or more saved lesson notes, upload a note, or enter topics first.");
 
     setAiGenerating(true);
     setAiDraft(null);
     try {
       const payload = new FormData();
       if (aiFile) payload.append("source_file", aiFile);
+      selectedLessonNoteIds.forEach((id) => payload.append("lesson_note_ids[]", id));
       payload.append("topics", aiForm.topics);
       payload.append("source_text", aiForm.source_text);
       payload.append("question_count", String(aiForm.question_count));
@@ -813,7 +867,9 @@ export default function CbtExamsPage() {
       setOfflineLicense(license);
 
       const exam = selectedExamId ? exams.find((item) => item.id === selectedExamId) : null;
-      const query = exam && ["offline", "hybrid"].includes(exam.delivery_mode) ? `?exam_ids[]=${exam.id}` : "";
+      if (exam && exam.status !== "published") throw new Error("Publish this exam before downloading the offline package.");
+      if (exam && !["offline", "hybrid"].includes(exam.delivery_mode)) throw new Error("Change this exam mode to Offline/LAN or Hybrid before downloading an offline package.");
+      const query = exam ? `?exam_ids[]=${exam.id}` : "";
       const res = await authApi.get(`/cbt/offline/licenses/${license.id}/bundle${query}`, { responseType: "blob" });
       const blob = new Blob([res.data], { type: "application/json" });
       const url = window.URL.createObjectURL(blob);
@@ -841,7 +897,9 @@ export default function CbtExamsPage() {
     setSaving(true);
     try {
       const exam = selectedExamId ? exams.find((item) => item.id === selectedExamId) : null;
-      const query = exam && ["offline", "hybrid"].includes(exam.delivery_mode) ? `?exam_ids[]=${exam.id}` : "";
+      if (exam && exam.status !== "published") throw new Error("Publish this exam before downloading the offline package.");
+      if (exam && !["offline", "hybrid"].includes(exam.delivery_mode)) throw new Error("Change this exam mode to Offline/LAN or Hybrid before downloading an offline package.");
+      const query = exam ? `?exam_ids[]=${exam.id}` : "";
       const res = await authApi.get(`/cbt/offline/licenses/${offlineLicense.id}/bundle${query}`, { responseType: "blob" });
       const blob = new Blob([res.data], { type: "application/json" });
       const url = window.URL.createObjectURL(blob);
@@ -991,7 +1049,7 @@ export default function CbtExamsPage() {
         .cbt-option-row{display:grid;grid-template-columns:54px minmax(0,1fr) 86px;gap:8px;align-items:center;margin-bottom:8px}.cbt-option-check{display:flex;gap:6px;align-items:center;font-size:12px;font-weight:800;color:#475569}
         .cbt-toggle{display:flex;align-items:flex-start;gap:9px;border:1px solid #e5e7eb;border-radius:10px;padding:10px 11px;margin-bottom:8px;background:#fbfdff}.cbt-toggle input{margin-top:3px}.cbt-toggle strong{display:block;color:#111827;font-size:13px}.cbt-toggle span{display:block;color:#64748b;font-size:12px;line-height:1.42}
         .cbt-question-card{border:1px solid #e5e7eb;border-radius:12px;padding:13px;margin-bottom:10px;background:#fff}.cbt-question-card h3{font-size:14px;font-weight:900;margin:0 0 6px;color:#111827;line-height:1.5}.cbt-question-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.cbt-empty{border:1px dashed #cbd5e1;border-radius:14px;padding:24px;text-align:center;color:#64748b;background:#f8fafc}
-        .cbt-ai-format-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px}.cbt-ai-check{border:1px solid #dbe3ef;background:#fff;border-radius:10px;padding:10px;display:flex;gap:8px;align-items:center;font-size:12px;font-weight:900;color:#334155}.cbt-ai-check input{accent-color:var(--bs-primary,#d300b0)}.cbt-import-box{border:1px solid #dbe3ef;border-radius:13px;background:#fbfdff;padding:14px;margin-bottom:14px}.cbt-import-top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:end}.cbt-import-file{position:relative;border:1px dashed #cbd5e1;border-radius:12px;background:#fff;padding:12px;min-height:62px;display:flex;align-items:center;gap:10px}.cbt-import-file i{font-size:22px;color:var(--bs-primary,#d300b0)}.cbt-import-file strong{display:block;color:#111827;font-size:13px}.cbt-import-file span{display:block;color:#64748b;font-size:12px;line-height:1.35}.cbt-import-file input{position:absolute;inset:0;opacity:0;cursor:pointer}.cbt-import-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.cbt-import-guide{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.cbt-import-guide code{display:block;background:#fff;border:1px solid #e5e7eb;border-radius:9px;padding:8px;color:#334155;font-size:11px;white-space:normal}.cbt-import-result{border-top:1px solid #e5e7eb;margin-top:12px;padding-top:12px}.cbt-import-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px}.cbt-import-summary div{background:#fff;border:1px solid #e7ecf4;border-radius:10px;padding:9px}.cbt-import-summary span{display:block;color:#64748b;font-size:10px;font-weight:900;text-transform:uppercase}.cbt-import-summary strong{display:block;color:#111827;font-size:16px}.cbt-import-errors{border:1px solid #fecaca;background:#fff1f2;color:#991b1b;border-radius:10px;padding:10px;font-size:12px}.cbt-import-preview{display:grid;gap:8px;max-height:260px;overflow:auto}.cbt-import-preview-item{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px}.cbt-import-preview-item strong{display:block;color:#111827;font-size:13px;line-height:1.45}.cbt-import-preview-item span{display:inline-flex;margin:6px 6px 0 0}
+        .cbt-ai-note-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px;max-height:240px;overflow:auto;border:1px solid #e2e8f0;border-radius:12px;background:#fff;padding:10px}.cbt-ai-note-option{display:flex;gap:9px;align-items:flex-start;border:1px solid #e7ecf4;border-radius:10px;background:#fbfdff;padding:10px;cursor:pointer}.cbt-ai-note-option input{margin-top:3px;accent-color:var(--bs-primary,#d300b0)}.cbt-ai-note-option strong{display:block;color:#111827;font-size:12.5px;line-height:1.35}.cbt-ai-note-option small{display:block;color:#64748b;font-size:11px;line-height:1.35;margin-top:3px}.cbt-ai-format-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px}.cbt-ai-check{border:1px solid #dbe3ef;background:#fff;border-radius:10px;padding:10px;display:flex;gap:8px;align-items:center;font-size:12px;font-weight:900;color:#334155}.cbt-ai-check input{accent-color:var(--bs-primary,#d300b0)}.cbt-import-box{border:1px solid #dbe3ef;border-radius:13px;background:#fbfdff;padding:14px;margin-bottom:14px}.cbt-import-top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:end}.cbt-import-file{position:relative;border:1px dashed #cbd5e1;border-radius:12px;background:#fff;padding:12px;min-height:62px;display:flex;align-items:center;gap:10px}.cbt-import-file i{font-size:22px;color:var(--bs-primary,#d300b0)}.cbt-import-file strong{display:block;color:#111827;font-size:13px}.cbt-import-file span{display:block;color:#64748b;font-size:12px;line-height:1.35}.cbt-import-file input{position:absolute;inset:0;opacity:0;cursor:pointer}.cbt-import-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.cbt-import-guide{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.cbt-import-guide code{display:block;background:#fff;border:1px solid #e5e7eb;border-radius:9px;padding:8px;color:#334155;font-size:11px;white-space:normal}.cbt-import-result{border-top:1px solid #e5e7eb;margin-top:12px;padding-top:12px}.cbt-import-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px}.cbt-import-summary div{background:#fff;border:1px solid #e7ecf4;border-radius:10px;padding:9px}.cbt-import-summary span{display:block;color:#64748b;font-size:10px;font-weight:900;text-transform:uppercase}.cbt-import-summary strong{display:block;color:#111827;font-size:16px}.cbt-import-errors{border:1px solid #fecaca;background:#fff1f2;color:#991b1b;border-radius:10px;padding:10px;font-size:12px}.cbt-import-preview{display:grid;gap:8px;max-height:260px;overflow:auto}.cbt-import-preview-item{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px}.cbt-import-preview-item strong{display:block;color:#111827;font-size:13px;line-height:1.45}.cbt-import-preview-item span{display:inline-flex;margin:6px 6px 0 0}
         .cbt-rich-editor{border:1px solid #d8e1ee;border-radius:12px;background:#fff;margin-bottom:12px;overflow:hidden}.cbt-rich-editor.is-disabled{opacity:.7}.cbt-rich-toolbar{display:flex;gap:6px;flex-wrap:wrap;padding:8px;border-bottom:1px solid #e5e7eb;background:#f8fafc}.cbt-rich-toolbar button{width:34px;height:32px;border:1px solid #dbe3ef;background:#fff;color:#334155;border-radius:8px;display:grid;place-items:center}.cbt-rich-toolbar button.is-active{background:var(--bs-primary,#d300b0);border-color:var(--bs-primary,#d300b0);color:#fff}.cbt-rich-toolbar button:disabled{opacity:.45;cursor:not-allowed}.cbt-rich-content{padding:12px}.cbt-rich-content .ProseMirror{outline:none;min-height:inherit}.cbt-rich-content .ProseMirror p.is-editor-empty:first-child:before{content:attr(data-placeholder);float:left;color:#94a3b8;pointer-events:none;height:0}
         .cbt-html{color:#111827;line-height:1.55}.cbt-html p{margin:0 0 10px}.cbt-html table,.cbt-rich-content table{width:100%;border-collapse:collapse;margin:10px 0;table-layout:fixed}.cbt-html th,.cbt-html td,.cbt-rich-content th,.cbt-rich-content td{border:1px solid #cbd5e1;padding:8px;vertical-align:top}.cbt-html th,.cbt-rich-content th{background:#f1f5f9;font-weight:900}.cbt-html img,.cbt-rich-content img{max-width:100%;height:auto;border-radius:10px;border:1px solid #e5e7eb;margin:8px 0}.cbt-html ul,.cbt-html ol{padding-left:20px;margin:8px 0}.cbt-html blockquote{border-left:4px solid var(--bs-primary,#d300b0);padding-left:12px;color:#475569}
         .cbt-builder-title{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -1193,7 +1251,6 @@ export default function CbtExamsPage() {
                                   <button className="cbt-btn cbt-soft" type="button" disabled={saving} onClick={() => loadExam(exam.id)}><i className="bi bi-pencil-square" /> Builder</button>
                                   <button className="cbt-btn cbt-primary" type="button" disabled={saving || exam.status === "published"} title={exam.status === "published" ? "Reopen this exam before importing questions." : "Import questions from Word or Excel"} onClick={() => openWordImport(exam.id)}><i className="bi bi-file-earmark-arrow-up" /> Import File</button>
                                   <button className="cbt-btn cbt-soft" type="button" disabled={saving} onClick={() => previewExam(exam.id)}><i className="bi bi-eye" /> Preview</button>
-                                    disabled={saving || (exam.attempts_count ?? 0) > 0}
                                   {exam.status === "draft" ? (
                                     <button className="cbt-btn cbt-gold" type="button" disabled={saving} onClick={() => publishExam(exam.id)}><i className="bi bi-send" /> Publish</button>
                                   ) : exam.status === "published" ? (
@@ -1246,9 +1303,7 @@ export default function CbtExamsPage() {
                         <i className="bi bi-file-earmark-arrow-up" /> Import File
                       </button>
                       <button className="cbt-btn cbt-gold" type="button" disabled={!examDetail || selectedIsPublished} onClick={() => {
-                        setAiDraft(null);
-                        setAiFile(null);
-                        setAiModalOpen(true);
+                        openAiGenerator();
                       }}>
                         <i className="bi bi-stars" /> Generate with AI
                       </button>
@@ -1966,6 +2021,33 @@ export default function CbtExamsPage() {
             <div className="cbt-modal-body">
               <div className="cbt-import-box">
                 <div className="row g-3">
+                  <div className="col-12">
+                    <label className="cbt-label">Saved lesson notes / topics</label>
+                    <div className="cbt-ai-note-list">
+                      {lessonNotesLoading ? (
+                        <div className="cbt-help">Loading lesson notes...</div>
+                      ) : lessonNoteSources.length === 0 ? (
+                        <div className="cbt-help">No saved lesson note is available yet.</div>
+                      ) : lessonNoteSources.map((item) => {
+                        const id = String(item.id);
+                        return (
+                          <label className="cbt-ai-note-option" key={item.id}>
+                            <input
+                              type="checkbox"
+                              checked={(Array.isArray(aiForm.lesson_note_ids) ? aiForm.lesson_note_ids : []).includes(id)}
+                              disabled={aiGenerating || aiImporting}
+                              onChange={() => toggleLessonNoteSource(id)}
+                            />
+                            <span>
+                              <strong>{item.topic || item.title}</strong>
+                              <small>{item.subject} - {item.class_name} - {item.status}</small>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <div className="cbt-help">Tick one or more lesson topics. AI will combine the selected notes when generating the exam questions.</div>
+                  </div>
                   <div className="col-md-6">
                     <label className="cbt-label">Teacher note / manual</label>
                     <label className="cbt-import-file">

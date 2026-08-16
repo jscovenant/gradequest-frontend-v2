@@ -19,6 +19,8 @@ type Policy = {
   ai_result_comment_credit_cost: number;
   ai_cbt_question_credit_cost: number;
   ai_lesson_plan_credit_cost: number;
+  ai_scheme_work_credit_cost: number;
+  ai_lesson_note_credit_cost: number;
   ai_fee_collection_credit_cost: number;
   ai_credit_unit_price: string | number;
   legacy_subscription_honor_enabled: boolean;
@@ -72,6 +74,8 @@ const defaultPolicy: Policy = {
   ai_result_comment_credit_cost: 1,
   ai_cbt_question_credit_cost: 5,
   ai_lesson_plan_credit_cost: 3,
+  ai_scheme_work_credit_cost: 4,
+  ai_lesson_note_credit_cost: 5,
   ai_fee_collection_credit_cost: 2,
   ai_credit_unit_price: 25,
   legacy_subscription_honor_enabled: true,
@@ -161,6 +165,8 @@ export default function BillingPolicyPage() {
         ai_result_comment_credit_cost: Number(policy.ai_result_comment_credit_cost || 1),
         ai_cbt_question_credit_cost: Number(policy.ai_cbt_question_credit_cost || 1),
         ai_lesson_plan_credit_cost: Number(policy.ai_lesson_plan_credit_cost || 1),
+        ai_scheme_work_credit_cost: Number((policy as any).ai_scheme_work_credit_cost || 4),
+        ai_lesson_note_credit_cost: Number((policy as any).ai_lesson_note_credit_cost || 5),
         ai_fee_collection_credit_cost: Number(policy.ai_fee_collection_credit_cost || 1),
         ai_credit_unit_price: Number(policy.ai_credit_unit_price || 0),
         legacy_subscription_honor_enabled: asBool(policy.legacy_subscription_honor_enabled),
@@ -355,7 +361,14 @@ export default function BillingPolicyPage() {
                     </Field>
                     <Field label="AI lesson plan cost (credits)">
                       <input className="bp-input" type="number" min={1} value={policy.ai_lesson_plan_credit_cost} onChange={(e)=>setPolicy((p)=>({...p, ai_lesson_plan_credit_cost:Number(e.target.value)}))} />
-                    </Field>                    <Field label="AI fee collection cost (credits)">
+                    </Field>
+                    <Field label="AI scheme of work cost (credits)">
+                      <input className="bp-input" type="number" min={1} value={policy.ai_scheme_work_credit_cost} onChange={(e)=>setPolicy((p)=>({...p, ai_scheme_work_credit_cost:Number(e.target.value)}))} />
+                    </Field>
+                    <Field label="AI lesson note cost (credits)">
+                      <input className="bp-input" type="number" min={1} value={policy.ai_lesson_note_credit_cost} onChange={(e)=>setPolicy((p)=>({...p, ai_lesson_note_credit_cost:Number(e.target.value)}))} />
+                    </Field>
+                    <Field label="AI fee collection cost (credits)">
                       <input className="bp-input" type="number" min={1} value={policy.ai_fee_collection_credit_cost} onChange={(e)=>setPolicy((p)=>({...p, ai_fee_collection_credit_cost:Number(e.target.value)}))} />
                     </Field>
                     <Field label="AI credit price (NGN)">

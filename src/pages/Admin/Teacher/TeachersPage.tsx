@@ -335,6 +335,13 @@ export default function TeachersPage() {
 
       showSuccess(res.data.message || "Teacher updated successfully!");
       await fetchTeachers();
+      if (res.data?.teacher) {
+        setTeacherDetails((prev: any) => ({ ...(prev || {}), teacher: res.data.teacher }));
+        setSelectedTeacher(res.data.teacher);
+      }
+      setDecryptedPassword(res.data?.decrypted_password || "");
+      setPasswordVisible(Boolean(res.data?.password_updated));
+      if (res.data?.password_updated) setActiveProfileTab("security");
       setIsEditMode(false);
       setPhotoFile(null);
       setPhotoPreview("");
@@ -1959,3 +1966,4 @@ export default function TeachersPage() {
     </>
   );
 }
+

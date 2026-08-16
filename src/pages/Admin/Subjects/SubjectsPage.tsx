@@ -13,6 +13,7 @@ import PageTitle from "../../../components/PageTitle";
 type Department = { id: number; name: string };
 const GENERAL_DEPARTMENT_ID = "general";
 type Section = { id: number; name: string };
+type StudentClass = { id: number; name: string; section_id?: number | null };
 
 type Subject = {
   id: number;
@@ -77,6 +78,7 @@ export default function SubjectsPage() {
   // data
   const [departments, setDepartments] = useState<Department[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
+  const [classes, setClasses] = useState<StudentClass[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
 
   // selection / ui
@@ -102,6 +104,12 @@ export default function SubjectsPage() {
   // assign-section
   const [selectedIds, setSelectedIds] = useState<Record<number, boolean>>({});
   const [assignSectionId, setAssignSectionId] = useState<string>("");
+
+  // subject offerings
+  const [offeringClassId, setOfferingClassId] = useState("");
+  const [offeringSectionId, setOfferingSectionId] = useState("");
+  const [offeringDepartmentId, setOfferingDepartmentId] = useState("");
+  const [offeringSubjectIds, setOfferingSubjectIds] = useState<Record<number, boolean>>({});
 
   const isBusy = (key: string) => busyKey === key;
 
@@ -131,6 +139,15 @@ export default function SubjectsPage() {
       showError(getErrorMessage(err));
     } finally {
       setLoadingSections(false);
+    }
+  }
+  async function fetchClasses() {
+    try {
+      const res = await authApi.get("/levels");
+      const rows = Array.isArray(res.data) ? res.data : res.data?.data || [];
+      setClasses(rows);
+    } catch (err: any) {
+      showError(getErrorMessage(err));
     }
   }
 
@@ -166,7 +183,7 @@ export default function SubjectsPage() {
 
   useEffect(() => {
     setLoadingPage(true);
-    Promise.all([fetchDepartments(), fetchSections()]).finally(() => setLoadingPage(false));
+    Promise.all([fetchDepartments(), fetchSections(), fetchClasses()]).finally(() => setLoadingPage(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -317,6 +334,50 @@ export default function SubjectsPage() {
     setSelectedIds((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
+  const offeringSelectedCount = useMemo(() => Object.values(offeringSubjectIds).filter(Boolean).length, [offeringSubjectIds]);
+
+  async function loadOfferings() {
+
+    try {
+      setBusyKey("offerings:load");
+      const params: any = {};
+      if (offeringClassId) params.level_id = Number(offeringClassId);
+      if (offeringSectionId) params.section_id = Number(offeringSectionId);
+      if (offeringDepartmentId) params.department_id = Number(offeringDepartmentId);
+      const res = await authApi.get("/subject-offerings", { params });
+      const ids = new Set<number>((res.data?.subject_ids || []).map((id: number) => Number(id)));
+      const next: Record<number, boolean> = {};
+      subjects.forEach((subject) => { next[subject.id] = ids.has(subject.id); });
+      setOfferingSubjectIds(next);
+    } catch (err: any) {
+      showError(getErrorMessage(err));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function saveOfferings() {
+
+    const subject_ids = Object.entries(offeringSubjectIds).filter(([, selected]) => selected).map(([id]) => Number(id));
+
+    try {
+      setBusyKey("offerings:save");
+      const payload: any = { subject_ids };
+      if (offeringClassId) payload.level_id = Number(offeringClassId);
+      if (offeringSectionId) payload.section_id = Number(offeringSectionId);
+      if (offeringDepartmentId) payload.department_id = Number(offeringDepartmentId);
+      const res = await authApi.post("/subject-offerings", payload);
+      showSuccess(res.data?.message || "Subject offerings saved.");
+    } catch (err: any) {
+      showError(getErrorMessage(err));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  function toggleOfferingSubject(id: number) {
+    setOfferingSubjectIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
   function selectAllFiltered() {
     const next: Record<number, boolean> = { ...selectedIds };
     filteredSubjects.forEach((s) => (next[s.id] = true));
@@ -916,6 +977,11 @@ export default function SubjectsPage() {
           background: #faf8f5;
           cursor: pointer;
         }
+        .db-check-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 10px;
+        }
         .db-option-card:hover { border-color: rgba(201,168,76,0.55); background: #fffaf0; }
         .db-option-card input { width: 18px; height: 18px; margin-top: 2px; accent-color: #c9a84c; cursor: pointer; flex-shrink: 0; }
         .db-option-title { display:block; font-size: 13px; font-weight: 900; color: #1a1a2e; line-height: 1.25; }
@@ -1425,6 +1491,97 @@ export default function SubjectsPage() {
               ) : null}
             </div>
 
+            {/* ===== PANEL: SUBJECT OFFERINGS ===== */}
+            <div className="db-panel" style={{ marginTop: 18 }}>
+              <div className="db-panel-head">
+                <div className="db-panel-title-group">
+                  <div className="db-panel-icon" style={{ "--pi": "#e0f2fe", "--pc": "#0369a1" } as React.CSSProperties}>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <path d="M3 4h10M3 8h10M3 12h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="db-panel-title">Control Who Offers These Subjects</h3>
+                    <p className="db-panel-sub">
+                      Decide the exact class, section, or department that should see and use the subjects currently listed above.
+                    </p>
+                  </div>
+                </div>
+                <div className="db-panel-actions">
+                  <span className="db-pill">{offeringSelectedCount} selected</span>
+                </div>
+              </div>
+
+              <div className="db-toolbar" style={{ alignItems: "end" }}>
+                <div className="db-field" style={{ minWidth: 180 }}>
+                  <label>Class</label>
+                  <select value={offeringClassId} onChange={(e) => setOfferingClassId(e.target.value)}>
+                    <option value="">All classes</option>
+                    {classes.map((item) => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="db-field" style={{ minWidth: 180 }}>
+                  <label>Section</label>
+                  <select value={offeringSectionId} onChange={(e) => setOfferingSectionId(e.target.value)}>
+                    <option value="">All sections</option>
+                    {sections.map((item) => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="db-field" style={{ minWidth: 200 }}>
+                  <label>Department</label>
+                  <select value={offeringDepartmentId} onChange={(e) => setOfferingDepartmentId(e.target.value)}>
+                    <option value="">All departments</option>
+                    {departments.map((item) => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <button className="db-btn-outline" type="button" onClick={loadOfferings} disabled={!departmentId || busyKey !== null}>
+                  {isBusy("offerings:load") ? "Loading..." : "Load current setup"}
+                </button>
+                <button className="db-btn-primary" type="button" onClick={saveOfferings} disabled={!departmentId || busyKey !== null}>
+                  {isBusy("offerings:save") ? "Saving..." : "Save setup"}
+                </button>
+              </div>
+
+              <div style={{ marginTop: 12, color: "#7a6a5a", fontSize: 13, lineHeight: 1.6 }}>
+                First select a department above so the subject list loads. Leave Class, Section, and Department as "All" to edit the school default.
+                To restrict a general subject like Civic Education, remove it from the default, then add it only to the correct class, section, or department.
+              </div>
+
+              {!departmentId ? (
+                <div className="db-empty" style={{ marginTop: 14 }}>
+                  Select General Department or another department above to load subjects first.
+                </div>
+              ) : subjects.length === 0 ? (
+                <div className="db-empty" style={{ marginTop: 14 }}>
+                  No subjects are loaded for the selected department.
+                </div>
+              ) : (
+                <div className="db-check-grid" style={{ marginTop: 16 }}>
+                  {subjects.map((subject) => (
+                    <label key={subject.id} className="db-option-card" style={{ alignItems: "center" }}>
+                      <input
+                        type="checkbox"
+                        checked={!!offeringSubjectIds[subject.id]}
+                        onChange={() => toggleOfferingSubject(subject.id)}
+                      />
+                      <span>
+                        <b>{subject.name}</b>
+                        <small style={{ display: "block", color: "#9a8a7a", marginTop: 2 }}>ID: {subject.id}</small>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
             <Footer />
 
             {/* =========================

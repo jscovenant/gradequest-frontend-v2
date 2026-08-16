@@ -97,6 +97,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       .map((key: string) => key.toLowerCase())
   );
   const featureAliases: Record<string, string[]> = {
+    staff_attendance: ["staff_attendance", "support_staff_attendance", "attendance_management", "support_attendance_management"],
     ai_lesson_plan_generator: ["ai_lesson_plan_generator", "support_ai_lesson_plan_generator", "lesson_plan_ai", "ai_lesson_planner", "gradequest_plus"],
     ai_fee_collection_assistant: ["ai_fee_collection_assistant", "support_ai_fee_collection_assistant", "ai_fee_assistant", "fee_collection_ai", "gradequest_plus"],
     ai_result_comment_generator: ["ai_result_comment_generator", "support_ai_result_comment_generator", "ai_result_comments", "result_comment_ai", "gradequest_plus"],
@@ -192,6 +193,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       // featureKey: "teachers", lockIfNoFeature: true, // optional
       children: [
         { label: "All Teachers", href: "/teachers" },
+        { label: "Assign Subjects", href: "/teacher-subjects" },
        
       ],
       roles: ["Admin"],
@@ -442,6 +444,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       collapseId: "studentAcademicsMenu",
       children: [
         { label: "My Subjects", href: "/student/my-subjects" },
+        { label: "Lesson Notes", href: "/student/lesson-notes" },
         { label: "My CBT Exams", href: "/student/cbt/exams", featureKey: "cbt_online", hideIfNoFeature: true },
       ],
       roles: ["Student"],
@@ -892,6 +895,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
     </>
   );
 }
+
 
 
 

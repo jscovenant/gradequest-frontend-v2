@@ -84,6 +84,7 @@ const ResultSubmissionDeadlinePage = lazy(() => import("./pages/Admin/StudentRes
 const ResultMonitoringPage = lazy(() => import("./pages/Admin/StudentResult/Resultmonitoringpage"));
 const CbtExamsPage = lazy(() => import("./pages/Admin/CBT/CbtExamsPage"));
 const StudentCbtExamsPage = lazy(() => import("./pages/Student/CBT/StudentCbtExamsPage"));
+const StudentLessonNotesPage = lazy(() => import("./pages/Student/Lessons/StudentLessonNotesPage"));
 const WhatsAppSettingsPage = lazy(() => import("./pages/Admin/School/WhatsAppSettingsPage"));
 const AiCreditsPage = lazy(() => import("./pages/Admin/School/AiCreditsPage"));
 const AiLessonPlanPage = lazy(() => import("./pages/Admin/School/AiLessonPlanPage"));
@@ -412,6 +413,15 @@ function App() {
                 </OnboardingGuard>
               </RequireAuth>
             }
+          />          <Route
+            path="/student/lesson-notes"
+            element={
+              <RequireAuth roles={["Student"]}>
+                <OnboardingGuard>
+                  <StudentLessonNotesPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
           />
 
           <Route
@@ -657,7 +667,7 @@ function App() {
           />
 
           <Route
-            path="/teacher/subjects"
+            path="/teacher-subjects"
             element={
               <RequireAuth roles={["Admin"]}>
                 <OnboardingGuard>
@@ -1006,6 +1016,7 @@ function App() {
 }
 
 export default App;
+
 
 
 

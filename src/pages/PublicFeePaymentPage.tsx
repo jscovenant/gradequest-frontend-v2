@@ -46,8 +46,10 @@ const money = (value: number) =>
 export default function PublicFeePaymentPage() {
   const query = useMemo(() => new URLSearchParams(window.location.search), []);
   const initialReference = query.get("reference") || "";
+  const initialSchoolCode = query.get("school_code") || "";
+  const hasSchoolCodeInLink = initialSchoolCode.trim().length > 0;
 
-  const [schoolCode, setSchoolCode] = useState(query.get("school_code") || "");
+  const [schoolCode] = useState(initialSchoolCode);
   const [studentRegNo, setStudentRegNo] = useState(query.get("student_reg_no") || "");
   const [amount, setAmount] = useState("");
   const [payerEmail, setPayerEmail] = useState("");
@@ -183,6 +185,9 @@ export default function PublicFeePaymentPage() {
         .pf-input:focus{border-color:rgba(211,0,176,.4);box-shadow:0 0 0 4px rgba(211,0,176,.08)}
         .pf-hint{font-size:12px;color:#9a8a7a;margin-top:6px}
         .pf-found{display:flex;align-items:flex-start;gap:10px;padding:12px;border-radius:12px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.18);color:#065f46;font-size:13px}
+        .pf-school-brand{padding:18px;border-radius:16px;background:linear-gradient(135deg,rgba(211,0,176,.12),rgba(255,200,87,.16));border:1px solid rgba(211,0,176,.18);box-shadow:0 10px 24px rgba(211,0,176,.08)}
+        .pf-school-label{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:#8c3a7f;margin-bottom:6px}
+        .pf-school-name{font-size:clamp(20px,3vw,30px);line-height:1.1;font-weight:950;color:#050008;margin:0;letter-spacing:0}
         .pf-warn{padding:12px;border-radius:12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);color:#92400e;font-size:13px}
         .pf-error{padding:12px;border-radius:12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.18);color:#991b1b;font-size:13px}
         .pf-success{padding:12px;border-radius:12px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.18);color:#065f46;font-size:13px}
@@ -212,7 +217,7 @@ export default function PublicFeePaymentPage() {
             </div>
             <h1 className="pf-title">Pay School Fees Online</h1>
             <p className="pf-sub">
-              Enter the school code and student admission number to confirm the student record and outstanding balance before payment.
+              Confirm your child's admission number, review the outstanding balance, and complete payment securely.
             </p>
           </div>
           <div className="pf-secure">
@@ -235,19 +240,16 @@ export default function PublicFeePaymentPage() {
                 {message && <div className="pf-success">{message}</div>}
                 {error && <div className="pf-error">{error}</div>}
 
-                <div>
-                  <label className="pf-label">School Code</label>
-                  <input className="pf-input" value={schoolCode} onChange={(e) => setSchoolCode(e.target.value)} placeholder="Admin reg no, e.g. R123456" />
-                  <div className="pf-hint">{schoolLoading ? "Checking school..." : "This is the school owner/admin registration number."}</div>
-                </div>
+                {schoolLoading && <div className="pf-warn">Loading school details...</div>}
+
+                {!hasSchoolCodeInLink && (
+                  <div className="pf-warn">Please use the payment link sent by the school to continue.</div>
+                )}
 
                 {school && (
-                  <div className="pf-found">
-                    <i className="bi bi-building" />
-                    <div>
-                      <strong>{school.name}</strong>
-                      <div>School code: {school.code}</div>
-                    </div>
+                  <div className="pf-school-brand">
+                    <div className="pf-school-label">Paying to</div>
+                    <h2 className="pf-school-name">{school.name}</h2>
                   </div>
                 )}
 
@@ -293,7 +295,7 @@ export default function PublicFeePaymentPage() {
             </div>
             <div className="pf-card-body">
               {!studentData ? (
-                <div className="pf-warn">Enter a school code and admission number to load the student's outstanding fees.</div>
+                <div className="pf-warn">Enter the student admission number to load the outstanding fees.</div>
               ) : (
                 <>
                   <div className="pf-student">

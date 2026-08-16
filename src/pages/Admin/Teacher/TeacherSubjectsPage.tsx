@@ -1,859 +1,165 @@
-// src/pages/Teachers/TeacherSubjectsPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import TopNav from "../../../components/LayoutComponents/TopNav";
 import Sidebar from "../../../components/LayoutComponents/Sidebar";
 import Footer from "../../../components/LayoutComponents/Footer";
 import Loader from "../../../components/ui/dashboardLoader";
+import PageTitle from "../../../components/PageTitle";
 import { authApi } from "../../../utils/axios";
 import { useToast } from "../../../contexts/ToastContext";
-import PageTitle from "../../../components/PageTitle";
 
-type Teacher = { id: number; firstname?: string; surname?: string };
-type Subject = { id: number; name: string };
+type AssignedClass = { id: number; name: string; section_id?: number | null; section_name?: string | null };
+type Teacher = { id: number; firstname?: string; surname?: string; email?: string | null; reg_no?: string | null; username?: string | null; teacher_status?: string | null; assigned_classes?: AssignedClass[] };
+type Subject = { id: number; name: string; section_id?: number | null; department_id?: number | null; class_id?: number | null; section_name?: string | null; department_name?: string | null };
+type Assignment = { teacher_id: number; subject_id: number; teacher?: Teacher | null; subject?: Subject | null };
 
-type Assignment = {
-  teacher_id: number;
-  subject_id: number;
-  teacher?: Teacher | null;
-  subject?: Subject | null;
+const capitalize = (value?: string | null) => {
+  const text = String(value || "").trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1).toLowerCase() : "";
 };
 
-function capitalize(str?: string | null) {
-  if (!str) return "";
-  const s = String(str).trim();
-  if (!s) return "";
-  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
-}
-
-function fullName(t?: Teacher | null) {
-  return [capitalize(t?.firstname), capitalize(t?.surname)].filter(Boolean).join(" ").trim() || "—";
-}
-
-function getGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good Morning";
-  if (hour < 17) return "Good Afternoon";
-  return "Good Evening";
-}
+const fullName = (teacher?: Teacher | null) => [capitalize(teacher?.firstname), capitalize(teacher?.surname)].filter(Boolean).join(" ") || "Unnamed teacher";
 
 export default function TeacherSubjectsPage() {
   const { showSuccess, showError } = useToast();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  // page loading
-  const [loadingPage, setLoadingPage] = useState(true);
-  const [loadingData, setLoadingData] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
-  // data
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-
-  // filters
-  const [teacherQuery, setTeacherQuery] = useState("");
-  const [subjectQuery, setSubjectQuery] = useState("");
-  const [onlyAssigned, setOnlyAssigned] = useState(false);
-
-  // modal state (assign subjects)
-  const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedTeacherId, setSelectedTeacherId] = useState<number | "">("");
   const [selectedSubjectIds, setSelectedSubjectIds] = useState<number[]>([]);
-  const [modalSubjectSearch, setModalSubjectSearch] = useState("");
+  const [teacherSearch, setTeacherSearch] = useState("");
+  const [subjectSearch, setSubjectSearch] = useState("");
 
-  // boot loader
-  useEffect(() => {
-    const t = window.setTimeout(() => setLoadingPage(false), 120);
-    return () => window.clearTimeout(t);
-  }, []);
-
-  const normalizeAssignments = (raw: any): Assignment[] => {
-    const list: any[] = Array.isArray(raw) ? raw : raw?.data ?? raw?.assignments ?? [];
-    return list
-      .map((a) => ({
-        teacher_id: Number(a.teacher_id ?? a.teacher?.id ?? 0),
-        subject_id: Number(a.subject_id ?? a.subject?.id ?? 0),
-        teacher: a.teacher
-          ? { id: Number(a.teacher.id), firstname: a.teacher.firstname, surname: a.teacher.surname }
-          : undefined,
-        subject: a.subject ? { id: Number(a.subject.id), name: a.subject.name } : undefined,
-      }))
-      .filter((a) => a.teacher_id > 0 && a.subject_id > 0);
-  };
-
-  const fetchAll = async () => {
-    setLoadingData(true);
+  const loadWorkspace = async () => {
+    setLoading(true);
     try {
-      const [tRes, sRes, aRes] = await Promise.all([
-        authApi.get("/teachers"),
-        authApi.get("/subjects"),
-        authApi.get("/teacher-subjects"),
-      ]);
+      const res = await authApi.get("/teacher-subjects/workspace");
+      const nextTeachers: Teacher[] = res.data?.teachers || [];
+      const nextSubjects: Subject[] = res.data?.subjects || [];
+      const nextAssignments: Assignment[] = res.data?.assignments || [];
+      setTeachers(nextTeachers);
+      setSubjects(nextSubjects);
+      setAssignments(nextAssignments);
 
-      const tList: Teacher[] = (tRes.data?.data ?? tRes.data ?? []).map((t: any) => ({
-        id: Number(t.id),
-        firstname: t.firstname,
-        surname: t.surname,
-      }));
-
-      const sList: Subject[] = (sRes.data?.data ?? sRes.data ?? []).map((s: any) => ({
-        id: Number(s.id),
-        name: String(s.name ?? "").trim(),
-      }));
-
-      setTeachers(tList);
-      setSubjects(sList);
-      setAssignments(normalizeAssignments(aRes.data));
-    } catch (e: any) {
-      console.error(e);
-      showError(e?.response?.data?.message || "Failed to load teacher-subject data.");
+      if (!selectedTeacherId && nextTeachers.length > 0) {
+        setSelectedTeacherId(nextTeachers[0].id);
+      }
+    } catch (err: any) {
+      showError(err?.response?.data?.message || "Unable to load teacher subject assignments.");
     } finally {
-      setLoadingData(false);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAll();
+    loadWorkspace();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const assignedTeacherIds = useMemo(() => new Set(assignments.map((a) => a.teacher_id)), [assignments]);
+  const selectedTeacher = useMemo(() => teachers.find((teacher) => teacher.id === Number(selectedTeacherId)) || null, [teachers, selectedTeacherId]);
+  const selectedTeacherAssignments = useMemo(() => assignments.filter((item) => item.teacher_id === Number(selectedTeacherId)), [assignments, selectedTeacherId]);
 
-  const assignmentsByTeacher = useMemo(() => {
-    const map = new Map<number, Assignment[]>();
-    for (const a of assignments) {
-      const arr = map.get(a.teacher_id) ?? [];
-      arr.push(a);
-      map.set(a.teacher_id, arr);
-    }
-    for (const [k, arr] of map.entries()) {
-      arr.sort((x, y) => String(x.subject?.name ?? "").localeCompare(String(y.subject?.name ?? "")));
-      map.set(k, arr);
-    }
+  useEffect(() => {
+    setSelectedSubjectIds(selectedTeacherAssignments.map((item) => item.subject_id));
+  }, [selectedTeacherAssignments]);
+
+  const eligibleSubjects = useMemo(() => {
+    if (!selectedTeacher) return [];
+    const classIds = new Set((selectedTeacher.assigned_classes || []).map((item) => Number(item.id)).filter(Boolean));
+    const sectionIds = new Set((selectedTeacher.assigned_classes || []).map((item) => Number(item.section_id)).filter(Boolean));
+    const q = subjectSearch.trim().toLowerCase();
+
+    return subjects.filter((subject) => {
+      const classOk = !subject.class_id || subject.class_id === 0 || classIds.has(Number(subject.class_id));
+      const sectionOk = !subject.section_id || sectionIds.size === 0 || sectionIds.has(Number(subject.section_id));
+      const searchOk = !q || subject.name.toLowerCase().includes(q) || String(subject.section_name || "").toLowerCase().includes(q) || String(subject.department_name || "").toLowerCase().includes(q);
+      return classOk && sectionOk && searchOk;
+    });
+  }, [selectedTeacher, subjects, subjectSearch]);
+
+  const filteredTeachers = useMemo(() => {
+    const q = teacherSearch.trim().toLowerCase();
+    if (!q) return teachers;
+    return teachers.filter((teacher) => `${teacher.firstname || ""} ${teacher.surname || ""} ${teacher.email || ""} ${teacher.reg_no || ""} ${teacher.username || ""}`.toLowerCase().includes(q));
+  }, [teachers, teacherSearch]);
+
+  const assignedCountByTeacher = useMemo(() => {
+    const map = new Map<number, number>();
+    assignments.forEach((item) => map.set(item.teacher_id, (map.get(item.teacher_id) || 0) + 1));
     return map;
   }, [assignments]);
 
-  const teacherNameById = (id: number) => {
-    const t = teachers.find((x) => x.id === id);
-    return fullName(t ?? null);
+  const toggleSubject = (subjectId: number) => {
+    setSelectedSubjectIds((prev) => prev.includes(subjectId) ? prev.filter((id) => id !== subjectId) : [...prev, subjectId]);
   };
 
-  // ===== helper: get assigned subject ids for a teacher =====
-  const assignedSubjectIdsForTeacher = (teacherId: number) => {
-    return assignments
-      .filter((a) => a.teacher_id === teacherId)
-      .map((a) => a.subject_id)
-      .filter((x) => Number(x) > 0);
-  };
+  const saveAssignments = async () => {
+    if (!selectedTeacher) return showError("Select a teacher first.");
+    if ((selectedTeacher.assigned_classes || []).length === 0) return showError("This teacher has no assigned class. Assign class first from the teacher profile.");
 
-  const filteredTeachers = useMemo(() => {
-    const q = teacherQuery.trim().toLowerCase();
-    let list = teachers;
-
-    if (onlyAssigned) list = list.filter((t) => assignedTeacherIds.has(t.id));
-    if (!q) return list;
-
-    return list.filter((t) => {
-      const name = `${t.firstname ?? ""} ${t.surname ?? ""}`.toLowerCase();
-      return name.includes(q) || String(t.id).includes(q);
-    });
-  }, [teachers, teacherQuery, onlyAssigned, assignedTeacherIds]);
-
-  const totalAssignments = assignments.length;
-  const totalTeachers = teachers.length;
-  const totalSubjects = subjects.length;
-  const teachersWithSubjects = assignedTeacherIds.size;
-
-  // ===== MODAL =====
-  const openAssignModal = (teacherId?: number) => {
-    setModalSubjectSearch("");
-
-    const tid = teacherId ?? "";
-    setSelectedTeacherId(tid);
-
-    // ✅ Pre-check subjects already assigned
-    if (teacherId) {
-      setSelectedSubjectIds(assignedSubjectIdsForTeacher(teacherId));
-    } else {
-      setSelectedSubjectIds([]);
+    setSaving(true);
+    try {
+      const res = await authApi.post("/teacher-subjects", {
+        teacher_id: selectedTeacher.id,
+        subject_ids: selectedSubjectIds,
+        sync: true,
+      });
+      showSuccess(res.data?.message || "Teacher subjects saved.");
+      if (res.data?.assignments) setAssignments(res.data.assignments);
+      await loadWorkspace();
+    } catch (err: any) {
+      showError(err?.response?.data?.message || "Unable to save teacher subjects.");
+    } finally {
+      setSaving(false);
     }
-
-    setShowAssignModal(true);
   };
 
-  const closeAssignModal = () => {
-    setShowAssignModal(false);
-    setSelectedTeacherId("");
-    setSelectedSubjectIds([]);
-    setModalSubjectSearch("");
-  };
-
-  // ✅ When teacher changes inside modal, auto-load their assigned subjects
-  useEffect(() => {
-    if (!showAssignModal) return;
-
-    const tid = Number(selectedTeacherId);
-    if (!tid) {
-      setSelectedSubjectIds([]);
+  const selectAllVisible = () => {
+    const ids = eligibleSubjects.map((subject) => subject.id);
+    const allSelected = ids.length > 0 && ids.every((id) => selectedSubjectIds.includes(id));
+    if (allSelected) {
+      setSelectedSubjectIds((prev) => prev.filter((id) => !ids.includes(id)));
       return;
     }
-
-    setSelectedSubjectIds(assignedSubjectIdsForTeacher(tid));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTeacherId, showAssignModal, assignments]);
-
-  const toggleSubject = (id: number) => {
-    setSelectedSubjectIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setSelectedSubjectIds((prev) => Array.from(new Set([...prev, ...ids])));
   };
 
-  const modalSubjects = useMemo(() => {
-    const q = modalSubjectSearch.trim().toLowerCase();
-    if (!q) return subjects;
-    return subjects.filter((s) => s.name.toLowerCase().includes(q));
-  }, [subjects, modalSubjectSearch]);
+  return <>
+    <style>{`
+      .ts-main{background:#fbf7f8;min-height:100vh;overflow-x:hidden;font-family:"DM Sans",system-ui,sans-serif}.ts-shell{padding:26px 26px 0}.ts-hero{background:#08020b;color:#fff;border-radius:16px;padding:24px 26px;margin-bottom:16px}.ts-kicker{font-size:11px;text-transform:uppercase;font-weight:900;color:var(--bs-secondary,#ffc857);letter-spacing:.12em}.ts-title{font-family:"Lora",serif;font-size:clamp(25px,3vw,35px);font-weight:900;margin:6px 0}.ts-sub{max-width:820px;color:rgba(255,255,255,.72);font-size:13.5px;line-height:1.7;margin:0}.ts-grid{display:grid;grid-template-columns:360px 1fr;gap:16px;align-items:start}.ts-card{background:#fff;border:1px solid rgba(8,2,11,.08);border-radius:14px;box-shadow:0 12px 32px rgba(8,2,11,.055);overflow:hidden}.ts-pad{padding:16px}.ts-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}.ts-head h2{font-size:16px;font-weight:900;color:#181022;margin:0}.ts-muted{font-size:12px;color:#806f78;line-height:1.55;margin:3px 0 0}.ts-input,.ts-select{width:100%;border:1px solid rgba(8,2,11,.12);border-radius:10px;padding:10px 12px;background:#fff;color:#181022;font-weight:700;outline:none}.ts-teacher{width:100%;border:1px solid rgba(8,2,11,.08);background:#fff;border-radius:12px;padding:12px;text-align:left;margin-bottom:8px}.ts-teacher.active{border-color:var(--bs-primary,#d300b0);box-shadow:0 0 0 3px rgba(211,0,176,.12)}.ts-name{font-weight:900;color:#181022}.ts-pill{display:inline-flex;border-radius:999px;padding:5px 9px;background:#f3eef2;color:#3c3039;font-size:11px;font-weight:900}.ts-pill.ok{background:#dcfce7;color:#166534}.ts-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.ts-class-list{display:flex;gap:8px;flex-wrap:wrap}.ts-subject-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;max-height:520px;overflow:auto;padding-right:4px}.ts-subject{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;border:1px solid rgba(8,2,11,.08);border-radius:12px;padding:12px;background:#fff;cursor:pointer}.ts-subject.checked{border-color:#16a34a;background:#f0fdf4}.ts-btn{border:0;border-radius:10px;background:var(--bs-primary,#d300b0);color:#fff;font-weight:900;padding:10px 14px}.ts-btn.secondary{background:#fff;color:#181022;border:1px solid rgba(8,2,11,.12)}.ts-actions{display:flex;gap:8px;flex-wrap:wrap}.ts-empty{border:1px dashed rgba(8,2,11,.18);border-radius:14px;padding:28px;text-align:center;color:#806f78;background:#fff}.ts-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}.ts-summary div{border:1px solid rgba(8,2,11,.08);border-radius:12px;padding:12px;background:#fffcf7}.ts-summary span{display:block;font-size:11px;color:#806f78}.ts-summary strong{font-size:20px;color:#181022}@media(max-width:1100px){.ts-grid{grid-template-columns:1fr}.ts-subject-grid{grid-template-columns:1fr}}@media(max-width:767px){.ts-shell{padding:18px 12px 0}.ts-summary{grid-template-columns:1fr}}`}</style>
+    <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title="Teacher Subjects" />
+    <div className="container-fluid"><div className="row"><Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+      <main className="col-md-9 col-lg-10 ms-auto gq-app-main ts-main">
+        <div className="ts-shell">
+        <PageTitle title="Teacher Subjects" />
+        {(loading || saving) && <Loader message={saving ? "Saving assignment..." : "Loading teacher subjects..."} />}
+        <section className="ts-hero"><div className="ts-kicker">Academic setup</div><h1 className="ts-title">Assign Subjects to Teachers</h1><p className="ts-sub">Choose a teacher, confirm the assigned class/section, then select the subjects the teacher can use for lesson notes, lesson plans, CBT and result workflows.</p></section>
 
-  const modalAllSelected = useMemo(() => {
-    if (!modalSubjects.length) return false;
-    const set = new Set(selectedSubjectIds);
-    return modalSubjects.every((s) => set.has(s.id));
-  }, [modalSubjects, selectedSubjectIds]);
+        <div className="ts-summary"><div><span>Teachers</span><strong>{teachers.length}</strong></div><div><span>Subjects</span><strong>{subjects.length}</strong></div><div><span>Assignments</span><strong>{assignments.length}</strong></div></div>
 
-  const toggleSelectAllModal = () => {
-    const visibleIds = modalSubjects.map((s) => s.id);
-    const set = new Set(selectedSubjectIds);
-    if (modalAllSelected) {
-      setSelectedSubjectIds(selectedSubjectIds.filter((id) => !visibleIds.includes(id)));
-    } else {
-      visibleIds.forEach((id) => set.add(id));
-      setSelectedSubjectIds(Array.from(set));
-    }
-  };
+        <div className="ts-grid">
+          <section className="ts-card"><div className="ts-pad"><div className="ts-head"><div><h2>Teachers</h2><p className="ts-muted">Select one teacher to manage subjects.</p></div><button className="ts-btn secondary" onClick={loadWorkspace}>Refresh</button></div><input className="ts-input" placeholder="Search teacher" value={teacherSearch} onChange={(e)=>setTeacherSearch(e.target.value)} />
+            <div style={{marginTop:12,maxHeight:620,overflow:"auto"}}>{filteredTeachers.length === 0 ? <div className="ts-empty">No teacher found.</div> : filteredTeachers.map((teacher)=><button key={teacher.id} type="button" className={`ts-teacher ${selectedTeacherId === teacher.id ? "active" : ""}`} onClick={()=>setSelectedTeacherId(teacher.id)}><div className="ts-name">{fullName(teacher)}</div><div className="ts-muted">{teacher.email || teacher.username || teacher.reg_no || `ID ${teacher.id}`}</div><div className="ts-meta"><span className={`ts-pill ${assignedCountByTeacher.get(teacher.id) ? "ok" : ""}`}>{assignedCountByTeacher.get(teacher.id) || 0} subject(s)</span>{(teacher.assigned_classes || []).length ? <span className="ts-pill">{teacher.assigned_classes?.map((c)=>c.name).join(", ")}</span> : <span className="ts-pill">No class</span>}</div></button>)}</div>
+          </div></section>
 
-  // ✅ SYNC: add new + remove unchecked
-  const assignSubjects = async () => {
-    const teacherId = Number(selectedTeacherId);
-    if (!teacherId) return showError("Please select a teacher.");
-
-    setSaving(true);
-    try {
-      const existing = new Set(assignedSubjectIdsForTeacher(teacherId));
-      const next = new Set(selectedSubjectIds);
-
-      const toRemove = Array.from(existing).filter((id) => !next.has(id));
-      const toAdd = Array.from(next).filter((id) => !existing.has(id));
-
-      // remove unchecked
-      if (toRemove.length) {
-        await Promise.all(toRemove.map((sid) => authApi.delete(`/teacher-subjects/${teacherId}/${sid}`)));
-      }
-
-      // add new checked (or re-send all selected; we only send additions)
-      if (toAdd.length) {
-        const res = await authApi.post("/teacher-subjects", {
-          teacher_id: teacherId,
-          subject_ids: toAdd,
-        });
-        showSuccess(res?.data?.message || "Subjects assigned successfully.");
-      } else {
-        // if only removals happened
-        showSuccess("Assignments updated successfully.");
-      }
-
-      closeAssignModal();
-      await fetchAll();
-    } catch (e: any) {
-      console.error(e);
-      showError(e?.response?.data?.message || "Failed to update assignments.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const removeAssignment = async (teacherId: number, subjectId: number) => {
-    const ok = window.confirm("Remove this subject from the teacher?");
-    if (!ok) return;
-
-    setSaving(true);
-    try {
-      const res = await authApi.delete(`/teacher-subjects/${teacherId}/${subjectId}`);
-      showSuccess(res?.data?.message || "Subject removed from teacher.");
-      await fetchAll();
-    } catch (e: any) {
-      console.error(e);
-      showError(e?.response?.data?.message || "Failed to remove assignment.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <>
-      <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-      <PageTitle title="Teacher's Subjects" />
-
-      <div className="container-fluid">
-        <div className="row">
-          <Sidebar sidebarOpen={sidebarOpen} />
-
-          <main
-            className="col-md-9 col-lg-10 ms-auto px-4 d-flex flex-column min-vh-100"
-            style={{ backgroundColor: "#f8f9fa" }}
-          >
-            {(loadingPage || loadingData || saving) && (
-              <Loader message={saving ? "Saving changes..." : loadingData ? "Loading assignments..." : "Loading..."} />
-            )}
-
-            {/* HERO */}
-            <div
-              className="mt-4 p-4 position-relative overflow-hidden"
-              style={{
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                borderRadius: 16,
-                boxShadow: "0 10px 30px rgba(102, 126, 234, 0.3)",
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  top: "-55px",
-                  right: "-55px",
-                  width: 210,
-                  height: 210,
-                  background: "rgba(255,255,255,0.10)",
-                  borderRadius: "50%",
-                  filter: "blur(42px)",
-                }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "-35px",
-                  left: "-35px",
-                  width: 170,
-                  height: 170,
-                  background: "rgba(255,255,255,0.10)",
-                  borderRadius: "50%",
-                  filter: "blur(42px)",
-                }}
-              />
-
-              <div className="row align-items-center position-relative g-3">
-                <div className="col-lg-8">
-                  <div className="d-flex flex-wrap gap-2 align-items-center mb-2">
-                    <span
-                      className="badge px-3 py-2"
-                      style={{
-                        backgroundColor: "rgba(255,255,255,0.18)",
-                        color: "#fff",
-                        borderRadius: 999,
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                      }}
-                    >
-                      <i className="bi bi-journal-bookmark-fill me-1" />
-                      Teacher Subject Assignment
-                    </span>
-
-                    <span
-                      className="badge px-3 py-2"
-                      style={{
-                        backgroundColor: "rgba(16, 185, 129, 0.9)",
-                        color: "#fff",
-                        borderRadius: 999,
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                      }}
-                    >
-                      <i className="bi bi-shield-check me-1" />
-                      Manage teaching workload
-                    </span>
-                  </div>
-
-                  <h2 className="fw-bold text-white mb-2">{getGreeting()}, Admin 👋</h2>
-                  <p className="text-white mb-4" style={{ opacity: 0.9, fontSize: "1rem" }}>
-                    Assign subjects to teachers, view all assignments, and remove subjects when needed.
-                  </p>
-
-                  <div className="d-flex flex-wrap gap-2">
-                    <button
-                      className="btn btn-light px-4 py-2 d-flex align-items-center gap-2"
-                      style={{ borderRadius: 10, fontWeight: 700, boxShadow: "0 4px 12px rgba(0,0,0,0.10)" }}
-                      onClick={() => openAssignModal()}
-                      disabled={loadingData}
-                    >
-                      <i className="bi bi-plus-circle" />
-                      Assign Subjects
-                    </button>
-
-                    <button
-                      className="btn px-4 py-2 d-flex align-items-center gap-2"
-                      style={{
-                        borderRadius: 10,
-                        fontWeight: 700,
-                        backgroundColor: "rgba(255,255,255,0.20)",
-                        color: "#fff",
-                        border: "1px solid rgba(255,255,255,0.30)",
-                      }}
-                      onClick={() => fetchAll()}
-                      disabled={loadingData}
-                    >
-                      <i className="bi bi-arrow-clockwise" />
-                      Refresh
-                    </button>
-                  </div>
-                </div>
-
-                <div className="col-lg-4 d-none d-lg-block">
-                  <div
-                    style={{
-                      background: "rgba(255, 255, 255, 0.15)",
-                      backdropFilter: "blur(10px)",
-                      borderRadius: 16,
-                      padding: "1.25rem",
-                      border: "1px solid rgba(255, 255, 255, 0.2)",
-                    }}
-                  >
-                    <div className="d-flex align-items-center justify-content-between mb-3">
-                      <span className="text-white" style={{ fontSize: "0.9rem", opacity: 0.9 }}>
-                        Quick Stats
-                      </span>
-                      <i className="bi bi-graph-up text-white" />
-                    </div>
-
-                    <div className="d-flex flex-column gap-2">
-                      <div className="d-flex justify-content-between">
-                        <span className="text-white" style={{ opacity: 0.85 }}>
-                          Teachers
-                        </span>
-                        <span className="text-white fw-bold">{loadingData ? "..." : totalTeachers}</span>
-                      </div>
-                      <div className="d-flex justify-content-between">
-                        <span className="text-white" style={{ opacity: 0.85 }}>
-                          Subjects
-                        </span>
-                        <span className="text-white fw-bold">{loadingData ? "..." : totalSubjects}</span>
-                      </div>
-                      <div className="d-flex justify-content-between">
-                        <span className="text-white" style={{ opacity: 0.85 }}>
-                          Assignments
-                        </span>
-                        <span className="text-white fw-bold">{loadingData ? "..." : totalAssignments}</span>
-                      </div>
-                      <div className="mt-2 pt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.18)" }}>
-                        <small className="text-white" style={{ opacity: 0.85 }}>
-                          Teachers assigned: <b>{loadingData ? "..." : teachersWithSubjects}</b>
-                        </small>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* TOOLBAR */}
-            <div className="card border-0 shadow-sm mb-4 mt-3" style={{ borderRadius: 12 }}>
-              <div className="card-body p-3 p-md-4 d-flex flex-wrap gap-2 align-items-center justify-content-between">
-                <div style={{ minWidth: 260 }}>
-                  <div className="fw-semibold" style={{ color: "#1e293b" }}>
-                    Directory & Filters
-                  </div>
-                  <div className="text-muted small">Search teachers, search subjects, and optionally show only assigned teachers.</div>
-                </div>
-
-                <div className="d-flex flex-wrap gap-2 align-items-center">
-                  <div className="input-group" style={{ minWidth: 260 }}>
-                    <span className="input-group-text bg-white">
-                      <i className="bi bi-search" />
-                    </span>
-                    <input
-                      className="form-control"
-                      placeholder="Search teacher (e.g. Ade)"
-                      value={teacherQuery}
-                      onChange={(e) => setTeacherQuery(e.target.value)}
-                    />
-                    {teacherQuery.trim() ? (
-                      <button className="btn btn-outline-secondary" onClick={() => setTeacherQuery("")} title="Clear">
-                        <i className="bi bi-x-lg" />
-                      </button>
-                    ) : null}
-                  </div>
-
-                  <div className="input-group" style={{ minWidth: 260 }}>
-                    <span className="input-group-text bg-white">
-                      <i className="bi bi-funnel" />
-                    </span>
-                    <input
-                      className="form-control"
-                      placeholder="Search subject (e.g. Maths)"
-                      value={subjectQuery}
-                      onChange={(e) => setSubjectQuery(e.target.value)}
-                    />
-                    {subjectQuery.trim() ? (
-                      <button className="btn btn-outline-secondary" onClick={() => setSubjectQuery("")} title="Clear">
-                        <i className="bi bi-x-lg" />
-                      </button>
-                    ) : null}
-                  </div>
-
-                  <div className="form-check ms-2">
-                    <input
-                      className="form-check-input"
-                      type="checkbox"
-                      id="onlyAssigned"
-                      checked={onlyAssigned}
-                      onChange={(e) => setOnlyAssigned(e.target.checked)}
-                    />
-                    <label className="form-check-label" htmlFor="onlyAssigned">
-                      Only assigned
-                    </label>
-                  </div>
-
-                  <button className="btn btn-primary" style={{ borderRadius: 10, fontWeight: 700 }} onClick={() => openAssignModal()}>
-                    <i className="bi bi-plus-circle me-1" />
-                    Assign
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* CONTENT GRID */}
-            <div className="row g-3 mb-4">
-              {/* LEFT: TEACHERS */}
-              <div className="col-12 col-lg-6">
-                <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
-                  <div className="card-body p-3 p-md-4">
-                    <div className="d-flex align-items-center justify-content-between mb-2">
-                      <div>
-                        <div className="fw-semibold" style={{ color: "#1e293b" }}>
-                          Teachers
-                        </div>
-                        <div className="text-muted small">Select a teacher to assign subjects quickly.</div>
-                      </div>
-                      <span className="badge bg-light text-dark" style={{ borderRadius: 999 }}>
-                        {filteredTeachers.length} shown
-                      </span>
-                    </div>
-
-                    <div style={{ maxHeight: 520, overflow: "auto" }}>
-                      {filteredTeachers.length === 0 ? (
-                        <div className="text-center text-muted py-5">
-                          <i className="bi bi-emoji-frown fs-3 d-block mb-2" />
-                          No teachers found.
-                        </div>
-                      ) : (
-                        <div className="list-group">
-                          {filteredTeachers.map((t) => {
-                            const count = assignmentsByTeacher.get(t.id)?.length ?? 0;
-                            const isAssigned = count > 0;
-
-                            return (
-                              <button
-                                key={t.id}
-                                type="button"
-                                className="list-group-item list-group-item-action d-flex align-items-center justify-content-between"
-                                onClick={() => openAssignModal(t.id)}
-                                style={{ borderRadius: 10, marginBottom: 8 }}
-                              >
-                                <div>
-                                  <div className="fw-semibold">{fullName(t)}</div>
-                                  <div className="text-muted small">ID: {t.id}</div>
-                                </div>
-
-                                <div className="d-flex align-items-center gap-2">
-                                  <span className={`badge ${isAssigned ? "bg-success" : "bg-secondary"}`} style={{ borderRadius: 999 }}>
-                                    {isAssigned ? `${count} subject(s)` : "No subjects"}
-                                  </span>
-                                  <i className="bi bi-chevron-right text-muted" />
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="text-muted small mt-2">
-                      <i className="bi bi-info-circle me-1" />
-                      Tip: Clicking a teacher opens the Assign modal with that teacher pre-selected.
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* RIGHT: ASSIGNMENTS */}
-              <div className="col-12 col-lg-6">
-                <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
-                  <div className="card-body p-3 p-md-4">
-                    <div className="input-group mb-3">
-                      <span className="input-group-text bg-white">
-                        <i className="bi bi-search" />
-                      </span>
-                      <input
-                        className="form-control"
-                        placeholder="Filter subjects in assignment list (e.g. English)"
-                        value={subjectQuery}
-                        onChange={(e) => setSubjectQuery(e.target.value)}
-                      />
-                      {subjectQuery.trim() ? (
-                        <button className="btn btn-outline-secondary" onClick={() => setSubjectQuery("")} title="Clear">
-                          <i className="bi bi-x-lg" />
-                        </button>
-                      ) : null}
-                    </div>
-
-                    <div style={{ maxHeight: 520, overflow: "auto" }}>
-                      {assignments.length === 0 ? (
-                        <div className="text-center text-muted py-5">
-                          <i className="bi bi-info-circle fs-3 d-block mb-2" />
-                          No assignments yet.
-                          <div className="small">Click “Assign Subjects” to start.</div>
-                        </div>
-                      ) : (
-                        Array.from(assignmentsByTeacher.entries())
-                          .sort((a, b) => teacherNameById(a[0]).localeCompare(teacherNameById(b[0])))
-                          .map(([teacherId, list]) => {
-                            const q = subjectQuery.trim().toLowerCase();
-                            const filtered = q ? list.filter((x) => (x.subject?.name ?? "").toLowerCase().includes(q)) : list;
-                            if (q && filtered.length === 0) return null;
-
-                            return (
-                              <div key={teacherId} className="mb-3">
-                                <div className="d-flex align-items-center justify-content-between mb-2">
-                                  <div className="fw-bold" style={{ color: "#1e293b" }}>
-                                    {teacherNameById(teacherId)}
-                                  </div>
-                                  <span className="badge bg-light text-dark" style={{ borderRadius: 999 }}>
-                                    {filtered.length} subject(s)
-                                  </span>
-                                </div>
-
-                                <div className="d-flex flex-wrap gap-2">
-                                  {filtered.map((a) => (
-                                    <span
-                                      key={`${a.teacher_id}-${a.subject_id}`}
-                                      className="badge bg-white text-dark border d-inline-flex align-items-center gap-2 px-3 py-2"
-                                      style={{ borderRadius: 999 }}
-                                    >
-                                      <i className="bi bi-book" />
-                                      {a.subject?.name ?? `Subject #${a.subject_id}`}
-                                      <button
-                                        type="button"
-                                        className="btn btn-sm btn-outline-danger"
-                                        style={{ borderRadius: 999, padding: "2px 8px" }}
-                                        onClick={() => removeAssignment(a.teacher_id, a.subject_id)}
-                                        title="Remove"
-                                      >
-                                        <i className="bi bi-x-lg" />
-                                      </button>
-                                    </span>
-                                  ))}
-                                </div>
-
-                                <button
-                                  type="button"
-                                  className="btn btn-sm btn-outline-primary mt-2"
-                                  style={{ borderRadius: 10 }}
-                                  onClick={() => openAssignModal(teacherId)}
-                                >
-                                  <i className="bi bi-plus-circle me-1" />
-                                  Add / Edit subjects
-                                </button>
-
-                                <hr className="mt-3 mb-0" />
-                              </div>
-                            );
-                          })
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-auto">
-              <Footer />
-            </div>
-          </main>
+          <section className="ts-card"><div className="ts-pad"><div className="ts-head"><div><h2>{selectedTeacher ? fullName(selectedTeacher) : "Select teacher"}</h2><p className="ts-muted">Subjects are filtered by the teacher assigned class and section.</p></div><div className="ts-actions"><button className="ts-btn secondary" onClick={selectAllVisible} disabled={!selectedTeacher || eligibleSubjects.length === 0}>Select visible</button><button className="ts-btn" onClick={saveAssignments} disabled={!selectedTeacher || saving}>Save Assignment</button></div></div>
+            {!selectedTeacher ? <div className="ts-empty">Select a teacher from the left.</div> : <>
+              <div className="ts-class-list">{(selectedTeacher.assigned_classes || []).length ? selectedTeacher.assigned_classes?.map((item)=><span className="ts-pill ok" key={item.id}>{item.name}{item.section_name ? ` - ${item.section_name}` : ""}</span>) : <span className="ts-pill">No assigned class. Assign class from teacher profile first.</span>}</div>
+              <div style={{margin:"14px 0"}}><input className="ts-input" placeholder="Search eligible subjects" value={subjectSearch} onChange={(e)=>setSubjectSearch(e.target.value)} /></div>
+              {eligibleSubjects.length === 0 ? <div className="ts-empty">No eligible subject found for this teacher class/section. Confirm that subjects have been created and linked to the correct section/class.</div> : <div className="ts-subject-grid">{eligibleSubjects.map((subject)=>{ const checked = selectedSubjectIds.includes(subject.id); return <label key={subject.id} className={`ts-subject ${checked ? "checked" : ""}`}><div><div className="ts-name">{subject.name}</div><div className="ts-muted">{subject.section_name || "General section"}{subject.department_name ? ` - ${subject.department_name}` : ""}</div></div><input type="checkbox" checked={checked} onChange={()=>toggleSubject(subject.id)} /></label>; })}</div>}
+              <p className="ts-muted" style={{marginTop:12}}>Selected subjects: <strong>{selectedSubjectIds.length}</strong>. Saving will replace the teacher previous subject list with the selected subjects.</p>
+            </>}
+          </div></section>
         </div>
-      </div>
-
-      {/* ASSIGN MODAL */}
-      {showAssignModal && (
-        <div
-          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
-          style={{ background: "rgba(0,0,0,.55)", backdropFilter: "blur(7px)", zIndex: 1200 }}
-          onMouseDown={closeAssignModal}
-        >
-          <div
-            className="card border-0 shadow-lg"
-            style={{ width: "min(980px, 96vw)", maxHeight: "92vh", borderRadius: 18, overflow: "hidden" }}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            <div className="p-3 p-md-4 text-white" style={{ background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}>
-              <div className="d-flex align-items-start justify-content-between gap-2">
-                <div>
-                  <h5 className="fw-bold mb-1">
-                    <i className="bi bi-plus-circle me-2" />
-                    Assign Subjects to Teacher
-                  </h5>
-                  <div className="small" style={{ opacity: 0.9 }}>
-                    Subjects already assigned are pre-selected.
-                  </div>
-                </div>
-
-                <button className="btn btn-outline-light" style={{ borderRadius: 10 }} onClick={closeAssignModal}>
-                  <i className="bi bi-x-lg" />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-3 p-md-4" style={{ background: "#f8f9fa", overflow: "auto", maxHeight: "calc(92vh - 150px)" }}>
-              <div className="row g-3">
-                <div className="col-12 col-lg-5">
-                  <label className="form-label fw-semibold small mb-1">Teacher *</label>
-                  <select
-                    className="form-select"
-                    value={selectedTeacherId}
-                    onChange={(e) => setSelectedTeacherId(e.target.value ? Number(e.target.value) : "")}
-                  >
-                    <option value="">-- Select Teacher --</option>
-                    {teachers
-                      .slice()
-                      .sort((a, b) => fullName(a).localeCompare(fullName(b)))
-                      .map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {fullName(t)}
-                        </option>
-                      ))}
-                  </select>
-
-                  {selectedTeacherId ? (
-                    <div className="alert alert-info mt-3 mb-0" style={{ borderRadius: 12 }}>
-                      Editing assignments for: <b>{teacherNameById(Number(selectedTeacherId))}</b>
-                      <div className="small mt-1">
-                        Currently selected: <b>{selectedSubjectIds.length}</b> subject(s)
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-muted small mt-2">Tip: Click a teacher on the left to open this modal pre-filled.</div>
-                  )}
-                </div>
-
-                <div className="col-12 col-lg-7">
-                  <div className="d-flex align-items-center justify-content-between">
-                    <label className="form-label fw-semibold small mb-1">Subjects *</label>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-outline-secondary"
-                      style={{ borderRadius: 10 }}
-                      onClick={toggleSelectAllModal}
-                      disabled={modalSubjects.length === 0}
-                      title="Select / Unselect visible"
-                    >
-                      <i className="bi bi-check2-square me-1" />
-                      {modalAllSelected ? "Unselect visible" : "Select visible"}
-                    </button>
-                  </div>
-
-                  <div className="input-group mb-2">
-                    <span className="input-group-text bg-white">
-                      <i className="bi bi-search" />
-                    </span>
-                    <input
-                      className="form-control"
-                      placeholder="Search subjects..."
-                      value={modalSubjectSearch}
-                      onChange={(e) => setModalSubjectSearch(e.target.value)}
-                    />
-                    {modalSubjectSearch.trim() ? (
-                      <button className="btn btn-outline-secondary" onClick={() => setModalSubjectSearch("")} title="Clear">
-                        <i className="bi bi-x-lg" />
-                      </button>
-                    ) : null}
-                  </div>
-
-                  <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
-                    <div className="card-body" style={{ maxHeight: 360, overflow: "auto" }}>
-                      {modalSubjects.length === 0 ? (
-                        <div className="text-center text-muted py-4">
-                          <i className="bi bi-emoji-frown fs-3 d-block mb-2" />
-                          No subjects found.
-                        </div>
-                      ) : (
-                        <div className="row g-2">
-                          {modalSubjects.map((s) => {
-                            const checked = selectedSubjectIds.includes(s.id);
-                            return (
-                              <div className="col-12 col-md-6" key={s.id}>
-                                <label
-                                  className="d-flex align-items-center justify-content-between border rounded p-2 bg-white"
-                                  style={{ cursor: "pointer" }}
-                                >
-                                  <div className="d-flex align-items-center gap-2">
-                                    <input
-                                      type="checkbox"
-                                      className="form-check-input"
-                                      checked={checked}
-                                      onChange={() => toggleSubject(s.id)}
-                                      disabled={!selectedTeacherId}
-                                      title={!selectedTeacherId ? "Select a teacher first" : undefined}
-                                    />
-                                    <span className="fw-semibold">{s.name}</span>
-                                  </div>
-                                  <span className={`badge ${checked ? "bg-success" : "bg-secondary"}`} style={{ borderRadius: 999 }}>
-                                    {checked ? "Selected" : "—"}
-                                  </span>
-                                </label>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="text-muted small mt-2">
-                    Selected: <b>{selectedSubjectIds.length}</b>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-3 px-md-4 border-top bg-white">
-              <div className="d-flex flex-wrap gap-2 align-items-center justify-content-between">
-                <small className="text-muted">
-                  <i className="bi bi-info-circle me-1" />
-                  This will <b>sync</b> (add + remove) assignments for the selected teacher.
-                </small>
-
-                <div className="d-flex gap-2">
-                  <button className="btn btn-outline-secondary" style={{ borderRadius: 10 }} onClick={closeAssignModal} disabled={saving}>
-                    Cancel
-                  </button>
-                  <button
-                    className="btn btn-primary"
-                    style={{ borderRadius: 10, fontWeight: 800 }}
-                    onClick={assignSubjects}
-                    disabled={saving || !selectedTeacherId}
-                  >
-                    {saving ? (
-                      <>
-                        <span className="spinner-border spinner-border-sm me-2" />
-                        Saving…
-                      </>
-                    ) : (
-                      <>
-                        <i className="bi bi-check-circle me-2" />
-                        Save Assignment
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
-      )}
-    </>
-  );
+        <Footer />
+      </main>
+    </div></div>
+  </>;
 }
+
+
+
+
