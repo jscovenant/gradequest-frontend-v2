@@ -1,4 +1,4 @@
-﻿import AdminDashboard from "../components/DashboardPages/AdminDasboard";
+import AdminDashboard from "../components/DashboardPages/AdminDasboard";
 import TeacherDashboard from "../components/DashboardPages/TeacherDashboard";
 import StudentDashboard from "../components/DashboardPages/StudentDashboard";
 import { getUser } from "../utils/token";
@@ -20,14 +20,15 @@ export default function Dashboard() {
 
   switch (user.role) {
     case "Admin":
+    case "Operator":
       return (
         <div className="pt-5">
           <AdminDashboard />
         </div>
       );
 
-     case "Super-Admin":
-     case "Platform-Staff":
+    case "Super-Admin":
+    case "Platform-Staff":
       return (
         <div className="pt-5">
           <SuperAdminDashboard />
@@ -47,20 +48,21 @@ export default function Dashboard() {
           <StudentDashboard />
         </div>
       );
-    
-       case "Bursar":
+
+    case "Bursar":
       return (
         <div className="pt-5">
           <BursarDashboard />
         </div>
       );
 
-       case "Parent":
+    case "Parent":
       return (
         <div className="pt-5">
           <ParentDashboardPage />
         </div>
       );
+
     case "Sales-Representative":
       return (
         <div className="pt-5">
@@ -76,5 +78,3 @@ export default function Dashboard() {
       );
   }
 }
-
-

@@ -8,7 +8,7 @@ interface PageTitleProps {
 
 export default function PageTitle({
   title,
-  suffix = "GradeQuest",
+  suffix = "GradiosEdu",
 }: PageTitleProps) {
   useEffect(() => {
     document.title = title ? `${title} | ${suffix}` : suffix;

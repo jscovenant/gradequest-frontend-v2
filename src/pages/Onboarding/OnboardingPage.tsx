@@ -688,7 +688,7 @@ export default function OnboardingPage() {
                   <path d="M12 8v5M12 15.5v.5" stroke="#0a0f1e" strokeWidth="2.2" strokeLinecap="round"/>
                 </svg>
               </span>
-              <span className="ob-logo-name">GradeQuest</span>
+              <span className="ob-logo-name">GradiosEdu</span>
               <span className="ob-logo-pill">AI</span>
             </a>
 
@@ -785,7 +785,7 @@ export default function OnboardingPage() {
                 <path d="M12 8v5M12 15.5v.5" stroke="#0a0f1e" strokeWidth="2.2" strokeLinecap="round"/>
               </svg>
             </span>
-            <span style={{ fontFamily:"'Lora',serif", fontSize:17, fontWeight:700, color:"#1a1a2e" }}>GradeQuest</span>
+            <span style={{ fontFamily:"'Lora',serif", fontSize:17, fontWeight:700, color:"#1a1a2e" }}>GradiosEdu</span>
           </a>
 
           {/* Header */}
@@ -798,10 +798,10 @@ export default function OnboardingPage() {
                 </div>
                 <h1 className="ob-title">
                   Activate your<br/>
-                  <em>GradeQuest school.</em>
+                  <em>GradiosEdu school.</em>
                 </h1>
                 <p className="ob-subtitle">
-                  Complete four steps and unlock your <strong style={{ color:"#b45309" }}>5,000 GradeQuestPlus wallet credit</strong>.
+                  Complete four steps and unlock your <strong style={{ color:"#b45309" }}>5,000 GradiosEduPlus wallet credit</strong>.
                 </p>
               </div>
               <button className="ob-refresh" onClick={refresh} disabled={loading}>
@@ -825,7 +825,7 @@ export default function OnboardingPage() {
                 </svg>
               </div>
               <div className="ob-bonus-text">
-                <div className="ob-bonus-title">5,000 GradeQuestPlus wallet credit waiting for you</div>
+                <div className="ob-bonus-title">5,000 GradiosEduPlus wallet credit waiting for you</div>
                 <div className="ob-bonus-sub">Complete all steps to claim. Credit goes directly to your school wallet and expires after 30 days if unused.</div>
               </div>
             </div>
@@ -975,7 +975,7 @@ export default function OnboardingPage() {
               </StepCard>
 
               <StepCard number={4} title="Accept the Terms and Conditions"
-                subtitle={`Review and accept the current GradeQuest terms (${status.terms_version}).`}
+                subtitle={`Review and accept the current GradiosEdu terms (${status.terms_version}).`}
                 done={status.terms_accepted} active={activeStep === "agreement"}>
                 {!status.terms_accepted && (
                   <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
@@ -983,7 +983,7 @@ export default function OnboardingPage() {
                       <span className="ob-toggle-label">
                         I am authorized to bind this school and I accept the{" "}
                         <a href="/terms-and-conditions" target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
-                          GradeQuest Terms and Conditions
+                          GradiosEdu Terms and Conditions
                         </a>.
                       </span>
                       <input id="acceptTermsCheckbox" type="checkbox" checked={termsChecked}
@@ -998,14 +998,14 @@ export default function OnboardingPage() {
 
               {/*  Step 5: Bonus  */}
               <StepCard number={5} title="Claim your welcome bonus"
-                subtitle={"All steps complete - your 5,000 GradeQuestPlus wallet credit is ready."}
+                subtitle={"All steps complete - your 5,000 GradiosEduPlus wallet credit is ready."}
                 done={status.bonus_given} active={activeStep === "bonus"}>
                 {!status.bonus_given && (
                   <div className="ob-bonus-claim">
                     <div style={{ fontSize:32 }} aria-hidden="true"></div>
                     <div className="ob-bonus-amount">5,000</div>
                     <p className="ob-bonus-desc">
-                      Credited directly to your school wallet for GradeQuestPlus subscription. It expires after 30 days if it is not used.
+                      Credited directly to your school wallet for GradiosEduPlus subscription. It expires after 30 days if it is not used.
                     </p>
                     <button className="ob-btn-claim" onClick={handleClaimBonus} disabled={claiming}
                       style={{ maxWidth:280 }}>

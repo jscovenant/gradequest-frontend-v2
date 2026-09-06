@@ -153,32 +153,25 @@ export default function AttendanceSettingsPage() {
     );
   };
 
-  // ===== same template css (inline) =====
   const templateCss = `
+    /* ======= AttendanceSettingsPage - Modern SaaS style ======= */
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
     .db-main {
-      background: var(--bs-body-bg, #f5f1eb);
+      background: #F8FAFC;
       min-height: 100vh;
-      font-family: "DM Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      padding: 28px 28px 0;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      padding: 24px 28px 0;
     }
     @media (max-width: 991.98px) { .db-main { padding: 18px 14px 0; } }
 
     .db-hero {
-      background: #0f172a;
-      border-radius: 16px;
+      background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
+      border-radius: 18px;
       padding: 32px 36px;
       position: relative;
       overflow: hidden;
-      margin: 10px 0 18px;
-      border: 1px solid rgba(255,255,255,0.06);
-    }
-    .db-hero::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background-image: radial-gradient(circle, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
-      background-size: 24px 24px;
-      pointer-events: none;
+      margin: 10px 0 24px;
+      box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
     }
     .db-hero-glow {
       position: absolute;
@@ -187,7 +180,7 @@ export default function AttendanceSettingsPage() {
       width: 320px;
       height: 320px;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(201, 168, 76, 0.12) 0%, transparent 65%);
+      background: radial-gradient(circle, rgba(217, 119, 6, 0.15) 0%, transparent 65%);
       pointer-events: none;
     }
     .db-hero-glow2 {
@@ -197,7 +190,7 @@ export default function AttendanceSettingsPage() {
       width: 220px;
       height: 220px;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(37, 99, 235, 0.10) 0%, transparent 70%);
       pointer-events: none;
     }
     .db-hero-inner {
@@ -214,22 +207,22 @@ export default function AttendanceSettingsPage() {
       display: inline-flex;
       align-items: center;
       gap: 7px;
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 0.12em;
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
       text-transform: uppercase;
-      color: #e8c97a;
-      background: rgba(201, 168, 76, 0.10);
-      border: 1px solid rgba(201, 168, 76, 0.22);
+      color: #FBBF24;
+      background: rgba(217, 119, 6, 0.20);
+      border: 1px solid rgba(217, 119, 6, 0.35);
       border-radius: 100px;
       padding: 4px 12px;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
     }
     .db-session-dot {
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      background: #22c55e;
+      background: #10B981;
       animation: dbPulse 2s ease infinite;
     }
     @keyframes dbPulse {
@@ -237,23 +230,20 @@ export default function AttendanceSettingsPage() {
       50% { opacity: 0.4; transform: scale(1.5); }
     }
     .db-greeting {
-      font-family: "Lora", Georgia, serif;
-      font-size: clamp(22px, 2.5vw, 32px);
-      font-weight: 700;
+      font-size: 26px;
+      font-weight: 800;
       color: #fff;
       line-height: 1.1;
       margin-bottom: 8px;
     }
-    .db-greeting em { font-style: italic; color: #e8c97a; }
+    .db-greeting em { font-style: normal; color: #FBBF24; }
 
     .db-hero-sub {
       font-size: 13.5px;
-      font-weight: 300;
-      color: #cbd5e1;
-      line-height: 1.65;
+      color: #CBD5E1;
+      line-height: 1.6;
       max-width: 760px;
-      margin-bottom: 16px;
-      opacity: 0.9;
+      margin-bottom: 20px;
     }
     .db-hero-btns { display: flex; gap: 10px; flex-wrap: wrap; }
 
@@ -261,41 +251,41 @@ export default function AttendanceSettingsPage() {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 10px 18px;
+      padding: 9px 18px;
       font-size: 13px;
-      font-weight: 600;
-      color: #0f172a;
-      background: #c9a84c;
+      font-weight: 700;
+      color: #FFFFFF;
+      background: #D97706;
       border: none;
       border-radius: 10px;
       cursor: pointer;
-      transition: background 0.2s, transform 0.2s;
+      transition: all 0.2s ease;
       white-space: nowrap;
     }
-    .db-btn-gold:hover { background: #e8c97a; transform: translateY(-1px); }
+    .db-btn-gold:hover { background: #B45309; transform: translateY(-1px); color: #FFFFFF; }
     .db-btn-gold:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 
     .db-btn-outline {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 10px 18px;
+      padding: 9px 18px;
       font-size: 13px;
-      font-weight: 500;
-      color: rgba(255, 255, 255, 0.75);
-      background: transparent;
-      border: 1px solid rgba(255, 255, 255, 0.14);
+      font-weight: 600;
+      color: #FFFFFF;
+      background: rgba(255, 255, 255, 0.10);
+      border: 1px solid rgba(255, 255, 255, 0.20);
       border-radius: 10px;
       cursor: pointer;
-      transition: background 0.2s, border-color 0.2s, color 0.2s;
+      transition: all 0.2s ease;
       white-space: nowrap;
     }
-    .db-btn-outline:hover { background: rgba(255, 255, 255, 0.06); color: #fff; border-color: rgba(255, 255, 255, 0.28); }
+    .db-btn-outline:hover { background: rgba(255, 255, 255, 0.18); color: #fff; }
     .db-btn-outline:disabled { opacity: 0.55; cursor: not-allowed; }
 
     .db-hero-stat-card {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.09);
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
       backdrop-filter: blur(8px);
       border-radius: 14px;
       padding: 18px 20px;
@@ -304,56 +294,55 @@ export default function AttendanceSettingsPage() {
     @media (max-width: 991.98px) { .db-hero { padding: 24px 20px; } .db-hero-stat-card { min-width: 0; width: 100%; } }
     .db-hero-stat-row { display: flex; flex-direction: column; gap: 10px; }
     .db-hero-stat-item { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-    .db-hero-stat-label { font-size: 12px; font-weight: 300; color: #94a3b8; }
+    .db-hero-stat-label { font-size: 12px; font-weight: 400; color: #CBD5E1; }
     .db-hero-stat-val {
-      font-family: "Lora", serif;
       font-size: 18px;
-      font-weight: 700;
-      color: #fff;
+      font-weight: 800;
+      color: #FBBF24;
     }
-    .db-hero-stat-sep { height: 1px; background: rgba(255, 255, 255, 0.06); }
+    .db-hero-stat-sep { height: 1px; background: rgba(255, 255, 255, 0.08); }
 
     .db-panel {
       background: #ffffff;
-      border: 1px solid #ede8e0;
-      border-radius: 14px;
+      border: 1px solid #E2E8F0;
+      border-radius: 16px;
       overflow: hidden;
-      box-shadow: 0 2px 10px rgba(15,23,42,0.04);
+      box-shadow: 0 4px 16px rgba(15,39,68,0.03);
+      margin-bottom: 24px;
     }
     .db-panel-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 16px 18px;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      padding: 18px 20px;
+      border-bottom: 1px solid #E2E8F0;
       gap: 12px;
       flex-wrap: wrap;
     }
     .db-panel-title {
-      font-family: "Lora", serif;
       font-size: 16px;
-      font-weight: 800;
-      color: #1a1a2e;
+      font-weight: 700;
+      color: #0F2744;
       margin: 0;
     }
-    .db-panel-sub { font-size: 11.5px; font-weight: 300; color: #9a8a7a; margin: 0; }
+    .db-panel-sub { font-size: 12px; color: #64748B; margin: 0; }
 
     .db-refresh-btn {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 8px 12px;
-      font-size: 12px;
+      padding: 8px 14px;
+      font-size: 12.5px;
       font-weight: 600;
-      color: #7a6a5a;
-      background: #f5f1eb;
-      border: 1px solid #e5ddd3;
-      border-radius: 10px;
+      color: #0F2744;
+      background: #F1F5F9;
+      border: 1px solid #E2E8F0;
+      border-radius: 8px;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: all 0.2s;
       white-space: nowrap;
     }
-    .db-refresh-btn:hover { background: #ede8e0; }
+    .db-refresh-btn:hover { background: #E2E8F0; }
     .db-refresh-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
     .db-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 16px 0 18px; }
@@ -363,45 +352,48 @@ export default function AttendanceSettingsPage() {
       width: 100%;
       padding: 10px 12px;
       border-radius: 10px;
-      border: 1px solid #e5ddd3;
+      border: 1px solid #E2E8F0;
       outline: none;
       font-size: 13px;
-      background: #fff;
+      background: #F8FAFC;
+      color: #0F2744;
+      font-weight: 600;
+      transition: border-color 0.2s;
     }
-    .db-input:focus { border-color: rgba(201,168,76,0.7); box-shadow: 0 0 0 3px rgba(201,168,76,0.18); }
+    .db-input:focus { border-color: #D97706; background: #fff; box-shadow: 0 0 0 3px rgba(217,119,6,0.12); }
 
     .miniCard {
       background: #fff;
-      border: 1px solid #ede8e0;
+      border: 1px solid #E2E8F0;
       border-radius: 14px;
-      box-shadow: 0 2px 10px rgba(15,23,42,0.04);
+      box-shadow: 0 4px 12px rgba(15,39,68,0.02);
       overflow: hidden;
     }
-    .miniCardTop { height: 4px; background: linear-gradient(135deg, #c9a84c 0%, #e8c97a 100%); }
-    .miniCardBody { padding: 14px 14px; display: grid; gap: 8px; }
-    .miniCardLabel { font-size: 11px; color: #9a8a7a; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
-    .miniCardValue { font-family: "Lora", serif; font-size: 22px; font-weight: 900; color: #1a1a2e; line-height: 1.1; }
-    .miniCardHint { font-size: 12px; color: #9a8a7a; }
+    .miniCardTop { height: 3px; background: linear-gradient(135deg, #D97706 0%, #FBBF24 100%); }
+    .miniCardBody { padding: 16px 18px; display: grid; gap: 6px; }
+    .miniCardLabel { font-size: 11px; color: #64748B; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+    .miniCardValue { font-size: 22px; font-weight: 800; color: #0F2744; line-height: 1.1; }
+    .miniCardHint { font-size: 12px; color: #64748B; }
     .miniCardIcon {
-      width: 38px; height: 38px; border-radius: 12px;
+      width: 38px; height: 38px; border-radius: 10px;
       display: flex; align-items: center; justify-content: center;
-      background: rgba(201,168,76,0.12);
-      border: 1px solid rgba(201,168,76,0.18);
-      color: #b45309;
+      background: rgba(217,119,6,0.12);
+      border: 1px solid rgba(217,119,6,0.20);
+      color: #D97706;
     }
 
     .db-pill {
       display: inline-flex;
       align-items: center;
-      font-size: 12px;
-      font-weight: 800;
-      padding: 6px 10px;
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 5px 10px;
       border-radius: 999px;
       white-space: nowrap;
       border: 1px solid rgba(0,0,0,0.06);
     }
-    .db-muted { color: #9a8a7a; }
-    .db-strong { font-weight: 900; color: #1a1a2e; }
+    .db-muted { color: #64748B; }
+    .db-strong { font-weight: 700; color: #0F2744; }
   `;
 
   const activeBadge = useMemo(() => {
@@ -460,7 +452,6 @@ export default function AttendanceSettingsPage() {
       <div className="container-fluid">
         <div className="row">
           <Sidebar sidebarOpen={sidebarOpen} />
-
           <main className="col-md-9 col-lg-10 ms-auto db-main">
             {(loading || saving) && <Loader message={loading ? "Loading settings..." : "Saving settings..."} />}
 

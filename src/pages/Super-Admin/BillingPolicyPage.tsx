@@ -14,6 +14,14 @@ type Policy = {
   offline_grace_days: number;
   offline_school_block_enabled: boolean;
   platform_fee_per_student: string | number;
+  support_whatsapp?: string;
+  whatsapp_credit_unit_price: string | number;
+  legacy_plus_ai_credits: number;
+  ai_result_comment_credit_cost: number;
+  ai_cbt_question_credit_cost: number;
+  ai_lesson_plan_credit_cost: number;
+  ai_scheme_work_credit_cost: number;
+  ai_lesson_note_credit_cost: number;
   whatsapp_credit_unit_price: string | number;
   legacy_plus_ai_credits: number;
   ai_result_comment_credit_cost: number;
@@ -27,6 +35,18 @@ type Policy = {
   per_student_billing_starts_at?: string | null;
   temporary_access_min_days: number;
   temporary_access_max_days: number;
+  promo_enabled?: boolean;
+  promo_title?: string;
+  promo_description?: string;
+  promo_target_plan?: string;
+  promo_min_students?: number;
+  promo_bonus_days?: number;
+  promo_starts_at?: string | null;
+  promo_ends_at?: string | null;
+  promo_max_claims?: number | null;
+  promo_claims_count?: number;
+  sales_partner_term_1_commission_rate?: number;
+  sales_partner_retention_commission_rate?: number;
 };
 
 type School = { id: number; school_name?: string | null };
@@ -69,6 +89,7 @@ const defaultPolicy: Policy = {
   offline_grace_days: 7,
   offline_school_block_enabled: true,
   platform_fee_per_student: 1000,
+  support_whatsapp: "08165748374",
   whatsapp_credit_unit_price: 10,
   legacy_plus_ai_credits: 100,
   ai_result_comment_credit_cost: 1,
@@ -82,6 +103,18 @@ const defaultPolicy: Policy = {
   per_student_billing_starts_at: "",
   temporary_access_min_days: 3,
   temporary_access_max_days: 7,
+  promo_enabled: false,
+  promo_title: "Buy 1 Year, Get +1 Year Free Promo",
+  promo_description: "Subscribe to GradiosEdu Plus for 1 year with at least 100 students and get an additional year 100% free.",
+  promo_target_plan: "GradiosEdu Plus",
+  promo_min_students: 100,
+  promo_bonus_days: 365,
+  promo_starts_at: "",
+  promo_ends_at: "",
+  promo_max_claims: 50,
+  promo_claims_count: 0,
+  sales_partner_term_1_commission_rate: 30,
+  sales_partner_retention_commission_rate: 12,
 };
 
 function fmtDate(value?: string | null) {
@@ -93,6 +126,15 @@ function fmtDate(value?: string | null) {
 
 function asBool(value: any) {
   return value === true || value === 1 || value === "1";
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="bp-field">
+      <span>{label}</span>
+      {children}
+    </label>
+  );
 }
 
 export default function BillingPolicyPage() {
@@ -269,13 +311,6 @@ export default function BillingPolicyPage() {
     }
   };
 
-  const Field = ({ label, children }: { label: string; children: ReactNode }) => (
-    <label className="bp-field">
-      <span>{label}</span>
-      {children}
-    </label>
-  );
-
   return (
     <>
       <style>{`
@@ -315,7 +350,7 @@ export default function BillingPolicyPage() {
             {(loading || saving) && <Loader message={saving ? "Saving billing policy..." : "Loading billing policy..."} />}
 
             <section className="bp-hero">
-              <div className="bp-kicker">GradeQuest revenue protection</div>
+              <div className="bp-kicker">GradiosEdu revenue protection</div>
               <h1 className="bp-title">Billing Enforcement Policy</h1>
               <p className="bp-sub">
                 Configure online collection grace, student-level protection, whole-school thresholds, offline invoice blocking, platform fee charges, and short temporary access grants.
@@ -346,6 +381,9 @@ export default function BillingPolicyPage() {
                     </Field>
                     <Field label="Platform fee per student">
                       <input className="bp-input" type="number" min={0} value={policy.platform_fee_per_student} onChange={(e)=>setPolicy((p)=>({...p, platform_fee_per_student:e.target.value}))} />
+                    </Field>
+                    <Field label="Platform Support & Sales WhatsApp Number">
+                      <input className="bp-input" type="text" placeholder="e.g. 08165748374 or +2348165748374" value={policy.support_whatsapp || ""} onChange={(e)=>setPolicy((p)=>({...p, support_whatsapp:e.target.value}))} />
                     </Field>
                     <Field label="WhatsApp price per credit (NGN)">
                       <input className="bp-input" type="number" min={0.01} step="0.01" value={policy.whatsapp_credit_unit_price} onChange={(e)=>setPolicy((p)=>({...p, whatsapp_credit_unit_price:e.target.value}))} />
@@ -388,6 +426,12 @@ export default function BillingPolicyPage() {
                     <Field label="Temporary access max days">
                       <input className="bp-input" type="number" min={1} max={90} value={policy.temporary_access_max_days} onChange={(e)=>setPolicy((p)=>({...p, temporary_access_max_days:Number(e.target.value)}))} />
                     </Field>
+                    <Field label="Sales Partner Default Term 1 Commission (%)">
+                      <input className="bp-input" type="number" min={0} max={100} step="0.5" value={policy.sales_partner_term_1_commission_rate ?? 30} onChange={(e)=>setPolicy((p)=>({...p, sales_partner_term_1_commission_rate:Number(e.target.value)}))} />
+                    </Field>
+                    <Field label="Sales Partner Default Retention Commission (%)">
+                      <input className="bp-input" type="number" min={0} max={100} step="0.5" value={policy.sales_partner_retention_commission_rate ?? 12} onChange={(e)=>setPolicy((p)=>({...p, sales_partner_retention_commission_rate:Number(e.target.value)}))} />
+                    </Field>
                   </div>
 
                   <div className="bp-form-grid" style={{ marginTop: 14 }}>
@@ -420,6 +464,69 @@ export default function BillingPolicyPage() {
                       <input type="checkbox" checked={asBool(policy.legacy_subscription_honor_enabled)} onChange={(e)=>setPolicy((p)=>({...p, legacy_subscription_honor_enabled:e.target.checked}))} />
                     </div>
                   </div>
+
+                  <div className="bp-switch mt-4" style={{ background: "rgba(255, 200, 87, 0.12)", border: "1px solid rgba(255, 200, 87, 0.4)" }}>
+                    <div>
+                      <div className="bp-card-title" style={{ fontSize: 14, color: "#92400e" }}>
+                        <i className="bi bi-stars me-2" /> Promotions & Launch Offers Engine
+                      </div>
+                      <div className="bp-muted">Automatically grant bonus subscription duration (e.g. +1 Year Free) to qualifying schools.</div>
+                    </div>
+                    <input type="checkbox" checked={asBool(policy.promo_enabled)} onChange={(e)=>setPolicy((p)=>({...p, promo_enabled:e.target.checked}))} />
+                  </div>
+
+                  {asBool(policy.promo_enabled) && (
+                    <div className="p-3 mt-3 rounded-3" style={{ background: "#fffdfa", border: "1px solid rgba(245, 158, 11, 0.25)" }}>
+                      <div className="d-flex justify-content-between align-items-center mb-3">
+                        <span className="bp-pill" style={{ background: "rgba(245, 158, 11, 0.2)", color: "#b45309" }}>
+                          Active Promotion Rules
+                        </span>
+                        <span className="text-muted small fw-bold">
+                          {policy.promo_claims_count || 0} / {policy.promo_max_claims || "∞"} Claims Redeemed
+                        </span>
+                      </div>
+
+                      <div className="bp-form-grid">
+                        <Field label="Promo title">
+                          <input className="bp-input" type="text" value={policy.promo_title || ""} onChange={(e)=>setPolicy((p)=>({...p, promo_title:e.target.value}))} placeholder="e.g. Buy 1 Year, Get +1 Year Free Promo" />
+                        </Field>
+                        <Field label="Target plan name">
+                          <input className="bp-input" type="text" value={policy.promo_target_plan || ""} onChange={(e)=>setPolicy((p)=>({...p, promo_target_plan:e.target.value}))} placeholder="e.g. GradiosEdu Plus" />
+                        </Field>
+                        <Field label="Minimum active students required">
+                          <input className="bp-input" type="number" min={0} value={policy.promo_min_students ?? 100} onChange={(e)=>setPolicy((p)=>({...p, promo_min_students:Number(e.target.value)}))} />
+                        </Field>
+                        <Field label="Bonus duration granted (Days)">
+                          <input className="bp-input" type="number" min={1} value={policy.promo_bonus_days ?? 365} onChange={(e)=>setPolicy((p)=>({...p, promo_bonus_days:Number(e.target.value)}))} />
+                        </Field>
+                        <Field label="Promo start date">
+                          <input
+                            className="bp-input"
+                            type="datetime-local"
+                            value={(policy.promo_starts_at || "").slice(0, 16)}
+                            onChange={(e)=>setPolicy((p)=>({...p, promo_starts_at:e.target.value}))}
+                          />
+                        </Field>
+                        <Field label="Promo ending date (Strict deadline)">
+                          <input
+                            className="bp-input"
+                            type="datetime-local"
+                            value={(policy.promo_ends_at || "").slice(0, 16)}
+                            onChange={(e)=>setPolicy((p)=>({...p, promo_ends_at:e.target.value}))}
+                          />
+                        </Field>
+                        <Field label="Max allowed redemption claims (optional)">
+                          <input className="bp-input" type="number" min={1} value={policy.promo_max_claims || ""} onChange={(e)=>setPolicy((p)=>({...p, promo_max_claims:e.target.value ? Number(e.target.value) : null}))} placeholder="e.g. 50" />
+                        </Field>
+                      </div>
+
+                      <div className="mt-3">
+                        <Field label="Promo description & conditions">
+                          <textarea className="bp-textarea" value={policy.promo_description || ""} onChange={(e)=>setPolicy((p)=>({...p, promo_description:e.target.value}))} placeholder="Subscribe for 1 full year with at least 100 students and receive an additional 1 year 100% free with ₦0 platform fee on school fees." />
+                        </Field>
+                      </div>
+                    </div>
+                  )}
 
                   <button className="bp-btn mt-3" onClick={updatePolicy} disabled={saving}>
                     <i className="bi bi-check2-circle" />

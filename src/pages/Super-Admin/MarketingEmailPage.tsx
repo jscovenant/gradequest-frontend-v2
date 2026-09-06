@@ -7,10 +7,10 @@ import Loader from "../../components/ui/dashboardLoader";
 import { authApi } from "../../utils/axios";
 import { useToast } from "../../contexts/ToastContext";
 
-type RecipientTier = "free" | "premium_active" | "premium_expired";
+type RecipientTier = "free" | "premium_active" | "premium_expired" | "newsletter";
 
 type Recipient = {
-  id?: number;
+  id?: number | string;
   firstname?: string;
   surname?: string;
   email: string;
@@ -43,6 +43,8 @@ function tierLabel(t?: string) {
   const x = (t || "free").toLowerCase();
   if (x === "premium_active") return "Premium (Active)";
   if (x === "premium_expired") return "Premium (Expired)";
+  if (x === "newsletter") return "Newsletter Lead";
+  if (x === "free") return "Free";
   return "Free";
 }
 
@@ -50,6 +52,7 @@ function tierBadge(t?: string) {
   const x = (t || "").toLowerCase();
   if (x === "premium_active") return "bg-success";
   if (x === "premium_expired") return "bg-warning text-dark";
+  if (x === "newsletter") return "bg-info text-dark";
   if (x === "free") return "bg-secondary";
   return "bg-light text-dark";
 }
@@ -68,13 +71,13 @@ export default function MarketingEmailPage() {
 
   // NEW: audience filter
   const [tierFilter, setTierFilter] = useState<
-    "all" | "free" | "premium_all" | "premium_active" | "premium_expired"
+    "all" | "free" | "premium_all" | "premium_active" | "premium_expired" | "newsletter"
   >("all");
 
   // form
   const [subject, setSubject] = useState("");
   const [content, setContent] = useState(
-    "Hello {firstname},\n\nWe have a quick update for you...\n\nRegards,\nGradeQuest Team"
+    "Hello {firstname},\n\nWe have a quick update for you...\n\nRegards,\nGradiosEdu Team"
   );
 
   // optional: paste emails
@@ -91,11 +94,9 @@ export default function MarketingEmailPage() {
       const tier = (r.tier || "free").toLowerCase();
 
       if (tierFilter === "free" && tier !== "free") return false;
-
       if (tierFilter === "premium_active" && tier !== "premium_active") return false;
-
       if (tierFilter === "premium_expired" && tier !== "premium_expired") return false;
-
+      if (tierFilter === "newsletter" && tier !== "newsletter") return false;
       if (
         tierFilter === "premium_all" &&
         !(tier === "premium_active" || tier === "premium_expired")
@@ -169,8 +170,6 @@ export default function MarketingEmailPage() {
 
   const clearSelection = () => setSelected({});
 
-  // selectAll removed because it was declared but never used
-
   const selectPremiumAll = () => {
     const next: Record<string, boolean> = {};
     recipients.forEach((r) => {
@@ -189,8 +188,16 @@ export default function MarketingEmailPage() {
     setSelected(next);
   };
 
+  const selectNewsletterOnly = () => {
+    const next: Record<string, boolean> = {};
+    recipients.forEach((r) => {
+      const t = (r.tier || "").toLowerCase();
+      if (t === "newsletter") next[safeEmail(r.email)] = true;
+    });
+    setSelected(next);
+  };
+
   const resolveRecipientsPayload = (): { email: string; firstname?: string }[] => {
-    // If paste mode, parse and send those addresses.
     if (pasteMode) {
       const emails = pasteEmails
         .split(/[\n,; ]+/)
@@ -198,48 +205,63 @@ export default function MarketingEmailPage() {
         .filter(Boolean)
         .filter((x) => x.includes("@"));
 
-      const uniq = Array.from(new Set(emails.map((e) => e.toLowerCase())));
-
-      return uniq.map((email) => {
-        const match = recipients.find((r) => safeEmail(r.email) === safeEmail(email));
-        return { email, firstname: match?.firstname || "dear Sir/Ma" };
-      });
+      const unique = Array.from(new Set(emails.map((e) => e.toLowerCase())));
+      return unique.map((e) => ({ email: e, firstname: "there" }));
     }
 
-    // else use selected list from table
-    const chosen = recipients.filter((r) => selected[safeEmail(r.email)]);
-    return chosen.map((r) => ({ email: r.email, firstname: r.firstname || "dear Sir/Ma" }));
-  };
+    const emailMap = new Map<string, Recipient>();
+    recipients.forEach((r) => emailMap.set(safeEmail(r.email), r));
 
-  const validateForm = (): string | null => {
-    if (!subject.trim()) return "Subject is required.";
-    if (!content.trim()) return "Content is required.";
+    const picked: { email: string; firstname?: string }[] = [];
+    Object.keys(selected).forEach((eKey) => {
+      if (!selected[eKey]) return;
+      const r = emailMap.get(eKey);
+      if (r?.email) {
+        picked.push({
+          email: r.email,
+          firstname: (r.firstname || "there").trim(),
+        });
+      }
+    });
 
-    const payload = resolveRecipientsPayload();
-    if (payload.length === 0) return "Please select at least one recipient.";
-
-    return null;
+    return picked;
   };
 
   const sendEmails = async () => {
-    const errMsg = validateForm();
-    if (errMsg) return showError(errMsg);
+    if (!subject.trim()) {
+      showError("Please enter an email subject.");
+      return;
+    }
+    if (!content.trim()) {
+      showError("Please write the email content.");
+      return;
+    }
 
-    const payload = {
-      subject: subject.trim(),
-      content,
-      recipients: resolveRecipientsPayload(),
-    };
+    const payloadRecipients = resolveRecipientsPayload();
+
+    if (payloadRecipients.length === 0) {
+      showError(
+        pasteMode
+          ? "Please paste at least one valid email address."
+          : "Please select at least one recipient from the list."
+      );
+      return;
+    }
 
     setSending(true);
     try {
-      await authApi.post("/send-marketing-emails", payload);
-      showSuccess("Emails sent successfully.");
-      clearSelection();
-      setPasteEmails("");
+      const res = await authApi.post("/send-marketing-emails", {
+        subject: subject.trim(),
+        content,
+        recipients: payloadRecipients,
+      });
+
+      showSuccess(res.data?.message || `Sent successfully to ${payloadRecipients.length} recipients.`);
+
+      if (pasteMode) setPasteEmails("");
     } catch (err: any) {
       console.error(err);
-      showError(err?.response?.data?.message || "Failed to send emails.");
+      showError(err?.response?.data?.message || "Failed to send marketing emails.");
     } finally {
       setSending(false);
     }
@@ -247,76 +269,37 @@ export default function MarketingEmailPage() {
 
   return (
     <>
-      <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-
+      <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title="Marketing Broadcast" />
       <div className="container-fluid">
         <div className="row">
           <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-
-          <main className="col-md-9 col-lg-10 ms-auto px-4 d-flex flex-column min-vh-100 sa-main">
-            {(loading || sending) && <Loader message={loading ? "Loading recipients..." : "Sending emails..."} />}
+          <main className="col-md-9 col-lg-10 ms-auto db-main p-3 p-md-4">
+            {loading && <Loader message="Loading recipients..." />}
 
             {/* HERO */}
             <div
-              className="mt-4 p-4 position-relative overflow-hidden sa-hero"
+              className="p-4 p-md-5 mb-4 text-white position-relative overflow-hidden"
               style={{
-                borderRadius: 16,
+                background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%)",
+                borderRadius: 20,
+                boxShadow: "0 20px 40px -15px rgba(15, 23, 42, 0.3)",
               }}
             >
-              <div
-                style={{
-                  position: "absolute",
-                  top: "-50px",
-                  right: "-50px",
-                  width: 220,
-                  height: 220,
-                  background: "rgba(255, 255, 255, 0.10)",
-                  borderRadius: "50%",
-                  filter: "blur(40px)",
-                }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "-30px",
-                  left: "-30px",
-                  width: 160,
-                  height: 160,
-                  background: "rgba(255, 255, 255, 0.10)",
-                  borderRadius: "50%",
-                  filter: "blur(40px)",
-                }}
-              />
-
-              <div className="row align-items-center position-relative g-3">
+              <div className="row align-items-center g-4">
                 <div className="col-lg-8">
-                  <div className="d-flex flex-wrap gap-2 align-items-center mb-2">
+                  <div className="d-flex align-items-center gap-2 flex-wrap mb-3">
                     <span
                       className="badge px-3 py-2"
                       style={{
-                        backgroundColor: "rgba(255, 255, 255, 0.2)",
-                        color: "#fff",
+                        backgroundColor: "#f59e0b",
+                        color: "#000",
                         borderRadius: 999,
                         fontSize: "0.75rem",
                         fontWeight: 600,
                       }}
                     >
                       <i className="bi bi-megaphone-fill me-1" />
-                      Marketing Email
-                    </span>
-
-                    <span
-                      className="badge px-3 py-2"
-                      style={{
-                        backgroundColor: "rgba(255, 255, 255, 0.2)",
-                        color: "#fff",
-                        borderRadius: 999,
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                      }}
-                    >
-                      <i className="bi bi-link-45deg me-1" />
-                      POST /send-marketing-emails
+                      Marketing Broadcast
                     </span>
 
                     <span
@@ -334,9 +317,9 @@ export default function MarketingEmailPage() {
                     </span>
                   </div>
 
-                  <h2 className="fw-bold text-white mb-2">Send Marketing Emails</h2>
+                  <h2 className="fw-bold text-white mb-2">Send Marketing Broadcasts</h2>
                   <p className="text-white mb-0" style={{ opacity: 0.9, fontSize: "1rem" }}>
-                    Target <b>Free</b>, <b>Premium Active</b>, or <b>Premium Expired</b> users. Use{" "}
+                    Target <b>Free</b>, <b>Premium Active</b>, <b>Premium Expired</b>, or <b>Newsletter Subscribers</b>. Use{" "}
                     <b>{"{firstname}"}</b> to personalize.
                   </p>
                 </div>
@@ -353,7 +336,7 @@ export default function MarketingEmailPage() {
                   >
                     <div className="d-flex align-items-center justify-content-between mb-2">
                       <span className="text-white" style={{ fontSize: "0.9rem", opacity: 0.9 }}>
-                        Quick Actions
+                        Quick Select Actions
                       </span>
                       <i className="bi bi-lightning-charge text-white" />
                     </div>
@@ -370,12 +353,16 @@ export default function MarketingEmailPage() {
                       </button>
 
                       <button className="btn btn-outline-light btn-sm" style={{ borderRadius: 10 }} onClick={selectFreeOnly} disabled={sending || loading}>
-                        <i className="bi bi-person-x-fill me-1" />
+                        <i className="bi bi-person-fill me-1" />
                         Select Free
                       </button>
 
-                      <button className="btn btn-outline-light btn-sm" style={{ borderRadius: 10 }} onClick={clearSelection} disabled={sending || loading}>
-                        <i className="bi bi-x-circle me-1" />
+                      <button className="btn btn-outline-light btn-sm" style={{ borderRadius: 10 }} onClick={selectNewsletterOnly} disabled={sending || loading}>
+                        <i className="bi bi-envelope-paper-heart me-1" />
+                        Select Newsletter Leads
+                      </button>
+
+                      <button className="btn btn-sm btn-link text-white-50 p-0 text-start" onClick={clearSelection} disabled={sending || loading}>
                         Clear Selection
                       </button>
                     </div>
@@ -419,11 +406,12 @@ export default function MarketingEmailPage() {
                   </div>
 
                   <div className="col-lg-6">
-                    <label className="form-label fw-semibold">Audience</label>
+                    <label className="form-label fw-semibold">Audience Filter</label>
                     <div className="d-flex gap-2 flex-wrap">
-                      <select className="form-select" style={{ width: 260, borderRadius: 10 }} value={tierFilter} onChange={(e) => setTierFilter(e.target.value as any)} disabled={pasteMode}>
-                        <option value="all">All users</option>
-                        <option value="free">Free users</option>
+                      <select className="form-select" style={{ width: 280, borderRadius: 10 }} value={tierFilter} onChange={(e) => setTierFilter(e.target.value as any)} disabled={pasteMode}>
+                        <option value="all">All Audience</option>
+                        <option value="newsletter">Newsletter Subscribers Only</option>
+                        <option value="free">Free Users</option>
                         <option value="premium_all">Premium (Active + Expired)</option>
                         <option value="premium_active">Premium (Active)</option>
                         <option value="premium_expired">Premium (Expired)</option>
@@ -460,9 +448,9 @@ export default function MarketingEmailPage() {
                 <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                   <div>
                     <div className="fw-semibold" style={{ color: "#1e293b" }}>
-                      Recipient List (Admin Users)
+                      Recipient List ({filteredRecipients.length} found)
                     </div>
-                    <div className="text-muted small">Loaded from: GET /mail/admin-users</div>
+                    <div className="text-muted small">Targeted users and newsletter subscribers</div>
                   </div>
 
                   <div className="input-group" style={{ maxWidth: 420 }}>
@@ -483,7 +471,7 @@ export default function MarketingEmailPage() {
                         <th>Name</th>
                         <th>Email</th>
                         <th>Tier</th>
-                        <th>Plan</th>
+                        <th>Plan / Source</th>
                         <th>Ends</th>
                       </tr>
                     </thead>
@@ -492,7 +480,7 @@ export default function MarketingEmailPage() {
                       {filteredRecipients.length === 0 ? (
                         <tr>
                           <td colSpan={6} className="text-center text-muted py-4">
-                            No recipients found.
+                            No recipients found matching the filter.
                           </td>
                         </tr>
                       ) : (

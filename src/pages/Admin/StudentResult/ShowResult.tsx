@@ -1,11 +1,12 @@
 // src/pages/Results/ShowResult.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { authApi } from "../../../utils/axios";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import QRCode from "qrcode";
 import PageTitle from "../../../components/PageTitle";
+import { getAppBaseUrl } from "../../../utils/apiUrl";
 
 /** -----------------------------
  * Types
@@ -245,7 +246,13 @@ export default function ShowResult() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { studentId, classId, term, session, schoolId } = location.state || {};
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const studentId = location.state?.studentId || searchParams.get("student_id") || searchParams.get("studentId");
+  const classId = location.state?.classId || searchParams.get("class_id") || searchParams.get("classId");
+  const term = location.state?.term || searchParams.get("term");
+  const session = location.state?.session || searchParams.get("session");
+  const schoolId = location.state?.schoolId || searchParams.get("school_id") || searchParams.get("schoolId");
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const isEmpty = (val: any): boolean => {
     return (
@@ -327,21 +334,21 @@ const mixHexWithWhite = (color: string, whitePercent = 82) => {
 };
 
   useEffect(() => {
-    if (!studentId || !classId || !term || !session || !schoolId) {
-      alert("Missing parameters.");
-      navigate("/dashboard");
+    if (!studentId) {
+      setFetching(false);
       return;
     }
 
     const fetchData = async () => {
       setFetching(true);
+      setFetchError(null);
       try {
         const params = new URLSearchParams({
-          school_id: schoolId.toString(),
-          class_id: classId.toString(),
+          ...(schoolId ? { school_id: schoolId.toString() } : {}),
+          ...(classId ? { class_id: classId.toString() } : {}),
           student_id: studentId.toString(),
-          term: term,
-          session: session,
+          ...(term ? { term } : {}),
+          ...(session ? { session } : {}),
         });
 
         const res = await authApi.get(`/report-card?${params.toString()}`);
@@ -350,32 +357,78 @@ const mixHexWithWhite = (color: string, whitePercent = 82) => {
         const qrPayload = {
           studentId: res.data.user.id,
           reg_no: res.data.user.reg_no,
-          term,
-          session,
+          term: term || res.data.average?.term || "",
+          session: session || res.data.average?.session || "",
         };
 
         const encodedPayload = encodeURIComponent(JSON.stringify(qrPayload));
-        const verificationBaseUrl = "https://gradequest.com.ng";
-        const verificationUrl = `${verificationBaseUrl}/verify-result?data=${encodedPayload}`;
+        const verificationBaseUrl = getAppBaseUrl();
+        const verificationUrl = `${verificationBaseUrl}/verify-result?data=${encodedPayload}&reg_no=${encodeURIComponent(
+          qrPayload.reg_no || ""
+        )}&term=${encodeURIComponent(qrPayload.term)}&session=${encodeURIComponent(qrPayload.session)}`;
 
         const generatedQR = await QRCode.toDataURL(verificationUrl);
         setQrDataUrl(generatedQR);
       } catch (err: any) {
         console.error(err);
-        alert(err.response?.data?.message || "Failed to fetch result");
-        navigate("/dashboard");
+        setFetchError(err.response?.data?.message || "Academic report sheet could not be retrieved. Please check parameters.");
       } finally {
         setFetching(false);
       }
     };
 
     fetchData();
-  }, [studentId, classId, term, session, schoolId, navigate]);
+  }, [studentId, classId, term, session, schoolId]);
 
-  if (fetching) return <p>Loading result...</p>;
-  if (!data) return null;
+  if (fetching) {
+    return (
+      <div className="min-vh-100 d-flex flex-column align-items-center justify-content-center bg-light">
+        <div className="spinner-border text-primary mb-3" role="status" style={{ width: "3rem", height: "3rem" }}>
+          <span className="visually-hidden">Loading...</span>
+        </div>
+        <h5 className="fw-bold text-dark">Preparing Official Report Card...</h5>
+        <p className="text-muted text-sm">Retrieving assessment marks and school verification seals</p>
+      </div>
+    );
+  }
 
-  const user = data.user;
+  if (fetchError || !data || !studentId) {
+    return (
+      <div className="min-vh-100 d-flex flex-column align-items-center justify-content-center bg-light p-4">
+        <div className="bg-white p-5 rounded-4 border shadow-sm text-center" style={{ maxWidth: "580px" }}>
+          <div
+            className="mx-auto mb-3 d-flex align-items-center justify-content-center rounded-circle"
+            style={{ width: "70px", height: "70px", background: "rgba(13, 71, 161, 0.1)", color: "#0d47a1" }}
+          >
+            <i className="bi bi-file-earmark-text fs-2" />
+          </div>
+          <h4 className="fw-bold text-dark mb-2">{fetchError ? "Report Sheet Notice" : "Select Student to View Result"}</h4>
+          <p className="text-muted text-sm mb-4">
+            {fetchError ||
+              "To display a student's official terminal report card, please search for their registration number in the Result Editor or select their record."}
+          </p>
+          <div className="d-flex justify-content-center gap-3">
+            <button
+              type="button"
+              className="btn btn-primary rounded-pill px-4 fw-bold"
+              onClick={() => navigate("/results/student-editor")}
+            >
+              <i className="bi bi-search me-1" /> Open Result Search & Editor
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline-secondary rounded-pill px-3 fw-bold"
+              onClick={() => navigate("/dashboard")}
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const user = data.user || {};
   const studentPhoto = data.user_photo_base64;
   const school_info = data.school_info;
   const affective_domains = data.affective_domains || [];
@@ -397,12 +450,25 @@ const mixHexWithWhite = (color: string, whitePercent = 82) => {
     show_watermark: true,
     ...(resultTemplate.display_options || {}),
   };
+
   const activeReportColumns = resolveReportColumns(
     displayOptions.report_column_rules || [],
     data.class_section_id,
     String((summary as any)?.term || "")
   );
-  const showResultPosition = displayOptions.show_position && activeReportColumns.show_position;
+
+  const rawPosition = (summary as any)?.position;
+  const hasPositionRecorded =
+    rawPosition !== undefined &&
+    rawPosition !== null &&
+    String(rawPosition).trim() !== "" &&
+    String(rawPosition).trim().toLowerCase() !== "n/a" &&
+    String(rawPosition).trim() !== "-" &&
+    String(rawPosition).trim().toLowerCase() !== "recorded";
+  const showResultPosition =
+    displayOptions.show_position &&
+    activeReportColumns.show_position &&
+    hasPositionRecorded;
   const showResultGrade = displayOptions.show_grade && activeReportColumns.show_grade;
   const showResultRemarks = displayOptions.show_remarks && activeReportColumns.show_remarks;
 
@@ -1164,25 +1230,29 @@ const mixHexWithWhite = (color: string, whitePercent = 82) => {
               ...customBlockStyle("signature"),
             }}
           >
-            {displayOptions.show_signature ? (
+            {displayOptions.show_signature && (school_info?.principal_signature || (school_info as any)?.stamp) ? (
               <div style={{ display: "flex", alignItems: "end", gap: 18 }}>
-                <div style={{ textAlign: "center" }}>
+                {school_info?.principal_signature ? (
+                  <div style={{ textAlign: "center" }}>
+                    <img
+                      src={school_info.principal_signature}
+                      alt="Principal/HM Signature"
+                      style={{
+                        width: "120px",
+                        height: "60px",
+                        objectFit: "contain",
+                      }}
+                    />
+                    <p style={{ margin: 0, color: themePrimary, fontWeight: 700 }}>Principal/HM Signature</p>
+                  </div>
+                ) : null}
+                {(school_info as any)?.stamp ? (
                   <img
-                    src={school_info.principal_signature || "/media/result/default-signature.svg"}
-                    alt="Principal/HM Signature"
-                    style={{
-                      width: "120px",
-                      height: "60px",
-                      objectFit: "contain",
-                    }}
+                    src={(school_info as any).stamp}
+                    alt="School stamp"
+                    style={{ width: 68, height: 68, objectFit: "contain", transform: "rotate(-8deg)" }}
                   />
-                  <p style={{ margin: 0, color: themePrimary, fontWeight: 700 }}>Principal/HM Signature</p>
-                </div>
-                <img
-                  src="/media/result/default-stamp.svg"
-                  alt="School stamp"
-                  style={{ width: 68, height: 68, objectFit: "contain", transform: "rotate(-8deg)" }}
-                />
+                ) : null}
               </div>
             ) : <div />}
 

@@ -398,56 +398,49 @@ const copyPassword = async (password?: string) => {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
         :root {
-          --sp-light:    var(--bs-light,     #fcf8f8);
-          --sp-dark:     var(--bs-dark,      #050008);
-          --sp-accent:   var(--bs-secondary, rgb(255,200,87));
-          --sp-magenta:  var(--bs-primary,   rgb(211,0,176));
-          --sp-success:  var(--bs-success,   rgb(34,197,94));
-          --sp-danger:   var(--bs-danger,    rgb(239,68,68));
-          --sp-warning:  var(--bs-warning,   rgb(245,158,11));
-          --sp-info:     var(--bs-info,      rgb(59,130,246));
-          --sp-border:   var(--bs-border-color, #ede8e0);
-          --sp-radius:   var(--bs-border-radius-lg, 14px);
+          --sp-light:    #F8FAFC;
+          --sp-dark:     #0F2744;
+          --sp-accent:   #D97706;
+          --sp-magenta:  #2563EB;
+          --sp-success:  #10B981;
+          --sp-danger:   #EF4444;
+          --sp-warning:  #F59E0B;
+          --sp-info:     #3B82F6;
+          --sp-border:   #E2E8F0;
+          --sp-radius:   14px;
 
-          --sp-accent-dim:    rgba(255,200,87,0.10);
-          --sp-accent-border: rgba(255,200,87,0.22);
-          --sp-magenta-dim:   rgba(211,0,176,0.08);
+          --sp-accent-dim:    rgba(217,119,6,0.15);
+          --sp-accent-border: rgba(217,119,6,0.35);
+          --sp-magenta-dim:   rgba(37,99,235,0.08);
         }
 
         .db-main {
-          background: var(--sp-light);
+          background: #F8FAFC;
           min-height: 100vh;
-          font-family: 'DM Sans', sans-serif;
-          padding: 28px 28px 0;
+          font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+          padding: 24px 28px 0;
         }
 
         .db-hero {
-          background: var(--sp-dark);
-          border-radius: var(--sp-radius);
+          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
+          border-radius: 18px;
           padding: 32px 36px;
           position: relative;
           overflow: hidden;
           margin-bottom: 24px;
-        }
-        .db-hero::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background-image: radial-gradient(circle, rgba(255,255,255,.045) 1px, transparent 1px);
-          background-size: 24px 24px;
-          pointer-events: none;
+          box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
         }
         .db-hero-glow {
           position:absolute; top:-60px; right:-60px; width:320px; height:320px; border-radius:50%;
-          background:radial-gradient(circle, rgba(255,200,87,.10) 0%, transparent 65%);
+          background:radial-gradient(circle, rgba(217,119,6,.15) 0%, transparent 65%);
           pointer-events:none;
         }
         .db-hero-glow2 {
           position:absolute; bottom:-40px; left:30%; width:200px; height:200px; border-radius:50%;
-          background:radial-gradient(circle, rgba(211,0,176,.06) 0%, transparent 70%);
+          background:radial-gradient(circle, rgba(37,99,235,.10) 0%, transparent 70%);
           pointer-events:none;
         }
         .db-hero-inner {
@@ -455,53 +448,53 @@ const copyPassword = async (password?: string) => {
         }
         .db-session-badge {
           display:inline-flex; align-items:center; gap:7px;
-          font-size:11px; font-weight:500; letter-spacing:.12em; text-transform:uppercase;
-          color: var(--sp-accent);
-          background: var(--sp-accent-dim);
-          border: 1px solid var(--sp-accent-border);
-          border-radius:999px; padding:4px 12px; margin-bottom:14px;
+          font-size:11.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+          color: #FBBF24;
+          background: rgba(217, 119, 6, 0.20);
+          border: 1px solid rgba(217, 119, 6, 0.35);
+          border-radius:999px; padding:4px 12px; margin-bottom:12px;
         }
         .db-session-dot {
-          width:6px; height:6px; border-radius:50%; background: var(--sp-success);
+          width:6px; height:6px; border-radius:50%; background: #10B981;
           animation:dbPulse 2s ease infinite;
         }
         @keyframes dbPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.5)} }
 
         .db-greeting {
-          font-family:'Playfair Display',serif; font-size:clamp(22px,2.5vw,32px); font-weight:900; color:#fff;
+          font-size:26px; font-weight:800; color:#fff;
           line-height:1.1; margin-bottom:8px;
         }
-        .db-greeting em { font-style:italic; color: var(--sp-magenta); }
+        .db-greeting em { font-style:normal; color: #FBBF24; }
         .db-hero-sub {
-          font-size:13.5px; font-weight:300; color:rgba(255,255,255,0.38);
-          line-height:1.65; max-width:560px; margin-bottom:24px;
+          font-size:13.5px; color:#CBD5E1;
+          line-height:1.6; max-width:560px; margin-bottom:20px;
         }
 
         .db-btn-gold {
-          display:inline-flex; align-items:center; gap:8px; padding:10px 20px; font-size:13px; font-weight:500;
-          color:var(--sp-dark); background:var(--sp-accent); border:none; border-radius:10px; cursor:pointer;
-          transition:background .2s,transform .2s; white-space:nowrap;
+          display:inline-flex; align-items:center; gap:8px; padding:9px 18px; font-size:13px; font-weight:700;
+          color:#FFFFFF; background:#D97706; border:none; border-radius:10px; cursor:pointer;
+          transition:all .2s ease; white-space:nowrap;
         }
-        .db-btn-gold:hover { background:#ffe0a0; transform:translateY(-1px); }
+        .db-btn-gold:hover { background:#B45309; transform:translateY(-1px); color:#FFFFFF; }
 
         .db-btn-outline {
-          display:inline-flex; align-items:center; gap:8px; padding:10px 20px; font-size:13px; font-weight:400;
-          color:rgba(255,255,255,.75); background:transparent; border:1px solid rgba(255,255,255,.14);
-          border-radius:10px; cursor:pointer; transition:background .2s,border-color .2s,color .2s; white-space:nowrap;
+          display:inline-flex; align-items:center; gap:8px; padding:9px 18px; font-size:13px; font-weight:600;
+          color:#FFFFFF; background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.20);
+          border-radius:10px; cursor:pointer; transition:all .2s ease; white-space:nowrap;
         }
-        .db-btn-outline:hover { background:rgba(255,255,255,.06); color:#fff; border-color:rgba(255,255,255,.28); }
+        .db-btn-outline:hover { background:rgba(255,255,255,.18); color:#fff; }
         .db-btn-outline:disabled { opacity:.5; cursor:not-allowed; }
 
         .db-hero-stat-card {
-          background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09); backdrop-filter:blur(8px);
-          border-radius:var(--sp-radius); padding:20px 24px; min-width:240px;
+          background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); backdrop-filter:blur(8px);
+          border-radius:14px; padding:20px 24px; min-width:240px;
         }
         .db-hero-stat-item { display:flex; justify-content:space-between; align-items:center; gap:16px; }
-        .db-hero-stat-label { font-size:12px; font-weight:300; color:rgba(255,255,255,0.28); }
+        .db-hero-stat-label { font-size:12px; font-weight:400; color:#CBD5E1; }
         .db-hero-stat-val {
-          font-family:'Playfair Display',serif; font-size:18px; font-weight:700; color:var(--sp-accent);
+          font-size:18px; font-weight:800; color:#FBBF24;
         }
-        .db-hero-stat-sep { height:1px; background:rgba(255,255,255,.06); }
+        .db-hero-stat-sep { height:1px; background:rgba(255,255,255,.08); }
 
         .db-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
         @media(max-width:1100px){ .db-stats{grid-template-columns:repeat(2,1fr);} }
@@ -617,6 +610,19 @@ const copyPassword = async (password?: string) => {
         }
         .db-view-btn:hover { background:rgba(255,200,87,0.18); border-color:rgba(255,200,87,0.4); }
 
+        .db-icon-btn {
+          display:inline-flex; align-items:center; justify-content:center;
+          width:34px; height:34px; border-radius:8px; cursor:pointer;
+          transition:all .2s ease; border:1px solid transparent; flex-shrink:0;
+          font-size:14px; text-decoration:none;
+        }
+        .db-icon-btn--view {
+          color:rgb(180,83,9); background:var(--sp-accent-dim); border-color:var(--sp-accent-border);
+        }
+        .db-icon-btn--view:hover {
+          background:rgba(255,200,87,0.28); transform:translateY(-1px);
+        }
+
         .db-action-btn {
           color:#475569; background:#f8fafc; border:1px solid #e2e8f0;
         }
@@ -641,109 +647,119 @@ const copyPassword = async (password?: string) => {
         .db-page-current { padding:6px 12px; font-size:12px; color:#9a8a7a; }
 
         .sp-overlay {
-          position:fixed; inset:0; background:rgba(0,0,0,.6); backdrop-filter:blur(8px);
+          position:fixed; inset:0; background:rgba(10, 25, 47, 0.70); backdrop-filter:blur(8px);
+          -webkit-backdrop-filter:blur(8px);
           z-index:1200; display:flex; align-items:center; justify-content:center; padding:16px;
         }
         .sp-card {
-          width:min(980px,96vw); max-height:92vh; border-radius:20px; overflow:hidden; background:var(--sp-light);
-          box-shadow:0 24px 72px rgba(0,0,0,.4); display:flex; flex-direction:column;
+          width:min(980px,96vw); max-height:92vh; border-radius:18px; overflow:hidden; background:#FFFFFF;
+          box-shadow:0 25px 60px -12px rgba(15, 39, 68, 0.35); border:1px solid rgba(15, 39, 68, 0.12);
+          display:flex; flex-direction:column; font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
         }
         .sp-header {
-          background:var(--sp-dark); padding:0; position:relative; overflow:hidden; flex-shrink:0;
+          background:linear-gradient(135deg, #0A192F 0%, #0F2744 100%); padding:0; position:relative; overflow:hidden; flex-shrink:0;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.12);
         }
         .sp-header::before {
           content:''; position:absolute; inset:0;
-          background-image:radial-gradient(circle,rgba(255,255,255,.04) 1px,transparent 1px);
-          background-size:22px 22px; pointer-events:none;
+          background-image:
+            linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+          background-size:24px 24px; pointer-events:none;
         }
         .sp-header-glow {
           position:absolute; top:-40px; right:-40px; width:280px; height:280px; border-radius:50%;
-          background:radial-gradient(circle,rgba(255,200,87,.10) 0%,transparent 65%);
+          background:radial-gradient(circle,rgba(217,119,6,0.20) 0%,transparent 65%);
         }
         .sp-header-top {
           position:relative; z-index:1; padding:24px 28px 0; display:flex; align-items:flex-start; justify-content:space-between;
           gap:16px; flex-wrap:wrap;
         }
         .sp-modal-avatar-initials {
-          width:64px; height:64px; border-radius:50%; background:linear-gradient(135deg, var(--sp-accent), #ffe0a0);
-          color:var(--sp-dark); font-family:'Playfair Display',serif; font-size:20px; font-weight:700;
-          display:flex; align-items:center; justify-content:center; border:3px solid rgba(255,255,255,.2);
+          width:64px; height:64px; border-radius:50%; background:linear-gradient(135deg, #FEF3C7, #FDE68A);
+          color:#92400E; font-family:'Plus Jakarta Sans',sans-serif; font-size:20px; font-weight:800;
+          display:flex; align-items:center; justify-content:center; border:3px solid rgba(255,255,255,0.25);
         }
         .sp-online-dot {
-          position:absolute; bottom:2px; right:2px; width:12px; height:12px; background:var(--sp-success);
-          border:2px solid var(--sp-dark); border-radius:50%;
+          position:absolute; bottom:2px; right:2px; width:12px; height:12px; background:#10B981;
+          border:2px solid #0A192F; border-radius:50%;
         }
         .sp-header-info { flex:1; min-width:0; }
         .sp-modal-name {
-          font-family:'Playfair Display',serif; font-size:20px; font-weight:700; color:#fff; line-height:1.15; margin-bottom:4px;
+          font-family:'Plus Jakarta Sans',sans-serif; font-size:20px; font-weight:800; color:#fff; line-height:1.15; margin-bottom:4px;
         }
         .sp-modal-meta { display:flex; flex-wrap:wrap; gap:12px; }
         .sp-modal-meta-item {
-          display:flex; align-items:center; gap:5px; font-size:12px; font-weight:300; color:rgba(255,255,255,0.35);
+          display:flex; align-items:center; gap:5px; font-size:12.5px; font-weight:500; color:#CBD5E1;
         }
         .sp-header-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 
         .sp-btn-edit, .sp-btn-save, .sp-btn-cancel, .sp-btn-close, .sp-btn-danger {
-          display:inline-flex; align-items:center; gap:7px; border-radius:8px; cursor:pointer;
+          display:inline-flex; align-items:center; gap:7px; border-radius:10px; cursor:pointer;
+          transition: all 0.2s ease;
         }
         .sp-btn-edit {
-          padding:8px 16px; font-size:13px; font-weight:500; color:var(--sp-dark);
-          background:var(--sp-accent); border:none;
+          padding:8px 16px; font-size:13px; font-weight:700; color:#0F2744;
+          background:#FBBF24; border:none; box-shadow: 0 2px 8px rgba(251, 191, 36, 0.3);
         }
-        .sp-btn-edit:hover { background:#ffe0a0; }
+        .sp-btn-edit:hover { background:#F59E0B; transform: translateY(-1px); }
 
         .sp-btn-save {
-          padding:8px 16px; font-size:13px; font-weight:500; color:#fff;
-          background:var(--sp-success); border:none;
+          padding:8px 16px; font-size:13px; font-weight:700; color:#fff;
+          background:linear-gradient(135deg, #10B981 0%, #059669 100%); border:none;
         }
-        .sp-btn-save:hover { background:rgb(21,128,61); }
+        .sp-btn-save:hover { background:rgb(21,128,61); transform: translateY(-1px); }
         .sp-btn-save:disabled { opacity:.6; cursor:not-allowed; }
 
         .sp-btn-cancel {
-          padding:8px 14px; font-size:13px; font-weight:400; color:rgba(255,255,255,.65);
-          background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.15);
+          padding:8px 14px; font-size:13px; font-weight:600; color:rgba(255,255,255,0.85);
+          background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.20);
         }
-        .sp-btn-cancel:hover { background:rgba(255,255,255,.12); color:#fff; }
+        .sp-btn-cancel:hover { background:rgba(255,255,255,0.18); color:#fff; }
 
         .sp-btn-danger {
-          padding:8px 14px; font-size:13px; font-weight:500; color:#fff;
-          background:#b91c1c; border:none;
+          padding:8px 14px; font-size:13px; font-weight:700; color:#fff;
+          background:#DC2626; border:none;
         }
-        .sp-btn-danger:hover { background:#991b1b; }
+        .sp-btn-danger:hover { background:#B91C1C; }
         .sp-btn-danger:disabled { opacity:.6; cursor:not-allowed; }
 
         .sp-btn-close {
-          width:32px; height:32px; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12);
-          justify-content:center; color:rgba(255,255,255,.6); padding:0;
+          width:34px; height:34px; background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.20);
+          border-radius:10px; justify-content:center; color:#FFFFFF; padding:0;
+        }
+        .sp-btn-close:hover {
+          background: rgba(239, 68, 68, 0.3); border-color: rgba(239, 68, 68, 0.5); transform: scale(1.1) rotate(90deg); color: #fff;
         }
 
         .sp-status {
-          display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:500;
-          border-radius:100px; padding:2px 9px;
+          display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700;
+          border-radius:100px; padding:3px 10px;
         }
         .sp-status--active {
-          background:rgba(34,197,94,.15); color:var(--sp-success); border:1px solid rgba(34,197,94,.3);
+          background:rgba(16,185,129,0.15); color:#10B981; border:1px solid rgba(16,185,129,0.3);
         }
         .sp-status--inactive {
-          background:rgba(100,116,139,.12); color:#94a3b8; border:1px solid rgba(100,116,139,.2);
+          background:rgba(100,116,139,0.15); color:#94a3b8; border:1px solid rgba(100,116,139,0.25);
         }
-        .sp-status-dot { width:5px; height:5px; border-radius:50%; background:currentColor; }
+        .sp-status-dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
 
         .sp-tabs {
-          position:relative; z-index:1; display:flex; gap:2px; padding:16px 28px 0; overflow-x:auto; scrollbar-width:none;
+          position:relative; z-index:1; display:flex; gap:4px; padding:16px 28px 0; overflow-x:auto; scrollbar-width:none;
+          border-bottom: 2px solid rgba(255,255,255,0.08);
         }
         .sp-tabs::-webkit-scrollbar { display:none; }
         .sp-tab {
-          display:inline-flex; align-items:center; gap:7px; padding:9px 16px; font-size:13px; font-weight:400;
-          color:rgba(255,255,255,.5); background:transparent; border:none; border-radius:8px 8px 0 0; cursor:pointer;
-          white-space:nowrap; border-bottom:2px solid transparent;
+          display:inline-flex; align-items:center; gap:7px; padding:9px 16px; font-size:13px; font-weight:600;
+          color:rgba(255,255,255,0.7); background:transparent; border:none; border-radius:8px 8px 0 0; cursor:pointer;
+          white-space:nowrap; transition: all 0.2s ease;
         }
-        .sp-tab:hover { color:rgba(255,255,255,.85); background:rgba(255,255,255,.05); }
+        .sp-tab:hover { color:#FFFFFF; background:rgba(255,255,255,0.08); }
         .sp-tab--active {
-          color:var(--sp-accent); background:var(--sp-accent-dim); border-bottom-color:var(--sp-accent); font-weight:500;
+          color:#FBBF24; background:rgba(217,119,6,0.18); border-bottom:2px solid #FBBF24; font-weight:700;
         }
 
-        .sp-body { overflow-y:auto; flex:1; padding:24px 28px 28px; }
+        .sp-body { overflow-y:auto; flex:1; padding:24px 28px 28px; background: #F8FAFC; }
         .sp-summary-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px; }
         @media(max-width:700px){ .sp-summary-grid{grid-template-columns:1fr;} }
 
@@ -1161,12 +1177,16 @@ const copyPassword = async (password?: string) => {
                               </span>
                             </td>
                             <td style={{ textAlign: "right" }}>
-                              <button className="db-view-btn" onClick={() => openBursar(b)}>
-                                <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                                  <circle cx="7" cy="7" r="4" stroke="currentColor" strokeWidth="1.3" />
-                                  <circle cx="7" cy="7" r="1.5" fill="currentColor" />
+                              <button
+                                className="db-icon-btn db-icon-btn--view"
+                                onClick={() => openBursar(b)}
+                                title={`View Profile: ${fullName(b)}`}
+                                aria-label="View Bursar Profile"
+                              >
+                                <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                                  <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+                                  <circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.4"/>
                                 </svg>
-                                View
                               </button>
                             </td>
                           </tr>

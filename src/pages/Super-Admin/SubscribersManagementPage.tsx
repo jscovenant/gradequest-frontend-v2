@@ -66,14 +66,15 @@ function deriveTier(s: SubscriptionRow): Tier {
   const planName = s.plan?.name ?? null;
   if (isFreePlanName(planName)) return "free";
 
-  // prefer ends_at for active/expired determination
-  const ends = s.ends_at ? new Date(s.ends_at) : null;
-  if (ends && !Number.isNaN(ends.getTime())) {
-    return ends.getTime() >= Date.now() ? "premium_active" : "premium_expired";
+  // If ends_at is null or far future, it is a lifetime active subscription
+  if (!s.ends_at) return "premium_active";
+
+  const ends = new Date(s.ends_at);
+  if (Number.isNaN(ends.getTime()) || ends.getFullYear() >= 2099) {
+    return "premium_active";
   }
 
-  // fallback: if plan isn't free, treat as premium_active
-  return "premium_active";
+  return ends.getTime() >= Date.now() ? "premium_active" : "premium_expired";
 }
 
 function tierLabel(t: Tier) {
@@ -89,9 +90,10 @@ function tierBadge(t: Tier) {
 }
 
 function fmtDate(val?: string | null) {
-  if (!val) return "—";
+  if (!val) return "Lifetime / Forever";
   const d = new Date(val);
   if (Number.isNaN(d.getTime())) return val;
+  if (d.getFullYear() >= 2099) return "Lifetime / Forever";
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 

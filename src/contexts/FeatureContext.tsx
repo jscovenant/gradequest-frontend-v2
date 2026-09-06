@@ -12,7 +12,21 @@ type FeatureState = {
 
 const FeatureContext = createContext<FeatureState | null>(null);
 
-const PUBLIC_PATHS = new Set(["/", "/login", "/register", "/check-result", "/unauthorized"]);
+const PUBLIC_PATHS = new Set([
+  "/",
+  "/login",
+  "/register",
+  "/check-result",
+  "/unauthorized",
+  "/sales-representative/register",
+  "/become-a-partner",
+  "/forgot-password",
+  "/reset-password",
+  "/privacy-policy",
+  "/terms-and-conditions",
+  "/book-demo",
+  "/pay-school-fee"
+]);
 
 export function FeatureProvider({ children }: { children: React.ReactNode }) {
   const location = useLocation();

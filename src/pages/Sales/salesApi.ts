@@ -1,4 +1,4 @@
-﻿import { authApi } from "../../utils/axios";
+import { authApi } from "../../utils/axios";
 
 export type SalesRepresentative = {
   id: number;
@@ -10,6 +10,10 @@ export type SalesRepresentative = {
   status: string;
   sales_page_url?: string;
   commission_rate: number;
+  term_1_commission_rate?: number;
+  retention_commission_rate?: number;
+  core_commission_rate?: number;
+  premium_commission_rate?: number;
   monthly_target_amount: number;
   monthly_target_schools: number;
   joined_at?: string | null;
@@ -69,6 +73,7 @@ export type SalesLead = {
   representative?: any;
   school_id?: number | null;
   admin_user_id?: number | null;
+  commission_term_count?: number;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -79,12 +84,17 @@ export type SalesCommission = {
   commission_rate: number;
   amount: number;
   status: string;
+  source?: "offline_invoice" | "core_platform_fee" | "subscription" | string;
+  term_number?: number;
   earned_at?: string | null;
   approved_at?: string | null;
   paid_at?: string | null;
   school?: any;
   subscription?: any;
   sub_payment?: any;
+  invoice?: any;
+  invoice_payment?: any;
+  metadata?: any;
 };
 
 export const salesApi = {
@@ -114,5 +124,25 @@ export function leadContact(lead?: SalesLead | null) {
   return lead.contact_name || lead.contact_email || lead.contact_phone || lead.demo_booking?.email || lead.admin_user?.email || lead.school?.email || "No contact yet";
 }
 
+export function commissionSourceLabel(source?: string): string {
+  switch (source) {
+    case "offline_invoice":
+      return "Offline Term Invoice";
+    case "core_platform_fee":
+      return "Core Online Fee";
+    case "subscription":
+      return "Plus Subscription";
+    default:
+      return source ? source.replace(/_/g, " ") : "Revenue";
+  }
+}
 
-
+export function commissionTierLabel(termNumber?: number): string {
+  if (!termNumber || termNumber === 1) {
+    return "Term 1 (Acquisition)";
+  }
+  if (termNumber === 2 || termNumber === 3) {
+    return `Term ${termNumber} (Retention)`;
+  }
+  return `Term ${termNumber}`;
+}

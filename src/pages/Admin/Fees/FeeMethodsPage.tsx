@@ -1,4 +1,4 @@
-// src/pages/Fees/FeeMethodsPage.tsx
+// src/pages/Admin/Fees/FeeMethodsPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import TopNav from "../../../components/LayoutComponents/TopNav";
 import Sidebar from "../../../components/LayoutComponents/Sidebar";
@@ -8,6 +8,7 @@ import Loader from "../../../components/ui/dashboardLoader";
 import { authApi } from "../../../utils/axios";
 import { useToast } from "../../../contexts/ToastContext";
 import PageTitle from "../../../components/PageTitle";
+import { Link } from "react-router-dom";
 
 /* =========================
    TYPES
@@ -51,7 +52,7 @@ type Option = { id: number; name: string };
 type FeeType = { id: number; name: string; amount: number };
 
 /* =========================
-   PAYSTACK INLINE (loaded once, reused across the app)
+   PAYSTACK INLINE
 ========================= */
 declare global {
   interface Window {
@@ -79,7 +80,7 @@ function loadPaystackInline(): Promise<void> {
     script.src = "https://js.paystack.co/v2/inline.js";
     script.async = true;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Could not load the Paystack checkout."));
+    script.onerror = () => reject(new Error("Could not load Paystack checkout."));
     document.body.appendChild(script);
   });
 
@@ -89,19 +90,12 @@ function loadPaystackInline(): Promise<void> {
 /* =========================
    HELPERS
 ========================= */
-function getGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
-}
-
 function getErrorMessage(err: any): string {
   const status = err?.response?.status;
   const data = err?.response?.data;
-  if (status === 409) return data?.message ?? data?.error ?? "This item already exists.";
-  if (status === 404) return data?.message ?? "Not found.";
-  if (status === 422) return data?.message ?? "Validation error.";
+  if (status === 409) return data?.message ?? data?.error ?? "This fee is already assigned.";
+  if (status === 404) return data?.message ?? "Resource not found.";
+  if (status === 422) return data?.message ?? "Please verify all required fields.";
   return data?.message ?? err?.message ?? "Something went wrong.";
 }
 
@@ -110,53 +104,42 @@ function naira(n: number | null | undefined) {
   return v.toLocaleString("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 });
 }
 
-function statusPillStyle(status?: FeeStatus) {
-  if (status === "paid") return { background: "rgba(6,95,70,0.08)", color: "#065f46", borderColor: "rgba(6,95,70,0.12)" };
-  if (status === "partial") return { background: "rgba(180,83,9,0.08)", color: "#b45309", borderColor: "rgba(180,83,9,0.14)" };
-  return { background: "rgba(220,38,38,0.08)", color: "#b91c1c", borderColor: "rgba(220,38,38,0.14)" };
-}
-
 /* =========================
-   PAGE
+   PAGE COMPONENT
 ========================= */
 export default function FeeMethodsPage() {
   const { showSuccess, showError, showWarning } = useToast();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  // page loading
   const [loadingPage, setLoadingPage] = useState(true);
 
-  // dropdowns
+  // Dropdown options
   const [sections, setSections] = useState<Option[]>([]);
   const [sessions, setSessions] = useState<Option[]>([]);
   const [terms, setTerms] = useState<Option[]>([]);
   const [loadingMeta, setLoadingMeta] = useState(true);
 
-  // student lookup
+  // Student search
   const [regNo, setRegNo] = useState("");
   const [searchingStudent, setSearchingStudent] = useState(false);
   const [studentPick, setStudentPick] = useState<StudentSearchItem | null>(null);
 
-  // fee context
+  // Fee context
   const [sectionId, setSectionId] = useState<number | "">("");
   const [sessionId, setSessionId] = useState<number | "">("");
   const [termId, setTermId] = useState<number | "">("");
 
-  // fee types to assign
+  // Fee types to assign
   const [feeTypes, setFeeTypes] = useState<FeeType[]>([]);
   const [loadingFeeTypes, setLoadingFeeTypes] = useState(false);
   const [selectedFeeTypeIds, setSelectedFeeTypeIds] = useState<Record<number, boolean>>({});
 
-  // assigned fees + student details
+  // Student fee details & ledger
   const [details, setDetails] = useState<StudentFeeDetails | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
-
-  // busy key
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  const isBusy = (k: string) => busyKey === k;
 
-  // online payment collection
+  // Online collection modal
   const [collectTarget, setCollectTarget] = useState<{ id: number; label: string; balance: number } | null>(null);
   const [collectAmount, setCollectAmount] = useState("");
   const [collectEmail, setCollectEmail] = useState("");
@@ -164,20 +147,19 @@ export default function FeeMethodsPage() {
   const [collectError, setCollectError] = useState<string | null>(null);
 
   useEffect(() => {
-    const t = window.setTimeout(() => setLoadingPage(false), 120);
+    const t = window.setTimeout(() => setLoadingPage(false), 80);
     return () => window.clearTimeout(t);
   }, []);
 
   /* =========================
-     FETCH META
-========================= */
+     LOAD METADATA
+  ========================= */
   useEffect(() => {
     let mounted = true;
 
-    async function boot() {
+    async function fetchMetadata() {
       try {
         setLoadingMeta(true);
-
         const [secRes, sesRes, termRes] = await Promise.all([
           authApi.get("/sections"),
           authApi.get("/facademic-sessions"),
@@ -196,6 +178,9 @@ export default function FeeMethodsPage() {
           name: s.name ?? s.session ?? s.title ?? "",
         }));
         setSessions(sesArr);
+        if (sesArr.length > 0 && !sessionId) {
+          setSessionId(sesArr[0].id);
+        }
 
         const rawTerms = termRes.data?.data ?? termRes.data ?? [];
         const termArr: Option[] = (Array.isArray(rawTerms) ? rawTerms : []).map((t: any) => ({
@@ -203,33 +188,33 @@ export default function FeeMethodsPage() {
           name: t.name ?? t.term ?? "",
         }));
         setTerms(termArr);
+        if (termArr.length > 0 && !termId) {
+          setTermId(termArr[0].id);
+        }
       } catch (e: any) {
         console.error(e);
-        showError(getErrorMessage(e) || "Failed to load fee setup data.");
+        showError(getErrorMessage(e) || "Failed to load fee configuration options.");
       } finally {
         if (mounted) setLoadingMeta(false);
       }
     }
 
-    boot();
+    fetchMetadata();
     return () => {
       mounted = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* =========================
      STUDENT SEARCH
-========================= */
+  ========================= */
   async function searchStudentByReg() {
     const q = regNo.trim();
-    if (!q) return showWarning("Enter a registration number.");
+    if (!q) return showWarning("Please enter a student admission or registration number.");
 
     try {
       setSearchingStudent(true);
-
       const res = await authApi.get("/students/search", { params: { query: q } });
-
       const list = res.data?.data ?? res.data ?? [];
       const arr: StudentSearchItem[] = Array.isArray(list) ? list : [];
 
@@ -239,48 +224,51 @@ export default function FeeMethodsPage() {
       if (!pick) {
         setStudentPick(null);
         setDetails(null);
-        return showError("No student found with that registration number.");
+        return showError("No student found matching that registration number.");
       }
 
       setStudentPick(pick);
+      if (pick.section_id) {
+        setSectionId(pick.section_id);
+      }
 
-      if (pick.section_id) setSectionId(pick.section_id);
+      showSuccess(`Found student: ${pick.firstname} ${pick.surname}`);
 
-      showSuccess(`Student found: ${pick.firstname} ${pick.surname} (${pick.reg_no})`);
+      // Auto load fees & ledger
+      await loadStudentFeeDetailsDirect(pick.reg_no);
     } catch (e: any) {
       console.error(e);
-      showError(getErrorMessage(e) || "Failed to find student.");
+      showError(getErrorMessage(e) || "Failed to search student.");
     } finally {
       setSearchingStudent(false);
     }
   }
 
   /* =========================
-     FETCH FEE TYPES
-========================= */
-  async function fetchFeeTypes() {
-    if (!studentPick?.id) return showError("Search and select a student first.");
-    if (!sectionId || !sessionId || !termId) return showError("Select Section, Session and Term.");
+     AUTO FETCH FEE TYPES
+  ========================= */
+  useEffect(() => {
+    if (studentPick?.id && sectionId && sessionId && termId) {
+      void fetchFeeTypesForStudent(studentPick.id, Number(sectionId), Number(sessionId), Number(termId));
+    }
+  }, [studentPick?.id, sectionId, sessionId, termId]);
 
+  async function fetchFeeTypesForStudent(sId: number, secId: number, sesId: number, tId: number) {
     try {
       setLoadingFeeTypes(true);
       setSelectedFeeTypeIds({});
 
       const res = await authApi.post("/fees/fetch-types", {
-        student_id: studentPick.id,
-        section_id: Number(sectionId),
-        session_id: Number(sessionId),
-        term_id: Number(termId),
+        student_id: sId,
+        section_id: secId,
+        session_id: sesId,
+        term_id: tId,
       });
 
       const ft: FeeType[] = Array.isArray(res.data?.fee_types) ? res.data.fee_types : [];
       setFeeTypes(ft);
-
-      if (!ft.length) showWarning(res.data?.message ?? "No fee types found for this selection.");
-      else showSuccess(res.data?.message ?? "Fee types loaded.");
     } catch (e: any) {
       console.error(e);
-      showError(getErrorMessage(e));
       setFeeTypes([]);
     } finally {
       setLoadingFeeTypes(false);
@@ -289,7 +277,7 @@ export default function FeeMethodsPage() {
 
   /* =========================
      ASSIGN FEES
-========================= */
+  ========================= */
   const selectedFeeIds = useMemo(
     () => Object.entries(selectedFeeTypeIds).filter(([_, v]) => v).map(([k]) => Number(k)),
     [selectedFeeTypeIds]
@@ -316,8 +304,8 @@ export default function FeeMethodsPage() {
   }
 
   async function assignFees() {
-    if (!studentPick?.id) return showError("Search and select a student first.");
-    if (!sectionId || !sessionId || !termId) return showError("Select Section, Session and Term.");
+    if (!studentPick?.id) return showError("Please search and select a student first.");
+    if (!sectionId || !sessionId || !termId) return showError("Please select Section, Session, and Term.");
     if (selectedFeeIds.length === 0) return showError("Select at least one fee type to assign.");
 
     try {
@@ -331,7 +319,7 @@ export default function FeeMethodsPage() {
       });
 
       showSuccess(res.data?.message ?? "Fee(s) assigned successfully.");
-      await loadStudentFeeDetails();
+      await loadStudentFeeDetailsDirect(studentPick.reg_no);
       clearFeeSelection();
     } catch (e: any) {
       console.error(e);
@@ -342,44 +330,40 @@ export default function FeeMethodsPage() {
   }
 
   /* =========================
-     STUDENT FEE DETAILS
-========================= */
-  async function loadStudentFeeDetails() {
-    const q = regNo.trim();
-    if (!q) return showWarning("Enter a registration number first.");
+     STUDENT FEE DETAILS / LEDGER
+  ========================= */
+  async function loadStudentFeeDetailsDirect(targetRegNo: string) {
+    if (!targetRegNo.trim()) return;
 
     try {
       setLoadingDetails(true);
       const res = await authApi.get<StudentFeeDetails>("/fees/student/details", {
         params: {
-          reg_no: q,
+          reg_no: targetRegNo.trim(),
           session_id: sessionId || undefined,
           term_id: termId || undefined,
         },
       });
-
       setDetails(res.data);
     } catch (e: any) {
       console.error(e);
-      showError(getErrorMessage(e));
       setDetails(null);
     } finally {
       setLoadingDetails(false);
     }
   }
 
-  /* =========================
-     REMOVE ASSIGNED FEE
-========================= */
   async function removeAssignedFee(studentFeeId: number) {
-    const ok = window.confirm("Remove this fee assignment? (You cannot remove paid fees)");
+    const ok = window.confirm("Are you sure you want to remove this fee assignment? (Paid fees cannot be removed)");
     if (!ok) return;
 
     try {
       setBusyKey(`fees:remove:${studentFeeId}`);
       const res = await authApi.delete(`/student-fees/${studentFeeId}`);
       showSuccess(res.data?.message ?? "Fee assignment removed.");
-      await loadStudentFeeDetails();
+      if (studentPick?.reg_no) {
+        await loadStudentFeeDetailsDirect(studentPick.reg_no);
+      }
     } catch (e: any) {
       console.error(e);
       showError(getErrorMessage(e));
@@ -389,8 +373,8 @@ export default function FeeMethodsPage() {
   }
 
   /* =========================
-     COLLECT ONLINE PAYMENT
-========================= */
+     ONLINE PAYMENT MODAL
+  ========================= */
   function openCollectModal(fee: StudentFeeDetails["fees"][number]) {
     setCollectTarget({
       id: fee.id,
@@ -403,7 +387,7 @@ export default function FeeMethodsPage() {
   }
 
   function closeCollectModal() {
-    if (collecting) return; // don't let the admin dismiss mid-flight
+    if (collecting) return;
     setCollectTarget(null);
   }
 
@@ -411,17 +395,16 @@ export default function FeeMethodsPage() {
     if (!collectTarget) return;
 
     const amount = Number(collectAmount);
-
     if (!amount || amount < 100) {
       setCollectError("Enter an amount of at least ₦100.");
       return;
     }
     if (amount > collectTarget.balance) {
-      setCollectError(`Amount can't exceed the balance of ${naira(collectTarget.balance)}.`);
+      setCollectError(`Amount cannot exceed outstanding balance of ${naira(collectTarget.balance)}.`);
       return;
     }
     if (!collectEmail.trim()) {
-      setCollectError("Enter the parent's email — Paystack sends the receipt there.");
+      setCollectError("Enter the parent or payer email address for receipt.");
       return;
     }
 
@@ -436,8 +419,6 @@ export default function FeeMethodsPage() {
       });
 
       await loadPaystackInline();
-
-      // Hand off to Paystack's own secure popup — close ours so they don't stack.
       setCollectTarget(null);
 
       const popup = new window.PaystackPop!();
@@ -445,12 +426,14 @@ export default function FeeMethodsPage() {
         onSuccess: async (transaction) => {
           try {
             await authApi.get(`/fees/online/verify/${transaction.reference}`);
-            showSuccess("Payment confirmed — ledger updated.");
+            showSuccess("Payment completed successfully!");
           } catch {
-            showWarning("Payment went through, but confirmation is still processing. Refresh the ledger shortly.");
+            showWarning("Payment processed. Updating records...");
           } finally {
             setCollecting(false);
-            await loadStudentFeeDetails();
+            if (studentPick?.reg_no) {
+              await loadStudentFeeDetailsDirect(studentPick.reg_no);
+            }
           }
         },
         onCancel: () => {
@@ -470,1228 +453,785 @@ export default function FeeMethodsPage() {
   }
 
   /* =========================
-     DERIVED
-========================= */
-  const canFetchFeeTypes = !!studentPick?.id && !!sectionId && !!sessionId && !!termId;
-
+     DERIVED LEDGER STATS
+  ========================= */
   const ledgerTotals = useMemo(() => {
     const fees = details?.fees ?? [];
     const totalAmount = fees.reduce((a, f) => a + Number(f.total_amount ?? 0), 0);
     const totalPaid = fees.reduce((a, f) => a + Number(f.amount_paid ?? 0), 0);
     const totalBal = fees.reduce((a, f) => a + Number(f.balance ?? 0), 0);
-    return { totalAmount, totalPaid, totalBal, count: fees.length };
+    const percent = totalAmount > 0 ? Math.round((totalPaid / totalAmount) * 100) : 0;
+    return { totalAmount, totalPaid, totalBal, count: fees.length, percent };
   }, [details]);
 
-  /* =========================
-     RENDER
-========================= */
   return (
     <>
-      {/* Same template CSS from AdminDashboard / FeeStructurePage, plus the collect-payment modal */}
+      <PageTitle title="Fee Assignments & Allocations" />
       <style>{`
-        .db-main {
-          background: var(--bs-body-bg, #f5f1eb);
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        .fa-main {
           min-height: 100vh;
-          font-family: "DM Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-          padding: 28px 28px 0;
+          background: #F8FAFC;
+          font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+          padding: calc(var(--gq-topnav-height, 66px) + 20px) 24px 48px;
+          overflow-x: hidden;
+          box-sizing: border-box;
         }
-
-        .db-hero {
-          background: #0f172a;
-          border-radius: var(--bs-border-radius-lg, 16px);
-          padding: 32px 36px;
+        @media(max-width: 767.98px) {
+          .fa-main { padding: calc(var(--gq-topnav-height, 66px) + 12px) 12px 36px; }
+        }
+        .fa-shell { max-width: 1280px; margin: 0 auto; width: 100%; }
+        
+        /* Hero Banner */
+        .fa-hero {
+          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
+          border-radius: 18px;
+          padding: 28px 32px;
+          color: #fff;
           position: relative;
           overflow: hidden;
-          margin-bottom: 20px;
+          box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
+          margin-bottom: 22px;
         }
-        .db-hero::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background-image: radial-gradient(circle, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
-          background-size: 24px 24px;
-          pointer-events: none;
+        @media(max-width: 767.98px) {
+          .fa-hero { padding: 20px 16px; border-radius: 14px; }
         }
-        .db-hero-glow {
+        .fa-hero-glow {
           position: absolute;
           top: -60px;
           right: -60px;
-          width: 320px;
-          height: 320px;
+          width: 280px;
+          height: 280px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(201, 168, 76, 0.1) 0%, transparent 65%);
+          background: radial-gradient(circle, rgba(217, 119, 6, 0.15) 0%, transparent 65%);
           pointer-events: none;
         }
-        .db-hero-glow2 {
-          position: absolute;
-          bottom: -40px;
-          left: 30%;
-          width: 200px;
-          height: 200px;
-          border-radius: 50%;
-          background: radial-gradient(circle, rgba(99, 102, 241, 0.07) 0%, transparent 70%);
-          pointer-events: none;
-        }
-        .db-hero-inner {
-          position: relative;
-          z-index: 1;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 32px;
-          flex-wrap: wrap;
-        }
-
-        .db-session-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 7px;
-          font-size: 11px;
-          font-weight: 500;
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-          color: #e8c97a;
-          background: rgba(201, 168, 76, 0.1);
-          border: 1px solid rgba(201, 168, 76, 0.2);
-          border-radius: 100px;
-          padding: 4px 12px;
-          margin-bottom: 14px;
-        }
-        .db-session-dot {
-          width: 6px;
-          height: 6px;
-          border-radius: 50%;
-          background: #22c55e;
-          animation: dbPulse 2s ease infinite;
-        }
-        @keyframes dbPulse {
-          0%,100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.4; transform: scale(1.5); }
-        }
-
-        .db-greeting {
-          font-family: "Lora", Georgia, serif;
-          font-size: clamp(22px, 2.5vw, 32px);
-          font-weight: 700;
-          color: #fff;
-          line-height: 1.1;
-          margin-bottom: 8px;
-        }
-        .db-greeting em { font-style: italic; color: #e8c97a; }
-
-        .db-hero-sub {
-          font-size: 13.5px;
-          font-weight: 300;
-          color: rgba(255, 255, 255, 0.72);
-          line-height: 1.65;
-          max-width: 560px;
-          margin-bottom: 16px;
-        }
-
-        .db-hero-btns {
-          display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
-        }
-
-        .db-btn-gold {
-          display: inline-flex;
-          align-items: center;
-          gap: 7px;
-          padding: 10px 18px;
-          font-family: "DM Sans", sans-serif;
-          font-size: 13px;
-          font-weight: 500;
-          color: #0f172a;
-          background: #c9a84c;
-          border: none;
-          border-radius: var(--bs-border-radius, 8px);
-          cursor: pointer;
-          transition: background 0.2s, transform 0.2s;
-          text-decoration: none;
-          white-space: nowrap;
-        }
-        .db-btn-gold:hover { background: #e8c97a; transform: translateY(-1px); }
-        .db-btn-gold:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
-
-        .db-btn-outline {
-          display: inline-flex;
-          align-items: center;
-          gap: 7px;
-          padding: 10px 18px;
-          font-family: "DM Sans", sans-serif;
-          font-size: 13px;
-          font-weight: 400;
-          color: rgba(255, 255, 255, 0.7);
-          background: transparent;
-          border: 1px solid rgba(255, 255, 255, 0.14);
-          border-radius: var(--bs-border-radius, 8px);
-          cursor: pointer;
-          transition: background 0.2s, border-color 0.2s, color 0.2s;
-          white-space: nowrap;
-        }
-        .db-btn-outline:hover { background: rgba(255, 255, 255, 0.06); color: #fff; border-color: rgba(255, 255, 255, 0.28); }
-        .db-btn-outline:disabled { opacity: 0.55; cursor: not-allowed; }
-
-        .db-hero-stat-card {
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.09);
-          backdrop-filter: blur(8px);
-          border-radius: var(--bs-border-radius, 12px);
-          padding: 20px 24px;
-          min-width: 300px;
-        }
-        .db-hero-stat-row { display: flex; flex-direction: column; gap: 10px; }
-        .db-hero-stat-item { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-        .db-hero-stat-label { font-size: 12px; font-weight: 300; color: #64748b; }
-        .db-hero-stat-val {
-          font-family: "Lora", serif;
-          font-size: 18px;
-          font-weight: 700;
-          color: #fff;
-        }
-        .db-hero-stat-sep { height: 1px; background: rgba(255, 255, 255, 0.06); }
-
-        .db-panel {
-          background: var(--bs-body-bg, #fff);
-          border: 1px solid var(--bs-border-color, #ede8e0);
-          border-radius: var(--bs-border-radius-lg, 14px);
-          overflow: hidden;
-        }
-        .db-panel-head {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 18px 20px;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-          gap: 12px;
-          flex-wrap: wrap;
-        }
-        .db-panel-title-group { display: flex; align-items: center; gap: 12px; min-width: 240px; }
-        .db-panel-icon {
-          width: 36px;
-          height: 36px;
-          border-radius: 9px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: var(--pi, #fef3c7);
-          color: var(--pc, #b45309);
-          flex-shrink: 0;
-        }
-        .db-panel-title {
-          font-family: "Lora", serif;
-          font-size: 16px;
-          font-weight: 700;
-          color: #1a1a2e;
-          margin: 0;
-        }
-        .db-panel-sub { font-size: 11.5px; font-weight: 300; color: #9a8a7a; margin: 0; }
-
-        .db-table {
-          width: 100%;
-          border-collapse: collapse;
-        }
-        .db-table th {
-          padding: 10px 16px;
-          font-size: 11px;
-          font-weight: 500;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          color: #9a8a7a;
-          background: #faf8f5;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-          text-align: left;
-          white-space: nowrap;
-        }
-        .db-table td {
-          padding: 13px 16px;
-          font-size: 13.5px;
-          color: #4a4a5a;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-          vertical-align: middle;
-        }
-        .db-table tbody tr { transition: background 0.15s; }
-        .db-table tbody tr:hover { background: #faf8f5; }
-
-        .db-skeleton {
-          height: 14px;
-          border-radius: 7px;
-          background: linear-gradient(90deg, #f0ebe3 25%, #e8e0d5 50%, #f0ebe3 75%);
-          background-size: 200% 100%;
-          animation: dbSkeleton 1.4s ease infinite;
-        }
-        @keyframes dbSkeleton {
-          from { background-position: 200% 0; }
-          to { background-position: -200% 0; }
-        }
-
-        .db-pill {
-          display: inline-flex;
-          align-items: center;
-          font-size: 12px;
-          font-weight: 500;
-          padding: 3px 10px;
-          border-radius: 999px;
-          background: rgba(30, 64, 175, 0.08);
-          color: #1e40af;
-          border: 1px solid rgba(30, 64, 175, 0.12);
-          white-space: nowrap;
-        }
-        .db-pill--gold {
-          background: rgba(180, 83, 9, 0.08);
-          color: #b45309;
-          border-color: rgba(180, 83, 9, 0.14);
-        }
-        .db-pill--violet {
-          background: rgba(124, 58, 237, 0.08);
-          color: #7c3aed;
-          border-color: rgba(124, 58, 237, 0.12);
-        }
-        .db-score-pill {
-          display: inline-flex;
-          align-items: center;
-          font-size: 12.5px;
-          font-weight: 600;
-          padding: 3px 10px;
-          border-radius: 999px;
-          float: right;
-        }
-
-        .db-refresh-btn {
+        .fa-hero h1 { font-size: 24px; font-weight: 800; margin: 0 0 6px; color: #fff; }
+        @media(max-width: 767.98px) { .fa-hero h1 { font-size: 19px; } }
+        .fa-hero p { margin: 0; color: #CBD5E1; font-size: 13.5px; max-width: 680px; line-height: 1.55; }
+        .fa-badge {
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          padding: 7px 14px;
-          font-size: 12px;
-          font-weight: 400;
-          color: #7a6a5a;
-          background: #f5f1eb;
-          border: 1px solid #e5ddd3;
-          border-radius: var(--bs-border-radius, 9px);
-          cursor: pointer;
-          transition: background 0.2s;
-          white-space: nowrap;
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: #FBBF24;
+          background: rgba(217, 119, 6, 0.20);
+          border: 1px solid rgba(217, 119, 6, 0.35);
+          border-radius: 100px;
+          padding: 4px 10px;
+          margin-bottom: 10px;
         }
-        .db-refresh-btn:hover { background: #ede8e0; }
-        .db-refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .fa-hero-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+        .fa-btn-gold {
+          background: #D97706;
+          color: #fff;
+          font-weight: 700;
+          font-size: 13px;
+          padding: 8px 16px;
+          border-radius: 10px;
+          border: none;
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .fa-btn-gold:hover { background: #B45309; color: #fff; transform: translateY(-1px); }
+        .fa-btn-soft {
+          background: rgba(255, 255, 255, 0.12);
+          color: #fff;
+          font-weight: 600;
+          font-size: 13px;
+          padding: 8px 16px;
+          border-radius: 10px;
+          border: 1px solid rgba(255, 255, 255, 0.22);
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          cursor: pointer;
+        }
+        .fa-btn-soft:hover { background: rgba(255, 255, 255, 0.20); color: #fff; }
 
-        .db-page-btn {
+        /* Main Workspace Grid */
+        .fa-grid {
+          display: grid;
+          grid-template-columns: 460px minmax(0, 1fr);
+          gap: 20px;
+          align-items: start;
+        }
+        @media(max-width: 1024px) {
+          .fa-grid { grid-template-columns: 1fr; }
+        }
+
+        /* Panels */
+        .fa-card {
+          background: #fff;
+          border: 1px solid #E2E8F0;
+          border-radius: 16px;
+          box-shadow: 0 4px 16px rgba(15, 39, 68, 0.03);
+          overflow: hidden;
+          margin-bottom: 18px;
+        }
+        .fa-card-head {
+          padding: 16px 20px;
+          border-bottom: 1px solid #F1F5F9;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          background: #fff;
+        }
+        .fa-card-title {
+          font-size: 15px;
+          font-weight: 800;
+          color: #0F2744;
+          margin: 0;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .fa-card-body { padding: 18px 20px; }
+        @media(max-width: 767.98px) {
+          .fa-card-body { padding: 14px 14px; }
+        }
+
+        /* Step numbers */
+        .fa-step-badge {
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          background: #0F2744;
+          color: #fff;
+          font-size: 12px;
+          font-weight: 800;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        /* Inputs & Dropdowns */
+        .fa-label {
+          display: block;
+          font-size: 11.5px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.03em;
+          color: #475569;
+          margin-bottom: 6px;
+        }
+        .fa-input, .fa-select {
+          width: 100%;
+          border: 1px solid #CBD5E1;
+          border-radius: 10px;
+          padding: 9px 12px;
+          font-size: 13.5px;
+          font-weight: 600;
+          color: #0F2744;
+          background: #F8FAFC;
+          outline: none;
+          transition: all 0.2s;
+          box-sizing: border-box;
+        }
+        .fa-input:focus, .fa-select:focus {
+          border-color: #D97706;
+          background: #fff;
+          box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.12);
+        }
+
+        /* Student Identity Card */
+        .fa-student-card {
+          background: linear-gradient(135deg, #F8FAFC 0%, #EEF2F6 100%);
+          border: 1px solid #CBD5E1;
+          border-radius: 12px;
+          padding: 14px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-top: 12px;
+        }
+        .fa-student-avatar {
+          width: 44px;
+          height: 44px;
+          border-radius: 10px;
+          background: #0F2744;
+          color: #FBBF24;
+          font-weight: 800;
+          font-size: 16px;
+          display: grid;
+          place-items: center;
+          flex-shrink: 0;
+        }
+        .fa-student-info h4 { font-size: 14.5px; font-weight: 800; margin: 0 0 2px; color: #0F2744; }
+        .fa-student-info p { font-size: 12px; color: #64748B; margin: 0; }
+
+        /* Fee Checklist */
+        .fa-fee-item {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 11px 14px;
+          border: 1px solid #E2E8F0;
+          border-radius: 10px;
+          margin-bottom: 8px;
+          background: #fff;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .fa-fee-item:hover { border-color: #CBD5E1; background: #F8FAFC; }
+        .fa-fee-item.selected {
+          border-color: #D97706;
+          background: #FFFBEB;
+        }
+        .fa-fee-info strong { display: block; font-size: 13.5px; color: #0F2744; }
+        .fa-fee-info span { font-size: 12px; color: #64748B; }
+        .fa-fee-amount { font-size: 14px; font-weight: 800; color: #0F2744; }
+
+        /* Ledger Summary Tiles */
+        .fa-stat-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 12px;
+          margin-bottom: 16px;
+        }
+        @media(max-width: 640px) {
+          .fa-stat-grid { grid-template-columns: 1fr; gap: 8px; }
+        }
+        .fa-stat-tile {
+          background: #F8FAFC;
+          border: 1px solid #E2E8F0;
+          border-radius: 12px;
+          padding: 14px;
+        }
+        .fa-stat-tile span { display: block; font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; }
+        .fa-stat-tile strong { display: block; font-size: 18px; font-weight: 800; color: #0F2744; margin-top: 4px; }
+        .fa-stat-tile.bal strong { color: #DC2626; }
+        .fa-stat-tile.paid strong { color: #16A34A; }
+
+        /* Status Pills */
+        .fa-pill {
+          display: inline-flex;
+          align-items: center;
+          padding: 4px 10px;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: capitalize;
+        }
+        .fa-pill-paid { background: #DCFCE7; color: #166534; }
+        .fa-pill-partial { background: #FEF3C7; color: #92400E; }
+        .fa-pill-unpaid { background: #FEE2E2; color: #991B1B; }
+
+        /* Ledger Table */
+        .fa-table-wrap {
+          width: 100%;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+          border: 1px solid #E2E8F0;
+          border-radius: 12px;
+          margin-top: 10px;
+        }
+        .fa-table {
+          width: 100%;
+          min-width: 640px;
+          border-collapse: collapse;
+          font-size: 13px;
+        }
+        .fa-table th {
+          background: #F8FAFC;
+          color: #475569;
+          font-weight: 700;
+          text-transform: uppercase;
+          font-size: 11px;
+          letter-spacing: 0.03em;
+          padding: 11px 14px;
+          border-bottom: 1px solid #E2E8F0;
+          text-align: left;
+        }
+        .fa-table td {
+          padding: 12px 14px;
+          border-bottom: 1px solid #F1F5F9;
+          vertical-align: middle;
+          color: #334155;
+        }
+        .fa-table tr:last-child td { border-bottom: none; }
+        .fa-table tr:hover td { background: #F8FAFC; }
+
+        /* Actions */
+        .fa-action-btn {
+          border: 1px solid #E2E8F0;
+          background: #fff;
+          color: #0F2744;
+          font-size: 12px;
+          font-weight: 700;
+          padding: 6px 12px;
+          border-radius: 8px;
           display: inline-flex;
           align-items: center;
           gap: 5px;
-          padding: 6px 12px;
-          font-size: 12.5px;
-          font-weight: 400;
-          color: #7a6a5a;
-          background: #f5f1eb;
-          border: 1px solid #e5ddd3;
-          border-radius: var(--bs-border-radius, 9px);
           cursor: pointer;
-          transition: background 0.2s, color 0.2s;
-          white-space: nowrap;
+          transition: all 0.15s;
         }
-        .db-page-btn:hover:not(:disabled) { background: #ede8e0; color: #1a1a2e; }
-        .db-page-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-        .db-page-current { padding: 6px 10px; font-size: 12px; color: #9a8a7a; }
-
-        .db-grid2 {
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) minmax(360px, 440px);
-          gap: 18px;
-          margin-bottom: 22px;
-        }
-
-        .fee-workflow {
-          display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
-          gap: 12px;
-          margin-bottom: 18px;
-        }
-        .fee-step {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          background: #fff;
-          border: 1px solid #ede8e0;
-          border-radius: 14px;
-          padding: 14px;
-          min-width: 0;
-        }
-        .fee-step-num {
-          width: 30px;
-          height: 30px;
-          border-radius: 9px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          background: #0f172a;
-          color: #e8c97a;
-          font-weight: 800;
-          font-size: 12px;
-          flex-shrink: 0;
-        }
-        .fee-step-title {
-          margin: 0;
-          color: #1a1a2e;
-          font-weight: 800;
-          font-size: 13px;
-          line-height: 1.2;
-        }
-        .fee-step-sub {
-          margin: 3px 0 0;
-          color: #9a8a7a;
-          font-size: 11.5px;
-          line-height: 1.3;
-        }
-        .fee-context-action {
-          height: 100%;
-          min-height: 92px;
-          border: 1px dashed rgba(201, 168, 76, 0.55);
-          background: rgba(201, 168, 76, 0.08);
-          border-radius: 12px;
-          padding: 12px;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          gap: 10px;
-        }
-        .fee-primary-action {
-          width: 100%;
-          justify-content: center;
-          padding: 10px 14px;
-          background: #0f172a;
-          border-color: #0f172a;
+        .fa-action-btn:hover { background: #F1F5F9; border-color: #CBD5E1; }
+        .fa-action-btn.pay {
+          background: #0F2744;
           color: #fff;
-          font-weight: 700;
+          border-color: #0F2744;
         }
-        .fee-primary-action:hover:not(:disabled) {
-          background: #1a1a2e;
-          color: #fff;
-        }
-        .fee-action-hint {
-          color: #8a765f;
-          font-size: 11.5px;
-          line-height: 1.35;
-          margin: 0;
-        }
-        .fee-empty-state {
-          padding: 26px 18px;
-          text-align: center;
-          color: #8a765f;
-          background: linear-gradient(180deg, #fff, #faf8f5);
-        }
-        .fee-empty-title {
-          margin: 0 0 4px;
-          color: #1a1a2e;
-          font-weight: 800;
-          font-size: 14px;
-        }
-        .fee-empty-sub {
-          margin: 0;
-          color: #9a8a7a;
-          font-size: 12.5px;
-        }
-        @media (max-width: 991.98px) {
-          .db-grid2 { grid-template-columns: 1fr; }
-          .db-main { padding: 18px 14px 0; }
-          .db-hero { padding: 24px 20px; }
-          .db-hero-stat-card { min-width: 0; width: 100%; }
-          .fee-workflow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-          .db-panel[style*="sticky"] { position: static !important; }
-        }
-        @media (max-width: 575.98px) {
-          .fee-workflow { grid-template-columns: 1fr; }
-          .db-panel-head { align-items: flex-start; }
-          .db-panel-title-group { min-width: 0; }
-        }
+        .fa-action-btn.pay:hover { background: #1E3A8A; }
+        .fa-action-btn.del { color: #DC2626; }
+        .fa-action-btn.del:hover { background: #FEE2E2; border-color: #FECACA; }
 
-        /* Collect-payment modal */
-        .db-modal-overlay {
+        /* Modal */
+        .fa-modal-backdrop {
           position: fixed;
           inset: 0;
-          background: rgba(15, 23, 42, 0.55);
+          background: rgba(15, 39, 68, 0.6);
+          backdrop-filter: blur(4px);
+          z-index: 2000;
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 1050;
           padding: 16px;
         }
-        .db-modal {
+        .fa-modal {
           background: #fff;
           border-radius: 16px;
-          width: 100%;
-          max-width: 420px;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+          width: min(480px, 100%);
+          box-shadow: 0 20px 60px rgba(15, 39, 68, 0.2);
           overflow: hidden;
         }
-        .db-modal-head {
+        .fa-modal-head {
+          padding: 16px 20px;
+          border-bottom: 1px solid #E2E8F0;
           display: flex;
-          align-items: flex-start;
+          align-items: center;
           justify-content: space-between;
-          padding: 18px 20px;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-          gap: 12px;
         }
-        .db-modal-body { padding: 20px; }
-        .db-modal-close {
-          border: none;
-          background: transparent;
-          font-size: 22px;
-          line-height: 1;
-          color: #9a8a7a;
-          cursor: pointer;
-          padding: 0 4px;
-        }
-        .db-modal-close:disabled { opacity: 0.4; cursor: not-allowed; }
-
-        @keyframes dbSpin { to { transform: rotate(360deg); } }
+        .fa-modal-head h3 { font-size: 16px; font-weight: 800; margin: 0; color: #0F2744; }
+        .fa-modal-body { padding: 20px; }
       `}</style>
 
-      <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-      <PageTitle title="Fee Method" />
+      <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title="Fee Assignments & Allocations" />
 
       <div className="container-fluid">
         <div className="row">
-          <Sidebar sidebarOpen={sidebarOpen} />
+          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+          
+          <main className="col-md-9 col-lg-10 ms-auto db-main fa-main">
+            {loadingPage && <Loader message="Loading Fee Management..." />}
 
-          <main className="col-md-9 col-lg-10 ms-auto db-main">
-            {loadingPage && <Loader message="Loading fee tools..." />}
-
-            {/* HERO */}
-            <div className="db-hero">
-              <div className="db-hero-glow" aria-hidden="true" />
-              <div className="db-hero-glow2" aria-hidden="true" />
-
-              <div className="db-hero-inner">
-                <div>
-                  <div className="db-session-badge">
-                    <span className="db-session-dot" />
-                    Fees • Assignment, Collection & Ledger
-                  </div>
-
-                  <h1 className="db-greeting">
-                    {getGreeting()}, <em>Admin.</em>
-                  </h1>
-
-                  <p className="db-hero-sub">
-                    Manage a student's fees from one simple workspace: find the student, choose the billing period,
-                    assign fees, and track payments from the ledger.
+            <div className="fa-shell">
+              {/* Header Hero */}
+              <section className="fa-hero">
+                <div className="fa-hero-glow" />
+                <div style={{ position: "relative", zIndex: 1 }}>
+                  <span className="fa-badge">
+                    <i className="bi bi-shield-check me-1" /> Student Fee Management
+                  </span>
+                  <h1>Fee Assignments & Allocations</h1>
+                  <p>
+                    Assign termly tuition, levies, and school fees to students, inspect live financial ledgers, and collect instant payments.
                   </p>
+                  <div className="fa-hero-actions">
+                    <Link to="/fees/structure" className="fa-btn-soft">
+                      <i className="bi bi-gear me-1" /> Configure Fee Structures
+                    </Link>
+                    <Link to="/fees/payments" className="fa-btn-soft">
+                      <i className="bi bi-wallet2 me-1" /> View All Student Payments
+                    </Link>
+                  </div>
+                </div>
+              </section>
 
-                  <div className="db-hero-btns">
-                    <button
-                      className="db-btn-gold"
-                      onClick={searchStudentByReg}
-                      disabled={searchingStudent || !regNo.trim()}
-                      title={!regNo.trim() ? "Enter Reg No" : ""}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                        <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
-                        <path d="M11 11l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                      </svg>
-                      {searchingStudent ? "Searching…" : "Find Student"}
-                    </button>
-
-                    <button
-                      className="db-btn-outline"
-                      onClick={loadStudentFeeDetails}
-                      disabled={loadingDetails || !regNo.trim()}
-                      title={!regNo.trim() ? "Enter Reg No first" : ""}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                        <path
-                          d="M4 2h8v12H4z"
-                          stroke="currentColor"
-                          strokeWidth="1.4"
-                          strokeLinejoin="round"
+              {/* Workspace Grid */}
+              <div className="fa-grid">
+                {/* LEFT: Assignment Studio */}
+                <div>
+                  {/* Step 1: Student Lookup */}
+                  <div className="fa-card">
+                    <div className="fa-card-head">
+                      <div className="fa-card-title">
+                        <span className="fa-step-badge">1</span> Student Lookup
+                      </div>
+                      {studentPick && (
+                        <button
+                          className="btn btn-sm btn-link text-muted p-0 text-decoration-none"
+                          onClick={() => {
+                            setStudentPick(null);
+                            setDetails(null);
+                            setRegNo("");
+                          }}
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    <div className="fa-card-body">
+                      <label className="fa-label">Admission / Reg Number</label>
+                      <div className="d-flex gap-2">
+                        <input
+                          className="fa-input"
+                          placeholder="e.g. GQ/2026/001"
+                          value={regNo}
+                          onChange={(e) => setRegNo(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && searchStudentByReg()}
                         />
-                        <path d="M6 5h4M6 8h4M6 11h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                      </svg>
-                      {loadingDetails ? "Loading…" : "Load Ledger"}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Quick glance */}
-                <div className="db-hero-stat-card d-none d-md-block">
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 500,
-                        letterSpacing: "0.14em",
-                        textTransform: "uppercase",
-                        color: "#c9a84c",
-                      }}
-                    >
-                      Quick glance
-                    </span>
-                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                      <path d="M2 10V6M5 10V4M8 10V7M11 10V3" stroke="#64748b" strokeWidth="1.5" strokeLinecap="round" />
-                    </svg>
-                  </div>
-
-                  <div className="db-hero-stat-row">
-                    <div className="db-hero-stat-item">
-                      <span className="db-hero-stat-label">Fee types loaded</span>
-                      <span className="db-hero-stat-val">{feeTypes.length}</span>
-                    </div>
-                    <div className="db-hero-stat-sep" />
-                    <div className="db-hero-stat-item">
-                      <span className="db-hero-stat-label">Selected fees</span>
-                      <span className="db-hero-stat-val">{selectedFeeIds.length}</span>
-                    </div>
-                    <div className="db-hero-stat-sep" />
-                    <div className="db-hero-stat-item">
-                      <span className="db-hero-stat-label">Selected total</span>
-                      <span className="db-hero-stat-val">{naira(totalSelectedAmount)}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="fee-workflow">
-              <div className="fee-step">
-                <span className="fee-step-num">1</span>
-                <div>
-                  <p className="fee-step-title">Find Student</p>
-                  <p className="fee-step-sub">Use admission or registration number.</p>
-                </div>
-              </div>
-              <div className="fee-step">
-                <span className="fee-step-num">2</span>
-                <div>
-                  <p className="fee-step-title">Choose Period</p>
-                  <p className="fee-step-sub">Select section, session, and term.</p>
-                </div>
-              </div>
-              <div className="fee-step">
-                <span className="fee-step-num">3</span>
-                <div>
-                  <p className="fee-step-title">Load Fees</p>
-                  <p className="fee-step-sub">Show fees for the selected period.</p>
-                </div>
-              </div>
-              <div className="fee-step">
-                <span className="fee-step-num">4</span>
-                <div>
-                  <p className="fee-step-title">Assign & Collect</p>
-                  <p className="fee-step-sub">Assign fees and record payments.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Meta loading */}
-            {loadingMeta ? (
-              <div className="db-panel">
-                <div className="db-panel-head">
-                  <div className="db-panel-title-group">
-                    <div className="db-panel-icon" style={{ "--pi": "#dbeafe", "--pc": "#1e40af" } as any}>
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M2 8h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                        <path
-                          d="M8 2v12"
-                          stroke="currentColor"
-                          strokeWidth="1.6"
-                          strokeLinecap="round"
-                          style={{ opacity: 0.35 }}
-                        />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="db-panel-title">Loading setup</p>
-                      <p className="db-panel-sub">Fetching sections, sessions and terms…</p>
-                    </div>
-                  </div>
-
-                  <button className="db-refresh-btn" disabled>
-                    <svg
-                      width="13"
-                      height="13"
-                      viewBox="0 0 14 14"
-                      fill="none"
-                      style={{ animation: "dbSpin 0.8s linear infinite" }}
-                    >
-                      <path d="M12 7A5 5 0 112 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                      <path d="M12 3v4h-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                    </svg>
-                    Loading…
-                  </button>
-                </div>
-
-                <div style={{ padding: 18 }}>
-                  <div className="db-skeleton" style={{ width: "45%", marginBottom: 10 }} />
-                  <div className="db-skeleton" style={{ width: "80%", marginBottom: 10 }} />
-                  <div className="db-skeleton" style={{ width: "65%" }} />
-                </div>
-              </div>
-            ) : (
-              <div className="db-grid2">
-                {/* LEFT: Search + Context + FeeTypes */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-                  {/* Student search + context */}
-                  <div className="db-panel">
-                    <div className="db-panel-head">
-                      <div className="db-panel-title-group">
-                        <div className="db-panel-icon" style={{ "--pi": "#d1fae5", "--pc": "#065f46" } as any}>
-                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                            <circle cx="7" cy="6" r="3" stroke="currentColor" strokeWidth="1.4" />
-                            <path
-                              d="M2 14c0-3 2.5-5 5-5"
-                              stroke="currentColor"
-                              strokeWidth="1.4"
-                              strokeLinecap="round"
-                            />
-                            <path
-                              d="M10.5 9.5h3M12 8v3"
-                              stroke="currentColor"
-                              strokeWidth="1.4"
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="db-panel-title">Student and Billing Period</p>
-                          <p className="db-panel-sub">Find the student, then choose the exact fee period.</p>
-                        </div>
+                        <button
+                          className="fa-btn-gold"
+                          onClick={searchStudentByReg}
+                          disabled={searchingStudent || !regNo.trim()}
+                        >
+                          {searchingStudent ? "Finding..." : "Find"}
+                        </button>
                       </div>
 
+                      {studentPick && (
+                        <div className="fa-student-card">
+                          <div className="fa-student-avatar">
+                            {studentPick.firstname?.charAt(0) || "S"}
+                          </div>
+                          <div className="fa-student-info">
+                            <h4>{studentPick.firstname} {studentPick.surname}</h4>
+                            <p>Reg No: <strong>{studentPick.reg_no}</strong></p>
+                          </div>
+                        </div>
+                      )}
                     </div>
+                  </div>
 
-                    <div style={{ padding: 18 }}>
-                      <div className="row g-3">
-                        <div className="col-12 col-md-6">
-                          <label className="form-label fw-semibold small mb-1">Registration Number</label>
-                          <div className="input-group">
-                            <span className="input-group-text bg-white">
-                              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                                <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
-                                <path d="M11 11l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                              </svg>
-                            </span>
-                            <input
-                              className="form-control"
-                              placeholder="Enter Reg No…"
-                              value={regNo}
-                              onChange={(e) => setRegNo(e.target.value)}
-                              disabled={busyKey !== null}
-                            />
-                            <button
-                              className="btn btn-outline-secondary"
-                              onClick={searchStudentByReg}
-                              disabled={searchingStudent || !regNo.trim() || busyKey !== null}
-                            >
-                              {searchingStudent ? (
-                                <>
-                                  <span className="spinner-border spinner-border-sm me-2" />
-                                  Searching…
-                                </>
-                              ) : (
-                                "Find"
-                              )}
-                            </button>
-                          </div>
-
-                          <div style={{ marginTop: 10 }}>
-                            {studentPick ? (
-                              <div className="db-pill" style={{ background: "rgba(201,168,76,0.12)", color: "#b45309", borderColor: "rgba(201,168,76,0.24)" }}>
-                                Selected: {studentPick.firstname} {studentPick.surname} • {studentPick.reg_no}
-                              </div>
-                            ) : (
-                              <span style={{ fontSize: 12, color: "#9a8a7a" }}>No student selected yet.</span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="col-12 col-md-6">
-                          <label className="form-label fw-semibold small mb-1">Ledger</label>
-                          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                            <button
-                              className="btn btn-outline-primary"
-                              onClick={loadStudentFeeDetails}
-                              disabled={loadingDetails || !regNo.trim() || busyKey !== null}
-                              style={{ borderRadius: 10 }}
-                            >
-                              {loadingDetails ? (
-                                <>
-                                  <span className="spinner-border spinner-border-sm me-2" />
-                                  Loading…
-                                </>
-                              ) : (
-                                "Load Ledger"
-                              )}
-                            </button>
-
-                            <button
-                              className="btn btn-outline-secondary"
-                              onClick={() => {
-                                setDetails(null);
-                                setFeeTypes([]);
-                                setSelectedFeeTypeIds({});
-                                setStudentPick(null);
-                              }}
-                              disabled={busyKey !== null}
-                              style={{ borderRadius: 10 }}
-                              title="Clear current selection"
-                            >
-                              Clear
-                            </button>
-                          </div>
-
-                          <div style={{ marginTop: 10, fontSize: 12, color: "#9a8a7a" }}>
-                            Tip: pick Session/Term to view ledger for that period.
-                          </div>
-                        </div>
+                  {/* Step 2: Academic Period & Section */}
+                  <div className="fa-card">
+                    <div className="fa-card-head">
+                      <div className="fa-card-title">
+                        <span className="fa-step-badge">2</span> Billing Period
                       </div>
-
-                      <hr style={{ opacity: 0.08 }} />
-
-                      <div className="row g-3 align-items-stretch">
-                        <div className="col-12 col-md-6 col-xl-3">
-                          <label className="form-label fw-semibold small mb-1">Section</label>
+                    </div>
+                    <div className="fa-card-body">
+                      <div className="row g-2">
+                        <div className="col-12 col-sm-6">
+                          <label className="fa-label">Academic Session</label>
                           <select
-                            className="form-select"
-                            value={sectionId}
-                            onChange={(e) => setSectionId(e.target.value ? Number(e.target.value) : "")}
-                            disabled={busyKey !== null}
-                          >
-                            <option value="">Select Section</option>
-                            {sections.map((s) => (
-                              <option key={s.id} value={s.id}>
-                                {s.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="col-12 col-md-6 col-xl-3">
-                          <label className="form-label fw-semibold small mb-1">Session</label>
-                          <select
-                            className="form-select"
+                            className="fa-select"
                             value={sessionId}
                             onChange={(e) => setSessionId(e.target.value ? Number(e.target.value) : "")}
-                            disabled={busyKey !== null}
                           >
                             <option value="">Select Session</option>
                             {sessions.map((s) => (
-                              <option key={s.id} value={s.id}>
-                                {s.name}
-                              </option>
+                              <option key={s.id} value={s.id}>{s.name}</option>
                             ))}
                           </select>
                         </div>
-
-                        <div className="col-12 col-md-6 col-xl-3">
-                          <label className="form-label fw-semibold small mb-1">Term</label>
+                        <div className="col-12 col-sm-6">
+                          <label className="fa-label">Term</label>
                           <select
-                            className="form-select"
+                            className="fa-select"
                             value={termId}
                             onChange={(e) => setTermId(e.target.value ? Number(e.target.value) : "")}
-                            disabled={busyKey !== null}
                           >
                             <option value="">Select Term</option>
                             {terms.map((t) => (
-                              <option key={t.id} value={t.id}>
-                                {t.name}
-                              </option>
+                              <option key={t.id} value={t.id}>{t.name}</option>
                             ))}
                           </select>
                         </div>
-
-                        <div className="col-12 col-md-6 col-xl-3">
-                          <div className="fee-context-action">
-                            <p className="fee-action-hint">
-                              {canFetchFeeTypes
-                                ? "Ready to load the matching fee types."
-                                : "Select student, section, session, and term first."}
-                            </p>
-                            <button
-                              className="db-refresh-btn fee-primary-action"
-                              onClick={fetchFeeTypes}
-                              disabled={!canFetchFeeTypes || loadingFeeTypes || busyKey !== null}
-                              title={!canFetchFeeTypes ? "Select student, section, session, and term" : ""}
-                            >
-                              <svg
-                                width="13"
-                                height="13"
-                                viewBox="0 0 14 14"
-                                fill="none"
-                                style={{ animation: loadingFeeTypes ? "dbSpin 0.8s linear infinite" : "none" }}
-                              >
-                                <path d="M12 7A5 5 0 112 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                                <path d="M12 3v4h-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                              </svg>
-                              {loadingFeeTypes ? "Loading..." : "Load Fee Types"}
-                            </button>
-                          </div>
+                        <div className="col-12">
+                          <label className="fa-label">Class Section</label>
+                          <select
+                            className="fa-select"
+                            value={sectionId}
+                            onChange={(e) => setSectionId(e.target.value ? Number(e.target.value) : "")}
+                          >
+                            <option value="">Select Section / Class</option>
+                            {sections.map((s) => (
+                              <option key={s.id} value={s.id}>{s.name}</option>
+                            ))}
+                          </select>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Fee types list + assign */}
-                  <div className="db-panel">
-                    <div className="db-panel-head">
-                      <div className="db-panel-title-group">
-                        <div className="db-panel-icon" style={{ "--pi": "#fef3c7", "--pc": "#b45309" } as any}>
-                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                            <path d="M3 4h10M3 8h10M3 12h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="db-panel-title">Available Fee Types</p>
-                          <p className="db-panel-sub">
-                            Loaded: <b>{feeTypes.length}</b> • Selected: <b>{selectedFeeIds.length}</b>
-                          </p>
-                        </div>
+                  {/* Step 3: Applicable Fee Types Checklist */}
+                  <div className="fa-card">
+                    <div className="fa-card-head">
+                      <div className="fa-card-title">
+                        <span className="fa-step-badge">3</span> Select & Assign Fees
                       </div>
-
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <button className="db-refresh-btn" onClick={selectAllFees} disabled={!feeTypes.length || busyKey !== null}>
-                          Select all
-                        </button>
-                        <button className="db-refresh-btn" onClick={clearFeeSelection} disabled={!selectedFeeIds.length || busyKey !== null}>
-                          Clear
-                        </button>
-                        <button
-                          className="db-refresh-btn"
-                          onClick={assignFees}
-                          disabled={!selectedFeeIds.length || !studentPick || busyKey !== null}
-                          style={{ background: "rgba(201,168,76,0.16)", borderColor: "rgba(201,168,76,0.26)", color: "#1a1a2e" }}
-                          title={!studentPick ? "Select student first" : ""}
-                        >
-                          {isBusy("fees:assign") ? (
-                            <>
-                              <span className="spinner-border spinner-border-sm" style={{ width: 14, height: 14 }} />
-                              Assigning…
-                            </>
-                          ) : (
-                            <>
-                              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                                <path
-                                  d="M13.5 4.5l-7 7-3-3"
-                                  stroke="currentColor"
-                                  strokeWidth="1.6"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                />
-                              </svg>
-                              Assign ({selectedFeeIds.length})
-                            </>
-                          )}
-                        </button>
-                      </div>
+                      {feeTypes.length > 0 && (
+                        <div className="d-flex gap-2">
+                          <button className="btn btn-sm btn-outline-secondary py-0 px-2" onClick={selectAllFees}>
+                            All
+                          </button>
+                          <button className="btn btn-sm btn-outline-secondary py-0 px-2" onClick={clearFeeSelection}>
+                            None
+                          </button>
+                        </div>
+                      )}
                     </div>
-
-                    <div style={{ padding: 0 }}>
+                    <div className="fa-card-body">
                       {loadingFeeTypes ? (
-                        <div style={{ padding: 18 }}>
-                          {Array.from({ length: 6 }).map((_, i) => (
-                            <div key={i} style={{ display: "flex", gap: 10, padding: "12px 16px", alignItems: "center" }}>
-                              <div className="db-skeleton" style={{ width: 16, height: 16, borderRadius: 4 }} />
-                              <div className="db-skeleton" style={{ width: "55%" }} />
-                              <div className="db-skeleton" style={{ width: 80, marginLeft: "auto" }} />
-                            </div>
-                          ))}
+                        <div className="text-center py-4 text-muted">
+                          <div className="spinner-border spinner-border-sm me-2" /> Loading fee types...
+                        </div>
+                      ) : !studentPick ? (
+                        <div className="text-center py-4 text-muted" style={{ fontSize: 13 }}>
+                          Search and select a student above to view applicable fee types.
                         </div>
                       ) : feeTypes.length === 0 ? (
-                        <div className="fee-empty-state">
-                          <p className="fee-empty-title">No fee types loaded yet</p>
-                          <p className="fee-empty-sub">Choose the billing period above, then load fee types.</p>
+                        <div className="text-center py-4 text-muted" style={{ fontSize: 13 }}>
+                          No fee types configured for this section and period.
                         </div>
                       ) : (
-                        <div style={{ overflowX: "auto" }}>
-                          <table className="db-table">
-                            <thead>
-                              <tr>
-                                <th style={{ width: 70 }}>
+                        <div>
+                          {feeTypes.map((f) => {
+                            const isSelected = !!selectedFeeTypeIds[f.id];
+                            return (
+                              <div
+                                key={f.id}
+                                className={`fa-fee-item ${isSelected ? "selected" : ""}`}
+                                onClick={() => toggleFee(f.id)}
+                              >
+                                <div className="d-flex align-items-center gap-2">
                                   <input
                                     type="checkbox"
-                                    className="form-check-input"
-                                    checked={feeTypes.length > 0 && feeTypes.every((f) => !!selectedFeeTypeIds[f.id])}
-                                    onChange={(e) => (e.target.checked ? selectAllFees() : clearFeeSelection())}
+                                    className="form-check-input mt-0"
+                                    checked={isSelected}
+                                    onChange={() => toggleFee(f.id)}
                                   />
-                                </th>
-                                <th>Fee Type</th>
-                                <th style={{ textAlign: "right", width: 200 }}>Amount</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {feeTypes.map((f) => (
-                                <tr key={f.id}>
-                                  <td>
-                                    <input
-                                      type="checkbox"
-                                      className="form-check-input"
-                                      checked={!!selectedFeeTypeIds[f.id]}
-                                      onChange={() => toggleFee(f.id)}
-                                    />
-                                  </td>
-                                  <td>
-                                    <div style={{ fontWeight: 600, color: "#1a1a2e" }}>{f.name}</div>
-                                    <div style={{ fontSize: 12, color: "#9a8a7a" }}>ID: {f.id}</div>
-                                  </td>
-                                  <td style={{ textAlign: "right", fontWeight: 700, color: "#1a1a2e" }}>
-                                    {naira(f.amount)}
-                                  </td>
-                                </tr>
-                              ))}
-                              <tr>
-                                <td colSpan={3} style={{ textAlign: "right", padding: "14px 16px" }}>
-                                  <span className="db-pill db-pill--gold" style={{ float: "right" }}>
-                                    Selected total: {naira(totalSelectedAmount)}
-                                  </span>
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
+                                  <div className="fa-fee-info">
+                                    <strong>{f.name}</strong>
+                                  </div>
+                                </div>
+                                <div className="fa-fee-amount">{naira(f.amount)}</div>
+                              </div>
+                            );
+                          })}
+
+                          {selectedFeeIds.length > 0 && (
+                            <div className="mt-3 p-3 bg-light rounded-3 d-flex justify-content-between align-items-center">
+                              <div>
+                                <small className="text-muted d-block">Selected {selectedFeeIds.length} fee(s)</small>
+                                <strong className="text-primary fs-6">{naira(totalSelectedAmount)}</strong>
+                              </div>
+                              <button
+                                className="fa-btn-gold"
+                                onClick={assignFees}
+                                disabled={busyKey === "fees:assign"}
+                              >
+                                {busyKey === "fees:assign" ? "Assigning..." : "Assign to Student"}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
 
-                {/* RIGHT: Ledger panel */}
-                <div className="db-panel" style={{ height: "fit-content", position: "sticky", top: 16 }}>
-                  <div className="db-panel-head">
-                    <div className="db-panel-title-group">
-                      <div className="db-panel-icon" style={{ "--pi": "#ede9fe", "--pc": "#7c3aed" } as any}>
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                          <path
-                            d="M4 2h8v12H4z"
-                            stroke="currentColor"
-                            strokeWidth="1.4"
-                            strokeLinejoin="round"
-                          />
-                          <path d="M6 5h4M6 8h4M6 11h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                        </svg>
+                {/* RIGHT: Live Student Fee Ledger */}
+                <div>
+                  <div className="fa-card">
+                    <div className="fa-card-head">
+                      <div className="fa-card-title">
+                        <i className="bi bi-journal-check text-primary" /> Student Financial Ledger
                       </div>
-                      <div>
-                        <p className="db-panel-title">Student Fee Ledger</p>
-                        <p className="db-panel-sub">Assigned fees • Payments • Balance</p>
-                      </div>
+                      {details?.student && (
+                        <span className="badge bg-light text-dark border">
+                          {details.student.class || details.student.section || "Student"}
+                        </span>
+                      )}
                     </div>
-
-                    <button
-                      className="db-refresh-btn"
-                      onClick={loadStudentFeeDetails}
-                      disabled={loadingDetails || !regNo.trim() || busyKey !== null}
-                      title={!regNo.trim() ? "Enter Reg No first" : ""}
-                    >
-                      <svg
-                        width="13"
-                        height="13"
-                        viewBox="0 0 14 14"
-                        fill="none"
-                        style={{ animation: loadingDetails ? "dbSpin 0.8s linear infinite" : "none" }}
-                      >
-                        <path d="M12 7A5 5 0 112 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                        <path d="M12 3v4h-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                      </svg>
-                      {loadingDetails ? "Loading…" : "Refresh"}
-                    </button>
-                  </div>
-
-                  {loadingDetails ? (
-                    <div style={{ padding: 18 }}>
-                      <div className="db-skeleton" style={{ width: "55%", marginBottom: 10 }} />
-                      <div className="db-skeleton" style={{ width: "80%", marginBottom: 18 }} />
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <div key={i} className="db-skeleton" style={{ width: "100%", marginBottom: 10 }} />
-                      ))}
-                    </div>
-                  ) : !details ? (
-                    <div className="fee-empty-state">
-                      <p className="fee-empty-title">No ledger loaded yet</p>
-                      <p className="fee-empty-sub">Enter a student registration number to view assigned fees.</p>
-                    </div>
-                  ) : (
-                    <>
-                      <div style={{ padding: "14px 18px 0" }}>
-                        <div style={{ fontWeight: 700, color: "#1a1a2e" }}>{details.student.name}</div>
-                        <div style={{ fontSize: 12.5, color: "#9a8a7a", marginTop: 3 }}>
-                          {details.student.reg_no} • <span className="db-pill">{details.student.section}</span>{" "}
-                          <span className="db-pill db-pill--violet" style={{ marginLeft: 8 }}>
-                            {details.student.class}
-                          </span>
+                    <div className="fa-card-body">
+                      {loadingDetails ? (
+                        <div className="text-center py-5 text-muted">
+                          <div className="spinner-border spinner-border-sm me-2" /> Loading student ledger...
                         </div>
-
-                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
-                          <span className="db-pill db-pill--gold">Total: {naira(ledgerTotals.totalAmount)}</span>
-                          <span className="db-pill" style={{ background: "rgba(6,95,70,0.08)", color: "#065f46", borderColor: "rgba(6,95,70,0.12)" }}>
-                            Paid: {naira(ledgerTotals.totalPaid)}
-                          </span>
-                          <span className="db-pill" style={{ background: "rgba(220,38,38,0.08)", color: "#b91c1c", borderColor: "rgba(220,38,38,0.14)" }}>
-                            Balance: {naira(ledgerTotals.totalBal)}
-                          </span>
+                      ) : !details ? (
+                        <div className="text-center py-5 text-muted">
+                          <i className="bi bi-search display-6 d-block mb-2 text-secondary opacity-50" />
+                          <h6 className="fw-bold text-dark">No Student Selected</h6>
+                          <p className="small text-muted mb-0">Search a student by registration number on the left to inspect their fees and payments.</p>
                         </div>
-                      </div>
+                      ) : (
+                        <div>
+                          {/* Top 3 Summary Tiles */}
+                          <div className="fa-stat-grid">
+                            <div className="fa-stat-tile">
+                              <span>Total Assigned</span>
+                              <strong>{naira(ledgerTotals.totalAmount)}</strong>
+                            </div>
+                            <div className="fa-stat-tile paid">
+                              <span>Total Paid</span>
+                              <strong>{naira(ledgerTotals.totalPaid)}</strong>
+                            </div>
+                            <div className="fa-stat-tile bal">
+                              <span>Outstanding</span>
+                              <strong>{naira(ledgerTotals.totalBal)}</strong>
+                            </div>
+                          </div>
 
-                      <div style={{ overflowX: "auto", marginTop: 12 }}>
-                        <table className="db-table">
-                          <thead>
-                            <tr>
-                              <th>Fee</th>
-                              <th style={{ textAlign: "right", width: 110 }}>Total</th>
-                              <th style={{ textAlign: "right", width: 110 }}>Paid</th>
-                              <th style={{ textAlign: "right", width: 110 }}>Bal</th>
-                              <th style={{ textAlign: "right", width: 170 }}>Action</th>
-                            </tr>
-                          </thead>
+                          {/* Progress Bar */}
+                          <div className="mb-4">
+                            <div className="d-flex justify-content-between small text-muted mb-1 font-monospace">
+                              <span>Payment Progress</span>
+                              <span>{ledgerTotals.percent}%</span>
+                            </div>
+                            <div className="progress" style={{ height: 8, borderRadius: 4 }}>
+                              <div
+                                className={`progress-bar ${ledgerTotals.percent === 100 ? "bg-success" : "bg-warning"}`}
+                                style={{ width: `${ledgerTotals.percent}%` }}
+                              />
+                            </div>
+                          </div>
 
-                          <tbody>
-                            {details.fees?.length ? (
-                              details.fees.map((f) => {
-                                const removing = isBusy(`fees:remove:${f.id}`);
-                                return (
-                                  <tr key={f.id}>
-                                    <td>
-                                      <div style={{ fontWeight: 600, color: "#1a1a2e" }}>
-                                    {f.fee_type?.name ?? `FeeType #${f.fee_type_id}`}
-                                      </div>
-                                      <div style={{ fontSize: 12, color: "#9a8a7a", display: "flex", gap: 6, alignItems: "center", marginTop: 2, flexWrap: "wrap" }}>
-                                        <span>
-                                    {f.session?.name ?? `Session #${f.session_id}`} - {f.term?.name ?? `Term #${f.term_id}`}
-                                        </span>
-                                        {f.status && (
-                                          <span className="db-pill" style={{ fontSize: 10.5, padding: "1px 8px", ...statusPillStyle(f.status) }}>
-                                            {f.status}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </td>
-                                    <td style={{ textAlign: "right" }}>{naira(f.total_amount)}</td>
-                                    <td style={{ textAlign: "right" }}>{naira(f.amount_paid)}</td>
-                                    <td style={{ textAlign: "right", fontWeight: 700 }}>{naira(f.balance)}</td>
-                                    <td style={{ textAlign: "right" }}>
-                                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
-                                        {f.balance > 0 && (
-                                          <button
-                                            className="db-page-btn"
-                                            onClick={() => openCollectModal(f)}
-                                            disabled={busyKey !== null || collecting}
-                                            title="Collect this balance online via Paystack"
-                                            style={{
-                                              padding: "6px 10px",
-                                              background: "rgba(201,168,76,0.14)",
-                                              borderColor: "rgba(201,168,76,0.26)",
-                                              color: "#92710f",
-                                            }}
-                                          >
-                                            Collect
-                                          </button>
-                                        )}
-                                        <button
-                                          className="db-page-btn"
-                                          onClick={() => removeAssignedFee(f.id)}
-                                          disabled={busyKey !== null || collecting}
-                                          title="Remove assignment (only if unpaid)"
-                                          style={{
-                                            padding: "6px 10px",
-                                            background: "rgba(220,38,38,0.08)",
-                                            borderColor: "rgba(220,38,38,0.18)",
-                                            color: "#b91c1c",
-                                          }}
-                                        >
-                                          {removing ? (
-                                            <span className="spinner-border spinner-border-sm" style={{ width: 14, height: 14 }} />
-                                          ) : (
-                                            "Remove"
-                                          )}
-                                        </button>
-                                      </div>
-                                    </td>
+                          {/* Assigned Fee Table */}
+                          <h6 className="fw-bold text-dark mb-2">Assigned Fee Items</h6>
+                          {details.fees.length === 0 ? (
+                            <div className="p-4 bg-light rounded-3 text-center text-muted small">
+                              No fees assigned for this student yet. Use Step 3 to assign fees.
+                            </div>
+                          ) : (
+                            <div className="fa-table-wrap">
+                              <table className="fa-table">
+                                <thead>
+                                  <tr>
+                                    <th>Fee Item</th>
+                                    <th>Total</th>
+                                    <th>Paid</th>
+                                    <th>Balance</th>
+                                    <th>Status</th>
+                                    <th className="text-end">Actions</th>
                                   </tr>
-                                );
-                              })
-                            ) : (
-                              <tr>
-                                <td colSpan={5} style={{ padding: 18, textAlign: "center", color: "#b5a090" }}>
-                                  No fees found for this student (and filters).
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      <div style={{ padding: "12px 18px 18px", color: "#9a8a7a", fontSize: 12.5 }}>
-                        Tip: Changing <b>Session/Term</b> affects ledger view and assignment context.
-                      </div>
-                    </>
-                  )}
+                                </thead>
+                                <tbody>
+                                  {details.fees.map((f) => (
+                                    <tr key={f.id}>
+                                      <td>
+                                        <strong>{f.fee_type?.name || `Fee #${f.fee_type_id}`}</strong>
+                                        <div className="small text-muted">{f.session?.name} • {f.term?.name}</div>
+                                      </td>
+                                      <td>{naira(f.total_amount)}</td>
+                                      <td className="text-success fw-bold">{naira(f.amount_paid)}</td>
+                                      <td className={f.balance > 0 ? "text-danger fw-bold" : "text-muted"}>
+                                        {naira(f.balance)}
+                                      </td>
+                                      <td>
+                                        <span className={`fa-pill fa-pill-${f.status || (f.balance === 0 ? "paid" : "unpaid")}`}>
+                                          {f.status || (f.balance === 0 ? "paid" : "unpaid")}
+                                        </span>
+                                      </td>
+                                      <td className="text-end">
+                                        <div className="d-inline-flex gap-2">
+                                          {f.balance > 0 && (
+                                            <button
+                                              className="fa-action-btn pay"
+                                              onClick={() => openCollectModal(f)}
+                                              title="Collect payment online via Paystack"
+                                            >
+                                              <i className="bi bi-credit-card" /> Pay
+                                            </button>
+                                          )}
+                                          {f.amount_paid === 0 && (
+                                            <button
+                                              className="fa-action-btn del"
+                                              onClick={() => removeAssignedFee(f.id)}
+                                              disabled={busyKey === `fees:remove:${f.id}`}
+                                              title="Remove assigned fee"
+                                            >
+                                              <i className="bi bi-trash" />
+                                            </button>
+                                          )}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
-            )}
-
-            <div className="mt-auto">
-              <Footer />
             </div>
+
+            <Footer />
           </main>
         </div>
       </div>
 
-      {/* COLLECT ONLINE PAYMENT MODAL */}
+      {/* Online Payment Modal */}
       {collectTarget && (
-        <div className="db-modal-overlay" onClick={closeCollectModal}>
-          <div className="db-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="db-modal-head">
-              <div>
-                <p className="db-panel-title" style={{ fontSize: 15, marginBottom: 2 }}>
-                  Collect online payment
-                </p>
-                <p className="db-panel-sub">
-                  {collectTarget.label} • Balance {naira(collectTarget.balance)}
-                </p>
-              </div>
-              <button className="db-modal-close" onClick={closeCollectModal} disabled={collecting} aria-label="Close">
-                ×
-              </button>
+        <div className="fa-modal-backdrop" onClick={closeCollectModal}>
+          <div className="fa-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="fa-modal-head">
+              <h3>Collect Fee Payment</h3>
+              <button className="btn-close" onClick={closeCollectModal} disabled={collecting} />
             </div>
-
-            <div className="db-modal-body">
-              <label className="form-label small fw-semibold mb-1">Amount to collect (₦)</label>
-              <input
-                type="number"
-                className="form-control mb-3"
-                value={collectAmount}
-                onChange={(e) => setCollectAmount(e.target.value)}
-                min={100}
-                max={collectTarget.balance}
-                disabled={collecting}
-              />
-
-              <label className="form-label small fw-semibold mb-1">Parent's email</label>
-              <input
-                type="email"
-                className="form-control mb-1"
-                placeholder="parent@email.com"
-                value={collectEmail}
-                onChange={(e) => setCollectEmail(e.target.value)}
-                disabled={collecting}
-              />
-              <div className="mb-3" style={{ fontSize: 11.5, color: "#9a8a7a" }}>
-                Paystack sends the payment receipt to this address.
+            <div className="fa-modal-body">
+              <div className="p-3 bg-light rounded-3 mb-3">
+                <small className="text-muted d-block">Fee Item</small>
+                <strong className="fs-6 text-dark">{collectTarget.label}</strong>
+                <div className="d-flex justify-content-between mt-2 pt-2 border-top">
+                  <span className="small text-muted">Outstanding Balance</span>
+                  <span className="fw-bold text-danger">{naira(collectTarget.balance)}</span>
+                </div>
               </div>
 
-              {collectError && <div className="alert alert-danger small">{collectError}</div>}
+              {collectError && (
+                <div className="alert alert-danger py-2 small mb-3">
+                  {collectError}
+                </div>
+              )}
 
-              <button
-                className="db-btn-gold w-100 justify-content-center"
-                onClick={handleCollectPayment}
-                disabled={collecting}
-              >
-                {collecting ? (
-                  <>
-                    <span className="spinner-border spinner-border-sm" style={{ width: 14, height: 14 }} />
-                    Opening secure checkout…
-                  </>
-                ) : (
-                  "Open Paystack Checkout"
-                )}
-              </button>
+              <div className="mb-3">
+                <label className="fa-label">Amount to Collect (₦)</label>
+                <input
+                  type="number"
+                  className="fa-input"
+                  value={collectAmount}
+                  onChange={(e) => setCollectAmount(e.target.value)}
+                  placeholder="Enter amount"
+                  disabled={collecting}
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="fa-label">Payer / Parent Email (for receipt)</label>
+                <input
+                  type="email"
+                  className="fa-input"
+                  value={collectEmail}
+                  onChange={(e) => setCollectEmail(e.target.value)}
+                  placeholder="parent@example.com"
+                  disabled={collecting}
+                />
+              </div>
+
+              <div className="d-grid">
+                <button
+                  className="fa-btn-gold justify-content-center py-2 fs-6"
+                  onClick={handleCollectPayment}
+                  disabled={collecting}
+                >
+                  {collecting ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" /> Initializing Paystack...
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-credit-card me-2" /> Make Payment with Paystack
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1699,30 +1239,3 @@ export default function FeeMethodsPage() {
     </>
   );
 }
-
-/**
- * NOTES:
- * 1) Student search params:
- *    - GET /students/search?query=REGNO
- *    If your backend uses ?q or ?reg_no, change it in searchStudentByReg().
- *
- * 2) Meta endpoints:
- *    - /sections
- *    - /facademic-sessions
- *    - /fterms
- *
- * 3) Assign fees:
- *    - POST /fees/assign requires: student_id, section_id, session_id, term_id, fee_type_ids[]
- *
- * 4) Ledger:
- *    - GET /fees/student/details?reg_no=...&session_id=...&term_id=...
- *      (now also expects `status` in each fee row — see backend note below)
- *
- * 5) Online collection (new):
- *    - POST /fees/online/initialize { student_fee_id, amount, email } → { access_code, reference }
- *    - GET  /fees/online/verify/{reference}
- *    Paystack's inline.js is lazy-loaded the first time "Collect" is clicked.
- *    If you add online payments to another admin page later, move the
- *    `declare global { interface Window { PaystackPop... } }` block and
- *    loadPaystackInline() into a shared file instead of duplicating it.
- */

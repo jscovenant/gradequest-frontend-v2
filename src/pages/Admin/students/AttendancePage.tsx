@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { authApi } from "../../../utils/axios";
+import { resolveMediaUrl } from "../../../utils/apiUrl";
 import TopNav from "../../../components/LayoutComponents/TopNav";
 import Sidebar from "../../../components/LayoutComponents/Sidebar";
 import Footer from "../../../components/LayoutComponents/Footer";
@@ -42,11 +43,6 @@ function getGreeting() {
 }
 
 export default function AttendancePage() {
-  const BASE_URL =
-    import.meta.env.VITE_API_BASE_URL ||
-    "http://localhost:8000" ||
-    "https://gradequest.com.ng";
-
   const { showSuccess, showError } = useToast();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -72,7 +68,7 @@ export default function AttendancePage() {
   const disableClassSelect = isTeacher && classes.length <= 1;
 
   const getStudentPhoto = (photo?: string | null) =>
-    photo ? `${BASE_URL}/uploads/users/${photo}` : "/media/profile.jpg";
+    resolveMediaUrl(photo, "/media/profile.jpg");
 
   const selectedClassName = useMemo(() => {
     return classes.find((c) => String(c.id) === String(classId))?.name || "Select class";

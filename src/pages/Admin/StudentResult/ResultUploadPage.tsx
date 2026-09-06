@@ -286,7 +286,15 @@ export default function ResultUploadPage() {
   const handleShowResult = (studentId: number) => {
     if (!batch) return;
 
-    navigate("/students/results/show", {
+    const params = new URLSearchParams({
+      student_id: String(studentId),
+      class_id: String(batch.class_id),
+      term: String(batch.term),
+      session: String(batch.session),
+      school_id: String(batch.school_id),
+    });
+
+    navigate(`/students/results/show?${params.toString()}`, {
       state: {
         studentId,
         classId: batch.class_id,
@@ -307,30 +315,23 @@ export default function ResultUploadPage() {
   return (
     <>
       <style>{`
-        /* --- TEMPLATE BASE (same feel as AdminDashboard) --- */
+        /* ======= ResultUploadPage - Modern SaaS style ======= */
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
         .db-main {
-          background: var(--bs-body-bg, #f5f1eb);
+          background: #F8FAFC;
           min-height: 100vh;
-          font-family: "DM Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-          padding: 28px 28px 0;
+          font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+          padding: 24px 28px 0;
         }
 
         .db-hero {
-          background: #0f172a;
-          border-radius: var(--bs-border-radius-lg, 16px);
+          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
+          border-radius: 18px;
           padding: 32px 36px;
           position: relative;
           overflow: hidden;
-          margin-bottom: 28px;
-        }
-
-        .db-hero::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background-image: radial-gradient(circle, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
-          background-size: 24px 24px;
-          pointer-events: none;
+          margin-bottom: 24px;
+          box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
         }
 
         .db-hero-glow {
@@ -340,7 +341,7 @@ export default function ResultUploadPage() {
           width: 320px;
           height: 320px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(201, 168, 76, 0.1) 0%, transparent 65%);
+          background: radial-gradient(circle, rgba(217, 119, 6, 0.15) 0%, transparent 65%);
           pointer-events: none;
         }
 
@@ -351,7 +352,7 @@ export default function ResultUploadPage() {
           width: 200px;
           height: 200px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(99, 102, 241, 0.07) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(37, 99, 235, 0.10) 0%, transparent 70%);
           pointer-events: none;
         }
 
@@ -365,7 +366,6 @@ export default function ResultUploadPage() {
           flex-wrap: wrap;
         }
 
-        /* ✅ KEY FIX: on desktop, keep stat card on the same row */
         @media (min-width: 768px) {
           .db-hero-inner { flex-wrap: nowrap; }
         }
@@ -374,23 +374,23 @@ export default function ResultUploadPage() {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          font-size: 11px;
-          font-weight: 500;
-          letter-spacing: 0.12em;
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
           text-transform: uppercase;
-          color: #e8c97a;
-          background: rgba(201, 168, 76, 0.1);
-          border: 1px solid rgba(201, 168, 76, 0.2);
+          color: #FBBF24;
+          background: rgba(217, 119, 6, 0.20);
+          border: 1px solid rgba(217, 119, 6, 0.35);
           border-radius: 100px;
           padding: 4px 12px;
-          margin-bottom: 14px;
+          margin-bottom: 12px;
         }
 
         .db-session-dot {
           width: 6px;
           height: 6px;
           border-radius: 50%;
-          background: #22c55e;
+          background: #10B981;
           animation: dbPulse 2s ease infinite;
         }
 
@@ -400,22 +400,20 @@ export default function ResultUploadPage() {
         }
 
         .db-greeting {
-          font-family: "Lora", Georgia, serif;
-          font-size: clamp(22px, 2.5vw, 32px);
-          font-weight: 700;
+          font-size: 26px;
+          font-weight: 800;
           color: #fff;
           line-height: 1.1;
           margin-bottom: 8px;
         }
-        .db-greeting em { font-style: italic; color: #e8c97a; }
+        .db-greeting em { font-style: normal; color: #FBBF24; }
 
         .db-hero-sub {
           font-size: 13.5px;
-          font-weight: 300;
-          color: #64748b;
-          line-height: 1.65;
+          color: #CBD5E1;
+          line-height: 1.6;
           max-width: 440px;
-          margin-bottom: 24px;
+          margin-bottom: 20px;
         }
 
         .db-hero-btns { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -423,56 +421,51 @@ export default function ResultUploadPage() {
         .db-btn-gold {
           display: inline-flex;
           align-items: center;
-          gap: 7px;
-          padding: 10px 20px;
-          font-family: "DM Sans", sans-serif;
+          gap: 8px;
+          padding: 9px 18px;
           font-size: 13px;
-          font-weight: 500;
-          color: #0f172a;
-          background: #c9a84c;
+          font-weight: 700;
+          color: #FFFFFF;
+          background: #D97706;
           border: none;
-          border-radius: var(--bs-border-radius, 8px);
+          border-radius: 10px;
           cursor: pointer;
-          transition: background 0.2s, transform 0.2s;
+          transition: all 0.2s ease;
           white-space: nowrap;
         }
-        .db-btn-gold:hover { background: #e8c97a; transform: translateY(-1px); }
+        .db-btn-gold:hover { background: #B45309; transform: translateY(-1px); color: #FFFFFF; }
         .db-btn-gold:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 
         .db-btn-outline {
           display: inline-flex;
           align-items: center;
-          gap: 7px;
-          padding: 10px 20px;
-          font-family: "DM Sans", sans-serif;
+          gap: 8px;
+          padding: 9px 18px;
           font-size: 13px;
-          font-weight: 400;
-          color: rgba(255, 255, 255, 0.7);
-          background: transparent;
-          border: 1px solid rgba(255, 255, 255, 0.14);
-          border-radius: var(--bs-border-radius, 8px);
+          font-weight: 600;
+          color: #FFFFFF;
+          background: rgba(255, 255, 255, 0.10);
+          border: 1px solid rgba(255, 255, 255, 0.20);
+          border-radius: 10px;
           cursor: pointer;
-          transition: background 0.2s, border-color 0.2s, color 0.2s;
+          transition: all 0.2s ease;
           white-space: nowrap;
         }
         .db-btn-outline:hover {
-          background: rgba(255, 255, 255, 0.06);
+          background: rgba(255, 255, 255, 0.18);
           color: #fff;
-          border-color: rgba(255, 255, 255, 0.28);
         }
         .db-btn-outline:disabled { opacity: 0.55; cursor: not-allowed; }
 
-        /* ✅ KEY FIX: pin card to the RIGHT even when wrapping */
         .db-hero-stat-card {
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.09);
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.15);
           backdrop-filter: blur(8px);
-          border-radius: var(--bs-border-radius, 12px);
-          padding: 20px 24px;
+          border-radius: 14px;
+          padding: 18px 20px;
           min-width: 240px;
-
-          margin-left: auto;      /* push to far right */
-          align-self: flex-end;   /* if it wraps, keep it right aligned */
+          margin-left: auto;
+          align-self: flex-end;
         }
 
         .db-hero-stat-row {
@@ -490,53 +483,50 @@ export default function ResultUploadPage() {
 
         .db-hero-stat-label {
           font-size: 12px;
-          font-weight: 300;
-          color: #64748b;
+          font-weight: 400;
+          color: #CBD5E1;
         }
 
         .db-hero-stat-val {
-          font-family: "Lora", serif;
           font-size: 18px;
-          font-weight: 700;
-          color: #fff;
+          font-weight: 800;
+          color: #FBBF24;
         }
 
         .db-hero-stat-sep {
           height: 1px;
-          background: rgba(255, 255, 255, 0.06);
+          background: rgba(255, 255, 255, 0.08);
         }
 
-        /* --- your existing table/panel styles (kept from your file) --- */
         .db-panel {
           background: #fff;
-          border: 1px solid #ede8e0;
-          border-radius: 14px;
+          border: 1px solid #E2E8F0;
+          border-radius: 16px;
           overflow: hidden;
-          box-shadow: 0 2px 10px rgba(15,23,42,0.04);
+          box-shadow: 0 4px 16px rgba(15, 39, 68, 0.03);
+          margin-bottom: 20px;
         }
 
         .db-panel-head {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 18px 18px;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+          padding: 18px 20px;
+          border-bottom: 1px solid #E2E8F0;
           gap: 12px;
           flex-wrap: wrap;
         }
 
         .db-panel-title {
-          font-family: "Lora", serif;
           font-size: 16px;
-          font-weight: 800;
-          color: #1a1a2e;
+          font-weight: 700;
+          color: #0F2744;
           margin: 0;
         }
 
         .db-panel-sub {
-          font-size: 11.5px;
-          font-weight: 300;
-          color: #9a8a7a;
+          font-size: 12px;
+          color: #64748B;
           margin: 0;
         }
 
@@ -544,18 +534,18 @@ export default function ResultUploadPage() {
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          padding: 8px 12px;
-          font-size: 12px;
+          padding: 8px 14px;
+          font-size: 12.5px;
           font-weight: 600;
-          color: #7a6a5a;
-          background: #f5f1eb;
-          border: 1px solid #e5ddd3;
-          border-radius: 10px;
+          color: #0F2744;
+          background: #F1F5F9;
+          border: 1px solid #E2E8F0;
+          border-radius: 8px;
           cursor: pointer;
-          transition: background 0.2s;
+          transition: all 0.2s;
           white-space: nowrap;
         }
-        .db-refresh-btn:hover { background: #ede8e0; }
+        .db-refresh-btn:hover { background: #E2E8F0; }
         .db-refresh-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
         .db-grid {
@@ -566,39 +556,39 @@ export default function ResultUploadPage() {
         }
         @media (max-width: 991.98px) { .db-grid { grid-template-columns: 1fr; } }
 
-        .db-table { width: 100%; border-collapse: collapse; }
+        .db-table { width: 100%; border-collapse: separate; border-spacing: 0; }
         .db-table th {
-          padding: 10px 16px;
-          font-size: 11px;
-          font-weight: 500;
-          letter-spacing: 0.1em;
+          padding: 12px 16px;
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
           text-transform: uppercase;
-          color: #9a8a7a;
-          background: #faf8f5;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+          color: #64748B;
+          background: #F8FAFC;
+          border-bottom: 1px solid #E2E8F0;
           text-align: left;
           white-space: nowrap;
         }
         .db-table th:last-child { text-align: right; }
         .db-table td {
-          padding: 13px 16px;
-          font-size: 13.5px;
-          color: #4a4a5a;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+          padding: 14px 16px;
+          font-size: 13px;
+          color: #334155;
+          border-bottom: 1px solid #E2E8F0;
           vertical-align: middle;
         }
         .db-table tbody tr:last-child td { border-bottom: none; }
-        .db-table tbody tr:hover { background: #faf8f5; }
+        .db-table tbody tr:hover { background: #F8FAFC; }
 
-        .db-muted { color: #9a8a7a; }
-        .db-strong { font-weight: 900; color: #1a1a2e; }
+        .db-muted { color: #64748B; }
+        .db-strong { font-weight: 700; color: #0F2744; }
 
         .db-pill {
           display: inline-flex;
           align-items: center;
-          font-size: 12px;
-          font-weight: 800;
-          padding: 6px 10px;
+          font-size: 11.5px;
+          font-weight: 700;
+          padding: 5px 10px;
           border-radius: 999px;
           white-space: nowrap;
           border: 1px solid rgba(0,0,0,0.06);
@@ -607,7 +597,7 @@ export default function ResultUploadPage() {
         .db-skeleton {
           height: 14px;
           border-radius: 7px;
-          background: linear-gradient(90deg, #f0ebe3 25%, #e8e0d5 50%, #f0ebe3 75%);
+          background: linear-gradient(90deg, #F1F5F9 25%, #E2E8F0 50%, #F1F5F9 75%);
           background-size: 200% 100%;
           animation: dbSkeleton 1.4s ease infinite;
         }
@@ -618,25 +608,24 @@ export default function ResultUploadPage() {
           align-items: center;
           gap: 10px;
           background: #fff;
-          border: 1px solid #e5ddd3;
-          border-radius: 12px;
-          padding: 10px 12px;
+          border: 1px solid #E2E8F0;
+          border-radius: 10px;
+          padding: 10px 14px;
           min-width: 260px;
         }
-        .db-search input { border: none; outline: none; width: 100%; font-size: 13px; }
+        .db-search input { border: none; outline: none; width: 100%; font-size: 13px; color: #0F2744; }
 
         .db-progress-wrap { min-width: 280px; }
         .db-progress-bar {
-          height: 10px;
+          height: 8px;
           border-radius: 999px;
-          background: #f0ebe3;
+          background: #E2E8F0;
           overflow: hidden;
-          border: 1px solid rgba(0,0,0,0.06);
         }
         .db-progress-fill {
           height: 100%;
           width: var(--w, 0%);
-          background: linear-gradient(90deg, rgba(201,168,76,0.9), rgba(201,168,76,0.25));
+          background: linear-gradient(90deg, #D97706, #FBBF24);
         }
 
         .db-badge {
@@ -645,9 +634,8 @@ export default function ResultUploadPage() {
           gap:6px;
           padding:4px 10px;
           border-radius:999px;
-          font-size:12px;
-          font-weight:800;
-          border: 1px solid rgba(0,0,0,0.06);
+          font-size:11.5px;
+          font-weight:700;
         }
       `}</style>
 

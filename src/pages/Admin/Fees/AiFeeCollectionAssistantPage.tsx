@@ -36,7 +36,17 @@ type Analysis = {
   parent_messages: ParentMessage[];
   breakdowns: { by_class: Breakdown[]; by_parent: Breakdown[]; by_term: Breakdown[]; by_student: Breakdown[] };
 };
-type CreditSummary = { remaining_credits: number; ai_fee_collection_credit_cost?: number };
+type CreditSummary = {
+  remaining_credits: number;
+  user_allocation?: {
+    allocated_credits: number;
+    used_credits: number;
+    remaining_credits: number;
+    is_unlimited: boolean;
+  } | null;
+  is_plus_active?: boolean;
+  ai_fee_collection_credit_cost?: number;
+};
 
 function money(value?: number | string | null) {
   return `NGN ${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -153,14 +163,169 @@ export default function AiFeeCollectionAssistantPage() {
   return (
     <>
       <style>{`
-        .fee-ai-main{background:linear-gradient(180deg,rgba(211,0,176,.035),transparent 260px),var(--bs-light,#fcf8f8);min-height:100vh;padding:28px 28px 0;overflow-x:hidden;font-family:"DM Sans",system-ui,sans-serif}.fee-ai-hero{background:#050008;color:#fff;border-radius:16px;padding:28px 30px;margin-bottom:18px;position:relative;overflow:hidden}.fee-ai-hero:before{content:"";position:absolute;inset:0;background-image:radial-gradient(circle,rgba(255,255,255,.055) 1px,transparent 1px);background-size:22px 22px}.fee-ai-hero>*{position:relative;z-index:1}.fee-ai-kicker{font-size:11px;text-transform:uppercase;font-weight:900;color:var(--bs-secondary,rgb(255,200,87));letter-spacing:.12em}.fee-ai-title{font-family:"Lora",serif;font-weight:900;font-size:clamp(25px,3vw,36px);margin:6px 0}.fee-ai-sub{max-width:800px;color:rgba(255,255,255,.66);font-size:13.5px;line-height:1.7;margin:0}.fee-ai-grid{display:grid;grid-template-columns:360px 1fr;gap:18px;align-items:start}.fee-ai-card{background:#fff;border:1px solid rgba(5,0,8,.08);border-radius:14px;box-shadow:0 12px 34px rgba(5,0,8,.055);overflow:hidden}.fee-ai-pad{padding:18px}.fee-ai-card h2{font-size:17px;font-weight:900;color:#1a1a2e;margin:0}.fee-ai-muted{font-size:12.5px;color:#8d7d70;line-height:1.6;margin:4px 0 0}.fee-ai-field{display:flex;flex-direction:column;gap:6px;margin-top:12px}.fee-ai-field span{font-size:12px;font-weight:900;color:#4a3f4f}.fee-ai-input{border:1px solid rgba(5,0,8,.12);border-radius:10px;padding:11px 12px;outline:none;background:#fff;color:#1a1a2e;font-weight:750}.fee-ai-input:focus{border-color:rgba(211,0,176,.45);box-shadow:0 0 0 4px rgba(211,0,176,.08)}.fee-ai-btn{border:0;border-radius:10px;background:var(--bs-secondary,rgb(255,200,87));color:#050008;font-weight:900;padding:11px 15px;width:100%;margin-top:14px}.fee-ai-btn:disabled{opacity:.65}.fee-ai-credit{display:flex;justify-content:space-between;gap:10px;border:1px solid rgba(5,0,8,.08);background:#fffcf7;border-radius:12px;padding:12px;margin-top:14px}.fee-ai-credit span{font-size:12px;color:#8d7d70}.fee-ai-credit strong{font-weight:900;color:#1a1a2e}.fee-ai-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}.fee-ai-stat{background:#fff;border:1px solid rgba(5,0,8,.08);border-radius:13px;padding:15px}.fee-ai-stat span{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#9a8a7a;font-weight:900}.fee-ai-stat strong{display:block;font-family:"Lora",serif;font-size:25px;color:#050008;margin-top:7px}.fee-ai-section{border:1px solid rgba(5,0,8,.08);border-radius:12px;padding:14px;background:#fff;margin-top:12px}.fee-ai-section h3{font-size:14px;font-weight:900;color:var(--bs-primary,rgb(211,0,176));margin:0 0 8px}.fee-ai-section p,.fee-ai-section li{font-size:13px;line-height:1.75;color:#322739}.fee-ai-risk-card{border:1px solid rgba(5,0,8,.08);border-radius:12px;padding:14px;background:#fff;margin-top:10px}.fee-ai-risk-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.fee-ai-risk-name{font-weight:900;color:#1a1a2e}.fee-ai-pill{border-radius:999px;padding:5px 9px;font-size:11px;font-weight:900;text-transform:uppercase}.fee-ai-risk-high{background:rgba(239,68,68,.12);color:#b91c1c}.fee-ai-risk-medium{background:rgba(245,158,11,.14);color:#b45309}.fee-ai-risk-low{background:rgba(34,197,94,.12);color:#15803d}.fee-ai-table{width:100%;border-collapse:collapse}.fee-ai-table th{font-size:11px;text-transform:uppercase;color:#9a8a7a;letter-spacing:.06em}.fee-ai-table th,.fee-ai-table td{padding:10px;border-bottom:1px solid rgba(5,0,8,.06);font-size:13px}.fee-ai-message{background:#fffcf7;border:1px solid rgba(5,0,8,.08);border-radius:12px;padding:13px;margin-top:10px;white-space:pre-wrap;font-size:13px;line-height:1.7;color:#322739}.fee-ai-copy{border:1px solid rgba(5,0,8,.12);background:#fff;border-radius:9px;padding:8px 11px;font-size:12px;font-weight:850}.fee-ai-send{border:0;background:var(--bs-primary,rgb(211,0,176));color:#fff;border-radius:9px;padding:8px 11px;font-size:12px;font-weight:900}.fee-ai-send:disabled{opacity:.6}.fee-ai-message-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}@media(max-width:1199.98px){.fee-ai-grid{grid-template-columns:1fr}.fee-ai-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:767.98px){.fee-ai-main{padding:20px 16px 0}.fee-ai-stats{grid-template-columns:1fr}}
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        .fee-ai-main {
+          background: #F8FAFC;
+          min-height: 100vh;
+          padding: 24px 28px 0;
+          overflow-x: hidden;
+          font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+        }
+        .fee-ai-hero {
+          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
+          color: #fff;
+          border-radius: 18px;
+          padding: 32px 36px;
+          margin-bottom: 24px;
+          position: relative;
+          overflow: hidden;
+          box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
+        }
+        .fee-ai-hero-glow {
+          position: absolute;
+          top: -60px;
+          right: -60px;
+          width: 320px;
+          height: 320px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(217, 119, 6, 0.15) 0%, transparent 65%);
+          pointer-events: none;
+        }
+        .fee-ai-hero>* { position: relative; z-index: 1; }
+        .fee-ai-kicker {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: #FBBF24;
+          background: rgba(217, 119, 6, 0.20);
+          border: 1px solid rgba(217, 119, 6, 0.35);
+          border-radius: 100px;
+          padding: 4px 12px;
+          margin-bottom: 12px;
+        }
+        .fee-ai-title {
+          font-weight: 800;
+          font-size: 26px;
+          margin: 6px 0 8px;
+          color: #fff;
+        }
+        .fee-ai-sub {
+          max-width: 800px;
+          color: #CBD5E1;
+          font-size: 13.5px;
+          line-height: 1.6;
+          margin: 0;
+        }
+        .fee-ai-grid {
+          display: grid;
+          grid-template-columns: 360px 1fr;
+          gap: 20px;
+          align-items: start;
+        }
+        .fee-ai-card {
+          background: #fff;
+          border: 1px solid #E2E8F0;
+          border-radius: 16px;
+          box-shadow: 0 4px 16px rgba(15, 39, 68, 0.03);
+          overflow: hidden;
+        }
+        .fee-ai-pad { padding: 20px; }
+        .fee-ai-card h2 { font-size: 16px; font-weight: 700; color: #0F2744; margin: 0; }
+        .fee-ai-muted { font-size: 12.5px; color: #64748B; line-height: 1.5; margin: 4px 0 0; }
+        .fee-ai-field { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+        .fee-ai-field span { font-size: 12px; font-weight: 700; color: #0F2744; }
+        .fee-ai-input {
+          border: 1px solid #E2E8F0;
+          border-radius: 10px;
+          padding: 10px 12px;
+          outline: none;
+          background: #F8FAFC;
+          color: #0F2744;
+          font-size: 13px;
+          font-weight: 600;
+          transition: border-color 0.2s;
+        }
+        .fee-ai-input:focus { border-color: #D97706; background: #fff; }
+        .fee-ai-btn {
+          border: 0;
+          border-radius: 10px;
+          background: #D97706;
+          color: #FFFFFF;
+          font-weight: 700;
+          font-size: 13px;
+          padding: 11px 15px;
+          width: 100%;
+          margin-top: 16px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .fee-ai-btn:hover { background: #B45309; transform: translateY(-1px); }
+        .fee-ai-btn:disabled { opacity: .65; transform: none; cursor: not-allowed; }
+        .fee-ai-credit {
+          display: flex;
+          justify-content: space-between;
+          gap: 10px;
+          border: 1px solid #E2E8F0;
+          background: #F8FAFC;
+          border-radius: 12px;
+          padding: 12px 14px;
+          margin-top: 14px;
+        }
+        .fee-ai-credit span { font-size: 12px; color: #64748B; font-weight: 500; }
+        .fee-ai-credit strong { font-weight: 700; color: #0F2744; font-size: 13px; }
+        .fee-ai-stats {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 14px;
+          margin-bottom: 18px;
+        }
+        .fee-ai-stat {
+          background: #fff;
+          border: 1px solid #E2E8F0;
+          border-radius: 14px;
+          padding: 18px 20px;
+          box-shadow: 0 4px 12px rgba(15,39,68,0.02);
+        }
+        .fee-ai-stat span { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: #64748B; font-weight: 700; }
+        .fee-ai-stat strong { display: block; font-size: 22px; font-weight: 800; color: #0F2744; margin-top: 6px; }
+        .fee-ai-section { border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px; background: #F8FAFC; margin-top: 14px; }
+        .fee-ai-section h3 { font-size: 14px; font-weight: 700; color: #0F2744; margin: 0 0 8px; }
+        .fee-ai-section p, .fee-ai-section li { font-size: 13px; line-height: 1.7; color: #334155; }
+        .fee-ai-risk-card { border: 1px solid #E2E8F0; border-radius: 12px; padding: 14px 16px; background: #F8FAFC; margin-top: 10px; }
+        .fee-ai-risk-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+        .fee-ai-risk-name { font-weight: 700; color: #0F2744; font-size: 14px; }
+        .fee-ai-pill { border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+        .fee-ai-risk-high { background: rgba(239, 68, 68, .12); color: #b91c1c; }
+        .fee-ai-risk-medium { background: rgba(245, 158, 11, .14); color: #b45309; }
+        .fee-ai-risk-low { background: rgba(16, 185, 129, .12); color: #059669; }
+        .fee-ai-table { width: 100%; border-collapse: collapse; }
+        .fee-ai-table th { font-size: 11.5px; text-transform: uppercase; color: #64748B; letter-spacing: .04em; font-weight: 700; }
+        .fee-ai-table th, .fee-ai-table td { padding: 10px 12px; border-bottom: 1px solid #F1F5F9; font-size: 13px; color: #334155; }
+        .fee-ai-message { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 14px; margin-top: 12px; white-space: pre-wrap; font-size: 13px; line-height: 1.7; color: #334155; }
+        .fee-ai-copy { border: 1px solid #E2E8F0; background: #fff; border-radius: 8px; padding: 7px 12px; font-size: 12px; font-weight: 700; color: #0F2744; cursor: pointer; transition: all 0.2s; }
+        .fee-ai-copy:hover { background: #E2E8F0; }
+        .fee-ai-send { border: 0; background: #D97706; color: #fff; border-radius: 8px; padding: 7px 14px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+        .fee-ai-send:hover { background: #B45309; }
+        .fee-ai-send:disabled { opacity: .6; cursor: not-allowed; }
+        .fee-ai-message-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+        @media(max-width:1199.98px){.fee-ai-grid{grid-template-columns:1fr}.fee-ai-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+        @media(max-width:767.98px){.fee-ai-main{padding:20px 16px 0}.fee-ai-stats{grid-template-columns:1fr}}
       `}</style>
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title="AI Fee Collection" />
       <div className="container-fluid"><div className="row"><Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
         <main className="col-md-9 col-lg-10 ms-auto db-main fee-ai-main">
           <PageTitle title="AI Fee Collection Assistant" />
           {loading && <Loader message="Analyzing outstanding fees..." />}
-          <section className="fee-ai-hero"><div className="fee-ai-kicker">GradeQuest AI finance tools</div><h1 className="fee-ai-title">AI Fee Collection Assistant</h1><p className="fee-ai-sub">Identify parents with the highest outstanding balances, summarize debts by class, term, parent, or student, and generate polite reminder drafts.</p></section>
+          <section className="fee-ai-hero">
+            <div className="fee-ai-hero-glow" />
+            <div className="fee-ai-kicker">GradiosEdu AI finance tools</div>
+            <h1 className="fee-ai-title">AI Fee Collection Assistant</h1>
+            <p className="fee-ai-sub">Identify parents with the highest outstanding balances, summarize debts by class, term, parent, or student, and generate polite reminder drafts.</p>
+          </section>
           <div className="fee-ai-grid">
             <section className="fee-ai-card"><div className="fee-ai-pad"><h2>Analysis filters</h2><p className="fee-ai-muted">Leave filters empty to analyze all unpaid fee records.</p>
               <label className="fee-ai-field"><span>Academic session</span><select className="fee-ai-input" value={filters.session_id} onChange={(e)=>update("session_id", e.target.value)}><option value="">All sessions</option>{sessions.map((item)=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
@@ -168,8 +333,28 @@ export default function AiFeeCollectionAssistantPage() {
               <label className="fee-ai-field"><span>Class</span><select className="fee-ai-input" value={filters.class_id} onChange={(e)=>update("class_id", e.target.value)}><option value="">All classes</option>{classes.map((item)=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
               <label className="fee-ai-field"><span>Section</span><select className="fee-ai-input" value={filters.section_id} onChange={(e)=>update("section_id", e.target.value)}><option value="">All sections</option>{sections.map((item)=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
               <label className="fee-ai-field"><span>Parents to review</span><input className="fee-ai-input" type="number" min={3} max={25} value={filters.limit} onChange={(e)=>update("limit", Number(e.target.value))} /></label>
-              <div className="fee-ai-credit"><div><span>Cost per analysis</span><strong>{credits?.ai_fee_collection_credit_cost ?? "-"} credit(s)</strong></div><div><span>Remaining</span><strong>{credits?.remaining_credits ?? "-"}</strong></div></div>
-              <button className="fee-ai-btn" disabled={loading} onClick={analyze}>{loading ? "Analyzing..." : "Generate Fee Analysis"}</button>
+              <div className="fee-ai-credit">
+                <div><span>Cost per analysis</span><strong>{credits?.ai_fee_collection_credit_cost ?? 2} credit(s)</strong></div>
+                <div>
+                  <span>{credits?.user_allocation ? "Your Quota" : "Remaining"}</span>
+                  <strong>
+                    {credits?.user_allocation
+                      ? credits.user_allocation.is_unlimited
+                        ? "Unlimited"
+                        : `${credits.user_allocation.remaining_credits} credits`
+                      : `${credits?.remaining_credits ?? "-"} credits`}
+                  </strong>
+                </div>
+              </div>
+              {credits && credits.is_plus_active === false && (
+                <div className="alert alert-warning py-2 px-3 mt-3 mb-0" style={{ fontSize: "12px", borderRadius: "10px" }}>
+                  <i className="bi bi-exclamation-triangle me-1" />
+                  <strong>GradiosEdu Plus Required:</strong> AI Fee Assistant requires an active GradiosEdu Plus subscription.
+                </div>
+              )}
+              <button className="fee-ai-btn" disabled={loading || (credits && credits.is_plus_active === false)} onClick={analyze}>
+                {loading ? "Analyzing..." : "Generate Fee Analysis"}
+              </button>
             </div></section>
             <section>
               {analysis ? <>

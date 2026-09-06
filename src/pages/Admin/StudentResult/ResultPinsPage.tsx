@@ -352,81 +352,75 @@ export default function ResultPinsPage() {
   return (
     <>
       <style>{`
-        /* ===== Result Pins (dashboard-like template) ===== */
+        /* ===== Result Pins (Modern SaaS template) ===== */
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
         .rp-main{
-          background: var(--bs-body-bg, #f5f1eb);
+          background: #F8FAFC;
           min-height: 100vh;
-          font-family: "DM Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-          padding: 28px 28px 0;
+          font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+          padding: 24px 28px 0;
         }
 
         .rp-hero{
-          background: #0f172a;
-          border-radius: 16px;
-          padding: 28px 30px;
+          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
+          border-radius: 18px;
+          padding: 32px 36px;
           position: relative;
           overflow: hidden;
-          margin-bottom: 18px;
-        }
-        .rp-hero:before{
-          content:"";
-          position:absolute; inset:0;
-          background-image: radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px);
-          background-size: 24px 24px;
-          pointer-events:none;
+          margin-bottom: 24px;
+          box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
         }
         .rp-glow{ position:absolute; top:-60px; right:-60px; width:320px; height:320px; border-radius:50%;
-          background: radial-gradient(circle, rgba(201,168,76,0.12) 0%, transparent 65%); pointer-events:none; }
+          background: radial-gradient(circle, rgba(217,119,6,0.15) 0%, transparent 65%); pointer-events:none; }
         .rp-glow2{ position:absolute; bottom:-50px; left:25%; width:220px; height:220px; border-radius:50%;
-          background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%); pointer-events:none; }
+          background: radial-gradient(circle, rgba(37,99,235,0.10) 0%, transparent 70%); pointer-events:none; }
 
         .rp-hero-inner{ position:relative; z-index:1; display:flex; align-items:flex-start; justify-content:space-between; gap:18px; flex-wrap:wrap; }
 
         .rp-badge{
           display:inline-flex; align-items:center; gap:7px;
-          font-size:11px; font-weight:500; letter-spacing:0.12em; text-transform:uppercase;
-          color:#e8c97a;
-          background: rgba(201,168,76,0.1);
-          border:1px solid rgba(201,168,76,0.2);
+          font-size:11.5px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase;
+          color:#FBBF24;
+          background: rgba(217,119,6,0.20);
+          border:1px solid rgba(217,119,6,0.35);
           border-radius:100px;
           padding: 4px 12px;
-          margin-bottom: 10px;
+          margin-bottom: 12px;
         }
-        .rp-dot{ width:6px; height:6px; border-radius:50%; background:#22c55e; animation: rpPulse 2s ease infinite; }
+        .rp-dot{ width:6px; height:6px; border-radius:50%; background:#10B981; animation: rpPulse 2s ease infinite; }
         @keyframes rpPulse { 0%,100%{ opacity:1; transform:scale(1);} 50%{ opacity:.4; transform:scale(1.5);} }
 
         .rp-title{
-          font-family: "Lora", Georgia, serif;
-          font-size: clamp(20px, 2.2vw, 30px);
-          font-weight: 700;
+          font-size: 26px;
+          font-weight: 800;
           color: #fff;
-          margin: 0 0 6px;
+          margin: 0 0 8px;
           line-height:1.1;
         }
-        .rp-title em{ font-style: italic; color:#e8c97a; }
+        .rp-title em{ font-style: normal; color:#FBBF24; }
         .rp-sub{
-          color:#94a3b8; font-size: 13px; font-weight: 300; line-height:1.6;
+          color:#CBD5E1; font-size: 13.5px; line-height:1.6;
           margin:0;
-          max-width: 560px;
+          max-width: 620px;
         }
 
         .rp-hero-card{
-          background: rgba(255,255,255,0.05);
-          border: 1px solid rgba(255,255,255,0.09);
+          background: rgba(255,255,255,0.08);
+          border: 1px solid rgba(255,255,255,0.15);
           backdrop-filter: blur(8px);
           border-radius: 14px;
-          padding: 16px 18px;
+          padding: 18px 20px;
           min-width: 240px;
         }
         .rp-mini-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
-        .rp-mini-label{ font-size:12px; color:#94a3b8; font-weight:300; }
-        .rp-mini-val{ font-family:"Lora", serif; font-size:18px; color:#fff; font-weight:700; }
+        .rp-mini-label{ font-size:12px; color:#CBD5E1; font-weight:400; }
+        .rp-mini-val{ font-size:18px; color:#FBBF24; font-weight:800; }
 
         .rp-grid{
           display:grid;
           grid-template-columns: 420px 1fr;
-          gap: 18px;
-          margin-bottom: 22px;
+          gap: 20px;
+          margin-bottom: 24px;
         }
         @media (max-width: 991.98px){
           .rp-grid{ grid-template-columns: 1fr; }
@@ -434,79 +428,89 @@ export default function ResultPinsPage() {
 
         .rp-panel{
           background: #fff;
-          border: 1px solid #ede8e0;
-          border-radius: 14px;
+          border: 1px solid #E2E8F0;
+          border-radius: 16px;
           overflow: hidden;
+          box-shadow: 0 4px 16px rgba(15,39,68,0.03);
         }
         .rp-panel-head{
           display:flex; align-items:center; justify-content:space-between;
-          padding: 18px 18px 14px;
-          border-bottom: 1px solid rgba(0,0,0,0.06);
+          padding: 18px 20px;
+          border-bottom: 1px solid #E2E8F0;
           gap: 10px;
           flex-wrap: wrap;
         }
         .rp-panel-title{
-          font-family:"Lora", serif; font-size:16px; font-weight:700; color:#1a1a2e; margin:0;
+          font-size:16px; font-weight:800; color:#0F2744; margin:0;
         }
-        .rp-panel-sub{ font-size:11.5px; font-weight:300; color:#9a8a7a; margin:0; }
+        .rp-panel-sub{ font-size:12px; color:#64748B; margin:0; }
 
         .rp-icon{
-          width: 36px; height: 36px; border-radius: 10px;
+          width: 38px; height: 38px; border-radius: 10px;
           display:flex; align-items:center; justify-content:center;
-          background: var(--pi, #fef3c7);
-          color: var(--pc, #b45309);
+          background: rgba(217,119,6,0.12);
+          color: #D97706;
           flex-shrink:0;
         }
 
-        .rp-body{ padding: 18px; }
+        .rp-body{ padding: 20px; }
 
         .rp-btn{
-          display:inline-flex; align-items:center; gap:7px;
-          padding: 9px 14px;
-          font-size: 12.5px;
+          display:inline-flex; align-items:center; gap:8px;
+          padding: 9px 16px;
+          font-size: 13px;
+          font-weight: 700;
           border-radius: 10px;
-          border: 1px solid rgba(0,0,0,0.08);
-          background: #f5f1eb;
-          color: #7a6a5a;
+          border: 1px solid #E2E8F0;
+          background: #F1F5F9;
+          color: #0F2744;
           cursor: pointer;
-          transition: background .2s, transform .2s;
+          transition: all .2s ease;
           text-decoration:none;
           user-select:none;
           white-space:nowrap;
         }
-        .rp-btn:hover{ background:#ede8e0; transform: translateY(-1px); }
+        .rp-btn:hover{ background:#E2E8F0; transform: translateY(-1px); }
         .rp-btn:disabled{ opacity:.55; cursor:not-allowed; transform:none; }
 
         .rp-btn-primary{
-          background:#0f172a; color:#fff; border-color: rgba(255,255,255,0.10);
+          background:#0F2744; color:#fff; border: none;
         }
-        .rp-btn-primary:hover{ background:#111c35; }
+        .rp-btn-primary:hover{ background:#1E3A8A; color:#fff; }
         .rp-btn-gold{
-          background:#c9a84c; color:#0f172a; border: none;
+          background:#D97706; color:#FFFFFF; border: none;
         }
-        .rp-btn-gold:hover{ background:#e8c97a; }
+        .rp-btn-gold:hover{ background:#B45309; color:#FFFFFF; }
 
-        .rp-field label{ font-size:12px; font-weight:600; color:#1a1a2e; margin-bottom:6px; }
+        .rp-field label{ font-size:12px; font-weight:700; color:#0F2744; margin-bottom:6px; }
         .rp-field .form-control, .rp-field .form-select{
-          border-radius: 12px;
-          border: 1px solid #e5ddd3;
-          padding: 10px 12px;
+          border-radius: 10px;
+          border: 1px solid #E2E8F0;
+          padding: 10px 14px;
+          font-size: 13px;
+          color: #0F2744;
+          font-weight: 600;
         }
-        .rp-help{ font-size: 12px; color:#9a8a7a; margin-top: 6px; }
+        .rp-field .form-control:focus, .rp-field .form-select:focus{
+          border-color: #D97706;
+          box-shadow: 0 0 0 3px rgba(217,119,6,0.12);
+        }
+        .rp-help{ font-size: 12px; color:#64748B; margin-top: 6px; }
 
         .rp-table{
           width:100%;
-          border-collapse: collapse;
+          border-collapse: separate;
+          border-spacing: 0;
         }
         .rp-table th{
-          padding: 10px 14px;
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: .1em;
+          padding: 12px 16px;
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
           text-transform: uppercase;
-          color:#9a8a7a;
-          background:#faf8f5;
-          border-bottom: 1px solid rgba(0,0,0,0.06);
+          color:#64748B;
+          background:#F8FAFC;
+          border-bottom: 1px solid #E2E8F0;
           text-align:left;
           white-space:nowrap;
         }
@@ -768,13 +772,13 @@ export default function ResultPinsPage() {
       `}</style>
 
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-      <PageTitle title="Generat Pin" />
+      <PageTitle title="Generate PINs" />
 
       <div className="container-fluid">
         <div className="row">
-          <Sidebar sidebarOpen={sidebarOpen} />
+          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-          <main className="col-md-9 col-lg-10 ms-auto rp-main">
+          <main className="col-md-9 col-lg-10 ms-auto db-main rp-main">
             {loading && <Loader message="Loading result PINs..." />}
 
             {/* ===== Hero ===== */}

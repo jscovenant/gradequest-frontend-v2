@@ -177,14 +177,14 @@ function revenueModelLabel(model?: string | null) {
 
 function revenueModelHelp(model?: string | null) {
   if (model === "online_transaction_fee") {
-    return "Core access is supported by GradeQuest charges collected automatically from parent fee payments.";
+    return "Core access is supported by GradiosEdu charges collected automatically from parent fee payments.";
   }
 
   if (model === "offline_term_invoice") {
-    return "GradeQuest bills the school directly based on active students for the current term.";
+    return "GradiosEdu bills the school directly based on active students for the current term.";
   }
 
-  return "Set up online payments or offline billing to activate the GradeQuest revenue model.";
+  return "Set up online payments or offline billing to activate the GradiosEdu revenue model.";
 }
 
 export default function BillingPage() {
@@ -242,22 +242,102 @@ export default function BillingPage() {
   const showingFrom = totalItems === 0 ? 0 : (safePage - 1) * pageSize + 1;
   const showingTo = Math.min(safePage * pageSize, totalItems);
 
+  const [clearanceSummary, setClearanceSummary] = useState<{
+    total_students: number;
+    cleared_count: number;
+    pending_count: number;
+    terms_count: number;
+    fee_per_student: number;
+    term_clearance_fee: number;
+    session_clearance_fee: number;
+    wallet_balance: number;
+    session_id?: number | null;
+    term_id?: number | null;
+  } | null>(null);
+
+  const [clearingTerm, setClearingTerm] = useState(false);
+  const [clearingSession, setClearingSession] = useState(false);
+
   const loadBillingData = async (showToast = false) => {
     setLoading(true);
     try {
-      const [subscriptionRes, schoolBillingRes] = await Promise.all([
+      const [subscriptionRes, schoolBillingRes, clearanceRes] = await Promise.all([
         authApi.get("/subscription/billing"),
         authApi.get("/school/billing/dashboard"),
+        authApi.get("/school/clearance/summary"),
       ]);
       setSubscription(subscriptionRes.data.subscription || null);
       setPayments(subscriptionRes.data.payments || []);
       setSchoolBilling(schoolBillingRes.data || null);
+      setClearanceSummary(clearanceRes.data || null);
       if (showToast) showSuccess?.("Billing refreshed.");
     } catch (err: any) {
       console.error(err);
       showError?.(err?.response?.data?.message || "Failed to load billing records.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleClearTerm = async () => {
+    if (!clearanceSummary?.session_id || !clearanceSummary?.term_id) {
+      showError?.("Current academic period is not active.");
+      return;
+    }
+    const fee = Number(clearanceSummary.term_clearance_fee || 0);
+    const count = Number(clearanceSummary.pending_count || 0);
+    if (count === 0) {
+      showSuccess?.("All active students are already cleared for the current term.");
+      return;
+    }
+    if ((clearanceSummary.wallet_balance || 0) < fee) {
+      showError?.(`Insufficient wallet balance. Total fee is ${fmtNaira(fee)}, but wallet balance is ${fmtNaira(clearanceSummary.wallet_balance)}. Please top up your wallet first.`);
+      return;
+    }
+    const ok = window.confirm(`Debit ${fmtNaira(fee)} from school wallet to clear all ${count} unpaid student(s) for the current term?`);
+    if (!ok) return;
+
+    setClearingTerm(true);
+    try {
+      const res = await authApi.post("/school/clearance/clear-school-term", {
+        session_id: clearanceSummary.session_id,
+        term_id: clearanceSummary.term_id,
+      });
+      showSuccess?.(res.data.message || "Whole-school term clearance completed successfully!");
+      await loadBillingData();
+    } catch (err: any) {
+      showError?.(err?.response?.data?.message || "Failed to clear students from wallet.");
+    } finally {
+      setClearingTerm(false);
+    }
+  };
+
+  const handleClearSession = async () => {
+    if (!clearanceSummary?.session_id) {
+      showError?.("Current academic session is not active.");
+      return;
+    }
+    const totalFee = Number(clearanceSummary.session_clearance_fee || 0);
+    const totalStudents = Number(clearanceSummary.total_students || 0);
+    const termsCount = Number(clearanceSummary.terms_count || 3);
+    if ((clearanceSummary.wallet_balance || 0) < totalFee) {
+      showError?.(`Insufficient wallet balance. Session clearance requires ${fmtNaira(totalFee)}, but wallet balance is ${fmtNaira(clearanceSummary.wallet_balance)}. Please top up your wallet first.`);
+      return;
+    }
+    const ok = window.confirm(`Debit ${fmtNaira(totalFee)} from school wallet to clear all ${totalStudents} active students across ALL ${termsCount} terms in this academic session?`);
+    if (!ok) return;
+
+    setClearingSession(true);
+    try {
+      const res = await authApi.post("/school/clearance/clear-school-session", {
+        session_id: clearanceSummary.session_id,
+      });
+      showSuccess?.(res.data.message || "Full academic session clearance completed successfully!");
+      await loadBillingData();
+    } catch (err: any) {
+      showError?.(err?.response?.data?.message || "Failed to clear session from wallet.");
+    } finally {
+      setClearingSession(false);
     }
   };
 
@@ -322,10 +402,10 @@ export default function BillingPage() {
     try {
       await authApi.post("/school/billing/offline-invoice/generate", {});
       await loadBillingData(false);
-      showSuccess?.("GradeQuest invoice generated.");
+      showSuccess?.("GradiosEdu invoice generated.");
     } catch (err: any) {
       console.error(err);
-      showError?.(err?.response?.data?.message || "Unable to generate GradeQuest invoice.");
+      showError?.(err?.response?.data?.message || "Unable to generate GradiosEdu invoice.");
     } finally {
       setLoading(false);
     }
@@ -354,7 +434,7 @@ export default function BillingPage() {
       showError?.(
         err?.response?.data?.message ||
           (paymentMode === "online"
-            ? "Unable to switch to online model. Make sure online bank payment is enabled and outstanding GradeQuest revenue is settled."
+            ? "Unable to switch to online model. Make sure online bank payment is enabled and outstanding GradiosEdu revenue is settled."
             : "Unable to switch to offline model.")
       );
 
@@ -370,29 +450,22 @@ export default function BillingPage() {
     <>
       <style>{`
         /* ===== AdminDashboard template styles (aligned with your upgraded pages) ===== */
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
         .db-main {
-          background: var(--bs-body-bg, #f5f1eb);
+          background: #F8FAFC;
           min-height: 100vh;
-          font-family: "DM Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-          padding: 28px 28px 0;
+          font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+          padding: 24px 28px 0;
         }
 
         .db-hero {
-          background: #0f172a;
-          border-radius: var(--bs-border-radius-lg, 16px);
+          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
+          border-radius: 18px;
           padding: 32px 36px;
           position: relative;
           overflow: hidden;
-          margin: 10px 0 18px;
-          border: 1px solid rgba(255,255,255,0.06);
-        }
-        .db-hero::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background-image: radial-gradient(circle, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
-          background-size: 24px 24px;
-          pointer-events: none;
+          margin-bottom: 24px;
+          box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
         }
         .db-hero-glow {
           position: absolute;
@@ -401,7 +474,7 @@ export default function BillingPage() {
           width: 320px;
           height: 320px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(201, 168, 76, 0.10) 0%, transparent 65%);
+          background: radial-gradient(circle, rgba(217, 119, 6, 0.15) 0%, transparent 65%);
           pointer-events: none;
         }
         .db-hero-glow2 {
@@ -411,7 +484,7 @@ export default function BillingPage() {
           width: 220px;
           height: 220px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(99, 102, 241, 0.07) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(37, 99, 235, 0.10) 0%, transparent 70%);
           pointer-events: none;
         }
         .db-hero-inner {
@@ -429,22 +502,22 @@ export default function BillingPage() {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          font-size: 11px;
-          font-weight: 500;
-          letter-spacing: 0.12em;
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
           text-transform: uppercase;
-          color: #e8c97a;
-          background: rgba(201, 168, 76, 0.10);
-          border: 1px solid rgba(201, 168, 76, 0.22);
+          color: #FBBF24;
+          background: rgba(217, 119, 6, 0.20);
+          border: 1px solid rgba(217, 119, 6, 0.35);
           border-radius: 100px;
           padding: 4px 12px;
-          margin-bottom: 14px;
+          margin-bottom: 12px;
         }
         .db-session-dot {
           width: 6px;
           height: 6px;
           border-radius: 50%;
-          background: #22c55e;
+          background: #10B981;
           animation: dbPulse 2s ease infinite;
         }
         @keyframes dbPulse {
@@ -453,20 +526,18 @@ export default function BillingPage() {
         }
 
         .db-greeting {
-          font-family: "Lora", Georgia, serif;
-          font-size: clamp(22px, 2.5vw, 32px);
-          font-weight: 700;
+          font-size: 26px;
+          font-weight: 800;
           color: #fff;
           line-height: 1.1;
           margin-bottom: 8px;
         }
-        .db-greeting em { font-style: italic; color: #e8c97a; }
+        .db-greeting em { font-style: normal; color: #FBBF24; }
 
         .db-hero-sub {
           font-size: 13.5px;
-          font-weight: 300;
-          color: #64748b;
-          line-height: 1.65;
+          color: #CBD5E1;
+          line-height: 1.6;
           max-width: 560px;
           margin-bottom: 18px;
         }
@@ -476,88 +547,84 @@ export default function BillingPage() {
         .db-btn-gold {
           display: inline-flex;
           align-items: center;
-          gap: 7px;
-          padding: 10px 20px;
-          font-family: "DM Sans", sans-serif;
+          gap: 8px;
+          padding: 9px 18px;
           font-size: 13px;
-          font-weight: 500;
-          color: #0f172a;
-          background: #c9a84c;
+          font-weight: 700;
+          color: #FFFFFF;
+          background: #D97706;
           border: none;
-          border-radius: var(--bs-border-radius, 8px);
+          border-radius: 10px;
           cursor: pointer;
-          transition: background 0.2s, transform 0.2s;
+          transition: all 0.2s ease;
           white-space: nowrap;
         }
-        .db-btn-gold:hover { background: #e8c97a; transform: translateY(-1px); }
+        .db-btn-gold:hover { background: #B45309; transform: translateY(-1px); color: #FFFFFF; }
         .db-btn-gold:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 
         .db-btn-outline {
           display: inline-flex;
           align-items: center;
-          gap: 7px;
-          padding: 10px 20px;
-          font-family: "DM Sans", sans-serif;
+          gap: 8px;
+          padding: 9px 18px;
           font-size: 13px;
-          font-weight: 400;
-          color: rgba(255, 255, 255, 0.7);
-          background: transparent;
-          border: 1px solid rgba(255, 255, 255, 0.14);
-          border-radius: var(--bs-border-radius, 8px);
+          font-weight: 600;
+          color: #FFFFFF;
+          background: rgba(255, 255, 255, 0.10);
+          border: 1px solid rgba(255, 255, 255, 0.20);
+          border-radius: 10px;
           cursor: pointer;
-          transition: background 0.2s, border-color 0.2s, color 0.2s;
+          transition: all 0.2s ease;
           white-space: nowrap;
         }
-        .db-btn-outline:hover { background: rgba(255, 255, 255, 0.06); color: #fff; border-color: rgba(255, 255, 255, 0.28); }
+        .db-btn-outline:hover { background: rgba(255, 255, 255, 0.18); color: #fff; }
         .db-btn-outline:disabled { opacity: 0.55; cursor: not-allowed; }
 
         .db-hero-stat-card {
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.09);
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.15);
           backdrop-filter: blur(8px);
-          border-radius: var(--bs-border-radius, 12px);
-          padding: 20px 24px;
+          border-radius: 14px;
+          padding: 18px 20px;
           min-width: 270px;
           margin-left: auto;
           align-self: flex-end;
         }
         .db-hero-stat-row { display: flex; flex-direction: column; gap: 10px; }
         .db-hero-stat-item { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-        .db-hero-stat-label { font-size: 12px; font-weight: 300; color: #64748b; }
-        .db-hero-stat-val { font-family: "Lora", serif; font-size: 18px; font-weight: 700; color: #fff; }
-        .db-hero-stat-sep { height: 1px; background: rgba(255, 255, 255, 0.06); }
+        .db-hero-stat-label { font-size: 12px; font-weight: 400; color: #CBD5E1; }
+        .db-hero-stat-val { font-size: 18px; font-weight: 800; color: #FBBF24; }
+        .db-hero-stat-sep { height: 1px; background: rgba(255, 255, 255, 0.08); }
 
         .db-panel {
-          background: var(--bs-body-bg, #fff);
-          border: 1px solid var(--bs-border-color, #ede8e0);
-          border-radius: var(--bs-border-radius-lg, 14px);
+          background: #fff;
+          border: 1px solid #E2E8F0;
+          border-radius: 16px;
           overflow: hidden;
-          box-shadow: 0 2px 10px rgba(15,23,42,0.04);
-          margin-bottom: 18px;
+          box-shadow: 0 4px 16px rgba(15,39,68,0.03);
+          margin-bottom: 20px;
         }
 
         .db-panel-head {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 18px 18px;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+          padding: 18px 20px;
+          border-bottom: 1px solid #E2E8F0;
           gap: 12px;
           flex-wrap: wrap;
         }
 
         .db-panel-title {
-          font-family: "Lora", serif;
           font-size: 16px;
-          font-weight: 700;
-          color: #1a1a2e;
+          font-weight: 800;
+          color: #0F2744;
           margin: 0;
         }
 
         .db-panel-sub {
-          font-size: 11.5px;
-          font-weight: 300;
-          color: #9a8a7a;
+          font-size: 12px;
+          color: #64748B;
           margin: 0;
         }
 
@@ -565,68 +632,68 @@ export default function BillingPage() {
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          padding: 7px 14px;
-          font-size: 12px;
-          font-weight: 400;
-          color: #7a6a5a;
-          background: #f5f1eb;
-          border: 1px solid #e5ddd3;
-          border-radius: var(--bs-border-radius, 7px);
+          padding: 8px 14px;
+          font-size: 12.5px;
+          font-weight: 600;
+          color: #0F2744;
+          background: #F1F5F9;
+          border: 1px solid #E2E8F0;
+          border-radius: 8px;
           cursor: pointer;
-          transition: background 0.2s;
+          transition: all 0.2s ease;
           white-space: nowrap;
         }
-        .db-refresh-btn:hover { background: #ede8e0; }
+        .db-refresh-btn:hover { background: #E2E8F0; }
         .db-refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .db-pill {
           display: inline-flex;
           align-items: center;
-          font-size: 12px;
-          font-weight: 800;
-          padding: 6px 10px;
+          font-size: 11.5px;
+          font-weight: 700;
+          padding: 5px 10px;
           border-radius: 999px;
           white-space: nowrap;
           border: 1px solid rgba(0,0,0,0.06);
         }
 
-        .db-muted { color: #9a8a7a; }
-        .db-strong { font-weight: 900; color: #1a1a2e; }
+        .db-muted { color: #64748B; }
+        .db-strong { font-weight: 700; color: #0F2744; }
 
-        .db-table { width: 100%; border-collapse: collapse; }
+        .db-table { width: 100%; border-collapse: separate; border-spacing: 0; }
         .db-table th {
-          padding: 10px 16px;
-          font-size: 11px;
-          font-weight: 500;
-          letter-spacing: 0.1em;
+          padding: 12px 16px;
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
           text-transform: uppercase;
-          color: #9a8a7a;
-          background: #faf8f5;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+          color: #64748B;
+          background: #F8FAFC;
+          border-bottom: 1px solid #E2E8F0;
           text-align: left;
           white-space: nowrap;
         }
         .db-table td {
-          padding: 13px 16px;
-          font-size: 13.5px;
-          color: #4a4a5a;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+          padding: 14px 16px;
+          font-size: 13px;
+          color: #334155;
+          border-bottom: 1px solid #E2E8F0;
           vertical-align: middle;
         }
         .db-table tbody tr:last-child td { border-bottom: none; }
-        .db-table tbody tr:hover { background: #faf8f5; }
+        .db-table tbody tr:hover { background: #F8FAFC; }
 
         .db-search {
           display: flex;
           align-items: center;
           gap: 10px;
           background: #fff;
-          border: 1px solid #e5ddd3;
-          border-radius: 12px;
-          padding: 10px 12px;
+          border: 1px solid #E2E8F0;
+          border-radius: 10px;
+          padding: 10px 14px;
           min-width: 260px;
         }
-        .db-search input { border: none; outline: none; width: 100%; font-size: 13px; }
+        .db-search input { border: none; outline: none; width: 100%; font-size: 13px; color: #0F2744; }
 
         @media (max-width: 991.98px) { .db-main { padding: 18px 14px 0; } }
       `}</style>
@@ -650,26 +717,26 @@ export default function BillingPage() {
                 <div>
                   <div className="db-session-badge">
                     <span className="db-session-dot" />
-                    Subscriptions — Billing
+                    Student Clearance — Billing
                   </div>
 
                   <h1 className="db-greeting">
-                    Billing <em>&</em> Payments
+                    Student Clearance <em>&</em> Billing
                   </h1>
 
                   <p className="db-hero-sub">
-                    Track your subscription status, renew when needed, and review payment history for receipts and audit.
+                    Manage student fee clearances, track your GradiosEdu wallet balance, and review fee payment history.
                   </p>
 
                   <div className="db-hero-btns">
-                    <button className="db-btn-gold" onClick={() => navigate("/checkout")} disabled={loading}>
-                      <i className="bi bi-arrow-repeat" />
-                      Renew / Upgrade
+                    <button className="db-btn-gold" onClick={() => navigate("/wallet")} disabled={loading}>
+                      <i className="bi bi-wallet2" />
+                      Wallet & Credits
                     </button>
 
-                    <button className="db-btn-outline" onClick={() => navigate("/checkout")} disabled={loading}>
-                      <i className="bi bi-arrow-left" />
-                      Back
+                    <button className="db-btn-outline" onClick={() => navigate("/students")} disabled={loading}>
+                      <i className="bi bi-people" />
+                      Student List
                     </button>
 
                     <button className="db-btn-outline" onClick={refresh} disabled={loading}>
@@ -692,9 +759,9 @@ export default function BillingPage() {
 
                   <div className="db-hero-stat-row">
                     <div className="db-hero-stat-item">
-                      <span className="db-hero-stat-label">Plan</span>
-                      <span className="db-hero-stat-val" style={{ fontSize: 14, fontFamily: "DM Sans" }}>
-                        {planName}
+                      <span className="db-hero-stat-label">Model</span>
+                      <span className="db-hero-stat-val" style={{ fontSize: 13, fontFamily: "DM Sans" }}>
+                        Free Core (Pay-As-You-Go)
                       </span>
                     </div>
 
@@ -702,17 +769,17 @@ export default function BillingPage() {
 
                     <div className="db-hero-stat-item">
                       <span className="db-hero-stat-label">Status</span>
-                      <span className="db-pill" style={{ background: statusPill.bg, color: statusPill.fg }}>
-                        {statusPill.text}
+                      <span className="db-pill" style={{ background: "rgba(34,197,94,0.16)", color: "#22c55e" }}>
+                        ACTIVE (UNLIMITED)
                       </span>
                     </div>
 
                     <div className="db-hero-stat-sep" />
 
                     <div className="db-hero-stat-item">
-                      <span className="db-hero-stat-label">Ends</span>
+                      <span className="db-hero-stat-label">Fee / Student</span>
                       <span className="db-hero-stat-val" style={{ fontSize: 14, fontFamily: "DM Sans" }}>
-                        {endsAt}
+                        {fmtNaira(Number(schoolBilling?.price_per_student || 500))}
                       </span>
                     </div>
 
@@ -727,29 +794,26 @@ export default function BillingPage() {
               </div>
             </div>
 
-            {/* ===== SUBSCRIPTION SUMMARY ===== */}
+            {/* ===== CLEARANCE & WALLET SUMMARY ===== */}
             <div className="db-panel">
               <div className="db-panel-head">
                 <div>
-                  <p className="db-panel-title">Subscription summary</p>
-                  <p className="db-panel-sub">Core subscription details and renewal settings.</p>
+                  <p className="db-panel-title">Clearance & Wallet Summary</p>
+                  <p className="db-panel-sub">100% Free Core school management. Per-student termly fee is cleared automatically online or via school wallet.</p>
                 </div>
 
-                <span className="db-pill" style={{ background: statusPill.bg, color: statusPill.fg }}>
-                  {subStatus}
+                <span className="db-pill" style={{ background: "rgba(34,197,94,0.16)", color: "#22c55e" }}>
+                  FREE CORE ACTIVE
                 </span>
               </div>
 
               <div style={{ padding: 16 }}>
                 <div className="row g-3">
                   {[
-                    { k: "Plan", v: planName, icon: "box-seam" },
-                    { k: "Price / Student", v: fmtNaira(Number(subscription?.plan?.price_per_student ?? subscription?.plan?.price ?? 0)), icon: "cash-coin" },
-                    { k: "Active Students", v: Number(subscription?.plan?.active_students ?? 0).toLocaleString(), icon: "people" },
-                    { k: "Current Amount", v: fmtNaira(Number(subscription?.plan?.current_amount ?? 0)), icon: "receipt" },
-                    { k: "Auto Renew", v: autoRenew, icon: "arrow-repeat" },
-                    { k: "Renewal Source", v: renewSource, icon: "wallet2" },
-                    { k: "End Date", v: endsAt, icon: "calendar-event" },
+                    { k: "Active Students", v: Number(clearanceSummary?.total_students || schoolBilling?.active_student_count || 0).toLocaleString(), icon: "people", color: "#1e293b" },
+                    { k: "Cleared (Active)", v: Number(clearanceSummary?.cleared_count || 0).toLocaleString(), icon: "check-circle-fill", color: "#16a34a" },
+                    { k: "Pending Clearance", v: Number(clearanceSummary?.pending_count || 0).toLocaleString(), icon: "exclamation-circle-fill", color: "#d97706" },
+                    { k: "Wallet Balance", v: fmtNaira(Number(clearanceSummary?.wallet_balance || 0)), icon: "wallet2", color: "#c9a84c" },
                   ].map((c) => (
                     <div className="col-12 col-md-6 col-lg-3" key={c.k}>
                       <div
@@ -765,9 +829,9 @@ export default function BillingPage() {
                           <div className="db-muted" style={{ fontSize: 12 }}>
                             {c.k}
                           </div>
-                          <i className={`bi bi-${c.icon}`} style={{ color: "#c8bfb5" }} />
+                          <i className={`bi bi-${c.icon}`} style={{ color: c.color }} />
                         </div>
-                        <div className="db-strong" style={{ fontFamily: "Lora, serif", fontSize: 18, marginTop: 6 }}>
+                        <div className="db-strong" style={{ fontFamily: "Lora, serif", fontSize: 18, marginTop: 6, color: c.color }}>
                           {c.v}
                         </div>
                       </div>
@@ -775,15 +839,100 @@ export default function BillingPage() {
                   ))}
                 </div>
 
-                <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <button className="db-refresh-btn" onClick={() => navigate("/checkout")} disabled={loading}>
-                    <i className="bi bi-credit-card" />
-                    Go to Checkout
+                {/* Bulk Offline Clearance Options */}
+                <div className="row g-3 mt-1">
+                  <div className="col-12 col-md-6">
+                    <div
+                      style={{
+                        background: "#fff",
+                        border: "1px solid rgba(0,0,0,0.08)",
+                        borderRadius: 14,
+                        padding: 16,
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                          <i className="bi bi-calendar2-check text-primary" style={{ fontSize: 18 }} />
+                          <div className="db-strong" style={{ fontSize: 15 }}>Clear Whole School (Current Term)</div>
+                        </div>
+                        <p className="db-muted" style={{ fontSize: 12.5, margin: "6px 0 12px 0" }}>
+                          Clear all <strong>{clearanceSummary?.pending_count || 0} unpaid student(s)</strong> for the active term at once from your GradiosEdu wallet.
+                        </p>
+                        <div className="db-strong" style={{ fontSize: 14, color: "#2563eb", marginBottom: 12 }}>
+                          Total: {fmtNaira(Number(clearanceSummary?.term_clearance_fee || 0))} ({fmtNaira(Number(clearanceSummary?.fee_per_student || 500))}/student)
+                        </div>
+                      </div>
+
+                      <button
+                        className="db-btn-gold"
+                        style={{ width: "100%", justifyContent: "center", padding: "10px 14px", fontSize: 13 }}
+                        onClick={handleClearTerm}
+                        disabled={clearingTerm || (clearanceSummary?.pending_count || 0) === 0}
+                      >
+                        {clearingTerm ? (
+                          <><span className="spinner-border spinner-border-sm me-2" /> Clearing Students…</>
+                        ) : (
+                          <><i className="bi bi-check2-all me-1" /> Clear Whole School ({fmtNaira(Number(clearanceSummary?.term_clearance_fee || 0))})</>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="col-12 col-md-6">
+                    <div
+                      style={{
+                        background: "#fff",
+                        border: "1px solid rgba(0,0,0,0.08)",
+                        borderRadius: 14,
+                        padding: 16,
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                          <i className="bi bi-stars text-success" style={{ fontSize: 18 }} />
+                          <div className="db-strong" style={{ fontSize: 15 }}>Clear Full Session (All Terms Upfront)</div>
+                        </div>
+                        <p className="db-muted" style={{ fontSize: 12.5, margin: "6px 0 12px 0" }}>
+                          Clear all <strong>{clearanceSummary?.total_students || 0} active students</strong> across all {clearanceSummary?.terms_count || 3} terms for the entire academic session.
+                        </p>
+                        <div className="db-strong" style={{ fontSize: 14, color: "#16a34a", marginBottom: 12 }}>
+                          Total Upfront: {fmtNaira(Number(clearanceSummary?.session_clearance_fee || 0))}
+                        </div>
+                      </div>
+
+                      <button
+                        className="db-btn-outline"
+                        style={{ width: "100%", justifyContent: "center", padding: "10px 14px", fontSize: 13, borderColor: "#16a34a", color: "#16a34a" }}
+                        onClick={handleClearSession}
+                        disabled={clearingSession || (clearanceSummary?.total_students || 0) === 0}
+                      >
+                        {clearingSession ? (
+                          <><span className="spinner-border spinner-border-sm me-2" /> Clearing Session…</>
+                        ) : (
+                          <><i className="bi bi-award-fill me-1" /> Clear Entire Academic Session</>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button className="db-refresh-btn" onClick={() => navigate("/wallet")} disabled={loading}>
+                    <i className="bi bi-wallet2" />
+                    Top Up School Wallet
                   </button>
 
-                  <button className="db-refresh-btn" onClick={() => navigate("/subscriptions/checkout")} disabled={loading}>
-                    <i className="bi bi-arrow-repeat" />
-                    Renew
+                  <button className="db-refresh-btn" onClick={() => navigate("/students")} disabled={loading}>
+                    <i className="bi bi-people" />
+                    Manage Students List
                   </button>
                 </div>
               </div>
@@ -793,14 +942,14 @@ export default function BillingPage() {
             <div className="db-panel">
               <div className="db-panel-head">
                 <div>
-                  <p className="db-panel-title">GradeQuest per-student invoice</p>
+                  <p className="db-panel-title">GradiosEdu per-student invoice</p>
                   <p className="db-panel-sub">
                     Current term invoice is calculated from active students and package price per student.
                   </p>
                 </div>
 
                 <span className="db-pill" style={{ background: "rgba(15,23,42,0.08)", color: "#0f172a" }}>
-                  Enforcement managed by GradeQuest
+                  Enforcement managed by GradiosEdu
                 </span>
               </div>
 
@@ -836,7 +985,7 @@ export default function BillingPage() {
                     </div>
                     <div>
                       <div className="db-muted" style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 0, fontWeight: 800 }}>
-                        GradeQuest revenue model
+                        GradiosEdu revenue model
                       </div>
                       <div className="db-strong" style={{ fontSize: 20, marginTop: 2 }}>
                         {revenueModelLabel(schoolBilling?.revenue_model)}
@@ -1013,9 +1162,9 @@ export default function BillingPage() {
                           </div>
 
                           <div style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                            <button className="db-refresh-btn" onClick={() => navigate("/checkout")} disabled={loading}>
-                              <i className="bi bi-arrow-repeat" />
-                              Renew / Upgrade
+                            <button className="db-refresh-btn" onClick={() => navigate("/wallet")} disabled={loading}>
+                              <i className="bi bi-wallet2" />
+                              Manage Wallet
                             </button>
                           </div>
                         </>
@@ -1264,7 +1413,7 @@ export default function BillingPage() {
                         <div>
                           <div className="db-strong">Students at risk</div>
                           <div className="db-muted" style={{ fontSize: 12 }}>
-                            Teachers will be protected from entering resources when GradeQuest revenue is not covered.
+                            Teachers will be protected from entering resources when GradiosEdu revenue is not covered.
                           </div>
                         </div>
                         <span className="db-pill" style={{ background: "rgba(245,158,11,0.14)", color: "#b45309" }}>

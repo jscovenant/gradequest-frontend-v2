@@ -1,5 +1,6 @@
 // src/pages/Settings/SettingsPage.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import TopNav from "../../../components/LayoutComponents/TopNav";
 import Sidebar from "../../../components/LayoutComponents/Sidebar";
 import Footer from "../../../components/LayoutComponents/Footer";
@@ -40,41 +41,8 @@ type SettingsResponse = {
 
 type SaveErrors = Record<string, string[] | string>;
 
-type FeeReminderSettings = {
-  enabled: boolean;
-  intervalDays: number; // every X days
-  maxCount: number; // 0 = unlimited (if backend supports) OR max reminders
-  sendEmail: boolean;
-  sendWhatsApp: boolean;
-  quietHoursStart: string | null; // "22:00"
-  quietHoursEnd: string | null; // "06:00"
-};
 
-type FeeReminderResponse = {
-  fee_reminders_enabled: boolean;
-  interval_days: number;
-  max_count: number;
-  send_email: boolean;
-  send_whatsapp: boolean;
-  quiet_hours_start: string | null;
-  quiet_hours_end: string | null;
-};
 
-type FeeAccessPolicy = {
-  enabled: boolean;
-  result_access_enabled: boolean;
-  result_min_payment_percent: number;
-  result_scope: "selected_period" | "all_outstanding";
-  cbt_access_enabled: boolean;
-  cbt_min_payment_percent: number;
-  cbt_scope: "selected_period" | "all_outstanding";
-  message: string;
-  cbt_message: string;
-};
-
-type FeeAccessPolicyResponse = {
-  policy: FeeAccessPolicy;
-};
 
 const clampPrefix = (v: string) => v.replace(/\s+/g, "").slice(0, 5).toUpperCase();
 
@@ -94,9 +62,9 @@ function clampInt(n: any, min: number, max: number, fallback: number) {
   return Math.min(max, Math.max(min, Math.trunc(x)));
 }
 
-function SectionHeading({ icon, title, subtitle }: { icon: string; title: string; subtitle?: string }) {
+function SectionHeading({ id, icon, title, subtitle }: { id?: string; icon: string; title: string; subtitle?: string }) {
   return (
-    <div className="db-section-head">
+    <div id={id} className="db-section-head">
       <div className="db-section-left">
         <div className="db-section-ico">
           <i className={`bi bi-${icon}`} />
@@ -117,8 +85,6 @@ export default function SettingsPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [savingFee, setSavingFee] = useState(false);
-  const [savingFeeAccess, setSavingFeeAccess] = useState(false);
 
   const [app, setApp] = useState<AppSettings>({
     autoGenerateAdmissionNo: false,
@@ -168,28 +134,6 @@ const [domainInstructions, setDomainInstructions] = useState<DomainInstructions 
     principal_signature_url: null,
   });
 
-  const [feeReminder, setFeeReminder] = useState<FeeReminderSettings>({
-    enabled: true,
-    intervalDays: 5,
-    maxCount: 6,
-    sendEmail: true,
-    sendWhatsApp: false,
-    quietHoursStart: null,
-    quietHoursEnd: null,
-  });
-
-  const [feeAccess, setFeeAccess] = useState<FeeAccessPolicy>({
-    enabled: false,
-    result_access_enabled: true,
-    result_min_payment_percent: 100,
-    result_scope: "selected_period",
-    cbt_access_enabled: false,
-    cbt_min_payment_percent: 100,
-    cbt_scope: "selected_period",
-    message: "Result access is currently unavailable because the required school fee payment has not been completed.",
-    cbt_message: "Access denied. Complete the required school fee payment before starting this exam.",
-  });
-
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
 
@@ -237,38 +181,6 @@ const [domainInstructions, setDomainInstructions] = useState<DomainInstructions 
     });
   };
 
-  const mapFeeReminderFromResponse = (data: FeeReminderResponse) => {
-    setFeeReminder({
-      enabled: !!data.fee_reminders_enabled,
-      intervalDays: clampInt(data.interval_days, 1, 60, 5),
-      maxCount: clampInt(data.max_count, 0, 50, 6),
-      sendEmail: !!data.send_email,
-      sendWhatsApp: !!data.send_whatsapp,
-      quietHoursStart: data.quiet_hours_start ?? null,
-      quietHoursEnd: data.quiet_hours_end ?? null,
-    });
-  };
-
-  const mapFeeAccessFromResponse = (data?: FeeAccessPolicyResponse) => {
-    const p = data?.policy;
-    if (!p) return;
-    setFeeAccess({
-      enabled: !!p.enabled,
-      result_access_enabled: p.result_access_enabled !== false,
-      result_min_payment_percent: clampInt(p.result_min_payment_percent, 0, 100, 100),
-      result_scope: p.result_scope === "all_outstanding" ? "all_outstanding" : "selected_period",
-      cbt_access_enabled: !!p.cbt_access_enabled,
-      cbt_min_payment_percent: clampInt(p.cbt_min_payment_percent, 0, 100, 100),
-      cbt_scope: p.cbt_scope === "all_outstanding" ? "all_outstanding" : "selected_period",
-      message:
-        p.message ||
-        "Result access is currently unavailable because the required school fee payment has not been completed.",
-      cbt_message:
-        p.cbt_message ||
-        "Access denied. Complete the required school fee payment before starting this exam.",
-    });
-  };
-
   const openLogoPicker = () => logoInputRef.current?.click();
   const openSigPicker = () => sigInputRef.current?.click();
 
@@ -278,28 +190,31 @@ const [domainInstructions, setDomainInstructions] = useState<DomainInstructions 
   useEffect(() => {
     setLoading(true);
 
-   // In your existing useEffect, add a third Promise
-Promise.all([
-  authApi.get<SettingsResponse>("/get-settings"),
-  authApi.get<FeeReminderResponse>("/settings/fee-reminders"),
-  authApi.get<FeeAccessPolicyResponse>("/settings/fee-access-policy"),
-  authApi.get<{ data: DomainRecord | null; instructions: DomainInstructions | null }>("/settings/domain").catch(() => ({ data: { data: null, instructions: null } })),
-])
-  .then(([settingsRes, feeRes, feeAccessRes, domainRes]) => {
-    mapSettingsFromResponse(settingsRes.data);
-    mapFeeReminderFromResponse(feeRes.data);
-    mapFeeAccessFromResponse(feeAccessRes.data);
+    Promise.all([
+      authApi.get<SettingsResponse>("/get-settings"),
+      authApi.get<{ data: DomainRecord | null; instructions: DomainInstructions | null }>("/settings/domain").catch(() => ({ data: { data: null, instructions: null } })),
+    ])
+      .then(([settingsRes, domainRes]) => {
+        mapSettingsFromResponse(settingsRes.data);
 
-    const dr = domainRes.data?.data ?? null;
-    setDomainRecord(dr);
-    setDomainInput(dr?.domain ?? "");
-    setDomainInstructions(domainRes.data?.instructions ?? null);
-  })
+        const dr = domainRes.data?.data ?? null;
+        setDomainRecord(dr);
+        setDomainInput(dr?.domain ?? "");
+        setDomainInstructions(domainRes.data?.instructions ?? null);
+      })
       .catch((err: any) => {
         console.error(err);
         showError?.("Failed to load settings. Please refresh.");
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        if (window.location.hash) {
+          setTimeout(() => {
+            const el = document.querySelector(window.location.hash);
+            if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+          }, 200);
+        }
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -320,70 +235,7 @@ Promise.all([
     }
   };
 
-  const saveFeeReminderSettings = async () => {
-    setSavingFee(true);
-    try {
-      const payload = {
-        fee_reminders_enabled: feeReminder.enabled,
-        interval_days: clampInt(feeReminder.intervalDays, 1, 60, 5),
-        max_count: clampInt(feeReminder.maxCount, 0, 50, 6),
-        send_email: !!feeReminder.sendEmail,
-        send_whatsapp: !!feeReminder.sendWhatsApp,
-        quiet_hours_start: feeReminder.quietHoursStart || null,
-        quiet_hours_end: feeReminder.quietHoursEnd || null,
-      };
 
-      const res = await authApi.put("/settings/fee-reminders", payload);
-      showSuccess?.(res?.data?.message || "Fee reminder settings updated.");
-    } catch (err: any) {
-      console.error(err);
-      const { msg, errors } = parseBackendError(err);
-      if (errors && typeof errors === "object") {
-        const firstKey = Object.keys(errors)[0];
-        const firstVal = (errors as any)[firstKey];
-        const firstMsg = Array.isArray(firstVal) ? firstVal[0] : String(firstVal);
-        showError?.(firstMsg || msg);
-      } else {
-        showError?.(msg);
-      }
-    } finally {
-      setSavingFee(false);
-    }
-  };
-
-  const saveFeeAccessPolicy = async () => {
-    setSavingFeeAccess(true);
-    try {
-      const payload = {
-        enabled: !!feeAccess.enabled,
-        result_access_enabled: !!feeAccess.result_access_enabled,
-        result_min_payment_percent: clampInt(feeAccess.result_min_payment_percent, 0, 100, 100),
-        result_scope: feeAccess.result_scope,
-        cbt_access_enabled: !!feeAccess.cbt_access_enabled,
-        cbt_min_payment_percent: clampInt(feeAccess.cbt_min_payment_percent, 0, 100, 100),
-        cbt_scope: feeAccess.cbt_scope,
-        message: feeAccess.message,
-        cbt_message: feeAccess.cbt_message,
-      };
-
-      const res = await authApi.put("/settings/fee-access-policy", payload);
-      mapFeeAccessFromResponse(res.data);
-      showSuccess?.(res?.data?.message || "Fee access policy saved.");
-    } catch (err: any) {
-      console.error(err);
-      const { msg, errors } = parseBackendError(err);
-      if (errors && typeof errors === "object") {
-        const firstKey = Object.keys(errors)[0];
-        const firstVal = (errors as any)[firstKey];
-        const firstMsg = Array.isArray(firstVal) ? firstVal[0] : String(firstVal);
-        showError?.(firstMsg || msg);
-      } else {
-        showError?.(msg);
-      }
-    } finally {
-      setSavingFeeAccess(false);
-    }
-  };
 
 
   const saveSettings = async (e: React.FormEvent) => {
@@ -456,10 +308,7 @@ Promise.all([
       setLogoFile(null);
       setSignatureFile(null);
 
-      // Also persist fee reminder settings (separate endpoint)
-      // (If you prefer "Save All", keep it here. Otherwise user can use the "Save fee reminder setup" button.)
-      await saveFeeReminderSettings();
-      await saveFeeAccessPolicy();
+
     } catch (err: any) {
       console.error(err);
       const { msg, errors } = parseBackendError(err);
@@ -553,14 +402,10 @@ const removeDomain = async () => {
   const refreshSettings = async () => {
     setLoading(true);
     try {
-      const [settingsRes, feeRes, feeAccessRes] = await Promise.all([
+      const [settingsRes] = await Promise.all([
         authApi.get<SettingsResponse>("/get-settings"),
-        authApi.get<FeeReminderResponse>("/settings/fee-reminders"),
-        authApi.get<FeeAccessPolicyResponse>("/settings/fee-access-policy"),
       ]);
       mapSettingsFromResponse(settingsRes.data);
-      mapFeeReminderFromResponse(feeRes.data);
-      mapFeeAccessFromResponse(feeAccessRes.data);
 
       setLogoFile(null);
       setSignatureFile(null);
@@ -575,60 +420,60 @@ const removeDomain = async () => {
 
   const whatsappEnabled = app.whatsapp.enabled;
   const canSave = !loading && !saving;
-  const feeBusy = loading || saving || savingFee || savingFeeAccess;
+  const feeBusy = loading || saving;
 
   return (
     <>
       <style>{`
-        /* existing styles */
-        .db-main { background: var(--bs-body-bg, #f5f1eb); min-height: 100vh; font-family: "DM Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; padding: 28px 28px 0; }
-        .db-hero { background: #0f172a; border-radius: var(--bs-border-radius-lg, 16px); padding: 32px 36px; position: relative; overflow: hidden; margin: 10px 0 18px; border: 1px solid rgba(255,255,255,0.06); }
-        .db-hero::before { content: ""; position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(255, 255, 255, 0.045) 1px, transparent 1px); background-size: 24px 24px; pointer-events: none; }
-        .db-hero-glow { position: absolute; top: -60px; right: -60px; width: 320px; height: 320px; border-radius: 50%; background: radial-gradient(circle, rgba(201, 168, 76, 0.10) 0%, transparent 65%); pointer-events: none; }
-        .db-hero-glow2 { position: absolute; bottom: -40px; left: 30%; width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, rgba(99, 102, 241, 0.07) 0%, transparent 70%); pointer-events: none; }
+        /* Modern SaaS styles */
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        .db-main { background: #F8FAFC; min-height: 100vh; font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; padding: 24px 28px 0; }
+        .db-hero { background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%); border-radius: 18px; padding: 32px 36px; position: relative; overflow: hidden; margin: 10px 0 24px; box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15); }
+        .db-hero-glow { position: absolute; top: -60px; right: -60px; width: 320px; height: 320px; border-radius: 50%; background: radial-gradient(circle, rgba(217, 119, 6, 0.15) 0%, transparent 65%); pointer-events: none; }
+        .db-hero-glow2 { position: absolute; bottom: -40px; left: 30%; width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, rgba(37, 99, 235, 0.10) 0%, transparent 70%); pointer-events: none; }
         .db-hero-inner { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 32px; flex-wrap: wrap; }
         @media (min-width: 768px) { .db-hero-inner { flex-wrap: nowrap; } }
-        .db-session-badge { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: #e8c97a; background: rgba(201, 168, 76, 0.10); border: 1px solid rgba(201, 168, 76, 0.22); border-radius: 100px; padding: 4px 12px; margin-bottom: 14px; }
-        .db-session-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; animation: dbPulse 2s ease infinite; }
+        .db-session-badge { display: inline-flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #FBBF24; background: rgba(217, 119, 6, 0.20); border: 1px solid rgba(217, 119, 6, 0.35); border-radius: 100px; padding: 4px 12px; margin-bottom: 12px; }
+        .db-session-dot { width: 6px; height: 6px; border-radius: 50%; background: #10B981; animation: dbPulse 2s ease infinite; }
         @keyframes dbPulse { 0%,100% { opacity: 1; transform: scale(1);} 50% { opacity: 0.4; transform: scale(1.5);} }
-        .db-greeting { font-family: "Lora", Georgia, serif; font-size: clamp(22px, 2.5vw, 32px); font-weight: 700; color: #fff; line-height: 1.1; margin-bottom: 8px; }
-        .db-greeting em { font-style: italic; color: #e8c97a; }
-        .db-hero-sub { font-size: 13.5px; font-weight: 300; color: #64748b; line-height: 1.65; max-width: 620px; margin-bottom: 18px; }
+        .db-greeting { font-size: 26px; font-weight: 800; color: #fff; line-height: 1.1; margin-bottom: 8px; }
+        .db-greeting em { font-style: normal; color: #FBBF24; }
+        .db-hero-sub { font-size: 13.5px; color: #CBD5E1; line-height: 1.6; max-width: 620px; margin-bottom: 20px; }
         .db-hero-btns { display: flex; gap: 10px; flex-wrap: wrap; }
-        .db-btn-gold { display: inline-flex; align-items: center; gap: 7px; padding: 10px 20px; font-family: "DM Sans", sans-serif; font-size: 13px; font-weight: 500; color: #0f172a; background: #c9a84c; border: none; border-radius: var(--bs-border-radius, 8px); cursor: pointer; transition: background 0.2s, transform 0.2s; white-space: nowrap; }
-        .db-btn-gold:hover { background: #e8c97a; transform: translateY(-1px); }
+        .db-btn-gold { display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px; font-size: 13px; font-weight: 700; color: #FFFFFF; background: #D97706; border: none; border-radius: 10px; cursor: pointer; transition: all 0.2s ease; white-space: nowrap; }
+        .db-btn-gold:hover { background: #B45309; transform: translateY(-1px); color: #FFFFFF; }
         .db-btn-gold:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
-        .db-btn-outline { display: inline-flex; align-items: center; gap: 7px; padding: 10px 20px; font-family: "DM Sans", sans-serif; font-size: 13px; font-weight: 400; color: rgba(255, 255, 255, 0.7); background: transparent; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: var(--bs-border-radius, 8px); cursor: pointer; transition: background 0.2s, border-color 0.2s, color 0.2s; white-space: nowrap; }
-        .db-btn-outline:hover { background: rgba(255, 255, 255, 0.06); color: #fff; border-color: rgba(255, 255, 255, 0.28); }
+        .db-btn-outline { display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px; font-size: 13px; font-weight: 600; color: #FFFFFF; background: rgba(255, 255, 255, 0.10); border: 1px solid rgba(255, 255, 255, 0.20); border-radius: 10px; cursor: pointer; transition: all 0.2s ease; white-space: nowrap; }
+        .db-btn-outline:hover { background: rgba(255, 255, 255, 0.18); color: #fff; }
         .db-btn-outline:disabled { opacity: 0.55; cursor: not-allowed; }
-        .db-hero-stat-card { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.09); backdrop-filter: blur(8px); border-radius: var(--bs-border-radius, 12px); padding: 20px 24px; min-width: 280px; margin-left: auto; align-self: flex-end; }
+        .db-hero-stat-card { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); backdrop-filter: blur(8px); border-radius: 14px; padding: 20px 24px; min-width: 280px; margin-left: auto; align-self: flex-end; }
         .db-hero-stat-row { display: flex; flex-direction: column; gap: 10px; }
         .db-hero-stat-item { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-        .db-hero-stat-label { font-size: 12px; font-weight: 300; color: #64748b; }
-        .db-hero-stat-val { font-family: "Lora", serif; font-size: 18px; font-weight: 700; color: #fff; }
-        .db-hero-stat-sep { height: 1px; background: rgba(255, 255, 255, 0.06); }
+        .db-hero-stat-label { font-size: 12px; font-weight: 400; color: #CBD5E1; }
+        .db-hero-stat-val { font-size: 18px; font-weight: 800; color: #FBBF24; }
+        .db-hero-stat-sep { height: 1px; background: rgba(255, 255, 255, 0.08); }
 
-        .db-panel { background: var(--bs-body-bg, #fff); border: 1px solid var(--bs-border-color, #ede8e0); border-radius: var(--bs-border-radius-lg, 14px); overflow: hidden; box-shadow: 0 2px 10px rgba(15,23,42,0.04); margin-bottom: 18px; }
-        .db-panel-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 18px; border-bottom: 1px solid rgba(0, 0, 0, 0.06); gap: 12px; flex-wrap: wrap; }
-        .db-panel-title { font-family: "Lora", serif; font-size: 16px; font-weight: 700; color: #1a1a2e; margin: 0; }
-        .db-panel-sub { font-size: 11.5px; font-weight: 300; color: #9a8a7a; margin: 0; }
-        .db-refresh-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; font-size: 12px; font-weight: 400; color: #7a6a5a; background: #f5f1eb; border: 1px solid #e5ddd3; border-radius: var(--bs-border-radius, 7px); cursor: pointer; transition: background 0.2s; white-space: nowrap; }
-        .db-refresh-btn:hover { background: #ede8e0; }
+        .db-panel { background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 16px rgba(15,39,68,0.03); margin-bottom: 24px; }
+        .db-panel-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid #F1F5F9; gap: 12px; flex-wrap: wrap; }
+        .db-panel-title { font-size: 16px; font-weight: 700; color: #0F2744; margin: 0; }
+        .db-panel-sub { font-size: 11.5px; font-weight: 400; color: #64748B; margin: 0; }
+        .db-refresh-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; font-size: 12px; font-weight: 700; color: #0F2744; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; white-space: nowrap; }
+        .db-refresh-btn:hover { background: #E2E8F0; }
         .db-refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .db-pill { display: inline-flex; align-items: center; font-size: 12px; font-weight: 800; padding: 6px 10px; border-radius: 999px; white-space: nowrap; border: 1px solid rgba(0,0,0,0.06); }
-        .db-muted { color: #9a8a7a; }
-        .db-strong { font-weight: 900; color: #1a1a2e; }
-        .db-card { border: 1px solid rgba(0,0,0,0.06); border-radius: 14px; background: #fff; box-shadow: 0 2px 10px rgba(15,23,42,0.04); }
-        .db-kv { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid rgba(0,0,0,0.06); border-radius: 12px; background: #faf8f5; }
-        .db-kv label { font-size: 12px; color: #9a8a7a; }
-        .db-kv b { color: #1a1a2e; }
+        .db-muted { color: #64748B; }
+        .db-strong { font-weight: 800; color: #0F2744; }
+        .db-card { border: 1px solid #E2E8F0; border-radius: 16px; background: #fff; box-shadow: 0 4px 16px rgba(15,39,68,0.03); }
+        .db-kv { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 10px 14px; border: 1px solid #E2E8F0; border-radius: 12px; background: #F8FAFC; }
+        .db-kv label { font-size: 12px; color: #64748B; font-weight: 600; }
+        .db-kv b { color: #0F2744; }
 
         /* category headings */
-        .db-section-head { margin: 10px 0 12px; display:flex; align-items:center; justify-content:space-between; }
+        .db-section-head { margin: 16px 0 14px; display:flex; align-items:center; justify-content:space-between; }
         .db-section-left { display:flex; align-items:center; gap:12px; }
-        .db-section-ico { width:40px; height:40px; border-radius:14px; display:flex; align-items:center; justify-content:center; background: rgba(15,23,42,0.06); border: 1px solid rgba(0,0,0,0.06); color:#0f172a; }
-        .db-section-title { font-family:"Lora", serif; font-weight:800; color:#1a1a2e; font-size: 15px; line-height:1.1; }
-        .db-section-sub { font-size: 12px; color:#9a8a7a; margin-top:4px; }
+        .db-section-ico { width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; background: rgba(15,39,68,0.08); border: 1px solid #E2E8F0; color:#0F2744; font-size: 18px; }
+        .db-section-title { font-weight:800; color:#0F2744; font-size: 16px; line-height:1.2; }
+        .db-section-sub { font-size: 12px; color:#64748B; margin-top:3px; }
 
         @media (max-width: 991.98px) { .db-main { padding: 18px 14px 0; } }
       `}</style>
@@ -656,7 +501,7 @@ const removeDomain = async () => {
                   </div>
 
                   <h1 className="db-greeting">
-                    Configure <em>GradeQuest</em>
+                    Configure <em>GradiosEdu</em>
                   </h1>
 
                   <p className="db-hero-sub">
@@ -664,7 +509,7 @@ const removeDomain = async () => {
                   </p>
 
                   <div className="db-hero-btns">
-                    <button className="db-btn-gold" type="button" onClick={refreshSettings} disabled={loading || saving || savingFee}>
+                    <button className="db-btn-gold" type="button" onClick={refreshSettings} disabled={loading || saving}>
                       <i className="bi bi-arrow-clockwise" />
                       Refresh
                     </button>
@@ -673,7 +518,7 @@ const removeDomain = async () => {
                       className="db-btn-outline"
                       type="button"
                       onClick={() => updateAutoAdmission(!app.autoGenerateAdmissionNo)}
-                      disabled={loading || saving || savingFee}
+                      disabled={loading || saving}
                     >
                       <i className="bi bi-hash" />
                       Auto Admission: {app.autoGenerateAdmissionNo ? "ON" : "OFF"}
@@ -697,7 +542,7 @@ const removeDomain = async () => {
                           },
                         }))
                       }
-                      disabled={loading || saving || savingFee}
+                      disabled={loading || saving}
                     >
                       <i className="bi bi-whatsapp" />
                       WhatsApp: {whatsappEnabled ? "ON" : "OFF"}
@@ -757,15 +602,15 @@ const removeDomain = async () => {
                     <div className="db-hero-stat-sep" />
 
                     <div className="db-hero-stat-item">
-                      <span className="db-hero-stat-label">Fee Reminders</span>
+                      <span className="db-hero-stat-label">Fee Policy</span>
                       <span
                         className="db-pill"
                         style={{
-                          background: feeReminder.enabled ? "rgba(34,197,94,0.14)" : "rgba(245,158,11,0.14)",
-                          color: feeReminder.enabled ? "#22c55e" : "#fbbf24",
+                          background: "rgba(34,197,94,0.14)",
+                          color: "#22c55e",
                         }}
                       >
-                        {feeReminder.enabled ? `ON • every ${feeReminder.intervalDays}d` : "OFF"}
+                        Active
                       </span>
                     </div>
                   </div>
@@ -802,9 +647,9 @@ const removeDomain = async () => {
                             className="form-control"
                             value={school.schoolName}
                             onChange={(e) => setSchool((p) => ({ ...p, schoolName: e.target.value }))}
-                            placeholder="e.g. GradeQuest Academy"
+                            placeholder="e.g. GradiosEdu Academy"
                             required
-                            disabled={loading || saving || savingFee}
+                            disabled={loading || saving}
                           />
                         </div>
 
@@ -816,7 +661,7 @@ const removeDomain = async () => {
                             onChange={(e) => setSchool((p) => ({ ...p, prefix: clampPrefix(e.target.value) }))}
                             placeholder="e.g. GQA"
                             maxLength={5}
-                            disabled={loading || saving || savingFee}
+                            disabled={loading || saving}
                           />
                           <div className="db-muted" style={{ fontSize: 12, marginTop: 6 }}>
                             Max 5 chars
@@ -831,7 +676,7 @@ const removeDomain = async () => {
                             onChange={(e) => setSchool((p) => ({ ...p, address: e.target.value }))}
                             placeholder="School address"
                             required
-                            disabled={loading || saving || savingFee}
+                            disabled={loading || saving}
                           />
                         </div>
 
@@ -843,7 +688,7 @@ const removeDomain = async () => {
                             onChange={(e) => setSchool((p) => ({ ...p, email: e.target.value }))}
                             placeholder="school@email.com"
                             type="email"
-                            disabled={loading || saving || savingFee}
+                            disabled={loading || saving}
                           />
                         </div>
 
@@ -855,7 +700,7 @@ const removeDomain = async () => {
                             onChange={(e) => setSchool((p) => ({ ...p, phone: e.target.value }))}
                             placeholder="e.g. 080..."
                             required
-                            disabled={loading || saving || savingFee}
+                            disabled={loading || saving}
                           />
                         </div>
 
@@ -1019,7 +864,7 @@ const removeDomain = async () => {
                     >
                       <i className="bi bi-shield-check" />
                       <span>
-                        <strong>{domainRecord.domain}</strong> is active. Users can now open the GradeQuest portal through this domain.
+                        <strong>{domainRecord.domain}</strong> is active. Users can now open the GradiosEdu portal through this domain.
                       </span>
                     </div>
                   )}
@@ -1041,11 +886,11 @@ const removeDomain = async () => {
                       </div>
 
                       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                        <button className="db-refresh-btn" type="button" onClick={openLogoPicker} disabled={loading || saving || savingFee}>
+                        <button className="db-refresh-btn" type="button" onClick={openLogoPicker} disabled={loading || saving}>
                           <i className="bi bi-upload" />
                           Logo
                         </button>
-                        <button className="db-refresh-btn" type="button" onClick={openSigPicker} disabled={loading || saving || savingFee}>
+                        <button className="db-refresh-btn" type="button" onClick={openSigPicker} disabled={loading || saving}>
                           <i className="bi bi-pen" />
                           Signature
                         </button>
@@ -1071,7 +916,7 @@ const removeDomain = async () => {
                                 type="button"
                                 className="db-refresh-btn"
                                 onClick={clearLogo}
-                                disabled={!logoFile || loading || saving || savingFee}
+                                disabled={!logoFile || loading || saving}
                                 title="Clear selected logo"
                               >
                                 <i className="bi bi-x-circle" />
@@ -1112,7 +957,7 @@ const removeDomain = async () => {
                                 className="db-refresh-btn"
                                 style={{ flex: 1, justifyContent: "center", padding: "10px 12px", borderRadius: 12 }}
                                 onClick={openLogoPicker}
-                                disabled={loading || saving || savingFee}
+                                disabled={loading || saving}
                               >
                                 <i className="bi bi-upload" />
                                 Choose file
@@ -1149,7 +994,7 @@ const removeDomain = async () => {
                                 type="button"
                                 className="db-refresh-btn"
                                 onClick={clearSignature}
-                                disabled={!signatureFile || loading || saving || savingFee}
+                                disabled={!signatureFile || loading || saving}
                                 title="Clear selected signature"
                               >
                                 <i className="bi bi-x-circle" />
@@ -1190,7 +1035,7 @@ const removeDomain = async () => {
                                 className="db-refresh-btn"
                                 style={{ flex: 1, justifyContent: "center", padding: "10px 12px", borderRadius: 12 }}
                                 onClick={openSigPicker}
-                                disabled={loading || saving || savingFee}
+                                disabled={loading || saving}
                               >
                                 <i className="bi bi-upload" />
                                 Choose file
@@ -1250,7 +1095,7 @@ const removeDomain = async () => {
                             role="switch"
                             checked={app.autoGenerateAdmissionNo}
                             onChange={(e) => updateAutoAdmission(e.target.checked)}
-                            disabled={loading || saving || savingFee}
+                            disabled={loading || saving}
                           />
                         </div>
                       </div>
@@ -1301,7 +1146,7 @@ const removeDomain = async () => {
                                 },
                               }))
                             }
-                            disabled={loading || saving || savingFee}
+                            disabled={loading || saving}
                           />
                         </div>
                       </div>
@@ -1356,7 +1201,7 @@ const removeDomain = async () => {
                                   type="checkbox"
                                   role="switch"
                                   checked={(app.whatsapp as any)[item.key]}
-                                  disabled={!whatsappEnabled || loading || saving || savingFee}
+                                  disabled={!whatsappEnabled || loading || saving}
                                   onChange={(e) =>
                                     setApp((p) => ({
                                       ...p,
@@ -1406,440 +1251,30 @@ const removeDomain = async () => {
                     </div>
                   </div>
 
-                  <SectionHeading icon="lock" title="Fee Access Control" subtitle="Control result access using school-fee payment records." />
+                  <SectionHeading id="fee-access" icon="lock" title="Fee & Installment Policy" subtitle="Result access controls, CBT exam gates, and installment payment rules." />
 
-                  <div className="db-panel">
-                    <div className="db-panel-head">
+                  <div className="db-panel" style={{ padding: "20px 24px", marginBottom: 24 }}>
+                    <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
                       <div>
-                        <p className="db-panel-title">Student and parent access</p>
-                        <p className="db-panel-sub">Block result viewing when payment is below your school requirement.</p>
+                        <h4 className="fw-bold text-dark mb-1" style={{ fontSize: 15.5 }}>
+                          <i className="bi bi-pie-chart-fill text-warning me-2" />
+                          Fee Policy & Installment Controls (Dedicated Page)
+                        </h4>
+                        <p className="db-muted mb-0" style={{ fontSize: 13 }}>
+                          Configure 70/30 installment payment splits, debt prevention schedules, result locks, and CBT exam gatekeepers on the dedicated Fee Policy page.
+                        </p>
                       </div>
-
-                      <span className="db-pill" style={{ background: feeAccess.enabled ? "rgba(34,197,94,0.1)" : "rgba(0,0,0,0.04)", color: feeAccess.enabled ? "#15803d" : "#7a6a5a" }}>
-                        <i className={`bi bi-${feeAccess.enabled ? "unlock" : "lock"} me-1`} />
-                        {feeAccess.enabled ? "Active" : "Off"}
-                      </span>
-                    </div>
-
-                    <div style={{ padding: 16 }}>
-                      <div className="db-kv">
-                        <div>
-                          <label className="d-block">Enable fee-based access control</label>
-                          <b>{feeAccess.enabled ? "Enabled" : "Disabled"}</b>
-                        </div>
-
-                        <div className="form-check form-switch m-0">
-                          <input
-                            className="form-check-input"
-                            type="checkbox"
-                            role="switch"
-                            checked={feeAccess.enabled}
-                            onChange={(e) => setFeeAccess((p) => ({ ...p, enabled: e.target.checked }))}
-                            disabled={feeBusy}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="row g-3 mt-2">
-                        <div className="col-12">
-                          <div className="db-kv">
-                            <div>
-                              <label className="d-block">Control result viewing</label>
-                              <b>{feeAccess.result_access_enabled ? "Yes" : "No"}</b>
-                            </div>
-
-                            <div className="form-check form-switch m-0">
-                              <input
-                                className="form-check-input"
-                                type="checkbox"
-                                role="switch"
-                                checked={feeAccess.result_access_enabled}
-                                onChange={(e) => setFeeAccess((p) => ({ ...p, result_access_enabled: e.target.checked }))}
-                                disabled={feeBusy || !feeAccess.enabled}
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="col-12 col-md-6">
-                          <label className="form-label fw-semibold small mb-1">Minimum payment required</label>
-                          <div className="input-group">
-                            <input
-                              type="number"
-                              className="form-control"
-                              min={0}
-                              max={100}
-                              value={feeAccess.result_min_payment_percent}
-                              onChange={(e) =>
-                                setFeeAccess((p) => ({
-                                  ...p,
-                                  result_min_payment_percent: clampInt(e.target.value, 0, 100, 100),
-                                }))
-                              }
-                              disabled={feeBusy || !feeAccess.enabled || !feeAccess.result_access_enabled}
-                            />
-                            <span className="input-group-text">%</span>
-                          </div>
-                          <div className="db-muted" style={{ fontSize: 12, marginTop: 6 }}>
-                            Example: 70 allows result viewing after at least 70% payment.
-                          </div>
-                        </div>
-
-                        <div className="col-12 col-md-6">
-                          <label className="form-label fw-semibold small mb-1">Fees to check</label>
-                          <select
-                            className="form-select"
-                            value={feeAccess.result_scope}
-                            onChange={(e) =>
-                              setFeeAccess((p) => ({
-                                ...p,
-                                result_scope: e.target.value === "all_outstanding" ? "all_outstanding" : "selected_period",
-                              }))
-                            }
-                            disabled={feeBusy || !feeAccess.enabled || !feeAccess.result_access_enabled}
-                          >
-                            <option value="selected_period">Only this result term/session</option>
-                            <option value="all_outstanding">All outstanding fees</option>
-                          </select>
-                          <div className="db-muted" style={{ fontSize: 12, marginTop: 6 }}>
-                            Most schools should use the selected term/session option.
-                          </div>
-                        </div>
-
-                        <div className="col-12">
-                          <div className="db-kv">
-                            <div>
-                              <label className="d-block">Control CBT exam access</label>
-                              <b>{feeAccess.cbt_access_enabled ? "Full payment required" : "Students can start exams"}</b>
-                              <div className="db-muted" style={{ fontSize: 12, marginTop: 4 }}>
-                                When enabled, students must meet the fee requirement before starting CBT exams.
-                              </div>
-                            </div>
-
-                            <div className="form-check form-switch m-0">
-                              <input
-                                className="form-check-input"
-                                type="checkbox"
-                                role="switch"
-                                checked={feeAccess.cbt_access_enabled}
-                                onChange={(e) => setFeeAccess((p) => ({ ...p, cbt_access_enabled: e.target.checked }))}
-                                disabled={feeBusy || !feeAccess.enabled}
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="col-12 col-md-6">
-                          <label className="form-label fw-semibold small mb-1">CBT payment required</label>
-                          <div className="input-group">
-                            <input
-                              type="number"
-                              className="form-control"
-                              min={0}
-                              max={100}
-                              value={feeAccess.cbt_min_payment_percent}
-                              onChange={(e) =>
-                                setFeeAccess((p) => ({
-                                  ...p,
-                                  cbt_min_payment_percent: clampInt(e.target.value, 0, 100, 100),
-                                }))
-                              }
-                              disabled={feeBusy || !feeAccess.enabled || !feeAccess.cbt_access_enabled}
-                            />
-                            <span className="input-group-text">%</span>
-                          </div>
-                          <div className="db-muted" style={{ fontSize: 12, marginTop: 6 }}>
-                            Set to 100 when students must fully pay before writing CBT.
-                          </div>
-                        </div>
-
-                        <div className="col-12 col-md-6">
-                          <label className="form-label fw-semibold small mb-1">CBT fees to check</label>
-                          <select
-                            className="form-select"
-                            value={feeAccess.cbt_scope}
-                            onChange={(e) =>
-                              setFeeAccess((p) => ({
-                                ...p,
-                                cbt_scope: e.target.value === "all_outstanding" ? "all_outstanding" : "selected_period",
-                              }))
-                            }
-                            disabled={feeBusy || !feeAccess.enabled || !feeAccess.cbt_access_enabled}
-                          >
-                            <option value="selected_period">Only this exam term/session</option>
-                            <option value="all_outstanding">All outstanding fees</option>
-                          </select>
-                          <div className="db-muted" style={{ fontSize: 12, marginTop: 6 }}>
-                            Use all outstanding fees when old debts should also stop exam access.
-                          </div>
-                        </div>
-
-                        <div className="col-12">
-                          <label className="form-label fw-semibold small mb-1">Message shown to parents/students</label>
-                          <textarea
-                            className="form-control"
-                            rows={3}
-                            maxLength={255}
-                            value={feeAccess.message}
-                            onChange={(e) => setFeeAccess((p) => ({ ...p, message: e.target.value }))}
-                            disabled={feeBusy || !feeAccess.enabled}
-                          />
-                        </div>
-
-                        <div className="col-12">
-                          <label className="form-label fw-semibold small mb-1">CBT message shown to students</label>
-                          <textarea
-                            className="form-control"
-                            rows={3}
-                            maxLength={255}
-                            value={feeAccess.cbt_message}
-                            onChange={(e) => setFeeAccess((p) => ({ ...p, cbt_message: e.target.value }))}
-                            disabled={feeBusy || !feeAccess.enabled || !feeAccess.cbt_access_enabled}
-                          />
-                        </div>
-
-                        <div className="col-12">
-                          <button
-                            type="button"
-                            className="db-refresh-btn"
-                            style={{ width: "100%", justifyContent: "center", padding: "12px 14px", borderRadius: 12 }}
-                            onClick={saveFeeAccessPolicy}
-                            disabled={feeBusy}
-                          >
-                            {savingFeeAccess ? (
-                              <>
-                                <span className="spinner-border spinner-border-sm me-2" />
-                                Saving policy...
-                              </>
-                            ) : (
-                              <>
-                                <i className="bi bi-save2 me-1" />
-                                Save access policy
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </div>
+                      <Link
+                        to="/fees/policy"
+                        className="db-btn-gold"
+                        style={{ textDecoration: "none" }}
+                      >
+                        <i className="bi bi-box-arrow-up-right" /> Open Fee Policy Page
+                      </Link>
                     </div>
                   </div>
 
-                  <SectionHeading icon="bell" title="Fee Reminders Automation" subtitle="Schedule follow-ups and control channels per school." />
 
-                  {/* Fee Reminder Setup */}
-                  <div className="db-panel">
-                    <div className="db-panel-head">
-                      <div>
-                        <p className="db-panel-title">Fee reminder setup</p>
-                        <p className="db-panel-sub">Automatically re-send reminders if invoice remains unpaid.</p>
-                      </div>
-
-                      <span className="db-pill" style={{ background: "rgba(0,0,0,0.04)", color: "#7a6a5a" }}>
-                        <i className="bi bi-alarm me-1" />
-                        Automation
-                      </span>
-                    </div>
-
-                    <div style={{ padding: 16 }}>
-                      <div className="db-kv">
-                        <div>
-                          <label className="d-block">Enable fee reminders automation</label>
-                          <b>{feeReminder.enabled ? "Enabled" : "Disabled"}</b>
-                        </div>
-
-                        <div className="form-check form-switch m-0">
-                          <input
-                            className="form-check-input"
-                            type="checkbox"
-                            role="switch"
-                            checked={feeReminder.enabled}
-                            onChange={(e) => setFeeReminder((p) => ({ ...p, enabled: e.target.checked }))}
-                            disabled={feeBusy}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="row g-3 mt-2">
-                        <div className="col-12 col-md-6">
-                          <label className="form-label fw-semibold small mb-1">Reminder interval (days)</label>
-                          <input
-                            type="number"
-                            className="form-control"
-                            value={feeReminder.intervalDays}
-                            min={1}
-                            max={60}
-                            onChange={(e) => setFeeReminder((p) => ({ ...p, intervalDays: clampInt(e.target.value, 1, 60, 5) }))}
-                            disabled={feeBusy || !feeReminder.enabled}
-                          />
-                          <div className="db-muted" style={{ fontSize: 12, marginTop: 6 }}>
-                            Example: every 5 days after the first reminder.
-                          </div>
-                        </div>
-
-                        <div className="col-12 col-md-6">
-                          <label className="form-label fw-semibold small mb-1">Max reminders</label>
-                          <input
-                            type="number"
-                            className="form-control"
-                            value={feeReminder.maxCount}
-                            min={0}
-                            max={50}
-                            onChange={(e) => setFeeReminder((p) => ({ ...p, maxCount: clampInt(e.target.value, 0, 50, 6) }))}
-                            disabled={feeBusy || !feeReminder.enabled}
-                          />
-                          <div className="db-muted" style={{ fontSize: 12, marginTop: 6 }}>
-                            Set to <b>0</b> to allow unlimited reminders (if enabled on backend).
-                          </div>
-                        </div>
-
-                        <div className="col-12">
-                          <div className="db-card" style={{ padding: 12 }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-                              <div>
-                                <div className="db-strong" style={{ fontWeight: 800 }}>
-                                  Channels
-                                </div>
-                                <div className="db-muted" style={{ fontSize: 12.5 }}>
-                                  Choose which channels the automation will use.
-                                </div>
-                              </div>
-                              <span className="db-pill" style={{ background: "rgba(0,0,0,0.04)", color: "#7a6a5a" }}>
-                                <i className="bi bi-send me-1" />
-                                Delivery
-                              </span>
-                            </div>
-
-                            <div className="row g-3 mt-2">
-                              <div className="col-12">
-                                <div className="db-kv">
-                                  <div>
-                                    <label className="d-block">Send email reminders</label>
-                                    <b>{feeReminder.sendEmail ? "Yes" : "No"}</b>
-                                  </div>
-                                  <div className="form-check form-switch m-0">
-                                    <input
-                                      className="form-check-input"
-                                      type="checkbox"
-                                      role="switch"
-                                      checked={feeReminder.sendEmail}
-                                      onChange={(e) => setFeeReminder((p) => ({ ...p, sendEmail: e.target.checked }))}
-                                      disabled={feeBusy || !feeReminder.enabled}
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="col-12">
-                                <div className="db-kv">
-                                  <div>
-                                    <label className="d-block">Send WhatsApp reminders</label>
-                                    <b>{feeReminder.sendWhatsApp ? "Yes" : "No"}</b>
-                                  </div>
-                                  <div className="form-check form-switch m-0">
-                                    <input
-                                      className="form-check-input"
-                                      type="checkbox"
-                                      role="switch"
-                                      checked={feeReminder.sendWhatsApp}
-                                      onChange={(e) => {
-                                        const next = e.target.checked;
-
-                                        if (next && !whatsappEnabled) {
-                                          showError?.("Enable WhatsApp from WhatsApp Settings before using this channel.");
-                                          return;
-                                        }
-
-                                        setFeeReminder((p) => ({ ...p, sendWhatsApp: next }));
-                                      }}
-                                      disabled={feeBusy || !feeReminder.enabled || !whatsappEnabled}
-                                    />
-                                  </div>
-                                </div>
-                                {!whatsappEnabled ? (
-                                  <div className="db-muted" style={{ fontSize: 12, marginTop: 6 }}>
-                                    WhatsApp is currently disabled. Turn on WhatsApp above to enable this channel.
-                                  </div>
-                                ) : null}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="col-12">
-                          <div className="db-card" style={{ padding: 12 }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-                              <div>
-                                <div className="db-strong" style={{ fontWeight: 800 }}>
-                                  Quiet hours (optional)
-                                </div>
-                                <div className="db-muted" style={{ fontSize: 12.5 }}>
-                                  Prevent reminders from sending during specific hours.
-                                </div>
-                              </div>
-                              <span className="db-pill" style={{ background: "rgba(0,0,0,0.04)", color: "#7a6a5a" }}>
-                                <i className="bi bi-moon-stars me-1" />
-                                Quiet
-                              </span>
-                            </div>
-
-                            <div className="row g-3 mt-2">
-                              <div className="col-12 col-md-6">
-                                <label className="form-label fw-semibold small mb-1">Start</label>
-                                <input
-                                  type="time"
-                                  className="form-control"
-                                  value={feeReminder.quietHoursStart ?? ""}
-                                  onChange={(e) => setFeeReminder((p) => ({ ...p, quietHoursStart: e.target.value || null }))}
-                                  disabled={feeBusy || !feeReminder.enabled}
-                                />
-                              </div>
-
-                              <div className="col-12 col-md-6">
-                                <label className="form-label fw-semibold small mb-1">End</label>
-                                <input
-                                  type="time"
-                                  className="form-control"
-                                  value={feeReminder.quietHoursEnd ?? ""}
-                                  onChange={(e) => setFeeReminder((p) => ({ ...p, quietHoursEnd: e.target.value || null }))}
-                                  disabled={feeBusy || !feeReminder.enabled}
-                                />
-                              </div>
-                            </div>
-
-                            <div className="db-muted" style={{ fontSize: 12, marginTop: 10 }}>
-                              If set, reminders will not be sent during this period (supports overnight ranges).
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="col-12">
-                          <button
-                            type="button"
-                            className="db-refresh-btn"
-                            style={{ width: "100%", justifyContent: "center", padding: "12px 14px", borderRadius: 12 }}
-                            onClick={saveFeeReminderSettings}
-                            disabled={feeBusy}
-                            title="Save fee reminder automation settings"
-                          >
-                            {savingFee ? (
-                              <>
-                                <span className="spinner-border spinner-border-sm me-2" />
-                                Saving fee reminders…
-                              </>
-                            ) : (
-                              <>
-                                <i className="bi bi-save2 me-1" />
-                                Save fee reminder setup
-                              </>
-                            )}
-                          </button>
-
-                          <div className="db-muted" style={{ fontSize: 12, marginTop: 8 }}>
-                            This saves only the automation settings. The main “Save settings” button also saves this automatically.
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
 
                   <SectionHeading icon="shield-check" title="Actions" subtitle="Save or refresh your configuration safely." />
 
@@ -1881,7 +1316,7 @@ const removeDomain = async () => {
                         type="button"
                         className="db-refresh-btn"
                         style={{ width: "100%", justifyContent: "center", marginTop: 10, padding: "12px 14px", borderRadius: 12 }}
-                        disabled={saving || loading || savingFee}
+                        disabled={saving || loading}
                         onClick={refreshSettings}
                       >
                         <i className="bi bi-arrow-clockwise me-1" />

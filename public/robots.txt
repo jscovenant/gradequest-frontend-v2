@@ -1,0 +1,22 @@
+User-agent: *
+Allow: /
+Allow: /blog
+Allow: /check-result
+Allow: /verify-result
+Allow: /become-a-partner
+Allow: /sales-page/
+Allow: /book-demo
+Allow: /privacy-policy
+Allow: /terms-and-conditions
+
+# Disallow private user/admin portal routes from indexing
+Disallow: /dashboard
+Disallow: /students
+Disallow: /fees
+Disallow: /billing
+Disallow: /checkout
+Disallow: /wallet
+Disallow: /results
+Disallow: /superadmin
+
+Sitemap: https://gradequest.com.ng/sitemap.xml

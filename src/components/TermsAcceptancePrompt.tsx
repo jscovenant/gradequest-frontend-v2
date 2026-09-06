@@ -61,8 +61,8 @@ export default function TermsAcceptancePrompt() {
           <div className="ta-icon" aria-hidden="true"><i className="bi bi-shield-check" /></div>
           <div>
             <div className="ta-kicker">Action required</div>
-            <h2 className="ta-title" id="terms-acceptance-title">Accept GradeQuest’s Terms and Conditions</h2>
-            <p className="ta-copy">An authorized school administrator must accept the current agreement to keep the school’s GradeQuest account compliant.</p>
+            <h2 className="ta-title" id="terms-acceptance-title">Accept GradiosEdu’s Terms and Conditions</h2>
+            <p className="ta-copy">An authorized school administrator must accept the current agreement to keep the school’s GradiosEdu account compliant.</p>
           </div>
         </div>
         <div className="ta-action">

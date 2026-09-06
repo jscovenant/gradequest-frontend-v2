@@ -40,9 +40,20 @@ type StudentFee = {
   session?: SessionRel | null;
 };
 
+type InstallmentPlan = {
+  enabled: boolean;
+  installment_type: string;
+  min_initial_percent: number;
+  min_initial_amount: number;
+  min_payable_now: number;
+  presets: Array<{ label: string; percent: number; amount: number }>;
+  message: string;
+};
+
 type StudentFeeDetailsResponse = {
   student: StudentInfo;
   fees: StudentFee[];
+  installment_plan?: InstallmentPlan;
 };
 
 type PayFeeResponse = {
@@ -112,6 +123,7 @@ export default function StudentFeePaymentPage() {
   // fetched result
   const [student, setStudent] = useState<StudentInfo | null>(null);
   const [fees, setFees] = useState<StudentFee[]>([]);
+  const [installmentPlan, setInstallmentPlan] = useState<InstallmentPlan | null>(null);
 
   // UI state
   const [filter, setFilter] = useState("");
@@ -177,11 +189,13 @@ export default function StudentFeePaymentPage() {
 
       setStudent(res.data?.student ?? null);
       setFees(Array.isArray(res.data?.fees) ? res.data.fees : []);
+      setInstallmentPlan(res.data?.installment_plan ?? null);
       showSuccess("Student fee details loaded.");
     } catch (e: any) {
       console.error(e);
       setStudent(null);
       setFees([]);
+      setInstallmentPlan(null);
       showError(getErrorMessage(e));
     } finally {
       setLoadingDetails(false);
@@ -258,28 +272,23 @@ export default function StudentFeePaymentPage() {
     <>
       {/* SAME TEMPLATE (inline CSS) */}
       <style>{`
+        /* ======= StudentFeePaymentPage - Modern SaaS style ======= */
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
         .db-main {
-          background: var(--bs-body-bg, #f5f1eb);
+          background: #F8FAFC;
           min-height: 100vh;
-          font-family: "DM Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-          padding: 28px 28px 0;
+          font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+          padding: 24px 28px 0;
         }
 
         .db-hero {
-          background: #0f172a;
-          border-radius: var(--bs-border-radius-lg, 16px);
+          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
+          border-radius: 18px;
           padding: 32px 36px;
           position: relative;
           overflow: hidden;
-          margin-bottom: 20px;
-        }
-        .db-hero::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background-image: radial-gradient(circle, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
-          background-size: 24px 24px;
-          pointer-events: none;
+          margin-bottom: 24px;
+          box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
         }
         .db-hero-glow {
           position: absolute;
@@ -288,7 +297,7 @@ export default function StudentFeePaymentPage() {
           width: 320px;
           height: 320px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(201, 168, 76, 0.1) 0%, transparent 65%);
+          background: radial-gradient(circle, rgba(217, 119, 6, 0.15) 0%, transparent 65%);
           pointer-events: none;
         }
         .db-hero-glow2 {
@@ -298,7 +307,7 @@ export default function StudentFeePaymentPage() {
           width: 200px;
           height: 200px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(99, 102, 241, 0.07) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(37, 99, 235, 0.10) 0%, transparent 70%);
           pointer-events: none;
         }
         .db-hero-inner {
@@ -315,22 +324,22 @@ export default function StudentFeePaymentPage() {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          font-size: 11px;
-          font-weight: 500;
-          letter-spacing: 0.12em;
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
           text-transform: uppercase;
-          color: #e8c97a;
-          background: rgba(201, 168, 76, 0.1);
-          border: 1px solid rgba(201, 168, 76, 0.2);
+          color: #FBBF24;
+          background: rgba(217, 119, 6, 0.20);
+          border: 1px solid rgba(217, 119, 6, 0.35);
           border-radius: 100px;
           padding: 4px 12px;
-          margin-bottom: 14px;
+          margin-bottom: 12px;
         }
         .db-session-dot {
           width: 6px;
           height: 6px;
           border-radius: 50%;
-          background: #22c55e;
+          background: #10B981;
           animation: dbPulse 2s ease infinite;
         }
         @keyframes dbPulse {
@@ -339,22 +348,20 @@ export default function StudentFeePaymentPage() {
         }
 
         .db-greeting {
-          font-family: "Lora", Georgia, serif;
-          font-size: clamp(22px, 2.5vw, 32px);
-          font-weight: 700;
+          font-size: 26px;
+          font-weight: 800;
           color: #fff;
           line-height: 1.1;
           margin-bottom: 8px;
         }
-        .db-greeting em { font-style: italic; color: #e8c97a; }
+        .db-greeting em { font-style: normal; color: #FBBF24; }
 
         .db-hero-sub {
           font-size: 13.5px;
-          font-weight: 300;
-          color: #64748b;
-          line-height: 1.65;
+          color: #CBD5E1;
+          line-height: 1.6;
           max-width: 620px;
-          margin-bottom: 16px;
+          margin-bottom: 20px;
         }
 
         .db-hero-btns { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -363,65 +370,60 @@ export default function StudentFeePaymentPage() {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          padding: 10px 18px;
-          font-family: "DM Sans", sans-serif;
+          padding: 9px 18px;
           font-size: 13px;
-          font-weight: 500;
-          color: #0f172a;
-          background: #c9a84c;
+          font-weight: 700;
+          color: #FFFFFF;
+          background: #D97706;
           border: none;
-          border-radius: var(--bs-border-radius, 8px);
+          border-radius: 10px;
           cursor: pointer;
-          transition: background 0.2s, transform 0.2s;
+          transition: all 0.2s ease;
           text-decoration: none;
           white-space: nowrap;
         }
-        .db-btn-gold:hover { background: #e8c97a; transform: translateY(-1px); }
+        .db-btn-gold:hover { background: #B45309; transform: translateY(-1px); color: #FFFFFF; }
         .db-btn-gold:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 
         .db-btn-outline {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          padding: 10px 18px;
-          font-family: "DM Sans", sans-serif;
+          padding: 9px 18px;
           font-size: 13px;
-          font-weight: 400;
-          color: rgba(255, 255, 255, 0.7);
-          background: transparent;
-          border: 1px solid rgba(255, 255, 255, 0.14);
-          border-radius: var(--bs-border-radius, 8px);
+          font-weight: 600;
+          color: #FFFFFF;
+          background: rgba(255, 255, 255, 0.10);
+          border: 1px solid rgba(255, 255, 255, 0.20);
+          border-radius: 10px;
           cursor: pointer;
-          transition: background 0.2s, border-color 0.2s, color 0.2s;
+          transition: all 0.2s ease;
           white-space: nowrap;
         }
-        .db-btn-outline:hover { background: rgba(255, 255, 255, 0.06); color: #fff; border-color: rgba(255, 255, 255, 0.28); }
+        .db-btn-outline:hover { background: rgba(255, 255, 255, 0.18); color: #fff; }
         .db-btn-outline:disabled { opacity: 0.55; cursor: not-allowed; }
 
         .db-hero-stat-card {
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.09);
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.15);
           backdrop-filter: blur(8px);
-          border-radius: var(--bs-border-radius, 12px);
+          border-radius: 14px;
           padding: 20px 24px;
           min-width: 320px;
         }
         .db-hero-stat-row { display: flex; flex-direction: column; gap: 10px; }
         .db-hero-stat-item { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-        .db-hero-stat-label { font-size: 12px; font-weight: 300; color: #64748b; }
-        .db-hero-stat-val {
-          font-family: "Lora", serif;
-          font-size: 18px;
-          font-weight: 700;
-          color: #fff;
-        }
-        .db-hero-stat-sep { height: 1px; background: rgba(255, 255, 255, 0.06); }
+        .db-hero-stat-label { font-size: 12px; font-weight: 400; color: #CBD5E1; }
+        .db-hero-stat-val { font-size: 18px; font-weight: 800; color: #FBBF24; }
+        .db-hero-stat-sep { height: 1px; background: rgba(255, 255, 255, 0.08); }
 
         .db-panel {
-          background: var(--bs-body-bg, #fff);
-          border: 1px solid var(--bs-border-color, #ede8e0);
-          border-radius: var(--bs-border-radius-lg, 14px);
+          background: #fff;
+          border: 1px solid #E2E8F0;
+          border-radius: 16px;
           overflow: hidden;
+          box-shadow: 0 4px 16px rgba(15,39,68,0.03);
+          margin-bottom: 24px;
         }
         .db-panel-head {
           display: flex;
@@ -745,6 +747,63 @@ export default function StudentFeePaymentPage() {
                   </div>
                 </div>
 
+                {installmentPlan?.enabled && (
+                  <div
+                    style={{
+                      background: "linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)",
+                      border: "1px solid #BFDBFE",
+                      borderRadius: 14,
+                      padding: "14px 18px",
+                      marginBottom: 18,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 14,
+                      flexWrap: "wrap",
+                      boxShadow: "0 2px 8px rgba(30, 64, 175, 0.05)",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 10,
+                          background: "#2563EB",
+                          color: "#FFFFFF",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 18,
+                        }}
+                      >
+                        <i className="bi bi-pie-chart-fill" />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 14, color: "#1E3A8A" }}>
+                          School Installment Policy ({installmentPlan.min_initial_percent}% Initial Payment)
+                        </div>
+                        <div style={{ fontSize: 12.5, color: "#2563EB" }}>
+                          {installmentPlan.message || `Minimum initial payment for the term is ${naira(installmentPlan.min_initial_amount)}.`}
+                        </div>
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        background: "#1E40AF",
+                        color: "#FFFFFF",
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        padding: "5px 12px",
+                        borderRadius: 999,
+                        letterSpacing: "0.03em",
+                      }}
+                    >
+                      <i className="bi bi-shield-check me-1" /> Policy Active
+                    </span>
+                  </div>
+                )}
+
                 {/* Fees Table */}
                 <div className="db-panel">
                   <div className="db-panel-head">
@@ -1027,6 +1086,20 @@ export default function StudentFeePaymentPage() {
                     <div className="row g-3">
                       <div className="col-12">
                         <label className="form-label fw-semibold small mb-1">Payment Method *</label>
+                        <div className="d-flex gap-2 mb-2 flex-wrap">
+                          {["Cash", "Bank Transfer", "POS"].map((m) => (
+                            <button
+                              key={m}
+                              type="button"
+                              className={`btn btn-sm ${payMethod === m ? "btn-dark" : "btn-outline-secondary"}`}
+                              style={{ borderRadius: 8, fontSize: 12, fontWeight: 600 }}
+                              onClick={() => setPayMethod(m)}
+                              disabled={busyKey !== null}
+                            >
+                              {m}
+                            </button>
+                          ))}
+                        </div>
                         <input
                           className="form-control"
                           placeholder="e.g. Bank Transfer / POS / Cash"
@@ -1040,7 +1113,40 @@ export default function StudentFeePaymentPage() {
                       </div>
 
                       <div className="col-12">
-                        <label className="form-label fw-semibold small mb-1">Amount (₦) *</label>
+                        <div className="d-flex justify-content-between align-items-center mb-1">
+                          <label className="form-label fw-semibold small mb-0">Amount (₦) *</label>
+                          {installmentPlan?.enabled && (
+                            <span className="badge bg-primary-subtle text-primary border border-primary-subtle">
+                              Min {installmentPlan.min_initial_percent}% Initial
+                            </span>
+                          )}
+                        </div>
+
+                        {installmentPlan?.enabled && (
+                          <div className="alert alert-info py-2 px-3 mb-2" style={{ fontSize: 12.5, borderRadius: 8 }}>
+                            <i className="bi bi-info-circle me-1" />
+                            {installmentPlan.message || `Minimum initial payment required is ${naira(installmentPlan.min_payable_now)}.`}
+                          </div>
+                        )}
+
+                        {/* Quick Presets */}
+                        {installmentPlan?.presets && installmentPlan.presets.length > 0 && (
+                          <div className="d-flex gap-2 mb-2 flex-wrap">
+                            {installmentPlan.presets.map((preset, pIdx) => (
+                              <button
+                                key={pIdx}
+                                type="button"
+                                className={`btn btn-sm ${payAmount === String(preset.amount) ? "btn-primary" : "btn-outline-primary"}`}
+                                style={{ borderRadius: 8, fontSize: 12, fontWeight: 600 }}
+                                onClick={() => setPayAmount(String(preset.amount))}
+                                disabled={busyKey !== null}
+                              >
+                                {preset.label} ({naira(preset.amount)})
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
                         <input
                           className="form-control"
                           type="number"

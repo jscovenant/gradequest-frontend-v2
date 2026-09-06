@@ -245,66 +245,66 @@ export default function WhatsAppSettingsPage() {
   return (
     <>
       <style>{`
-        .db-main { background: var(--bs-body-bg, #f5f1eb); min-height: 100vh; font-family: "DM Sans", system-ui, sans-serif; padding: 28px 28px 0; }
-        .db-hero { background: #0f172a; border-radius: 16px; padding: 32px 36px; position: relative; overflow: hidden; margin: 10px 0 18px; border: 1px solid rgba(255,255,255,0.06); }
-        .db-hero::before { content: ""; position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px); background-size: 24px 24px; pointer-events: none; }
-        .db-hero-glow  { position: absolute; top: -60px; right: -60px; width: 320px; height: 320px; border-radius: 50%; background: radial-gradient(circle, rgba(37,211,102,0.10) 0%, transparent 65%); pointer-events: none; }
-        .db-hero-glow2 { position: absolute; bottom: -40px; left: 30%; width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, rgba(201,168,76,0.07) 0%, transparent 70%); pointer-events: none; }
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        .db-main { background: #F8FAFC; min-height: 100vh; font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; padding: 24px 28px 0; }
+        .db-hero { background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%); border-radius: 18px; padding: 32px 36px; position: relative; overflow: hidden; margin-bottom: 24px; box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15); }
+        .db-hero-glow  { position: absolute; top: -60px; right: -60px; width: 320px; height: 320px; border-radius: 50%; background: radial-gradient(circle, rgba(37,211,102,0.15) 0%, transparent 65%); pointer-events: none; }
+        .db-hero-glow2 { position: absolute; bottom: -40px; left: 30%; width: 200px; height: 200px; border-radius: 50%; background: radial-gradient(circle, rgba(217,119,6,0.10) 0%, transparent 70%); pointer-events: none; }
         .db-hero-inner { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 32px; flex-wrap: wrap; }
         @media (min-width: 768px) { .db-hero-inner { flex-wrap: nowrap; } }
-        .db-session-badge { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: #4ade80; background: rgba(37,211,102,0.10); border: 1px solid rgba(37,211,102,0.22); border-radius: 100px; padding: 4px 12px; margin-bottom: 14px; }
+        .db-session-badge { display: inline-flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #4ade80; background: rgba(37,211,102,0.15); border: 1px solid rgba(37,211,102,0.30); border-radius: 100px; padding: 4px 12px; margin-bottom: 12px; }
         .db-session-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; animation: dbPulse 2s ease infinite; }
         @keyframes dbPulse { 0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.4;transform:scale(1.5);} }
-        .db-greeting { font-family: "Lora", Georgia, serif; font-size: clamp(22px,2.5vw,32px); font-weight: 700; color: #fff; line-height: 1.1; margin-bottom: 8px; }
-        .db-greeting em { font-style: italic; color: #4ade80; }
-        .db-hero-sub { font-size: 13.5px; font-weight: 300; color: #64748b; line-height: 1.65; max-width: 620px; margin-bottom: 18px; }
+        .db-greeting { font-size: 26px; font-weight: 800; color: #fff; line-height: 1.1; margin-bottom: 8px; }
+        .db-greeting em { font-style: normal; color: #4ade80; }
+        .db-hero-sub { font-size: 13.5px; color: #CBD5E1; line-height: 1.6; max-width: 620px; margin-bottom: 18px; }
         .db-hero-btns { display: flex; gap: 10px; flex-wrap: wrap; }
-        .db-btn-gold  { display:inline-flex;align-items:center;gap:7px;padding:10px 20px;font-family:"DM Sans",sans-serif;font-size:13px;font-weight:500;color:#0f172a;background:#c9a84c;border:none;border-radius:8px;cursor:pointer;transition:background .2s,transform .2s;white-space:nowrap; }
-        .db-btn-gold:hover { background:#e8c97a;transform:translateY(-1px); }
+        .db-btn-gold  { display:inline-flex;align-items:center;gap:8px;padding:9px 18px;font-size:13px;font-weight:700;color:#FFFFFF;background:#D97706;border:none;border-radius:10px;cursor:pointer;transition:all .2s ease;white-space:nowrap; }
+        .db-btn-gold:hover { background:#B45309;transform:translateY(-1px);color:#FFFFFF; }
         .db-btn-gold:disabled { opacity:.55;cursor:not-allowed;transform:none; }
-        .db-btn-green { display:inline-flex;align-items:center;gap:7px;padding:10px 20px;font-family:"DM Sans",sans-serif;font-size:13px;font-weight:500;color:#fff;background:#16a34a;border:none;border-radius:8px;cursor:pointer;transition:background .2s,transform .2s;white-space:nowrap; }
+        .db-btn-green { display:inline-flex;align-items:center;gap:8px;padding:9px 18px;font-size:13px;font-weight:700;color:#fff;background:#16a34a;border:none;border-radius:10px;cursor:pointer;transition:all .2s ease;white-space:nowrap; }
         .db-btn-green:hover { background:#15803d;transform:translateY(-1px); }
         .db-btn-green:disabled { opacity:.55;cursor:not-allowed;transform:none; }
-        .db-hero-stat-card { background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);backdrop-filter:blur(8px);border-radius:12px;padding:20px 24px;min-width:280px;margin-left:auto;align-self:flex-end; }
+        .db-hero-stat-card { background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);backdrop-filter:blur(8px);border-radius:14px;padding:18px 20px;min-width:280px;margin-left:auto;align-self:flex-end; }
         .db-hero-stat-row { display:flex;flex-direction:column;gap:10px; }
         .db-hero-stat-item { display:flex;justify-content:space-between;align-items:center;gap:16px; }
-        .db-hero-stat-label { font-size:12px;font-weight:300;color:#64748b; }
-        .db-hero-stat-val { font-size:14px;font-weight:700;color:#fff;font-family:"DM Sans"; }
-        .db-hero-stat-sep { height:1px;background:rgba(255,255,255,0.06); }
-        .db-panel { background:#fff;border:1px solid #ede8e0;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(15,23,42,0.04);margin-bottom:18px; }
-        .db-panel-head { display:flex;align-items:center;justify-content:space-between;padding:18px;border-bottom:1px solid rgba(0,0,0,0.06);gap:12px;flex-wrap:wrap; }
-        .db-panel-title { font-family:"Lora",serif;font-size:16px;font-weight:700;color:#1a1a2e;margin:0; }
-        .db-panel-sub { font-size:11.5px;font-weight:300;color:#9a8a7a;margin:0; }
-        .db-pill { display:inline-flex;align-items:center;font-size:12px;font-weight:800;padding:6px 10px;border-radius:999px;white-space:nowrap;border:1px solid rgba(0,0,0,0.06); }
-        .db-muted { color:#9a8a7a; }
-        .db-strong { font-weight:900;color:#1a1a2e; }
-        .db-card { border:1px solid rgba(0,0,0,0.06);border-radius:14px;background:#fff;box-shadow:0 2px 10px rgba(15,23,42,0.04); }
-        .db-kv { display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 12px;border:1px solid rgba(0,0,0,0.06);border-radius:12px;background:#faf8f5; }
-        .db-kv label { font-size:12px;color:#9a8a7a; }
-        .db-kv b { color:#1a1a2e; }
-        .db-section-head { margin:10px 0 12px;display:flex;align-items:center;justify-content:space-between; }
+        .db-hero-stat-label { font-size:12px;font-weight:400;color:#CBD5E1; }
+        .db-hero-stat-val { font-size:14px;font-weight:800;color:#fff; }
+        .db-hero-stat-sep { height:1px;background:rgba(255,255,255,0.08); }
+        .db-panel { background:#fff;border:1px solid #E2E8F0;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(15,39,68,0.03);margin-bottom:20px; }
+        .db-panel-head { display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid #E2E8F0;gap:12px;flex-wrap:wrap; }
+        .db-panel-title { font-size:16px;font-weight:800;color:#0F2744;margin:0; }
+        .db-panel-sub { font-size:12px;color:#64748B;margin:0; }
+        .db-pill { display:inline-flex;align-items:center;font-size:12px;font-weight:700;padding:6px 12px;border-radius:999px;white-space:nowrap;border:1px solid rgba(0,0,0,0.06); }
+        .db-muted { color:#64748B; }
+        .db-strong { font-weight:700;color:#0F2744; }
+        .db-card { border:1px solid #E2E8F0;border-radius:16px;background:#fff;box-shadow:0 4px 16px rgba(15,39,68,0.03); }
+        .db-kv { display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 14px;border:1px solid #E2E8F0;border-radius:12px;background:#F8FAFC; }
+        .db-kv label { font-size:12px;font-weight:600;color:#64748B; }
+        .db-kv b { color:#0F2744;font-weight:700; }
+        .db-section-head { margin:10px 0 14px;display:flex;align-items:center;justify-content:space-between; }
         .db-section-left { display:flex;align-items:center;gap:12px; }
-        .db-section-ico { width:40px;height:40px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,0.06);border:1px solid rgba(0,0,0,0.06);color:#0f172a; }
-        .db-section-title { font-family:"Lora",serif;font-weight:800;color:#1a1a2e;font-size:15px;line-height:1.1; }
-        .db-section-sub { font-size:12px;color:#9a8a7a;margin-top:4px; }
+        .db-section-ico { width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:#F1F5F9;border:1px solid #E2E8F0;color:#0F2744;font-size:16px; }
+        .db-section-title { font-weight:800;color:#0F2744;font-size:15px;line-height:1.1; }
+        .db-section-sub { font-size:12px;color:#64748B;margin-top:4px; }
         .wa-tab-row { display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap; }
-        .wa-tab { display:inline-flex;align-items:center;gap:7px;padding:9px 16px;font-size:13px;font-weight:500;border-radius:10px;border:1px solid rgba(0,0,0,0.10);background:#faf8f5;color:#7a6a5a;cursor:pointer;transition:all .15s; }
-        .wa-tab:hover { background:#f0ebe3; }
-        .wa-tab.active       { background:#0f172a;color:#fff;border-color:#0f172a; }
-        .wa-tab.active.green { background:#16a34a;border-color:#16a34a; }
-        .wa-tab.active.amber { background:#d97706;border-color:#d97706; }
-        .wa-tab.active.blue  { background:#2563eb;border-color:#2563eb; }
-        .wa-cred-item label { font-size:12px;font-weight:600;color:#1a1a2e;display:block;margin-bottom:5px; }
-        .wa-cred-hint { font-size:11.5px;color:#9a8a7a;margin-top:5px; }
-        .wa-callout { border-radius:12px;padding:12px 14px;font-size:12.5px; }
-        .wa-callout-warn    { background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.20);color:#92400e; }
-        .wa-callout-info    { background:rgba(37,99,235,0.05);border:1px solid rgba(37,99,235,0.15);color:#1e40af; }
-        .wa-callout-success { background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.18);color:#166534; }
+        .wa-tab { display:inline-flex;align-items:center;gap:8px;padding:9px 16px;font-size:13px;font-weight:600;border-radius:10px;border:1px solid #E2E8F0;background:#F8FAFC;color:#64748B;cursor:pointer;transition:all .15s ease; }
+        .wa-tab:hover { background:#F1F5F9;color:#0F2744; }
+        .wa-tab.active       { background:#0F2744;color:#fff;border-color:#0F2744; }
+        .wa-tab.active.green { background:#16a34a;border-color:#16a34a;color:#fff; }
+        .wa-tab.active.amber { background:#D97706;border-color:#D97706;color:#fff; }
+        .wa-tab.active.blue  { background:#2563eb;border-color:#2563eb;color:#fff; }
+        .wa-cred-item label { font-size:12px;font-weight:700;color:#0F2744;display:block;margin-bottom:5px; }
+        .wa-cred-hint { font-size:11.5px;color:#64748B;margin-top:5px; }
+        .wa-callout { border-radius:12px;padding:14px 16px;font-size:13px; }
+        .wa-callout-warn    { background:#FEF3C7;border:1px solid #FDE68A;color:#92400E; }
+        .wa-callout-info    { background:#EEF2FF;border:1px solid #E0E7FF;color:#3730A3; }
+        .wa-callout-success { background:#DCFCE7;border:1px solid #BBF7D0;color:#166534; }
         .wa-stat-row { display:flex;gap:12px;flex-wrap:wrap; }
-        .wa-stat-card { flex:1;min-width:120px;background:#faf8f5;border:1px solid rgba(0,0,0,0.07);border-radius:12px;padding:14px 16px; }
-        .wa-stat-num { font-family:"Lora",serif;font-size:28px;font-weight:700;color:#1a1a2e;line-height:1; }
-        .wa-stat-label { font-size:11.5px;color:#9a8a7a;margin-top:4px; }
-        .wa-progress-bar { height:6px;border-radius:999px;background:rgba(0,0,0,0.07);overflow:hidden;margin-top:8px; }
+        .wa-stat-card { flex:1;min-width:120px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:14px;padding:16px 18px; }
+        .wa-stat-num { font-size:26px;font-weight:800;color:#0F2744;line-height:1; }
+        .wa-stat-label { font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#64748B;margin-top:6px; }
+        .wa-progress-bar { height:6px;border-radius:999px;background:#E2E8F0;overflow:hidden;margin-top:8px; }
         .wa-progress-fill { height:100%;border-radius:999px;transition:width .4s; }
         @media (max-width: 991.98px) { .db-main { padding: 18px 14px 0; } }
       `}</style>
@@ -333,7 +333,7 @@ export default function WhatsAppSettingsPage() {
                     Send via <em>WhatsApp</em>
                   </h1>
                   <p className="db-hero-sub">
-                    Send result sheets, fee reminders and custom broadcasts to parents directly on WhatsApp — powered by GradeQuest. No setup required on your end.
+                    Send result sheets, fee reminders and custom broadcasts to parents directly on WhatsApp — powered by GradiosEdu. No setup required on your end.
                   </p>
                   <div className="db-hero-btns">
                     <span className="db-pill" style={{
@@ -410,7 +410,7 @@ export default function WhatsAppSettingsPage() {
                   <div className="db-panel-head">
                     <div>
                       <p className="db-panel-title">WhatsApp notifications</p>
-                      <p className="db-panel-sub">Messages are sent from GradeQuest's WhatsApp number on your behalf.</p>
+                      <p className="db-panel-sub">Messages are sent from GradiosEdu's WhatsApp number on your behalf.</p>
                     </div>
                     <StatusBadge enabled={settings.whatsapp_enabled} />
                   </div>
@@ -418,7 +418,7 @@ export default function WhatsAppSettingsPage() {
                   <div style={{ padding: 16 }}>
                     <div className="wa-callout wa-callout-info mb-3">
                       <i className="bi bi-info-circle me-1" />
-                      <strong>No setup required.</strong> GradeQuest handles all WhatsApp delivery via a shared number. Your school name is always included in every message so parents know who sent it.
+                      <strong>No setup required.</strong> GradiosEdu handles all WhatsApp delivery via a shared number. Your school name is always included in every message so parents know who sent it.
                     </div>
 
                     <div className="db-kv">
@@ -462,7 +462,7 @@ export default function WhatsAppSettingsPage() {
 
                     <div className="db-muted mt-2" style={{ fontSize: 12.5 }}>
                       <i className="bi bi-whatsapp me-1" style={{ color: "#25d366" }} />
-                      Messages appear from GradeQuest's number with your school name in the body.
+                      Messages appear from GradiosEdu's number with your school name in the body.
                     </div>
                   </div>
                 </div>

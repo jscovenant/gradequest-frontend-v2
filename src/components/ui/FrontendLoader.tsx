@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import Loader from "./dashboardLoader";
 
 const messages = [
-  "Opening GradeQuest…",
+  "Opening GradiosEdu…",
   "Preparing your experience…",
   "Almost ready…",
 ];
@@ -18,5 +18,5 @@ export default function FrontendLoader() {
     return () => window.clearInterval(interval);
   }, []);
 
-  return <Loader eyebrow="GradeQuest platform" message={messages[messageIndex]} />;
+  return <Loader eyebrow="GradiosEdu platform" message={messages[messageIndex]} />;
 }

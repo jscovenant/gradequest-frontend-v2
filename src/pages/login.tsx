@@ -1,896 +1,689 @@
-import { useState, useEffect } from "react";
-import FrontendLoader from "../components/ui/FrontendLoader";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../utils/api";
 import { setToken, setUser } from "../utils/token";
 import PageTitle from "../components/PageTitle";
 
+type PortalTab = "school" | "parent" | "platform";
+
 export default function Login() {
-  const [loading, setLoading]           = useState(true);
   const [buttonLoading, setButtonLoading] = useState(false);
-  const [email, setEmail]               = useState("");
-  const [password, setPassword]         = useState("");
-  const [showPass, setShowPass]         = useState(false);
-  const [error, setError]               = useState("");
+  const [portalMode, setPortalMode] = useState<PortalTab>("school");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [error, setError] = useState("");
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 800);
-    return () => clearTimeout(t);
-  }, []);
-
-  if (loading) return <FrontendLoader />;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setButtonLoading(true);
     try {
-      const response = await api.post("/login", { identifier: email, password });
-      console.log(response);
-console.log(response.data);
+      const response = await api.post("/login", {
+        identifier: email,
+        password,
+      });
       const { access_token, user } = response.data;
       setToken(access_token);
       setUser(user);
       switch (user.role) {
-        case "Admin": case "Super-Admin": case "Platform-Staff": case "Teacher":
-        case "Student": case "Parent": case "Bursar": case "Sales-Representative":
-          navigate("/dashboard"); break;
-        default: navigate("/unauthorized");
+        case "Admin":
+        case "Operator":
+        case "Super-Admin":
+        case "Platform-Staff":
+        case "Teacher":
+        case "Student":
+        case "Parent":
+        case "Bursar":
+        case "Sales-Representative":
+          navigate("/dashboard");
+          break;
+        default:
+          navigate("/unauthorized");
       }
-    } 
-    catch (err: any) {
-      setError(err?.response?.data?.message || "Login failed. Please try again.");
-   
-  } finally {
-    setButtonLoading(false);
-  }
-};
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Invalid credentials. Please verify your username and password.");
+    } finally {
+      setButtonLoading(false);
+    }
+  };
+
+  const portalMeta = {
+    school: {
+      badge: "School Community",
+      eyebrow: "School Academic & Admin Access",
+      title: "Sign in to your School",
+      subtitle: "Use your school email, Staff ID, or Student Registration Number.",
+      inputLabel: "Email, Staff ID, or Student Reg Number",
+      placeholder: "e.g. admin@school.com or SCH/2026/041",
+    },
+    parent: {
+      badge: "Parents & Guardians",
+      eyebrow: "Family Portal Access",
+      title: "Sign in as a Parent",
+      subtitle: "View your ward's verified term results, fee invoices, and attendance.",
+      inputLabel: "Registered Email or Phone Number",
+      placeholder: "e.g. parent@email.com or 08012345678",
+    },
+    platform: {
+      badge: "Central Operations",
+      eyebrow: "Operations & HQ Console",
+      title: "Sign in to HQ Console",
+      subtitle: "Secure access for platform administrators, support engineers, and managers.",
+      inputLabel: "SchoolProfit Staff Email",
+      placeholder: "e.g. staff@schoolprofit.ng",
+    },
+  }[portalMode];
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,800;1,600&display=swap');
 
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+          --gq-auth-navy: #0F2744;
+          --gq-auth-gold: #D97706;
+          --gq-auth-border: #E2E8F0;
+          --gq-auth-bg: #F8FAFC;
+        }
 
-        .lg-page {
+        .gq-auth-wrapper {
           min-height: 100vh;
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          font-family: 'DM Sans', sans-serif;
-          background: #0a0f1e;
+          display: flex;
+          background: var(--gq-auth-bg);
+          font-family: 'Plus Jakarta Sans', sans-serif;
         }
 
-        @media (max-width: 900px) {
-          .lg-page { grid-template-columns: 1fr; }
-          .lg-left  { display: none; }
-        }
-
-        /* 
-           LEFT PANEL
-         */
-        .lg-left {
-          position: relative;
-          background: #0a0f1e;
+        /* ── Left Visual Panel ── */
+        .gq-auth-left {
+          flex: 1;
+          background: linear-gradient(145deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          padding: 48px 52px;
+          padding: 48px;
+          position: relative;
           overflow: hidden;
+          color: #FFFFFF;
         }
 
-        /* Dot grid */
-        .lg-left::before {
-          content: '';
+        @media (max-width: 991px) {
+          .gq-auth-left {
+            display: none;
+          }
+        }
+
+        .gq-auth-left-bg-art {
           position: absolute;
           inset: 0;
-          background-image: radial-gradient(circle, rgba(255,255,255,0.055) 1px, transparent 1px);
-          background-size: 28px 28px;
+          background-image:
+            radial-gradient(circle at 10% 20%, rgba(217, 119, 6, 0.15) 0%, transparent 40%),
+            radial-gradient(circle at 90% 80%, rgba(29, 78, 216, 0.2) 0%, transparent 45%);
           pointer-events: none;
         }
 
-        /* Gold glow */
-        .lg-left::after {
-          content: '';
-          position: absolute;
-          bottom: -100px; left: -100px;
-          width: 500px; height: 500px;
-          border-radius: 50%;
-          background: radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 65%);
-          pointer-events: none;
-        }
-
-        /* Orbit rings */
-        .lg-orbit {
-          position: absolute;
-          top: 50%; left: 50%;
-          transform: translate(-50%, -50%);
-          border-radius: 50%;
-          border: 1px solid rgba(201,168,76,0.06);
-          pointer-events: none;
-          animation: lgSpin linear infinite;
-        }
-
-        .lg-orbit:nth-child(1) { width: 340px; height: 340px; animation-duration: 32s; }
-        .lg-orbit:nth-child(2) { width: 500px; height: 500px; animation-duration: 52s; animation-direction: reverse; border-color: rgba(99,102,241,0.04); }
-        .lg-orbit:nth-child(3) { width: 680px; height: 680px; animation-duration: 80s; border-color: rgba(255,255,255,0.025); }
-
-        @keyframes lgSpin {
-          from { transform: translate(-50%,-50%) rotate(0deg); }
-          to   { transform: translate(-50%,-50%) rotate(360deg); }
-        }
-
-        /* Orbit dot on ring 1 */
-        .lg-orbit-dot {
-          position: absolute;
-          top: -4px; left: 50%;
-          transform: translateX(-50%);
-          width: 8px; height: 8px;
-          border-radius: 50%;
-          background: #c9a84c;
-          box-shadow: 0 0 10px rgba(201,168,76,0.7);
-        }
-
-        /* Left content */
-        .lg-left-content {
-          position: relative;
-          z-index: 1;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          flex: 1;
-          padding: 60px 0 40px;
-        }
-
-        .lg-left-logo {
+        .gq-auth-brand-link {
           display: inline-flex;
           align-items: center;
-          gap: 11px;
+          gap: 12px;
           text-decoration: none;
-          position: relative;
-          z-index: 1;
+          z-index: 2;
         }
 
-        .lg-left-mark {
-          width: 40px; height: 40px;
+        .gq-auth-brand-logo {
+          width: 40px;
+          height: 40px;
+          object-fit: contain;
           border-radius: 10px;
-          background: linear-gradient(135deg, #c9a84c, #e8c97a);
-          display: flex;
-          align-items: center;
-          justify-content: center;
         }
 
-        .lg-left-name {
-          font-family: 'Lora', serif;
+        .gq-auth-brand-text {
           font-size: 22px;
-          font-weight: 700;
-          color: #fff;
-          letter-spacing: -0.01em;
+          font-weight: 800;
+          color: #FFFFFF;
+          letter-spacing: -0.02em;
         }
 
-        .lg-left-pill {
-          font-size: 9px;
-          font-weight: 500;
-          letter-spacing: 0.1em;
+        .gq-auth-left-content {
+          position: relative;
+          z-index: 2;
+          max-width: 500px;
+          margin: 40px 0;
+        }
+
+        .gq-auth-left-kicker {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 5px 14px;
+          border-radius: 999px;
+          background: rgba(217, 119, 6, 0.2);
+          border: 1px solid rgba(217, 119, 6, 0.4);
+          color: #FBBF24;
+          font-size: 11.5px;
+          font-weight: 700;
           text-transform: uppercase;
-          color: #c9a84c;
-          background: rgba(201,168,76,0.12);
-          border: 1px solid rgba(201,168,76,0.25);
-          border-radius: 100px;
-          padding: 2px 7px;
+          letter-spacing: 0.06em;
+          margin-bottom: 20px;
         }
 
-        .lg-headline {
-          font-family: 'Lora', Georgia, serif;
-          font-size: clamp(30px, 3vw, 44px);
-          font-weight: 700;
-          color: #fff;
-          line-height: 1.1;
-          margin: 56px 0 18px;
+        .gq-auth-left-title {
+          font-family: 'Playfair Display', Georgia, serif;
+          font-size: clamp(28px, 3vw, 40px);
+          font-weight: 800;
+          line-height: 1.2;
+          color: #FFFFFF;
+          margin-bottom: 16px;
         }
 
-        .lg-headline em {
+        .gq-auth-left-title em {
           font-style: italic;
-          color: #e8c97a;
+          color: #F59E0B;
         }
 
-        .lg-tagline {
+        .gq-auth-left-desc {
           font-size: 15px;
-          font-weight: 300;
-          color: #64748b;
-          line-height: 1.8;
-          max-width: 340px;
-          margin-bottom: 48px;
+          color: #CBD5E1;
+          line-height: 1.65;
+          margin-bottom: 32px;
         }
 
-        /* Feature chips */
-        .lg-chips {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .lg-chip {
+        /* Testimonial snippet on login page */
+        .gq-auth-quote-card {
+          background: rgba(255, 255, 255, 0.08);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          border-radius: 16px;
+          padding: 20px;
           display: flex;
           align-items: center;
-          gap: 12px;
-          font-size: 13.5px;
-          font-weight: 400;
-          color: #94a3b8;
+          gap: 16px;
         }
 
-        .lg-chip-icon {
-          width: 34px; height: 34px;
-          border-radius: 8px;
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.07);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #c9a84c;
+        .gq-quote-avatar {
+          width: 52px;
+          height: 52px;
+          border-radius: 50%;
+          object-fit: cover;
+          border: 2px solid #F59E0B;
           flex-shrink: 0;
         }
 
-        /* Bottom quote */
-        .lg-left-quote {
-          position: relative;
-          z-index: 1;
-        }
-
-        .lg-quote-text {
-          font-family: 'Lora', serif;
+        .gq-quote-text {
+          font-size: 13px;
+          color: #F1F5F9;
+          line-height: 1.5;
+          margin-bottom: 6px;
           font-style: italic;
-          font-size: 14px;
-          color: #475569;
-          line-height: 1.7;
-          margin-bottom: 10px;
         }
 
-        .lg-quote-author {
+        .gq-quote-author {
           font-size: 12px;
-          font-weight: 400;
-          color: #334155;
+          font-weight: 700;
+          color: #FBBF24;
         }
 
-        .lg-quote-line {
-          display: inline-block;
-          width: 20px; height: 1px;
-          background: #c9a84c;
-          opacity: 0.5;
-          vertical-align: middle;
-          margin-right: 8px;
-        }
-
-        /* 
-           RIGHT PANEL
-         */
-        .lg-right {
-          background: #faf8f5;
+        .gq-auth-left-footer {
+          position: relative;
+          z-index: 2;
           display: flex;
-          flex-direction: column;
+          align-items: center;
+          gap: 20px;
+          font-size: 12px;
+          color: #94A3B8;
+        }
+
+        /* ── Right Form Panel ── */
+        .gq-auth-right {
+          flex: 1;
+          display: flex;
           align-items: center;
           justify-content: center;
-          padding: 48px 40px;
-          position: relative;
-          overflow: hidden;
+          padding: 40px 24px;
         }
 
-        /* Warm ambient glow */
-        .lg-right::before {
-          content: '';
-          position: absolute;
-          top: -80px; right: -80px;
-          width: 400px; height: 400px;
-          border-radius: 50%;
-          background: radial-gradient(circle, rgba(180,83,9,0.05) 0%, transparent 70%);
-          pointer-events: none;
-        }
-
-        .lg-right::after {
-          content: '';
-          position: absolute;
-          bottom: -60px; left: -60px;
-          width: 300px; height: 300px;
-          border-radius: 50%;
-          background: radial-gradient(circle, rgba(201,168,76,0.06) 0%, transparent 70%);
-          pointer-events: none;
-        }
-
-        /* Form card */
-        .lg-form-wrap {
+        .gq-auth-card {
           width: 100%;
-          max-width: 420px;
-          position: relative;
-          z-index: 1;
-          animation: lgFormIn 0.6s cubic-bezier(0.4,0,0.2,1) both;
+          max-width: 440px;
+          background: #FFFFFF;
+          border: 1px solid var(--gq-auth-border);
+          border-radius: 20px;
+          padding: 36px 32px;
+          box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.06);
         }
 
-        @keyframes lgFormIn {
-          from { opacity:0; transform: translateY(20px); }
-          to   { opacity:1; transform: translateY(0); }
-        }
-
-        /* Mobile logo */
-        .lg-mobile-logo {
+        .gq-auth-mobile-logo {
           display: none;
           align-items: center;
           gap: 10px;
           text-decoration: none;
-          margin-bottom: 36px;
+          margin-bottom: 24px;
         }
 
-        @media (max-width: 900px) {
-          .lg-mobile-logo { display: flex; }
+        @media (max-width: 991px) {
+          .gq-auth-mobile-logo {
+            display: inline-flex;
+          }
         }
 
-        .lg-form-eyebrow {
-          font-size: 11px;
-          font-weight: 500;
-          letter-spacing: 0.18em;
-          text-transform: uppercase;
-          color: #b45309;
-          margin-bottom: 10px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
+        /* Portal Tabs */
+        .gq-portal-tabs {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          background: #F1F5F9;
+          border-radius: 12px;
+          padding: 4px;
+          gap: 4px;
+          margin-bottom: 24px;
         }
 
-        .lg-form-eyebrow-line {
-          display: block;
-          width: 22px; height: 1px;
-          background: #d97706;
-          opacity: 0.6;
-        }
-
-        .lg-form-title {
-          font-family: 'Lora', Georgia, serif;
-          font-size: 28px;
+        .gq-portal-tab {
+          border: none;
+          background: transparent;
+          font-family: inherit;
+          font-size: 12px;
           font-weight: 700;
-          color: #1a1a2e;
-          line-height: 1.15;
-          margin-bottom: 8px;
-        }
-
-        .lg-form-title em {
-          font-style: italic;
-          color: #b45309;
-        }
-
-        .lg-form-sub {
-          font-size: 14px;
-          font-weight: 300;
-          color: #7a6a5a;
-          margin-bottom: 36px;
-          line-height: 1.6;
-        }
-
-        /* Error */
-        .lg-error {
-          display: flex;
-          align-items: flex-start;
-          gap: 10px;
-          background: #fef2f2;
-          border: 1px solid #fecaca;
+          color: #64748B;
+          padding: 8px 4px;
           border-radius: 8px;
-          padding: 12px 14px;
-          margin-bottom: 20px;
-          font-size: 13.5px;
-          color: #b91c1c;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          text-align: center;
+        }
+
+        .gq-portal-tab.active {
+          background: #FFFFFF;
+          color: #0F2744;
+          box-shadow: 0 2px 6px rgba(15, 39, 68, 0.08);
+        }
+
+        .gq-form-title {
+          font-size: 22px;
+          font-weight: 800;
+          color: #0F2744;
+          margin-bottom: 6px;
+        }
+
+        .gq-form-subtitle {
+          font-size: 13px;
+          color: #64748B;
           line-height: 1.5;
-          animation: lgShake 0.35s ease;
+          margin-bottom: 24px;
         }
 
-        @keyframes lgShake {
-          0%,100% { transform: translateX(0); }
-          25% { transform: translateX(-5px); }
-          75% { transform: translateX(5px); }
-        }
-
-        .lg-error-icon { flex-shrink: 0; margin-top: 1px; }
-
-        /* Field */
-        .lg-field {
+        .gq-form-group {
           margin-bottom: 18px;
         }
 
-        .lg-label {
+        .gq-form-label {
           display: block;
           font-size: 12.5px;
-          font-weight: 500;
-          color: #4a4a5a;
-          margin-bottom: 7px;
-          letter-spacing: 0.02em;
+          font-weight: 700;
+          color: #1E293B;
+          margin-bottom: 6px;
         }
 
-        .lg-input-wrap {
+        .gq-input-wrap {
           position: relative;
-        }
-
-        .lg-input-icon {
-          position: absolute;
-          left: 14px; top: 50%;
-          transform: translateY(-50%);
-          color: #b5a090;
-          pointer-events: none;
           display: flex;
           align-items: center;
         }
 
-        .lg-input {
-          width: 100%;
-          background: #ffffff;
-          border: 1.5px solid #e5ddd3;
-          border-radius: 9px;
-          padding: 12px 14px 12px 42px;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 14px;
-          font-weight: 400;
-          color: #1a1a2e;
-          outline: none;
-          transition: border-color 0.2s, box-shadow 0.2s;
-          -webkit-appearance: none;
-        }
-
-        .lg-input::placeholder { color: #bdb3a8; }
-
-        .lg-input:focus {
-          border-color: #c9a84c;
-          box-shadow: 0 0 0 3px rgba(201,168,76,0.12);
-        }
-
-        .lg-input:focus + .lg-input-focus-ring { opacity: 1; }
-
-        /* Password toggle */
-        .lg-pass-toggle {
+        .gq-input-icon {
           position: absolute;
-          right: 13px; top: 50%;
-          transform: translateY(-50%);
+          left: 14px;
+          color: #94A3B8;
+          font-size: 16px;
+          pointer-events: none;
+        }
+
+        .gq-auth-input {
+          width: 100%;
+          height: 46px;
+          background: #FFFFFF;
+          border: 1.5px solid #E2E8F0;
+          border-radius: 10px;
+          padding: 0 14px 0 42px;
+          font-family: inherit;
+          font-size: 14px;
+          color: #0F172A;
+          outline: none;
+          transition: all 0.2s ease;
+        }
+
+        .gq-auth-input:focus {
+          border-color: #D97706;
+          box-shadow: 0 0 0 3.5px rgba(217, 119, 6, 0.15);
+        }
+
+        .gq-auth-input::placeholder {
+          color: #94A3B8;
+          font-size: 13px;
+        }
+
+        .gq-btn-eye {
+          position: absolute;
+          right: 12px;
           background: none;
           border: none;
+          color: #94A3B8;
           cursor: pointer;
-          color: #b5a090;
+          padding: 4px;
           display: flex;
           align-items: center;
-          padding: 4px;
-          transition: color 0.2s;
+          justify-content: center;
         }
 
-        .lg-pass-toggle:hover { color: #7a6a5a; }
+        .gq-btn-eye:hover {
+          color: #0F2744;
+        }
 
-        /* Remember + forgot row */
-        .lg-row {
+        .gq-auth-options {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          margin-bottom: 24px;
-          gap: 12px;
+          margin-bottom: 20px;
+          font-size: 12.5px;
         }
 
-        .lg-check-wrap {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          cursor: pointer;
-          user-select: none;
-        }
-
-        .lg-check {
-          width: 16px; height: 16px;
-          border: 1.5px solid #e5ddd3;
-          border-radius: 4px;
-          background: #fff;
-          accent-color: #c9a84c;
-          cursor: pointer;
-        }
-
-        .lg-check-label {
-          font-size: 13px;
-          font-weight: 300;
-          color: #7a6a5a;
-        }
-
-        .lg-forgot {
-          font-size: 13px;
-          font-weight: 500;
-          color: #b45309;
-          text-decoration: none;
-          white-space: nowrap;
-          transition: color 0.2s;
-        }
-
-        .lg-forgot:hover { color: #92400e; }
-
-        /* Submit button */
-        .lg-submit {
+        .gq-auth-btn-submit {
           width: 100%;
-          padding: 13px 20px;
-          background: #1a1a2e;
-          color: #ffffff;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 14.5px;
-          font-weight: 500;
+          height: 48px;
+          background: #0F2744;
+          color: #FFFFFF;
+          font-family: inherit;
+          font-size: 14px;
+          font-weight: 700;
           border: none;
-          border-radius: 9px;
+          border-radius: 10px;
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 9px;
-          transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
-          margin-bottom: 20px;
-          letter-spacing: 0.01em;
+          gap: 8px;
+          transition: all 0.2s ease;
+          box-shadow: 0 4px 14px rgba(15, 39, 68, 0.2);
         }
 
-        .lg-submit:hover:not(:disabled) {
-          background: #0a0f1e;
+        .gq-auth-btn-submit:hover:not(:disabled) {
+          background: #1E3A8A;
           transform: translateY(-1px);
-          box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+          box-shadow: 0 6px 18px rgba(30, 58, 138, 0.3);
         }
 
-        .lg-submit:disabled {
-          opacity: 0.75;
+        .gq-auth-btn-submit:disabled {
+          opacity: 0.7;
           cursor: not-allowed;
         }
 
-        /* Spinner */
-        .lg-spinner {
-          width: 16px; height: 16px;
-          border: 2px solid rgba(255,255,255,0.3);
-          border-top-color: #ffffff;
-          border-radius: 50%;
-          animation: lgSpin 0.7s linear infinite;
-          flex-shrink: 0;
-        }
-
-        @keyframes lgSpin {
-          to { transform: rotate(360deg); }
-        }
-
-        /* Divider */
-        .lg-divider {
+        .gq-auth-error {
+          background: #FEF2F2;
+          border: 1px solid #FEE2E2;
+          color: #B91C1C;
+          border-radius: 8px;
+          padding: 10px 14px;
+          font-size: 12.5px;
+          margin-bottom: 18px;
           display: flex;
           align-items: center;
-          gap: 12px;
-          margin-bottom: 20px;
+          gap: 8px;
         }
 
-        .lg-divider-line {
-          flex: 1;
-          height: 1px;
-          background: #e5ddd3;
+        .gq-auth-footer-links {
+          margin-top: 24px;
+          padding-top: 20px;
+          border-top: 1px solid #F1F5F9;
+          text-align: center;
+          font-size: 13px;
+          color: #64748B;
         }
 
-        .lg-divider-text {
-          font-size: 11.5px;
-          font-weight: 400;
-          color: #b5a090;
-          white-space: nowrap;
+        .gq-auth-footer-links a {
+          color: #D97706;
+          font-weight: 700;
+          text-decoration: none;
         }
 
-        /* Role badges */
-        .lg-roles {
+        .gq-auth-footer-links a:hover {
+          text-decoration: underline;
+        }
+
+        /* Quick shortcuts */
+        .gq-quick-links {
           display: flex;
-          gap: 7px;
+          justify-content: center;
+          gap: 8px;
+          margin-top: 14px;
           flex-wrap: wrap;
-          margin-bottom: 28px;
         }
 
-        .lg-role {
-          font-size: 11px;
-          font-weight: 400;
-          color: #9a8a7a;
-          background: #f0ebe3;
-          border: 1px solid #e5ddd3;
-          border-radius: 100px;
-          padding: 3px 10px;
-        }
-
-        /* Signup link */
-        .lg-signup {
-          text-align: center;
-          font-size: 13.5px;
-          font-weight: 300;
-          color: #9a8a7a;
-        }
-
-        .lg-signup a {
-          color: #b45309;
-          font-weight: 500;
-          text-decoration: none;
-          transition: color 0.2s;
-        }
-
-        .lg-signup a:hover { color: #92400e; }
-
-        /* Footer of right panel */
-        .lg-right-footer {
-          position: absolute;
-          bottom: 24px;
-          left: 0; right: 0;
-          text-align: center;
+        .gq-quick-btn {
           font-size: 11.5px;
-          font-weight: 300;
-          color: #c8bfb5;
-          z-index: 1;
-        }
-
-        .lg-right-footer a {
-          color: #b5a090;
+          font-weight: 600;
+          color: #475569;
+          background: #F8FAFC;
+          border: 1px solid #E2E8F0;
+          padding: 4px 10px;
+          border-radius: 6px;
           text-decoration: none;
-          transition: color 0.2s;
+          transition: all 0.2s;
         }
 
-        .lg-right-footer a:hover { color: #7a6a5a; }
-
-        
-/* Logo image */
-.ft-logo-img {
-  width: 10%;
-  height: 10%;
-  object-fit: contain;
-  border-radius: 8px;
-}
-
-
-
-/* Hover effect */
-.ft-logo:hover .ft-logo-wrap {
-  transform: scale(1.05);
-  transition: 0.25s ease;
-}
+        .gq-quick-btn:hover {
+          background: #EFF6FF;
+          border-color: #BFDBFE;
+          color: #1D4ED8;
+        }
       `}</style>
-      <PageTitle title="Login" />
-      <div className="lg-page">
 
-        {/*  LEFT PANEL  */}
-        <div className="lg-left">
-          <div className="lg-orbit"><div className="lg-orbit-dot" /></div>
-          <div className="lg-orbit" />
-          <div className="lg-orbit" />
+      <PageTitle title="Sign In | SchoolProfit Portal" />
 
-          {/* Logo */}
-    <a href="/" className="ft-logo" aria-label="GradeQuest home">     
-            <div className="ft-logo-wrap">
-              <img
-                src="/media/logo/gradequest-logo.png"
-                alt="GradeQuest logo"
-                className="ft-logo-img"
-              />
+      <div className="gq-auth-wrapper">
+        {/* ── Left Hero Panel ── */}
+        <div className="gq-auth-left">
+          <div className="gq-auth-left-bg-art" />
+
+          <Link to="/" className="gq-auth-brand-link">
+            <img
+              src="/media/logo/schoolprofit-logo.svg"
+              alt="SchoolProfit"
+              className="gq-auth-brand-logo"
+              style={{ width: "auto", height: 38 }}
+            />
+            <span className="gq-auth-brand-text">School<span style={{ color: "#059669" }}>Profit</span></span>
+          </Link>
+
+          <div className="gq-auth-left-content">
+            <div className="gq-auth-left-kicker">
+              <span>⚡</span> School Growth &amp; Profit OS
             </div>
-          </a>
-
-     
-
-          {/* Main copy */}
-          <div className="lg-left-content">
-            <h1 className="lg-headline">
-              Your school,<br />
-              <em>fully in control.</em>
+            <h1 className="gq-auth-left-title">
+              Stop Fee Defaults &amp; Grow Your School with <em>Total Financial Control.</em>
             </h1>
-            <p className="lg-tagline">
-              Manage results, fees, attendance, and parent communication 
-              all from one intelligent dashboard built for Nigerian schools.
+            <p className="gq-auth-left-desc">
+              From automated fee debt recovery and instant multi-bank settlements to 1-click broadsheets and offline CBT exams — SchoolProfit keeps your entire school institution thriving.
             </p>
 
-            <div className="lg-chips">
-              {[
-                {
-                  label: "AI-powered result monitoring",
-                  icon: <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="5" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.4"/><circle cx="8" cy="9" r="2" stroke="currentColor" strokeWidth="1.3"/><path d="M5 5V4a3 3 0 016 0v1" stroke="currentColor" strokeWidth="1.3"/></svg>
-                },
-                {
-                  label: "Secure PIN-based result portal",
-                  icon: <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1" y="5" width="14" height="9" rx="2" stroke="currentColor" strokeWidth="1.4"/><path d="M5 5V4a3 3 0 016 0v1" stroke="currentColor" strokeWidth="1.3"/><circle cx="8" cy="9.5" r="1.2" fill="currentColor"/></svg>
-                },
-                {
-                  label: "Real-time fees & attendance tracking",
-                  icon: <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 12V5M6 12V8M10 12V3M14 12V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-                },
-                {
-                  label: "Role-based access for all staff",
-                  icon: <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="6" cy="6" r="2.5" stroke="currentColor" strokeWidth="1.3"/><path d="M1 14c0-2.76 2.24-5 5-5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><path d="M11 9v4M9 11h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
-                },
-              ].map((c, i) => (
-                <div className="lg-chip" key={i}>
-                  <span className="lg-chip-icon">{c.icon}</span>
-                  {c.label}
+            {/* Testimonial Card */}
+            <div className="gq-auth-quote-card">
+              <img
+                src="/images/testimonials/funmi-bello.jpg"
+                alt="Principal"
+                className="gq-quote-avatar"
+              />
+              <div>
+                <p className="gq-quote-text">
+                  "SchoolProfit eliminated our fee debt defaults and cut result compilation from two weeks down to minutes."
+                </p>
+                <div className="gq-quote-author">
+                  Mrs. Deborah Afolabi · Power of Success Int'l School, Lagos
                 </div>
-              ))}
+              </div>
             </div>
           </div>
 
-          {/* Bottom testimonial quote */}
-          <div className="lg-left-quote">
-            <p className="lg-quote-text">
-              "GradeQuest cut our result processing time from two weeks to one afternoon."
-            </p>
-            <span className="lg-quote-author">
-              <span className="lg-quote-line" />
-              Mrs. Adaeze Okonkwo  Greenfield Model School, Enugu
-            </span>
+          <div className="gq-auth-left-footer">
+            <span>🛡️ 256-Bit SSL Encrypted</span>
+            <span>● 99.9% Uptime</span>
+            <span>● Role-Based Security</span>
           </div>
         </div>
 
-        {/*  RIGHT PANEL  */}
-        <div className="lg-right">
-          <div className="lg-form-wrap">
+        {/* ── Right Form Panel ── */}
+        <div className="gq-auth-right">
+          <div className="gq-auth-card">
+            {/* Mobile Logo */}
+            <Link to="/" className="gq-auth-mobile-logo">
+              <img src="/media/logo/schoolprofit-icon.svg" alt="SchoolProfit" style={{ width: 32, height: 32 }} />
+              <span style={{ fontSize: 19, fontWeight: 800, color: "#0F2744" }}>School<span style={{ color: "#059669" }}>Profit</span></span>
+            </Link>
 
-            {/* Mobile logo */}
-            <a href="/" className="lg-mobile-logo">
-              <span className="lg-left-mark" style={{ width: 34, height: 34, borderRadius: 9 }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <polygon points="12,2 22,19 2,19" stroke="#0a0f1e" strokeWidth="2"
-                    strokeLinejoin="round" fill="none"/>
-                  <path d="M12 8v5M12 15.5v.5" stroke="#0a0f1e" strokeWidth="2.2" strokeLinecap="round"/>
-                </svg>
-              </span>
-              <span style={{ fontFamily: "'Lora', serif", fontSize: 18, fontWeight: 700, color: "#1a1a2e" }}>
-                GradeQuest
-              </span>
-            </a>
-
-            {/* Form heading */}
-            <div className="lg-form-eyebrow">
-              <span className="lg-form-eyebrow-line" />
-              Secure login
+            {/* Portal Tab Switcher */}
+            <div className="gq-portal-tabs" role="tablist">
+              <button
+                type="button"
+                className={`gq-portal-tab ${portalMode === "school" ? "active" : ""}`}
+                onClick={() => { setPortalMode("school"); setError(""); }}
+              >
+                School Staff
+              </button>
+              <button
+                type="button"
+                className={`gq-portal-tab ${portalMode === "parent" ? "active" : ""}`}
+                onClick={() => { setPortalMode("parent"); setError(""); }}
+              >
+                Parents
+              </button>
+              <button
+                type="button"
+                className={`gq-portal-tab ${portalMode === "platform" ? "active" : ""}`}
+                onClick={() => { setPortalMode("platform"); setError(""); }}
+              >
+                HQ & Ops
+              </button>
             </div>
-            <h2 className="lg-form-title">
-              Welcome back,<br />
-              <em>let's pick up where you left off.</em>
-            </h2>
-            <p className="lg-form-sub">
-              Sign in with your school email or registration number.
-            </p>
 
-            {/* Error message */}
+            <h2 className="gq-form-title">{portalMeta.title}</h2>
+            <p className="gq-form-subtitle">{portalMeta.subtitle}</p>
+
             {error && (
-              <div className="lg-error" role="alert">
-                <span className="lg-error-icon">
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <circle cx="8" cy="8" r="7" stroke="#b91c1c" strokeWidth="1.4"/>
-                    <path d="M8 5v3.5M8 10.5v.5" stroke="#b91c1c" strokeWidth="1.5" strokeLinecap="round"/>
-                  </svg>
-                </span>
-                {error}
+              <div className="gq-auth-error" role="alert">
+                <i className="bi bi-exclamation-circle-fill" />
+                <span>{error}</span>
               </div>
             )}
 
-            {/* Form */}
             <form onSubmit={handleSubmit} noValidate>
-              {/* Email / Reg No */}
-              <div className="lg-field">
-                <label className="lg-label" htmlFor="identifier">
-                  Email or Registration Number
+              {/* Identifier Input */}
+              <div className="gq-form-group">
+                <label className="gq-form-label" htmlFor="identifier">
+                  {portalMeta.inputLabel}
                 </label>
-                <div className="lg-input-wrap">
-                  <span className="lg-input-icon">
-                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                      <rect x="1" y="3" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.4"/>
-                      <path d="M1 6l7 4 7-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                    </svg>
+                <div className="gq-input-wrap">
+                  <span className="gq-input-icon">
+                    <i className={portalMode === "parent" ? "bi bi-phone" : portalMode === "platform" ? "bi bi-shield-lock" : "bi bi-person"} />
                   </span>
                   <input
                     id="identifier"
                     type="text"
-                    className="lg-input"
-                    placeholder="school@email.com or R123456"
+                    className="gq-auth-input"
+                    placeholder={portalMeta.placeholder}
                     value={email}
-                    onChange={e => setEmail(e.target.value)}
+                    onChange={(e) => setEmail(e.target.value)}
                     autoComplete="username"
                     required
                   />
                 </div>
               </div>
 
-              {/* Password */}
-              <div className="lg-field">
-                <label className="lg-label" htmlFor="password">Password</label>
-                <div className="lg-input-wrap">
-                  <span className="lg-input-icon">
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                      <rect x="2" y="7" width="12" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
-                      <path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" strokeWidth="1.3"/>
-                      <circle cx="8" cy="10.5" r="1" fill="currentColor"/>
-                    </svg>
+              {/* Password Input */}
+              <div className="gq-form-group">
+                <label className="gq-form-label" htmlFor="password">
+                  Password
+                </label>
+                <div className="gq-input-wrap">
+                  <span className="gq-input-icon">
+                    <i className="bi bi-lock" />
                   </span>
                   <input
                     id="password"
                     type={showPass ? "text" : "password"}
-                    className="lg-input"
-                    placeholder=""
+                    className="gq-auth-input"
+                    placeholder="Enter your password"
                     value={password}
-                    onChange={e => setPassword(e.target.value)}
+                    onChange={(e) => setPassword(e.target.value)}
                     autoComplete="current-password"
-                    style={{ paddingRight: 42 }}
+                    style={{ paddingRight: 40 }}
                     required
                   />
                   <button
                     type="button"
-                    className="lg-pass-toggle"
-                    onClick={() => setShowPass(v => !v)}
+                    className="gq-btn-eye"
+                    onClick={() => setShowPass(!showPass)}
                     aria-label={showPass ? "Hide password" : "Show password"}
                   >
-                    {showPass ? (
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M2 8s2.5-5 6-5 6 5 6 5-2.5 5-6 5-6-5-6-5z" stroke="currentColor" strokeWidth="1.3"/>
-                        <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.3"/>
-                        <path d="M3 3l10 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                      </svg>
-                    ) : (
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M2 8s2.5-5 6-5 6 5 6 5-2.5 5-6 5-6-5-6-5z" stroke="currentColor" strokeWidth="1.3"/>
-                        <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.3"/>
-                      </svg>
-                    )}
+                    <i className={showPass ? "bi bi-eye-slash" : "bi bi-eye"} />
                   </button>
                 </div>
               </div>
 
-              {/* Remember + Forgot */}
-              <div className="lg-row">
-                <label className="lg-check-wrap">
-                  <input type="checkbox" className="lg-check" id="remember" />
-                  <span className="lg-check-label">Keep me signed in</span>
+              {/* Options Row */}
+              <div className="gq-auth-options">
+                <label className="d-flex align-items-center gap-2" style={{ color: "#475569", cursor: "pointer" }}>
+                  <input type="checkbox" style={{ accentColor: "#D97706" }} />
+                  <span>Remember me</span>
                 </label>
-                <Link to="/forgot-password" className="lg-forgot">Forgot password?</Link>
+                <Link to="/forgot-password" style={{ color: "#D97706", fontWeight: 600, textDecoration: "none" }}>
+                  Forgot password?
+                </Link>
               </div>
 
-              {/* Submit */}
+              {/* Submit Button */}
               <button
                 type="submit"
-                className="lg-submit"
-                disabled={buttonLoading}
+                className="gq-auth-btn-submit"
+                disabled={buttonLoading || !email || !password}
               >
                 {buttonLoading ? (
                   <>
-                    <span className="lg-spinner" />
-                    Signing in
+                    <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
+                    Signing in...
                   </>
                 ) : (
                   <>
-                    Sign In to Dashboard
-                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                      <path d="M1 7h12M7 1l6 6-6 6" stroke="currentColor" strokeWidth="1.7"
-                        strokeLinecap="round" strokeLinejoin="round"/>
+                    Sign In to {portalMeta.badge}
+                    <svg width="15" height="15" viewBox="0 0 14 14" fill="none">
+                      <path d="M1 7h12M7 1l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </>
                 )}
               </button>
             </form>
 
-            {/* Role divider */}
-            <div className="lg-divider">
-              <span className="lg-divider-line" />
-              <span className="lg-divider-text">Available for</span>
-              <span className="lg-divider-line" />
+            {/* Quick Access */}
+            <div className="gq-quick-links">
+              <Link to="/check-result" className="gq-quick-btn">
+                📜 Check Result (PIN)
+              </Link>
+              <Link to="/cbt/access" className="gq-quick-btn">
+                💻 CBT Exam Room
+              </Link>
             </div>
 
-            <div className="lg-roles">
-              {["Admin", "Teacher", "Student", "Parent", "Bursar"].map(r => (
-                <span className="lg-role" key={r}>{r}</span>
-              ))}
+            {/* Register Footer */}
+            <div className="gq-auth-footer-links">
+              New school proprietor or principal?{" "}
+              <Link to="/register">Create School Account</Link>
+              <div style={{ marginTop: 6, fontSize: "12px" }}>
+                Interested in earning commissions?{" "}
+                <Link to="/sales-representative/register">Join Sales Partner Program</Link>
+              </div>
             </div>
-
-            {/* Signup */}
-            <p className="lg-signup">
-              New school on GradeQuest?{" "}
-              <Link to="/book-demo">Book a demo </Link>
-            </p>
-          </div>
-
-          {/* Footer */}
-          <div className="lg-right-footer">
-            <a href="/privacy">Privacy</a>
-            {"  "}
-            <a href="/terms">Terms</a>
-            {"  "}
-             {new Date().getFullYear()} GradeQuest
           </div>
         </div>
-
       </div>
     </>
   );
 }
-

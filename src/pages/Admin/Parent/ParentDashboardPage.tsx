@@ -307,6 +307,403 @@ export default function ParentDashboardPage() {
 
   return (
     <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+        .parent-db-main {
+          background: #F8FAFC;
+          min-height: 100vh;
+          font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+          padding: 24px 28px 40px;
+        }
+
+        /* ── Signature Hero Banner ── */
+        .parent-hero {
+          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
+          border-radius: 18px;
+          padding: 32px 36px;
+          color: #FFFFFF;
+          margin-bottom: 24px;
+          box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
+          position: relative;
+          overflow: hidden;
+        }
+
+        .parent-hero::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background-image:
+            linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+          background-size: 32px 32px;
+          pointer-events: none;
+        }
+
+        .parent-hero-glow {
+          position: absolute;
+          top: -40px;
+          right: -40px;
+          width: 320px;
+          height: 320px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(217, 119, 6, 0.18) 0%, transparent 65%);
+          pointer-events: none;
+        }
+
+        .parent-hero-glow2 {
+          position: absolute;
+          bottom: -30px;
+          left: 20%;
+          width: 220px;
+          height: 220px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(37, 99, 235, 0.15) 0%, transparent 65%);
+          pointer-events: none;
+        }
+
+        .parent-hero-inner {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 24px;
+        }
+
+        .parent-session-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: #FBBF24;
+          background: rgba(217, 119, 6, 0.2);
+          border: 1px solid rgba(217, 119, 6, 0.35);
+          border-radius: 100px;
+          padding: 4px 12px;
+          margin-bottom: 12px;
+        }
+
+        .parent-session-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: #10B981;
+          box-shadow: 0 0 6px #10B981;
+          animation: parentPulse 2s ease infinite;
+        }
+
+        @keyframes parentPulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.4; transform: scale(1.5); }
+        }
+
+        .parent-greeting {
+          font-size: 26px;
+          font-weight: 800;
+          color: #FFFFFF;
+          line-height: 1.1;
+          margin-bottom: 8px;
+        }
+
+        .parent-greeting em {
+          font-style: normal;
+          color: #FBBF24;
+        }
+
+        .parent-hero-sub {
+          font-size: 13.5px;
+          color: #CBD5E1;
+          line-height: 1.6;
+          max-width: 520px;
+          margin-bottom: 20px;
+        }
+
+        .parent-hero-actions {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .parent-btn-gold {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          padding: 9px 18px;
+          font-size: 13px;
+          font-weight: 700;
+          border-radius: 10px;
+          color: #FFFFFF !important;
+          background: linear-gradient(135deg, #D97706 0%, #B45309 100%) !important;
+          border: none;
+          box-shadow: 0 4px 14px rgba(217, 119, 6, 0.3);
+          transition: all 0.2s ease;
+          text-decoration: none;
+          cursor: pointer;
+        }
+
+        .parent-btn-gold:hover {
+          background: linear-gradient(135deg, #B45309 0%, #92400E 100%) !important;
+          transform: translateY(-1px);
+        }
+
+        .parent-btn-outline {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          padding: 9px 18px;
+          font-size: 13px;
+          font-weight: 700;
+          border-radius: 10px;
+          color: #FFFFFF !important;
+          background: rgba(255, 255, 255, 0.12) !important;
+          border: 1px solid rgba(255, 255, 255, 0.22) !important;
+          backdrop-filter: blur(8px);
+          transition: all 0.2s ease;
+          text-decoration: none;
+          cursor: pointer;
+        }
+
+        .parent-btn-outline:hover {
+          background: rgba(255, 255, 255, 0.2) !important;
+          transform: translateY(-1px);
+        }
+
+        /* ── Child Selector Card in Hero ── */
+        .parent-child-card {
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.18);
+          border-radius: 14px;
+          padding: 18px 22px;
+          backdrop-filter: blur(12px);
+          min-width: 280px;
+        }
+
+        .parent-child-card-title {
+          font-size: 12px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: rgba(255, 255, 255, 0.8);
+          margin-bottom: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+
+        /* ── Unified Stat Cards ── */
+        .parent-stat-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 16px;
+          margin-bottom: 24px;
+        }
+
+        @media (max-width: 1100px) {
+          .parent-stat-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
+        @media (max-width: 600px) {
+          .parent-stat-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        .parent-stat-card {
+          background: #FFFFFF;
+          border: 1px solid rgba(15, 39, 68, 0.08);
+          border-radius: 16px;
+          padding: 20px 24px;
+          box-shadow: 0 2px 10px rgba(15, 39, 68, 0.04);
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+          position: relative;
+          overflow: hidden;
+        }
+
+        .parent-stat-card:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 8px 24px rgba(15, 39, 68, 0.08);
+          border-color: rgba(217, 119, 6, 0.25);
+        }
+
+        .parent-stat-icon-wrap {
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
+          margin-bottom: 14px;
+        }
+
+        .parent-stat-title {
+          font-size: 12px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: #64748B;
+          margin-bottom: 6px;
+        }
+
+        .parent-stat-val {
+          font-size: 24px;
+          font-weight: 800;
+          color: #0F2744;
+          line-height: 1.1;
+          margin-bottom: 8px;
+        }
+
+        /* ── Quick Actions Grid ── */
+        .parent-qa-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 14px;
+          margin-bottom: 24px;
+        }
+
+        @media (max-width: 1000px) {
+          .parent-qa-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
+        @media (max-width: 540px) {
+          .parent-qa-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        .parent-qa-card {
+          background: #FFFFFF;
+          border: 1px solid rgba(15, 39, 68, 0.08);
+          border-radius: 14px;
+          padding: 16px 20px;
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          text-decoration: none;
+          color: #0F2744;
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 8px rgba(15, 39, 68, 0.03);
+          cursor: pointer;
+        }
+
+        .parent-qa-card:hover {
+          border-color: rgba(217, 119, 6, 0.35);
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(15, 39, 68, 0.07);
+          color: #0F2744;
+        }
+
+        .parent-qa-icon {
+          width: 42px;
+          height: 42px;
+          border-radius: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 18px;
+          flex-shrink: 0;
+        }
+
+        /* ── Content Panels & Tables ── */
+        .parent-panel {
+          background: #FFFFFF;
+          border: 1px solid rgba(15, 39, 68, 0.08);
+          border-radius: 16px;
+          box-shadow: 0 2px 10px rgba(15, 39, 68, 0.04);
+          overflow: hidden;
+          margin-bottom: 24px;
+        }
+
+        .parent-panel-head {
+          padding: 18px 24px;
+          border-bottom: 1px solid #E2E8F0;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+
+        .parent-panel-title {
+          font-size: 16px;
+          font-weight: 800;
+          color: #0F2744;
+          margin: 0;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .parent-panel-body {
+          padding: 24px;
+        }
+
+        .parent-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 13px;
+        }
+
+        .parent-table th {
+          background: #F8FAFC;
+          padding: 12px 16px;
+          font-weight: 700;
+          color: #475569;
+          font-size: 11.5px;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          border-bottom: 1px solid #E2E8F0;
+        }
+
+        .parent-table td {
+          padding: 14px 16px;
+          border-bottom: 1px solid #F1F5F9;
+          color: #1E293B;
+          vertical-align: middle;
+        }
+
+        .parent-table tr:hover td {
+          background: #F8FAFC;
+        }
+
+        .parent-badge-clear {
+          background: #DCFCE7;
+          color: #15803D;
+          font-weight: 700;
+          padding: 4px 10px;
+          border-radius: 999px;
+          font-size: 11px;
+        }
+
+        .parent-badge-pending {
+          background: #FEF3C7;
+          color: #B45309;
+          font-weight: 700;
+          padding: 4px 10px;
+          border-radius: 999px;
+          font-size: 11px;
+        }
+
+        .parent-badge-owing {
+          background: #FEE2E2;
+          color: #B91C1C;
+          font-weight: 700;
+          padding: 4px 10px;
+          border-radius: 999px;
+          font-size: 11px;
+        }
+      `}</style>
+
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       <PageTitle title="Parent Dashboard" />
 
@@ -314,297 +711,208 @@ export default function ParentDashboardPage() {
         <div className="row">
           <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-          <main className="col-md-9 col-lg-10 ms-auto px-4 d-flex flex-column min-vh-100" style={{ backgroundColor: "#f8f9fa" }}>
-            {loading && <Loader message="Loading dashboard..." />}
+          <main className="col-md-9 col-lg-10 ms-auto gq-app-main parent-db-main d-flex flex-column min-vh-100">
+            {loading && <Loader message="Loading parent dashboard..." />}
 
-            {/* Hero */}
-            <div
-              className="mt-4 p-4 position-relative overflow-hidden"
-              style={{
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                borderRadius: "16px",
-                boxShadow: "0 10px 30px rgba(102, 126, 234, 0.3)",
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  top: "-50px",
-                  right: "-50px",
-                  width: "200px",
-                  height: "200px",
-                  background: "rgba(255, 255, 255, 0.1)",
-                  borderRadius: "50%",
-                  filter: "blur(40px)",
-                }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "-30px",
-                  left: "-30px",
-                  width: "150px",
-                  height: "150px",
-                  background: "rgba(255, 255, 255, 0.1)",
-                  borderRadius: "50%",
-                  filter: "blur(40px)",
-                }}
-              />
+            {/* ── Signature GradiosEdu Jumbotron ── */}
+            <div className="parent-hero">
+              <div className="parent-hero-glow" />
+              <div className="parent-hero-glow2" />
 
-              <div className="row align-items-center position-relative">
-                <div className="col-md-8">
-                  <div className="d-flex align-items-center gap-2 mb-2">
-                    <span
-                      className="badge px-3 py-2"
-                      style={{
-                        backgroundColor: "rgba(255, 255, 255, 0.2)",
-                        color: "#fff",
-                        borderRadius: "20px",
-                        fontSize: "0.75rem",
-                        fontWeight: 500,
-                      }}
-                    >
-                      <i className="bi bi-person-badge me-1"></i>
-                      Parent Portal
-                    </span>
-
-                    <span
-                      className="badge px-3 py-2"
-                      style={{
-                        backgroundColor: "rgba(16, 185, 129, 0.9)",
-                        color: "#fff",
-                        borderRadius: "20px",
-                        fontSize: "0.75rem",
-                        fontWeight: 500,
-                      }}
-                    >
-                      <i className="bi bi-bell-fill me-1"></i>
-                      {data?.stats.unread_notifications ?? 0} Unread
-                    </span>
+              <div className="parent-hero-inner">
+                <div>
+                  <div className="parent-session-badge">
+                    <span className="parent-session-dot" />
+                    Parent Academic Portal
                   </div>
 
-                  <h2 className="fw-bold text-white mb-2">
-                    {getGreeting()}, {parentName}! 👋
-                  </h2>
+                  <h1 className="parent-greeting">
+                    {getGreeting()}, <em>{parentName}!</em> 👋
+                  </h1>
 
-                  <p className="text-white mb-4" style={{ opacity: 0.9, fontSize: "1rem" }}>
-                    Here’s a quick overview of your children’s school activity—fees, attendance, and updates.
+                  <p className="parent-hero-sub">
+                    Institutional oversight for your children — view real-time continuous assessment, verified term broadsheets, digital fee clearance, and daily attendance logs.
                   </p>
 
-                  <div className="d-flex gap-2 flex-wrap">
+                  <div className="parent-hero-actions">
                     <button
-                      className="btn btn-light px-4 py-2 d-flex align-items-center gap-2"
-                      style={{
-                        borderRadius: "10px",
-                        fontWeight: 500,
-                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                      }}
-                      onClick={() => navigate("/student/my-fees")}
+                      className="parent-btn-gold"
+                      onClick={() => window.open(paymentLink, "_blank")}
                     >
-                      <i className="bi bi-wallet2"></i>
-                      View Fees
+                      <i className="bi bi-credit-card-2-front-fill" />
+                      Pay School Fees Online
                     </button>
-
                     <button
-                      className="btn px-4 py-2 d-flex align-items-center gap-2"
-                      style={{
-                        borderRadius: "10px",
-                        fontWeight: 500,
-                        backgroundColor: "rgba(255, 255, 255, 0.2)",
-                        color: "#fff",
-                        border: "1px solid rgba(255, 255, 255, 0.3)",
-                      }}
+                      className="parent-btn-outline"
+                      onClick={() => navigate("/parent/children")}
+                    >
+                      <i className="bi bi-people-fill" />
+                      Manage Children
+                    </button>
+                    <button
+                      className="parent-btn-outline"
                       onClick={() => navigate("/notifications")}
                     >
-                      <i className="bi bi-bell"></i>
-                      Notifications
+                      <i className="bi bi-bell-fill" />
+                      Notifications ({data?.stats.unread_notifications ?? 0})
                     </button>
                   </div>
                 </div>
 
-                <div className="col-md-4 d-none d-md-block text-end">
-                  <div
+                {/* Selected Child Switcher Card in Hero */}
+                <div className="parent-child-card">
+                  <div className="parent-child-card-title">
+                    <span>Active Student</span>
+                    <i className="bi bi-mortarboard-fill text-warning" />
+                  </div>
+
+                  <select
+                    className="form-select mb-3"
+                    value={selectedChildId ?? ""}
+                    onChange={(e) => {
+                      const id = Number(e.target.value);
+                      setSelectedChildId(id);
+                      fetchDashboard(id);
+                    }}
                     style={{
-                      background: "rgba(255, 255, 255, 0.15)",
-                      backdropFilter: "blur(10px)",
-                      borderRadius: "16px",
-                      padding: "1.5rem",
-                      border: "1px solid rgba(255, 255, 255, 0.2)",
+                      borderRadius: 10,
+                      border: "1px solid rgba(255,255,255,0.35)",
+                      background: "rgba(255,255,255,0.2)",
+                      color: "#FFFFFF",
+                      fontSize: "13px",
+                      fontWeight: 600,
                     }}
                   >
-                    <div className="d-flex align-items-center justify-content-between mb-3">
-                      <span className="text-white" style={{ fontSize: "0.9rem", opacity: 0.9 }}>
-                        Selected Child
-                      </span>
-                      <i className="bi bi-people text-white"></i>
+                    {children.map((c) => (
+                      <option key={c.id} value={c.id} style={{ color: "#0F2744" }}>
+                        {c.name} ({c.class || "No Class"})
+                      </option>
+                    ))}
+                  </select>
+
+                  <div className="d-flex flex-column gap-2" style={{ fontSize: "12.5px" }}>
+                    <div className="d-flex justify-content-between align-items-center">
+                      <span style={{ color: "rgba(255, 255, 255, 0.75)" }}>Admission No:</span>
+                      <strong className="text-white">{selectedChild?.reg_no || "N/A"}</strong>
                     </div>
-
-                    <select
-                      className="form-select"
-                      value={selectedChildId ?? ""}
-                      onChange={(e) => {
-                        const id = Number(e.target.value);
-                        setSelectedChildId(id);
-                        fetchDashboard(id);
-                      }}
-                      style={{
-                        borderRadius: 10,
-                        border: "1px solid rgba(255,255,255,0.35)",
-                        background: "rgba(255,255,255,0.2)",
-                        color: "#fff",
-                      }}
-                    >
-                      {children.map((c) => (
-                        <option key={c.id} value={c.id} style={{ color: "#0b1220" }}>
-                          {c.name} ({c.reg_no || "N/A"})
-                        </option>
-                      ))}
-                    </select>
-
-                    <div className="mt-3 d-flex flex-column gap-2">
-                      <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-white" style={{ fontSize: "0.85rem", opacity: 0.8 }}>
-                          Attendance (30d)
-                        </span>
-                        <span className="text-white fw-bold">
-                          {children.find((x) => x.id === selectedChildId)?.attendance_rate_30d ?? 0}%
-                        </span>
-                      </div>
-
-                      <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-white" style={{ fontSize: "0.85rem", opacity: 0.8 }}>
-                          Balance
-                        </span>
-                        <span className="text-white fw-bold">
-                          {money(children.find((x) => x.id === selectedChildId)?.fee_balance ?? 0)}
-                        </span>
-                      </div>
+                    <div className="d-flex justify-content-between align-items-center">
+                      <span style={{ color: "rgba(255, 255, 255, 0.75)" }}>Attendance Rate (30d):</span>
+                      <strong className="text-success">{selectedChild?.attendance_rate_30d ?? 0}%</strong>
+                    </div>
+                    <div className="d-flex justify-content-between align-items-center">
+                      <span style={{ color: "rgba(255, 255, 255, 0.75)" }}>Fee Balance:</span>
+                      <strong style={{ color: Number(selectedChild?.fee_balance || 0) > 0 ? "#FCA5A5" : "#86EFAC" }}>
+                        {money(selectedChild?.fee_balance ?? 0)}
+                      </strong>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Stats Cards */}
-            <div className="row g-3 mb-4 mt-1">
-              {stats.map(({ title, value, icon }, index) => {
-                const colors = [
-                  { gradient: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", icon: "#667eea", bg: "#f0edff" },
-                  { gradient: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)", icon: "#f5576c", bg: "#fff0f3" },
-                  { gradient: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)", icon: "#00f2fe", bg: "#e6f9ff" },
-                  { gradient: "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)", icon: "#38f9d7", bg: "#e6fff9" },
-                ];
+            {/* ── Unified 4-Column Stat Cards ── */}
+            <div className="parent-stat-grid">
+              {stats.map(({ title, value, icon }, idx) => {
+                const meta = [
+                  { color: "#10B981", bg: "rgba(16, 185, 129, 0.12)", border: "rgba(16, 185, 129, 0.3)" },
+                  { color: "#2563EB", bg: "rgba(37, 99, 235, 0.12)", border: "rgba(37, 99, 235, 0.3)" },
+                  { color: "#059669", bg: "rgba(5, 150, 105, 0.12)", border: "rgba(5, 150, 105, 0.3)" },
+                  { color: "#D97706", bg: "rgba(217, 119, 6, 0.12)", border: "rgba(217, 119, 6, 0.3)" },
+                ][idx % 4];
 
                 return (
-                  <div className="col-md-6 col-lg-3" key={title}>
-                    <div
-                      className="card border-0 h-100 position-relative overflow-hidden"
-                      style={{
-                        borderRadius: 12,
-                        boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-                        transition: "transform 0.2s, box-shadow 0.2s",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = "translateY(-4px)";
-                        e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.12)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)";
-                      }}
-                    >
-                      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: colors[index].gradient }} />
-
-                      <div className="card-body p-4">
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                          <div className="p-2 rounded-3" style={{ backgroundColor: colors[index].bg }}>
-                            <i className={`bi bi-${icon} fs-4`} style={{ color: colors[index].icon }} />
-                          </div>
-                          <i className="bi bi-three-dots-vertical text-muted" style={{ cursor: "pointer" }} />
-                        </div>
-
-                        <p className="text-muted mb-1 small">{title}</p>
-                        <h3 className="fw-bold mb-0" style={{ color: "#1e293b" }}>
-                          {value}
-                        </h3>
-
-                        <div className="mt-3 pt-3" style={{ borderTop: "1px solid #f1f5f9" }}>
-                          <small className="text-muted d-flex align-items-center gap-1">
-                            <i className="bi bi-shield-check text-success" />
-                            Live data from your account
-                          </small>
-                        </div>
+                  <div className="parent-stat-card" key={title}>
+                    <div className="d-flex align-items-start justify-content-between">
+                      <div>
+                        <div className="parent-stat-title">{title}</div>
+                        <div className="parent-stat-val">{value}</div>
                       </div>
+                      <div
+                        className="parent-stat-icon-wrap"
+                        style={{ backgroundColor: meta.bg, color: meta.color }}
+                      >
+                        <i className={`bi bi-${icon}`} />
+                      </div>
+                    </div>
+                    <div className="pt-2 d-flex align-items-center gap-1" style={{ borderTop: "1px solid #F1F5F9", fontSize: "11.5px", color: "#64748B" }}>
+                      <i className="bi bi-shield-check text-success" />
+                      Live institutional ledger
                     </div>
                   </div>
                 );
               })}
             </div>
 
-            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
-              <div className="card-body p-4">
-                <div className="d-flex align-items-center justify-content-between gap-3 flex-wrap">
-                  <div className="d-flex align-items-start gap-3">
-                    <div
-                      className="d-flex align-items-center justify-content-center"
-                      style={{
-                        width: 46,
-                        height: 46,
-                        borderRadius: 12,
-                        background: "rgba(211, 0, 176, 0.08)",
-                        color: "rgb(211, 0, 176)",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <i className="bi bi-credit-card-2-front fs-5" />
-                    </div>
-                    <div>
-                      <h6 className="fw-bold mb-1" style={{ color: "#1e293b" }}>
-                        Pay School Fees Online
-                      </h6>
-                      <div className="text-muted small">
-                        Open the public payment page, enter the school code and your child admission number, then pay securely.
-                      </div>
-                      {selectedChild?.reg_no && (
-                        <div className="mt-2 small text-muted">
-                          Selected admission no: <b>{selectedChild.reg_no}</b>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="d-flex align-items-center gap-2 flex-wrap">
-                    <button className="btn btn-primary" style={{ borderRadius: 10, fontWeight: 700 }} onClick={() => window.open(paymentLink, "_blank")}>
-                      <i className="bi bi-box-arrow-up-right me-1" />
-                      Open Payment Link
-                    </button>
-                    <button className="btn btn-outline-secondary" style={{ borderRadius: 10, fontWeight: 700 }} onClick={copyPaymentLink}>
-                      <i className="bi bi-clipboard me-1" />
-                {paymentLinkCopied ? "Copied" : "Copy"}
-                    </button>
-                  </div>
+            {/* ── Quick Actions Grid ── */}
+            <div className="parent-qa-grid">
+              <div
+                className="parent-qa-card"
+                onClick={() => window.open(paymentLink, "_blank")}
+              >
+                <div className="parent-qa-icon" style={{ background: "rgba(16, 185, 129, 0.12)", color: "#10B981" }}>
+                  <i className="bi bi-credit-card-2-front-fill" />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: "13.5px" }}>Pay School Fees</div>
+                  <div style={{ fontSize: "11.5px", color: "#64748B" }}>Secure instant gateway</div>
+                </div>
+              </div>
+
+              <div
+                className="parent-qa-card"
+                onClick={() => navigate("/parent/children")}
+              >
+                <div className="parent-qa-icon" style={{ background: "rgba(37, 99, 235, 0.12)", color: "#2563EB" }}>
+                  <i className="bi bi-file-earmark-bar-graph-fill" />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: "13.5px" }}>Term Broadsheet</div>
+                  <div style={{ fontSize: "11.5px", color: "#64748B" }}>Official academic results</div>
+                </div>
+              </div>
+
+              <div
+                className="parent-qa-card"
+                onClick={() => navigate("/student/my-fees")}
+              >
+                <div className="parent-qa-icon" style={{ background: "rgba(217, 119, 6, 0.12)", color: "#D97706" }}>
+                  <i className="bi bi-receipt-cutoff" />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: "13.5px" }}>Payment History</div>
+                  <div style={{ fontSize: "11.5px", color: "#64748B" }}>Verified receipts & logs</div>
+                </div>
+              </div>
+
+              <div
+                className="parent-qa-card"
+                onClick={() => navigate("/parent/whatsapp-verification")}
+              >
+                <div className="parent-qa-icon" style={{ background: "rgba(5, 150, 105, 0.12)", color: "#059669" }}>
+                  <i className="bi bi-whatsapp" />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: "13.5px" }}>WhatsApp Alerts</div>
+                  <div style={{ fontSize: "11.5px", color: "#64748B" }}>Direct mobile updates</div>
                 </div>
               </div>
             </div>
 
-            {/* Charts */}
+            {/* ── Visual Analytics / Charts ── */}
             <div className="row g-4 mb-4">
               <div className="col-lg-8">
-                <div className="card shadow-sm border-0 h-100" style={{ borderRadius: 12 }}>
-                  <div className="card-body p-4">
-                    <div className="d-flex justify-content-between align-items-center mb-4">
-                      <div className="d-flex align-items-center gap-2">
-                        <div className="p-2 rounded-2" style={{ backgroundColor: "#e0e7ff" }}>
-                          <i className="bi bi-clipboard-check" style={{ color: "#6366f1" }} />
-                        </div>
-                        <div>
-                          <h6 className="mb-0 fw-semibold" style={{ color: "#1e293b" }}>
-                            Attendance (Last 7 Days)
-                          </h6>
-                          <small className="text-muted">For selected child</small>
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ height: 300 }}>
+                <div className="parent-panel h-100 mb-0">
+                  <div className="parent-panel-head">
+                    <h2 className="parent-panel-title">
+                      <i className="bi bi-calendar2-check-fill text-primary" />
+                      Weekly Attendance Activity
+                    </h2>
+                    <span className="badge bg-light text-dark" style={{ border: "1px solid #E2E8F0" }}>
+                      {selectedChild?.name || "Selected Student"}
+                    </span>
+                  </div>
+                  <div className="parent-panel-body">
+                    <div style={{ height: 280 }}>
                       <canvas ref={attendanceChartRef} />
                     </div>
                   </div>
@@ -612,20 +920,18 @@ export default function ParentDashboardPage() {
               </div>
 
               <div className="col-lg-4">
-                <div className="card shadow-sm border-0 h-100" style={{ borderRadius: 12 }}>
-                  <div className="card-body p-4">
-                    <div className="d-flex align-items-center gap-2 mb-4">
-                      <div className="p-2 rounded-2" style={{ backgroundColor: "#dbeafe" }}>
-                        <i className="bi bi-wallet2" style={{ color: "#3b82f6" }} />
-                      </div>
-                      <div>
-                        <h6 className="mb-0 fw-semibold" style={{ color: "#1e293b" }}>
-                          Fee Balance by Child
-                        </h6>
-                        <small className="text-muted">Outstanding amounts</small>
-                      </div>
-                    </div>
-                    <div style={{ height: 300 }}>
+                <div className="parent-panel h-100 mb-0">
+                  <div className="parent-panel-head">
+                    <h2 className="parent-panel-title">
+                      <i className="bi bi-pie-chart-fill text-warning" />
+                      Fee Balance by Child
+                    </h2>
+                    <span className="badge bg-light text-dark" style={{ border: "1px solid #E2E8F0" }}>
+                      ₦ NGN
+                    </span>
+                  </div>
+                  <div className="parent-panel-body">
+                    <div style={{ height: 280 }}>
                       <canvas ref={feesChartRef} />
                     </div>
                   </div>
@@ -633,123 +939,207 @@ export default function ParentDashboardPage() {
               </div>
             </div>
 
-            {/* Children Table */}
-            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
-              <div className="card-body p-4">
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <div>
-                    <h6 className="fw-semibold mb-0" style={{ color: "#1e293b" }}>
-                      My Children
-                    </h6>
-                    <small className="text-muted">Quick overview (fees, attendance, results)</small>
+            {/* ── Children Summary Table ── */}
+            <div className="parent-panel">
+              <div className="parent-panel-head">
+                <div>
+                  <h2 className="parent-panel-title">
+                    <i className="bi bi-people-fill text-primary" />
+                    Enrolled Children Overview
+                  </h2>
+                  <div style={{ fontSize: "12px", color: "#64748B", marginTop: "2px" }}>
+                    Continuous assessment, fee status, and result access for your family
                   </div>
                 </div>
+                <button
+                  className="btn btn-sm btn-outline-primary"
+                  style={{ borderRadius: 8, fontWeight: 700 }}
+                  onClick={() => fetchDashboard(selectedChildId ?? undefined)}
+                >
+                  <i className="bi bi-arrow-clockwise me-1" />
+                  Refresh Data
+                </button>
+              </div>
 
-                <div className="table-responsive">
-                  <table className="table align-middle">
-                    <thead>
-                      <tr className="text-muted small">
-                        <th>Student</th>
-                        <th>Class</th>
-                        <th>Attendance (30d)</th>
-                        <th>Fee Balance</th>
-                        <th>Results</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {children.map((c) => (
+              <div className="table-responsive">
+                <table className="parent-table">
+                  <thead>
+                    <tr>
+                      <th>Student</th>
+                      <th>Class</th>
+                      <th>Attendance (30d)</th>
+                      <th>Fee Status</th>
+                      <th>Outstanding</th>
+                      <th className="text-end">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {children.map((c) => {
+                      const balance = Number(c.fee_balance || 0);
+                      const isClear = balance <= 0;
+
+                      return (
                         <tr key={c.id}>
                           <td>
-                            <div className="d-flex align-items-center gap-2">
+                            <div className="d-flex align-items-center gap-3">
                               <div
-                                className="rounded-circle d-flex align-items-center justify-content-center"
                                 style={{
                                   width: 38,
                                   height: 38,
-                                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                  color: "#fff",
-                                  fontWeight: 700,
+                                  borderRadius: "50%",
+                                  background: "linear-gradient(135deg, #0A192F 0%, #1E3A8A 100%)",
+                                  color: "#FBBF24",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontWeight: 800,
+                                  fontSize: "14px",
                                 }}
                               >
                                 {(c.name?.[0] || "S").toUpperCase()}
                               </div>
                               <div>
-                                <div className="fw-semibold">{c.name}</div>
-                                <small className="text-muted">{c.reg_no || "N/A"}</small>
+                                <div style={{ fontWeight: 700, color: "#0F2744" }}>{c.name}</div>
+                                <div style={{ fontSize: "11.5px", color: "#64748B" }}>
+                                  Admission No: <strong>{c.reg_no || "N/A"}</strong>
+                                </div>
                               </div>
                             </div>
                           </td>
-                          <td>{c.class || "—"}</td>
                           <td>
-                            <span className="badge bg-light text-dark" style={{ borderRadius: 20 }}>
-                              {c.attendance_rate_30d}%
-                            </span>
+                            <span style={{ fontWeight: 600 }}>{c.class || "—"}</span>
                           </td>
-                          <td className="fw-semibold">{money(c.fee_balance)}</td>
-                          <td>{c.results_count}</td>
+                          <td>
+                            <div className="d-flex align-items-center gap-2">
+                              <div className="progress flex-grow-1" style={{ height: 6, width: 60, borderRadius: 999 }}>
+                                <div
+                                  className="progress-bar bg-success"
+                                  style={{ width: `${Math.min(100, c.attendance_rate_30d || 0)}%` }}
+                                />
+                              </div>
+                              <span style={{ fontWeight: 700, fontSize: "12px" }}>{c.attendance_rate_30d}%</span>
+                            </div>
+                          </td>
+                          <td>
+                            {isClear ? (
+                              <span className="parent-badge-clear">
+                                <i className="bi bi-check-circle-fill me-1" />
+                                Cleared
+                              </span>
+                            ) : (
+                              <span className="parent-badge-owing">
+                                <i className="bi bi-exclamation-circle-fill me-1" />
+                                Balance Due
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ fontWeight: 700, color: isClear ? "#15803D" : "#B91C1C" }}>
+                            {money(c.fee_balance)}
+                          </td>
                           <td className="text-end">
-                            <button
-                              className="btn btn-sm btn-outline-primary"
-                              style={{ borderRadius: 10 }}
-                              onClick={() => {
-                                setSelectedChildId(c.id);
-                                fetchDashboard(c.id);
-                              }}
-                            >
-                              Select
-                            </button>
+                            <div className="d-flex align-items-center justify-content-end gap-2">
+                              <button
+                                className={`btn btn-sm ${c.id === selectedChildId ? "btn-primary" : "btn-outline-secondary"}`}
+                                style={{ borderRadius: 8, fontWeight: 700, fontSize: "12px" }}
+                                onClick={() => {
+                                  setSelectedChildId(c.id);
+                                  fetchDashboard(c.id);
+                                }}
+                              >
+                                {c.id === selectedChildId ? "Selected" : "Select"}
+                              </button>
+                              <button
+                                className="btn btn-sm btn-outline-success"
+                                style={{ borderRadius: 8, fontWeight: 700, fontSize: "12px" }}
+                                onClick={() => {
+                                  const childPayLink = `${window.location.origin}/pay-school-fee${c.reg_no ? `?student_reg_no=${encodeURIComponent(c.reg_no)}` : ""}`;
+                                  window.open(childPayLink, "_blank");
+                                }}
+                              >
+                                Pay Fees
+                              </button>
+                            </div>
                           </td>
                         </tr>
-                      ))}
-                      {children.length === 0 && (
-                        <tr>
-                          <td colSpan={6} className="text-center text-muted py-4">
-                            No children assigned.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                      );
+                    })}
+                    {children.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="text-center py-5 text-muted">
+                          <i className="bi bi-people fs-2 d-block mb-2 text-secondary" />
+                          No children assigned to this parent account yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
 
-            {/* Notifications */}
-            <div className="card border-0 shadow-sm mb-5" style={{ borderRadius: 12 }}>
-              <div className="card-body p-4">
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <div>
-                    <h6 className="fw-semibold mb-0" style={{ color: "#1e293b" }}>
-                      Recent Notifications
-                    </h6>
-                    <small className="text-muted">Latest updates for your account</small>
-                  </div>
-                  <button className="btn btn-sm btn-light" style={{ borderRadius: 10 }} onClick={() => navigate("/notifications")}>
-                    View all
-                  </button>
-                </div>
+            {/* ── Recent Notifications Panel ── */}
+            <div className="parent-panel mb-5">
+              <div className="parent-panel-head">
+                <h2 className="parent-panel-title">
+                  <i className="bi bi-bell-fill text-warning" />
+                  Recent Account & School Notifications
+                </h2>
+                <button
+                  className="btn btn-sm btn-light"
+                  style={{ borderRadius: 8, fontWeight: 700 }}
+                  onClick={() => navigate("/notifications")}
+                >
+                  View All Notifications
+                </button>
+              </div>
 
-                <div className="d-flex flex-column gap-2">
+              <div className="parent-panel-body p-0">
+                <div className="d-flex flex-column">
                   {(data?.recent_notifications ?? []).map((n) => (
                     <div
                       key={n.id}
-                      className="p-3 rounded-3"
-                      style={{
-                        backgroundColor: "#f8fafc",
-                        border: "1px solid #eef2f7",
-                      }}
+                      className="p-3 d-flex align-items-center justify-content-between border-bottom"
+                      style={{ transition: "background 0.2s" }}
                     >
-                      <div className="d-flex justify-content-between">
-                    <div className="fw-semibold">{n.data?.message ?? "Notification"}</div>
-                        <small className="text-muted">{new Date(n.created_at).toLocaleString()}</small>
+                      <div className="d-flex align-items-center gap-3">
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 10,
+                            background: "rgba(217, 119, 6, 0.12)",
+                            color: "#D97706",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "16px",
+                          }}
+                        >
+                          <i className="bi bi-chat-left-dots-fill" />
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, color: "#0F2744", fontSize: "13.5px" }}>
+                            {n.data?.message ?? "School Notification"}
+                          </div>
+                          {n.data?.type && (
+                            <small className="text-muted">Type: {n.data.type}</small>
+                          )}
+                        </div>
                       </div>
-                      {n.data?.type && <small className="text-muted">Type: {n.data.type}</small>}
+                      <small className="text-muted">
+                        {new Date(n.created_at).toLocaleDateString("en-NG", {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </small>
                     </div>
                   ))}
 
                   {(data?.recent_notifications ?? []).length === 0 && (
-                    <div className="text-muted">No notifications yet.</div>
+                    <div className="text-muted text-center py-4">
+                      No new notifications at this time.
+                    </div>
                   )}
                 </div>
               </div>

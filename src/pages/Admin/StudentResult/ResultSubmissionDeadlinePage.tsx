@@ -245,43 +245,24 @@ export default function ResultSubmissionDeadlinePage() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;700&display=swap');
-
-        :root {
-          --rd-light: var(--bs-light, #fcf8f8);
-          --rd-dark: var(--bs-dark, #050008);
-          --rd-accent: var(--bs-secondary, rgb(255,200,87));
-          --rd-primary: var(--bs-primary, rgb(211,0,176));
-          --rd-success: var(--bs-success, rgb(34,197,94));
-          --rd-danger: var(--bs-danger, rgb(239,68,68));
-          --rd-border: var(--bs-border-color, #ede8e0);
-          --rd-radius: var(--bs-border-radius-lg, 14px);
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
         .rd-main {
-          background: var(--rd-light);
+          background: #F8FAFC;
           min-height: 100vh;
-          font-family: 'DM Sans', sans-serif;
-          padding: 28px 28px 0;
+          font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+          padding: 24px 28px 0;
         }
 
         .rd-hero {
-          background: var(--rd-dark);
+          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
           color: #fff;
-          border-radius: var(--rd-radius);
-          padding: 30px 34px;
+          border-radius: 18px;
+          padding: 32px 36px;
           position: relative;
           overflow: hidden;
           margin-bottom: 24px;
-        }
-
-        .rd-hero::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background-image: radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px);
-          background-size: 24px 24px;
-          pointer-events: none;
+          box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
         }
 
         .rd-hero-glow {
@@ -291,7 +272,7 @@ export default function ResultSubmissionDeadlinePage() {
           top: -70px;
           right: -70px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(255,200,87,0.10) 0%, transparent 68%);
+          background: radial-gradient(circle, rgba(217, 119, 6, 0.15) 0%, transparent 68%);
         }
 
         .rd-hero-inner {
@@ -307,50 +288,51 @@ export default function ResultSubmissionDeadlinePage() {
         .rd-kicker {
           display: inline-flex;
           align-items: center;
-          gap: 8px;
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: .12em;
+          gap: 7px;
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: .04em;
           text-transform: uppercase;
-          color: var(--rd-accent);
-          background: rgba(255,200,87,0.10);
-          border: 1px solid rgba(255,200,87,0.22);
+          color: #FBBF24;
+          background: rgba(217, 119, 6, 0.20);
+          border: 1px solid rgba(217, 119, 6, 0.35);
           border-radius: 999px;
-          padding: 5px 12px;
-          margin-bottom: 14px;
+          padding: 4px 12px;
+          margin-bottom: 12px;
         }
 
         .rd-kicker-dot {
           width: 6px;
           height: 6px;
           border-radius: 50%;
-          background: var(--rd-success);
+          background: #10B981;
         }
 
         .rd-title {
-          font-family: 'Playfair Display', serif;
-          font-size: clamp(24px, 2.6vw, 34px);
-          line-height: 1.08;
+          font-size: 26px;
+          font-weight: 800;
+          line-height: 1.1;
           margin: 0 0 8px;
+          color: #fff;
         }
 
         .rd-title em {
-          color: var(--rd-primary);
-          font-style: italic;
+          color: #FBBF24;
+          font-style: normal;
         }
 
         .rd-sub {
-          color: rgba(255,255,255,0.45);
+          color: #CBD5E1;
           font-size: 13.5px;
-          max-width: 520px;
-          line-height: 1.7;
+          max-width: 580px;
+          line-height: 1.6;
           margin: 0;
         }
 
         .rd-hero-card {
-          background: rgba(255,255,255,0.05);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: var(--rd-radius);
+          background: rgba(255,255,255,0.08);
+          border: 1px solid rgba(255,255,255,0.15);
+          border-radius: 14px;
           padding: 18px 20px;
           min-width: 250px;
           backdrop-filter: blur(10px);
@@ -366,19 +348,18 @@ export default function ResultSubmissionDeadlinePage() {
         .rd-hero-card-row + .rd-hero-card-row {
           margin-top: 12px;
           padding-top: 12px;
-          border-top: 1px solid rgba(255,255,255,0.06);
+          border-top: 1px solid rgba(255,255,255,0.08);
         }
 
         .rd-hero-label {
           font-size: 12px;
-          color: rgba(255,255,255,0.38);
+          color: #CBD5E1;
         }
 
         .rd-hero-value {
-          font-family: 'Playfair Display', serif;
           font-size: 18px;
-          color: var(--rd-accent);
-          font-weight: 700;
+          color: #FBBF24;
+          font-weight: 800;
         }
 
         .rd-stats {
@@ -398,38 +379,43 @@ export default function ResultSubmissionDeadlinePage() {
 
         .rd-stat {
           background: #fff;
-          border: 1px solid var(--rd-border);
-          border-radius: var(--rd-radius);
-          padding: 22px;
+          border: 1px solid #E2E8F0;
+          border-radius: 16px;
+          padding: 20px 22px;
+          box-shadow: 0 4px 16px rgba(15,39,68,0.03);
         }
 
         .rd-stat-label {
-          font-size: 12px;
-          color: #9a8a7a;
-          margin-bottom: 8px;
+          font-size: 11.5px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: #64748B;
+          margin-bottom: 6px;
         }
 
         .rd-stat-value {
-          font-family: 'Playfair Display', serif;
-          font-size: 30px;
+          font-size: 26px;
+          font-weight: 800;
           line-height: 1;
-          color: var(--rd-dark);
+          color: #0F2744;
         }
 
         .rd-stat-sub {
           margin-top: 12px;
           padding-top: 12px;
-          border-top: 1px solid rgba(0,0,0,0.06);
+          border-top: 1px solid #E2E8F0;
           font-size: 12px;
-          color: #9a8a7a;
+          color: #64748B;
         }
 
         .rd-panel {
           background: #fff;
-          border: 1px solid var(--rd-border);
-          border-radius: var(--rd-radius);
+          border: 1px solid #E2E8F0;
+          border-radius: 16px;
           overflow: hidden;
           margin-bottom: 24px;
+          box-shadow: 0 4px 16px rgba(15,39,68,0.03);
         }
 
         .rd-panel-head {
@@ -437,15 +423,15 @@ export default function ResultSubmissionDeadlinePage() {
           align-items: center;
           justify-content: space-between;
           gap: 14px;
-          padding: 20px 22px;
-          border-bottom: 1px solid rgba(0,0,0,0.06);
+          padding: 18px 20px;
+          border-bottom: 1px solid #E2E8F0;
           flex-wrap: wrap;
         }
 
         .rd-panel-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 18px;
-          color: var(--rd-dark);
+          font-size: 16px;
+          font-weight: 800;
+          color: #0F2744;
           margin: 0;
         }
 

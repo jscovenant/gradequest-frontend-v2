@@ -660,7 +660,7 @@ export default function OfflineCbtRunnerPage() {
                     <p className="offline-sub">
                       {bundle
                         ? "This is what the local server currently has ready for student devices."
-                        : "Download an offline CBT package from the main GradeQuest portal, then import it here."}
+                        : "Download an offline CBT package from the main SchoolProfit portal, then import it here."}
                     </p>
                     <div className="offline-kv">
                       <div><strong>School</strong><span>{bundle?.school_name || "Not set"}</span></div>

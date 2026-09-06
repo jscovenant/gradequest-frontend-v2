@@ -270,16 +270,17 @@ export default function ForgotPasswordPage() {
           <div className="fp-left-glow2" aria-hidden="true" />
 
           <div className="fp-logo">
-              <a href="/" className="ft-logo" aria-label="GradeQuest home">     
-        <div className="ft-logo-wrap">
+              <a href="/" className="ft-logo" aria-label="SchoolProfit home">     
+        <div className="ft-logo-wrap" style={{ background: "transparent", border: "none" }}>
           <img
-            src="/media/logo/gradequest-logo.png"
-            alt="GradeQuest logo"
+            src="/media/logo/schoolprofit-icon.svg"
+            alt="SchoolProfit logo"
             className="ft-logo-img"
+            style={{ width: "32px", height: "32px" }}
           />
         </div>
       </a>
-            <span className="fp-logo-name">Grade<span>Quest</span></span>
+            <span className="fp-logo-name">School<span style={{ color: "#10B981" }}>Profit</span></span>
           </div>
 
           <div className="fp-left-body">
@@ -291,13 +292,13 @@ export default function ForgotPasswordPage() {
             <h1 className="fp-left-headline">
               Regain access
               <br />
-              to your <em>admin</em>
+              to your <em>school</em>
               <br />
               account.
             </h1>
 
             <p className="fp-left-desc">
-              Enter the email address registered to your GradeQuest admin account.
+              Enter the email address registered to your SchoolProfit school account.
               We&apos;ll send a 6-digit code valid for 15 minutes.
             </p>
 
@@ -339,7 +340,7 @@ export default function ForgotPasswordPage() {
                 <path d="M10 10l7-4M10 10v8M10 10L3 6" stroke="#0f172a" strokeWidth="1.4" strokeLinecap="round"/>
               </svg>
             </div>
-            <span className="fp-logo-name">Grade<span>Quest</span></span>
+            <span className="fp-logo-name">Gradios<span>Edu</span></span>
           </div>
 
           <div className="fp-form-header">

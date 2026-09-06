@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "tsc --noEmit && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "sass:build": "sass --no-source-map public/scss:public/css",

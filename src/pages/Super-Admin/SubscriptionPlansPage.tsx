@@ -63,8 +63,28 @@ type PlanForm = {
 
 const FEATURE_PRESETS: FeatureDraft[] = [
   { feature_name: "Online CBT", feature_key: "cbt_online", is_enabled: true },
-  { feature_name: "Offline CBT", feature_key: "cbt_offline", is_enabled: true },
+  { feature_name: "Offline CBT (LAN Server)", feature_key: "cbt_offline", is_enabled: true },
+  { feature_name: "Hostel Management", feature_key: "hostel_management", is_enabled: true },
+  { feature_name: "Transport Management", feature_key: "transport_management", is_enabled: true },
   { feature_name: "Report Card Designer", feature_key: "report_card_designer", is_enabled: true },
+  { feature_name: "WhatsApp Notifications", feature_key: "whatsapp_notifications", is_enabled: true },
+  { feature_name: "AI CBT Question Generator", feature_key: "ai_cbt_question_generator", is_enabled: true },
+  { feature_name: "AI Result Comment Generator", feature_key: "ai_result_comment_generator", is_enabled: true },
+  { feature_name: "AI Lesson Plan Generator", feature_key: "ai_lesson_plan_generator", is_enabled: true },
+  { feature_name: "AI Lesson Note Generator", feature_key: "ai_lesson_note_generator", is_enabled: true },
+  { feature_name: "AI Scheme of Work Generator", feature_key: "ai_scheme_work_generator", is_enabled: true },
+  { feature_name: "AI Fee Collection Assistant", feature_key: "ai_fee_collection_assistant", is_enabled: true },
+  { feature_name: "Student Management", feature_key: "student_management", is_enabled: true },
+  { feature_name: "Teacher Management", feature_key: "teacher_management", is_enabled: true },
+  { feature_name: "Result & Assessment Management", feature_key: "result_management", is_enabled: true },
+  { feature_name: "Fee Management & Invoicing", feature_key: "fee_management", is_enabled: true },
+  { feature_name: "Income & Expense Finance", feature_key: "finance_management", is_enabled: true },
+  { feature_name: "Online Fee Payment", feature_key: "online_payment", is_enabled: true },
+  { feature_name: "Attendance Management", feature_key: "attendance_management", is_enabled: true },
+  { feature_name: "Staff Attendance & QR Check-in", feature_key: "staff_attendance", is_enabled: true },
+  { feature_name: "Parent Portal", feature_key: "parent_management", is_enabled: true },
+  { feature_name: "Bursar & Accounting Portal", feature_key: "bursar_management", is_enabled: true },
+  { feature_name: "School Settings & Customization", feature_key: "settings_management", is_enabled: true },
 ];
 
 /* =========================
@@ -116,13 +136,23 @@ function safeParseFeatures(raw: Plan["features"]): PlanFeature[] {
 
 function toDraftFeatures(raw: Plan["features"]): FeatureDraft[] {
   const arr = safeParseFeatures(raw);
-  return arr
-    .map((f) => ({
-      feature_name: String(f.feature_name ?? f.feature_key ?? "").trim(),
-      feature_key: String(f.feature_key ?? "").trim() || normalizeKey(String(f.feature_name ?? "")),
+  const seen = new Set<string>();
+  const drafts: FeatureDraft[] = [];
+
+  for (const f of arr) {
+    const key = String(f.feature_key ?? "").trim() || normalizeKey(String(f.feature_name ?? ""));
+    const name = String(f.feature_name ?? f.feature_key ?? "").trim();
+    if (!key && !name) continue;
+    if (seen.has(key.toLowerCase())) continue;
+    seen.add(key.toLowerCase());
+    drafts.push({
+      feature_name: name,
+      feature_key: key,
       is_enabled: asBool(f.is_enabled),
-    }))
-    .filter((f) => f.feature_name || f.feature_key);
+    });
+  }
+
+  return drafts;
 }
 
 function isFreePlan(plan: Plan) {
@@ -644,11 +674,6 @@ export default function SubscriptionPlansPage() {
                       )}
                     </tbody>
                   </table>
-                </div>
-
-                <div className="mt-3 text-muted small">
-                  <i className="bi bi-info-circle me-1" />
-                  Features are stored in DB as JSON string (array of objects).
                 </div>
               </div>
             </div>

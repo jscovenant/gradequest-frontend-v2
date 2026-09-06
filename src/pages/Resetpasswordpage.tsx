@@ -512,12 +512,13 @@ export default function ResetPasswordPage() {
           <div className="rp-glow2" aria-hidden="true" />
 
           <div className="rp-logo">
-      <a href="/" className="ft-logo" aria-label="GradeQuest home">     
-        <div className="ft-logo-wrap">
+      <a href="/" className="ft-logo" aria-label="SchoolProfit home">     
+        <div className="ft-logo-wrap" style={{ background: "transparent", border: "none" }}>
           <img
-            src="/media/logo/gradequest-logo.png"
-            alt="GradeQuest logo"
+            src="/media/logo/schoolprofit-icon.svg"
+            alt="SchoolProfit logo"
             className="ft-logo-img"
+            style={{ width: "32px", height: "32px" }}
           />
         </div>
       </a>
@@ -579,7 +580,7 @@ export default function ResetPasswordPage() {
                 <path d="M10 10l7-4M10 10v8M10 10L3 6" stroke="#0f172a" strokeWidth="1.4" strokeLinecap="round"/>
               </svg>
             </div>
-            <span className="rp-logo-name">Grade<span>Quest</span></span>
+            <span className="rp-logo-name">Gradios<span>Edu</span></span>
           </div>
 
           {step === "otp" && (

@@ -768,8 +768,9 @@ export default function ParentsPage() {
 .pr-main{
   background: var(--bs-body-bg, #f5f1eb);
   min-height: 100vh;
-  font-family: "DM Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  padding: 96px 24px 34px;
+  background: #F8FAFC;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  padding: 24px 28px 34px;
   margin-left: 280px;
   width: calc(100% - 280px);
   max-width: calc(100% - 280px);
@@ -780,36 +781,29 @@ export default function ParentsPage() {
     margin-left: 0;
     width: 100%;
     max-width: 100%;
-    padding: 88px 14px 28px;
+    padding: 18px 14px 28px;
   }
 }
 
 .pr-hero{
-  background:#0f172a;
-  border-radius: var(--bs-border-radius-lg, 16px);
+  background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
+  border-radius: 18px;
   padding: 32px 36px;
   position:relative;
   overflow:hidden;
-  margin-bottom: 18px;
-}
-.pr-hero::before{
-  content:"";
-  position:absolute;
-  inset:0;
-  background-image: radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px);
-  background-size:24px 24px;
-  pointer-events:none;
+  margin-bottom: 24px;
+  box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
 }
 .pr-hero-glow{
   position:absolute; top:-60px; right:-60px;
   width:320px; height:320px; border-radius:50%;
-  background: radial-gradient(circle, rgba(201,168,76,0.1) 0%, transparent 65%);
+  background: radial-gradient(circle, rgba(217,119,6,0.15) 0%, transparent 65%);
   pointer-events:none;
 }
 .pr-hero-glow2{
   position:absolute; bottom:-40px; left:30%;
   width:220px; height:220px; border-radius:50%;
-  background: radial-gradient(circle, rgba(99,102,241,0.07) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(37,99,235,0.10) 0%, transparent 70%);
   pointer-events:none;
 }
 .pr-hero-inner{
@@ -819,18 +813,18 @@ export default function ParentsPage() {
 }
 .pr-session-badge{
   display:inline-flex; align-items:center; gap:7px;
-  font-size:11px; font-weight:500; letter-spacing:0.12em;
+  font-size:11.5px; font-weight:700; letter-spacing:0.04em;
   text-transform:uppercase;
-  color:#e8c97a;
-  background: rgba(201,168,76,0.1);
-  border: 1px solid rgba(201,168,76,0.2);
+  color:#FBBF24;
+  background: rgba(217,119,6,0.20);
+  border: 1px solid rgba(217,119,6,0.35);
   border-radius:999px;
   padding: 4px 12px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 .pr-session-dot{
   width:6px; height:6px; border-radius:50%;
-  background:#22c55e;
+  background:#10B981;
   animation: prPulse 2s ease infinite;
 }
 @keyframes prPulse{
@@ -838,45 +832,44 @@ export default function ParentsPage() {
   50%{ opacity:.4; transform:scale(1.5); }
 }
 .pr-greeting{
-  font-family:"Lora", Georgia, serif;
-  font-size: clamp(22px, 2.5vw, 32px);
-  font-weight:700;
+  font-size: 26px;
+  font-weight:800;
   color:#fff;
   line-height:1.1;
   margin-bottom: 8px;
 }
-.pr-greeting em{ font-style:italic; color:#e8c97a; }
+.pr-greeting em{ font-style:normal; color:#FBBF24; }
 .pr-hero-sub{
-  font-size: 13.5px; font-weight:300; color:#64748b;
-  line-height:1.65; max-width:520px; margin-bottom: 18px;
+  font-size: 13.5px; color:#CBD5E1;
+  line-height:1.6; max-width:520px; margin-bottom: 20px;
 }
 .pr-hero-btns{ display:flex; gap:10px; flex-wrap:wrap; }
 
 .pr-btn-gold{
   display:inline-flex; align-items:center; gap:7px;
-  padding: 10px 18px;
-  font-size:13px; font-weight:500;
-  color:#0f172a;
-  background:#c9a84c;
+  padding: 9px 18px;
+  font-size:13px; font-weight:700;
+  color:#FFFFFF;
+  background:#D97706;
   border:none;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor:pointer;
-  transition: background .2s, transform .2s;
+  transition: all .2s ease;
   text-decoration:none;
   white-space:nowrap;
 }
-.pr-btn-gold:hover{ background:#e8c97a; transform: translateY(-1px); }
+.pr-btn-gold:hover{ background:#B45309; transform: translateY(-1px); color:#fff; }
 
 .pr-btn-outline{
   display:inline-flex; align-items:center; gap:7px;
-  padding: 10px 18px;
-  font-size:13px; font-weight:400;
-  color: rgba(255,255,255,0.75);
-  background: transparent;
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 8px;
+  padding: 9px 18px;
+  font-size:13px; font-weight:600;
+  color: #FFFFFF;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.20);
+  border-radius: 10px;
   cursor:pointer;
-  transition: background .2s, border-color .2s, color .2s;
+  transition: all .2s ease;
   white-space:nowrap;
 }
 .pr-btn-outline:hover{
@@ -1158,13 +1151,35 @@ export default function ParentsPage() {
 .pr-mini-btn--danger:hover{ background:#fff7ed; }
 .pr-mini-btn:disabled{ opacity:.6; cursor:not-allowed; }
 
+.pr-icon-btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:36px; height:36px;
+  border-radius:10px;
+  font-size:15px;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: #fff;
+  color:#1a1a2e;
+  cursor:pointer;
+  transition: all .2s ease;
+  flex-shrink:0;
+}
+.pr-icon-btn:hover{ background:#faf8f5; transform: translateY(-1px); }
+.pr-icon-btn--view{ background: #fef3c7; color:#b45309; border-color:#fde68a; }
+.pr-icon-btn--view:hover{ background: #fde68a; }
+.pr-icon-btn--validate{ background: #dbeafe; color:#1e40af; border-color:#bfdbfe; }
+.pr-icon-btn--validate:hover{ background: #bfdbfe; }
+.pr-icon-btn--danger{ background:#fee2e2; color:#b91c1c; border-color: #fca5a5; }
+.pr-icon-btn--danger:hover{ background:#fecaca; }
+
 /* Modal shell */
 .pr-overlay{
   position:fixed; inset:0;
-  background: rgba(0,0,0,.55);
-  backdrop-filter: blur(7px);
+  background: rgba(10, 25, 47, 0.70);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display:flex; align-items:center; justify-content:center;
   z-index: 1400;
+  padding: 16px;
 }
 .pr-modal{
   width: min(1100px, 96vw);
@@ -1172,89 +1187,101 @@ export default function ParentsPage() {
   border-radius: 18px;
   overflow: hidden;
   background: #fff;
-  border: 1px solid rgba(255,255,255,0.12);
-  box-shadow: 0 20px 50px rgba(0,0,0,0.22);
+  border: 1px solid rgba(15, 39, 68, 0.12);
+  box-shadow: 0 25px 60px -12px rgba(15, 39, 68, 0.35);
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
 }
 .pr-modal--md{ width: min(900px, 96vw); }
 .pr-modal-head{
-  background:#0f172a;
+  background: linear-gradient(135deg, #0A192F 0%, #0F2744 100%);
   position:relative;
-  padding: 18px 20px;
+  padding: 22px 28px 16px;
   overflow:hidden;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 .pr-modal-head::before{
   content:"";
   position:absolute;
   inset:0;
-  background-image: radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px);
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
   background-size:24px 24px;
   pointer-events:none;
 }
 .pr-modal-head-inner{
   position:relative; z-index:1;
   display:flex; align-items:flex-start; justify-content:space-between;
-  gap: 12px;
+  gap: 16px; flex-wrap: wrap;
 }
 .pr-modal-title{
-  display:flex; align-items:center; gap: 12px;
+  display:flex; align-items:center; gap: 14px;
   color:#fff;
 }
 .pr-modal-title h5{
   margin:0;
-  font-family:"Lora", serif;
-  font-weight:700;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  font-weight:800;
+  font-size: 18px;
+  color: #FFFFFF;
 }
 .pr-modal-title p{
-  margin:0;
+  margin:4px 0 0;
   font-size: 12.5px;
-  font-weight: 300;
-  color:#64748b;
+  color:#CBD5E1;
 }
 .pr-modal-body{
-  background:#f5f1eb;
-  padding: 16px 16px 18px;
+  background:#F8FAFC;
+  padding: 24px;
   overflow:auto;
   max-height: calc(92vh - 150px);
 }
 .pr-modal-foot{
-  padding: 12px 16px;
-  border-top: 1px solid rgba(0,0,0,0.06);
+  padding: 16px 24px;
+  border-top: 1px solid #E2E8F0;
   background:#fff;
   display:flex;
   align-items:center;
   justify-content:space-between;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 .pr-tabs{
-  display:flex; flex-wrap:wrap; gap: 8px;
-  margin-top: 12px;
+  display:flex; flex-wrap:wrap; gap: 4px;
+  margin-top: 16px;
+  position: relative;
+  z-index: 1;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.08);
 }
 .pr-tab{
   display:inline-flex; align-items:center; gap: 7px;
-  padding: 7px 12px;
-  border-radius: 999px;
-  font-size: 12.5px;
-  border: 1px solid rgba(255,255,255,0.18);
+  padding: 9px 16px;
+  border-radius: 8px 8px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
   background: transparent;
-  color: rgba(255,255,255,0.85);
+  color: rgba(255,255,255,0.7);
   cursor: pointer;
+  transition: all 0.2s ease;
 }
-.pr-tab:hover{ background: rgba(255,255,255,0.06); color:#fff; }
+.pr-tab:hover{ background: rgba(255,255,255,0.08); color:#fff; }
 .pr-tab--active{
-  background: rgba(201,168,76,0.12);
-  border-color: rgba(201,168,76,0.22);
-  color:#e8c97a;
+  background: rgba(217,119,6,0.18);
+  border-bottom: 2px solid #FBBF24;
+  color:#FBBF24;
+  font-weight: 700;
 }
 
 /* Inside modal content cards */
 .pr-card{
   background:#fff;
-  border: 1px solid #ede8e0;
+  border: 1px solid #E2E8F0;
   border-radius: 14px;
   overflow:hidden;
+  box-shadow: 0 2px 10px rgba(15, 39, 68, 0.04);
 }
-.pr-card-pad{ padding: 16px; }
+.pr-card-pad{ padding: 20px; }
 .pr-form-grid{
   display:grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1712,16 +1739,31 @@ export default function ParentsPage() {
 
                             <td style={{ textAlign: "right" }}>
                               <div style={{ display: "inline-flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                                <button className="pr-mini-btn" onClick={() => openParent(p)}>
-                                  {I.eye} View
+                                <button
+                                  className="pr-icon-btn pr-icon-btn--view"
+                                  onClick={() => openParent(p)}
+                                  title={`View Profile: ${fullName(p)}`}
+                                  aria-label="View Parent Profile"
+                                >
+                                  {I.eye}
                                 </button>
 
-                                <button className="pr-mini-btn" onClick={() => { setContactParentId(p.id); window.scrollTo({ top: 520, behavior: "smooth" }); }}>
-                                  {I.phone} Validate
+                                <button
+                                  className="pr-icon-btn pr-icon-btn--validate"
+                                  onClick={() => { setContactParentId(p.id); window.scrollTo({ top: 520, behavior: "smooth" }); }}
+                                  title={`Validate Contact: ${fullName(p)}`}
+                                  aria-label="Validate Contact"
+                                >
+                                  {I.phone}
                                 </button>
 
-                                <button className="pr-mini-btn pr-mini-btn--danger" onClick={() => deleteParent(p)}>
-                                  {I.trash} Delete
+                                <button
+                                  className="pr-icon-btn pr-icon-btn--danger"
+                                  onClick={() => deleteParent(p)}
+                                  title={`Delete Parent: ${fullName(p)}`}
+                                  aria-label="Delete Parent"
+                                >
+                                  {I.trash}
                                 </button>
                               </div>
                             </td>

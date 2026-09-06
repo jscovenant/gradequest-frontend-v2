@@ -1,8 +1,6 @@
-// src/pages/Parents/ReceiptUploadPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { authApi } from "../../../utils/axios";
-
 import TopNav from "../../../components/LayoutComponents/TopNav";
 import Sidebar from "../../../components/LayoutComponents/Sidebar";
 import Footer from "../../../components/LayoutComponents/Footer";
@@ -20,6 +18,16 @@ type ReceiptRow = {
   updated_at?: string | null;
 };
 
+type ChildOption = {
+  id: number;
+  name?: string;
+  firstname?: string;
+  surname?: string;
+  reg_no?: string;
+  class_name?: string;
+  class?: string;
+};
+
 type MyReceiptsResponse = {
   reg_no: string;
   student?: { id: number; reg_no: string; name: string };
@@ -33,14 +41,18 @@ function useQuery() {
 
 function statusBadge(status: string) {
   const s = (status || "").toLowerCase();
-  if (s === "accepted" || s === "approved") return "bg-success";
-  if (s === "rejected") return "bg-danger";
-  return "bg-warning text-dark";
+  if (s === "accepted" || s === "approved") {
+    return <span className="badge bg-success-subtle text-success fw-bold px-2 py-1"><i className="bi bi-check-circle-fill me-1" />Verified & Approved</span>;
+  }
+  if (s === "rejected") {
+    return <span className="badge bg-danger-subtle text-danger fw-bold px-2 py-1"><i className="bi bi-x-circle-fill me-1" />Declined</span>;
+  }
+  return <span className="badge bg-warning-subtle text-warning fw-bold px-2 py-1"><i className="bi bi-clock-history me-1" />Under Bursary Review</span>;
 }
 
 function isImage(url: string) {
   const u = (url || "").toLowerCase();
-  return u.endsWith(".jpg") || u.endsWith(".jpeg") || u.endsWith(".png");
+  return u.endsWith(".jpg") || u.endsWith(".jpeg") || u.endsWith(".png") || u.endsWith(".webp");
 }
 
 const LAST_REGNO_KEY = "gq_receipts_last_reg_no";
@@ -51,22 +63,35 @@ export default function ReceiptUploadPage() {
   const { showSuccess, showError, showInfo } = useToast();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
 
-  // ✅ reg_no persisted via URL ?reg_no= and localStorage fallback
   const initialRegNo = q.get("reg_no") || localStorage.getItem(LAST_REGNO_KEY) || "";
   const [regNo, setRegNo] = useState<string>(initialRegNo);
 
+  const [children, setChildren] = useState<ChildOption[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<"online" | "cash">("online");
-  const [termId, setTermId] = useState<string>("");
-  const [sessionId, setSessionId] = useState<string>("");
   const [amount, setAmount] = useState<string>("");
 
   const [files, setFiles] = useState<File[]>([]);
   const [receipts, setReceipts] = useState<ReceiptRow[]>([]);
   const [studentName, setStudentName] = useState<string>("");
+
+  // Load parent's children to populate selector
+  useEffect(() => {
+    authApi
+      .get("/parent/children")
+      .then((res) => {
+        const list = res.data?.children || [];
+        setChildren(list);
+        if (!regNo && list.length > 0) {
+          const firstReg = list[0].reg_no;
+          if (firstReg) setRegNo(firstReg);
+        }
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const canSubmit = useMemo(() => {
     return !!regNo.trim() && files.length > 0 && !uploading;
@@ -87,18 +112,15 @@ export default function ReceiptUploadPage() {
     } catch (e: any) {
       console.error(e);
       showError(e?.response?.data?.message || "Failed to load receipts.");
-      // do not wipe list
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ keep URL + localStorage synced
   useEffect(() => {
     const v = regNo.trim();
     if (v) {
       localStorage.setItem(LAST_REGNO_KEY, v);
-
       const params = new URLSearchParams(window.location.search);
       if (params.get("reg_no") !== v) {
         params.set("reg_no", v);
@@ -108,7 +130,6 @@ export default function ReceiptUploadPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regNo]);
 
-  // ✅ reload whenever regNo changes
   useEffect(() => {
     loadReceipts(regNo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -120,7 +141,7 @@ export default function ReceiptUploadPage() {
 
     const tooBig = list.find((f) => f.size > 5 * 1024 * 1024);
     if (tooBig) {
-      showError("One of the files is larger than 5MB. Please reduce it.");
+      showError("One of the files is larger than 5MB. Please upload a smaller document.");
       return;
     }
 
@@ -136,18 +157,14 @@ export default function ReceiptUploadPage() {
 
     const rn = regNo.trim();
     if (!rn) {
-      showError("Student Reg No is required.");
+      showError("Student Admission / Reg No is required.");
       return;
     }
 
     const fd = new FormData();
     fd.append("reg_no", rn);
     fd.append("payment_method", paymentMethod);
-
-    if (termId.trim()) fd.append("term_id", termId.trim());
-    if (sessionId.trim()) fd.append("session_id", sessionId.trim());
     if (amount.trim()) fd.append("amount", amount.trim());
-
     files.forEach((f) => fd.append("receipts[]", f));
 
     setUploading(true);
@@ -156,16 +173,13 @@ export default function ReceiptUploadPage() {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      showSuccess("Receipts uploaded successfully. Status: Pending");
+      showSuccess("Receipt uploaded successfully. The school bursary will review and confirm.");
       setFiles([]);
       setAmount("");
-      setTermId("");
-      setSessionId("");
-
       await loadReceipts(rn);
     } catch (e: any) {
       console.error(e);
-      showError(e?.response?.data?.message || "Upload failed.");
+      showError(e?.response?.data?.message || "Upload failed. Please try again.");
     } finally {
       setUploading(false);
     }
@@ -173,322 +187,413 @@ export default function ReceiptUploadPage() {
 
   return (
     <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+        .p-up-main {
+          background: #F8FAFC;
+          min-height: 100vh;
+          font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+          padding: calc(66px + 24px) 28px 40px !important;
+        }
+
+        @media (max-width: 767.98px) {
+          .p-up-main {
+            padding: calc(66px + 16px) 14px 36px !important;
+          }
+          .p-up-hero {
+            padding: 20px 18px !important;
+            border-radius: 14px !important;
+            margin-bottom: 16px !important;
+          }
+          .p-up-title {
+            font-size: 20px !important;
+          }
+          .p-up-sub {
+            font-size: 12.5px !important;
+          }
+        }
+
+        .p-up-hero {
+          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
+          border-radius: 18px;
+          padding: 32px 36px;
+          color: #FFFFFF;
+          margin-bottom: 24px;
+          box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
+          position: relative;
+          overflow: hidden;
+        }
+
+        .p-up-hero::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background-image:
+            linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+          background-size: 32px 32px;
+          pointer-events: none;
+        }
+
+        .p-up-hero-glow {
+          position: absolute;
+          top: -40px;
+          right: -40px;
+          width: 320px;
+          height: 320px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(217, 119, 6, 0.2) 0%, transparent 65%);
+          pointer-events: none;
+        }
+
+        .p-up-hero-inner {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 20px;
+        }
+
+        .p-up-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: #FBBF24;
+          background: rgba(217, 119, 6, 0.20);
+          border: 1px solid rgba(217, 119, 6, 0.35);
+          border-radius: 100px;
+          padding: 4px 12px;
+          margin-bottom: 12px;
+        }
+
+        .p-up-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: #10B981;
+          box-shadow: 0 0 6px #10B981;
+        }
+
+        .p-up-title {
+          font-size: 26px;
+          font-weight: 800;
+          color: #FFFFFF;
+          line-height: 1.1;
+          margin-bottom: 8px;
+        }
+
+        .p-up-title em {
+          font-style: normal;
+          color: #FBBF24;
+        }
+
+        .p-up-sub {
+          font-size: 13.5px;
+          color: #CBD5E1;
+          line-height: 1.6;
+          max-width: 620px;
+          margin-bottom: 0;
+        }
+
+        .p-card {
+          background: #FFFFFF;
+          border: 1px solid rgba(15, 39, 68, 0.08);
+          border-radius: 18px;
+          box-shadow: 0 4px 20px rgba(15, 39, 68, 0.06);
+          overflow: hidden;
+        }
+
+        .p-card-head {
+          padding: 18px 24px;
+          border-bottom: 1px solid #E2E8F0;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+      `}</style>
+
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-      <PageTitle title="Upload Reciept" />
+      <PageTitle title="Upload Payment Receipt - GradiosEdu" />
 
       <div className="container-fluid">
         <div className="row">
-          <Sidebar sidebarOpen={sidebarOpen} />
+          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-          <main
-            className="col-md-9 col-lg-10 ms-auto px-4 d-flex flex-column min-vh-100"
-            style={{ backgroundColor: "#f8f9fa" }}
-          >
+          <main className="col-md-9 col-lg-10 ms-auto gq-app-main p-up-main d-flex flex-column min-vh-100">
             {loading && <Loader message="Loading receipts..." />}
 
-            {/* Header */}
-            <div
-              className="mt-4 p-4"
-              style={{
-                background: "linear-gradient(135deg, #0ea5e9 0%, #22c55e 100%)",
-                borderRadius: 16,
-                boxShadow: "0 10px 30px rgba(14, 165, 233, 0.2)",
-              }}
-            >
-              <div className="d-flex flex-wrap justify-content-between align-items-center">
+            {/* ── Signature Hero ── */}
+            <div className="p-up-hero">
+              <div className="p-up-hero-glow" />
+              <div className="p-up-hero-inner">
                 <div>
-                  <span
-                    className="badge px-3 py-2 mb-2"
-                    style={{
-                      backgroundColor: "rgba(255,255,255,0.2)",
-                      color: "#fff",
-                      borderRadius: 20,
-                      fontSize: "0.75rem",
-                      fontWeight: 500,
-                    }}
-                  >
-                    <i className="bi bi-upload me-1" />
-                    Receipts
-                  </span>
-
-                  <h3 className="fw-bold text-white mb-1">
-                    Upload Payment Receipt {studentName ? `— ${studentName}` : ""}
-                  </h3>
-                  <p className="text-white mb-0" style={{ opacity: 0.9 }}>
-                    Upload JPG/PNG/PDF evidence after payment. Admin will review and update status.
+                  <div className="p-up-badge">
+                    <span className="p-up-dot" />
+                    Parent Portal · Bursary Clearance
+                  </div>
+                  <h1 className="p-up-title">
+                    Upload Payment Receipt {studentName ? <span>— <em>{studentName}</em></span> : ""}
+                  </h1>
+                  <p className="p-up-sub">
+                    Upload proof of direct bank transfer, deposit slip, or electronic receipt for school review and clearance.
                   </p>
                 </div>
 
-                <div className="d-flex gap-2 mt-3 mt-md-0">
-                  <button className="btn btn-light" style={{ borderRadius: 10 }} onClick={() => navigate(-1)}>
-                    <i className="bi bi-arrow-left me-2" />
-                    Back
+                <div className="d-flex gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    className="btn btn-outline-light rounded-pill px-4 fw-bold"
+                    onClick={() => navigate("/parent/children")}
+                  >
+                    <i className="bi bi-arrow-left me-1" />
+                    My Children
                   </button>
 
                   <button
-                    className="btn btn-dark"
-                    style={{ borderRadius: 10 }}
+                    type="button"
+                    className="btn btn-warning rounded-pill px-4 fw-bold"
+                    style={{ color: "#0F2744", background: "#FBBF24" }}
                     onClick={() => {
-                      showInfo("Refreshing...");
+                      showInfo("Refreshing receipt history...");
                       loadReceipts();
                     }}
                   >
-                    <i className="bi bi-arrow-clockwise me-2" />
+                    <i className="bi bi-arrow-clockwise me-1" />
                     Refresh
                   </button>
                 </div>
               </div>
             </div>
 
-            <div className="row g-4 mt-1 mb-5">
-              {/* Upload form */}
+            <div className="row g-4 mb-5">
+              {/* ── Upload Form ── */}
               <div className="col-lg-5">
-                <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
-                  <div className="card-body p-4">
-                    <div className="d-flex justify-content-between align-items-center mb-3">
-                      <div>
-                        <h6 className="fw-semibold mb-0" style={{ color: "#1e293b" }}>
-                          Upload Receipt
-                        </h6>
-                        <small className="text-muted">Max 5MB per file • JPG/PNG/PDF</small>
-                      </div>
+                <div className="p-card">
+                  <div className="p-card-head">
+                    <div>
+                      <h2 className="fs-6 fw-bold mb-0 text-dark">
+                        <i className="bi bi-cloud-arrow-up-fill me-2 text-primary" />
+                        Submit New Proof of Payment
+                      </h2>
+                      <small className="text-muted">Accepted formats: JPG, PNG, PDF (Max 5MB)</small>
                     </div>
+                  </div>
 
-                    <div className="row g-3">
-                      <div className="col-12">
-                        <label className="form-label">Student Reg No</label>
-                        <input
-                          className="form-control"
-                          style={{ borderRadius: 10 }}
+                  <div className="p-4">
+                    {/* Child Quick Selector if available */}
+                    {children.length > 0 && (
+                      <div className="mb-3">
+                        <label className="form-label fw-bold small text-muted text-uppercase">
+                          Select Child / Ward
+                        </label>
+                        <select
+                          className="form-select rounded-3 py-2"
                           value={regNo}
                           onChange={(e) => setRegNo(e.target.value)}
-                          placeholder="e.g. REG/2026/001"
-                        />
-                        <small className="text-muted">
-                          Saved automatically and kept on refresh.
-                        </small>
-                      </div>
-
-                      <div className="col-12">
-                        <label className="form-label">Payment Method</label>
-                        <select
-                          className="form-select"
-                          style={{ borderRadius: 10 }}
-                          value={paymentMethod}
-                          onChange={(e) => setPaymentMethod(e.target.value as any)}
                         >
-                          <option value="online">Online / Transfer</option>
-                          <option value="cash">Cash</option>
+                          <option value="">-- Choose student --</option>
+                          {children.map((c) => (
+                            <option key={c.id} value={c.reg_no || ""}>
+                              {c.name || `${c.surname || ""} ${c.firstname || ""}`.trim()} ({c.reg_no || "No Reg No"})
+                            </option>
+                          ))}
                         </select>
                       </div>
+                    )}
 
-                      <div className="col-md-6">
-                        <label className="form-label">Term ID (optional)</label>
-                        <input
-                          className="form-control"
-                          style={{ borderRadius: 10 }}
-                          value={termId}
-                          onChange={(e) => setTermId(e.target.value)}
-                          placeholder="e.g. 2"
-                        />
-                      </div>
+                    <div className="mb-3">
+                      <label className="form-label fw-bold small text-muted text-uppercase">
+                        Student Admission / Reg No
+                      </label>
+                      <input
+                        className="form-control rounded-3 py-2"
+                        value={regNo}
+                        onChange={(e) => setRegNo(e.target.value)}
+                        placeholder="e.g. REG/2026/001"
+                      />
+                    </div>
 
-                      <div className="col-md-6">
-                        <label className="form-label">Session ID (optional)</label>
-                        <input
-                          className="form-control"
-                          style={{ borderRadius: 10 }}
-                          value={sessionId}
-                          onChange={(e) => setSessionId(e.target.value)}
-                          placeholder="e.g. 5"
-                        />
-                      </div>
+                    <div className="mb-3">
+                      <label className="form-label fw-bold small text-muted text-uppercase">
+                        Payment Channel / Method
+                      </label>
+                      <select
+                        className="form-select rounded-3 py-2"
+                        value={paymentMethod}
+                        onChange={(e) => setPaymentMethod(e.target.value as any)}
+                      >
+                        <option value="online">Bank Transfer / Electronic Deposit</option>
+                        <option value="cash">Direct Bank Teller Deposit / Cash</option>
+                      </select>
+                    </div>
 
-                      <div className="col-12">
-                        <label className="form-label">Amount (optional)</label>
-                        <input
-                          className="form-control"
-                          style={{ borderRadius: 10 }}
-                          value={amount}
-                          onChange={(e) => setAmount(e.target.value)}
-                          placeholder="e.g. 25000"
-                        />
-                      </div>
+                    <div className="mb-3">
+                      <label className="form-label fw-bold small text-muted text-uppercase">
+                        Amount Paid (₦) <span className="text-muted fw-normal">(optional)</span>
+                      </label>
+                      <input
+                        type="number"
+                        className="form-control rounded-3 py-2"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        placeholder="e.g. 50000"
+                      />
+                    </div>
 
-                      <div className="col-12">
-                        <label className="form-label">Receipt Files</label>
-                        <input
-                          className="form-control"
-                          style={{ borderRadius: 10 }}
-                          type="file"
-                          multiple
-                          accept=".jpg,.jpeg,.png,.pdf"
-                          onChange={onPickFiles}
-                        />
-                      </div>
+                    <div className="mb-3">
+                      <label className="form-label fw-bold small text-muted text-uppercase">
+                        Attach Receipt Evidence <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        className="form-control rounded-3 py-2"
+                        type="file"
+                        multiple
+                        accept=".jpg,.jpeg,.png,.pdf"
+                        onChange={onPickFiles}
+                      />
+                    </div>
 
-                      <div className="col-12">
-                        {files.length === 0 ? (
-                          <div className="text-muted small">No files selected yet.</div>
-                        ) : (
-                          <div className="p-3 rounded-3" style={{ background: "#f8fafc", border: "1px solid #eef2f7" }}>
-                            <div className="fw-semibold mb-2" style={{ color: "#0f172a" }}>
-                              Selected Files ({files.length})
-                            </div>
-
-                            <div className="d-flex flex-column gap-2">
-                              {files.map((f, idx) => (
-                                <div key={idx} className="d-flex align-items-center justify-content-between">
-                                  <div className="small">
-                                    <div className="fw-semibold">{f.name}</div>
-                                    <div className="text-muted">
-                                      {(f.size / (1024 * 1024)).toFixed(2)} MB
-                                    </div>
-                                  </div>
-                                  <button
-                                    className="btn btn-sm btn-outline-danger"
-                                    style={{ borderRadius: 10 }}
-                                    type="button"
-                                    onClick={() => removePicked(idx)}
-                                  >
-                                    <i className="bi bi-x-lg me-1" />
-                                    Remove
-                                  </button>
+                    {files.length > 0 && (
+                      <div className="p-3 rounded-3 mb-3 bg-light border">
+                        <div className="fw-bold small text-dark mb-2">
+                          Attached Files ({files.length}):
+                        </div>
+                        <div className="d-flex flex-column gap-2">
+                          {files.map((f, idx) => (
+                            <div key={idx} className="d-flex align-items-center justify-content-between bg-white p-2 rounded border">
+                              <div className="small">
+                                <div className="fw-bold text-truncate" style={{ maxWidth: 220 }}>{f.name}</div>
+                                <div className="text-muted" style={{ fontSize: "11px" }}>
+                                  {(f.size / (1024 * 1024)).toFixed(2)} MB
                                 </div>
-                              ))}
+                              </div>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-danger rounded-pill px-2 py-0"
+                                onClick={() => removePicked(idx)}
+                              >
+                                &times;
+                              </button>
                             </div>
-                          </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="d-flex gap-2 pt-2">
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary rounded-pill px-3"
+                        onClick={() => {
+                          setFiles([]);
+                          setAmount("");
+                        }}
+                        disabled={uploading}
+                      >
+                        Clear
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-primary rounded-pill px-4 fw-bold ms-auto"
+                        onClick={submit}
+                        disabled={!canSubmit}
+                      >
+                        {uploading ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm me-2" />
+                            Uploading Proof...
+                          </>
+                        ) : (
+                          <>
+                            <i className="bi bi-cloud-arrow-up-fill me-1" />
+                            Submit Receipt
+                          </>
                         )}
-                      </div>
-
-                      <div className="col-12 d-flex gap-2">
-                        <button
-                          className="btn btn-outline-secondary"
-                          style={{ borderRadius: 10 }}
-                          type="button"
-                          onClick={() => {
-                            setFiles([]);
-                            setAmount("");
-                            setTermId("");
-                            setSessionId("");
-                          }}
-                          disabled={uploading}
-                        >
-                          Reset
-                        </button>
-
-                        <button
-                          className="btn btn-primary ms-auto"
-                          style={{ borderRadius: 10 }}
-                          type="button"
-                          onClick={submit}
-                          disabled={!canSubmit}
-                        >
-                          {uploading ? (
-                            <>
-                              <span className="spinner-border spinner-border-sm me-2" />
-                              Uploading...
-                            </>
-                          ) : (
-                            <>
-                              <i className="bi bi-cloud-arrow-up me-2" />
-                              Upload
-                            </>
-                          )}
-                        </button>
-                      </div>
+                      </button>
                     </div>
                   </div>
                 </div>
-
-                <small className="text-muted d-block mt-3">
-                  Endpoints: <code>POST /upload-receipts</code> • <code>GET /my-receipts?reg_no=...</code>
-                </small>
               </div>
 
-              {/* Uploaded list */}
+              {/* ── Uploaded Receipts List ── */}
               <div className="col-lg-7">
-                <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
-                  <div className="card-body p-4">
-                    <div className="d-flex justify-content-between align-items-center mb-3">
-                      <div>
-                        <h6 className="fw-semibold mb-0" style={{ color: "#1e293b" }}>
-                          Uploaded Receipts
-                        </h6>
-                        <small className="text-muted">Track status (Pending / Accepted / Rejected).</small>
-                      </div>
-                      <span className="badge bg-primary">{receipts.length} records</span>
+                <div className="p-card">
+                  <div className="p-card-head">
+                    <div>
+                      <h2 className="fs-6 fw-bold mb-0 text-dark">
+                        <i className="bi bi-clock-history me-2 text-primary" />
+                        Receipt Submissions & Verification History
+                      </h2>
+                      <small className="text-muted">Track clearance reviews from school bursary</small>
                     </div>
+                    <span className="badge bg-primary rounded-pill px-3 py-1">
+                      {receipts.length} submission{receipts.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
 
+                  <div className="p-4">
                     {receipts.length === 0 ? (
-                      <div className="text-muted text-center py-5">No receipts yet for this Reg No.</div>
+                      <div className="text-center py-5 text-muted">
+                        <i className="bi bi-receipt-cutoff fs-1 d-block mb-2 text-secondary" />
+                        No receipts uploaded yet for this student.
+                      </div>
                     ) : (
                       <div className="d-flex flex-column gap-3">
                         {receipts.map((r) => (
                           <div
                             key={r.id}
-                            className="p-3"
-                            style={{
-                              border: "1px solid #eef2f7",
-                              borderRadius: 14,
-                              background: "#ffffff",
-                              boxShadow: "0 2px 10px rgba(15,23,42,0.04)",
-                            }}
+                            className="p-3 border rounded-4 bg-light"
                           >
-                            <div className="d-flex flex-wrap justify-content-between gap-2 align-items-center">
+                            <div className="d-flex flex-wrap justify-content-between gap-2 align-items-center mb-2">
                               <div>
-                                <div className="fw-semibold" style={{ color: "#0f172a" }}>
+                                <div className="fw-bold text-dark fs-6">
                                   Receipt #{r.id}
                                 </div>
                                 <div className="text-muted small">
-                                  Method: {String(r.payment_method).toUpperCase()} • Uploaded:{" "}
+                                  Channel: <strong>{String(r.payment_method).toUpperCase()}</strong> • Submitted:{" "}
                                   {r.created_at ? new Date(r.created_at).toLocaleString() : "—"}
                                 </div>
                               </div>
 
-                              <span className={`badge ${statusBadge(r.status)}`}>
-                                {String(r.status).toUpperCase()}
-                              </span>
+                              <div>{statusBadge(r.status)}</div>
                             </div>
 
-                            <hr className="my-3" />
-
-                            <div className="row g-2">
+                            <div className="row g-2 mt-2">
                               {r.files?.map((url, idx) => (
-                                <div className="col-12 col-md-6" key={idx}>
-                                  <div
-                                    className="p-2"
-                                    style={{
-                                      borderRadius: 12,
-                                      border: "1px solid #eef2f7",
-                                      background: "#f8fafc",
-                                    }}
-                                  >
+                                <div className="col-sm-6" key={idx}>
+                                  <div className="p-2 bg-white rounded-3 border">
                                     {isImage(url) ? (
-                                      <a href={url} target="_blank" rel="noreferrer">
+                                      <a href={url} target="_blank" rel="noreferrer" className="d-block text-decoration-none">
                                         <img
                                           src={url}
-                                          alt="receipt"
-                                          style={{
-                                            width: "100%",
-                                            height: 160,
-                                            objectFit: "cover",
-                                            borderRadius: 10,
-                                          }}
+                                          alt="receipt attachment"
+                                          className="w-100 rounded-2 object-fit-cover"
+                                          style={{ height: 140 }}
                                         />
+                                        <small className="text-muted d-block mt-1 text-center">Click to view full image</small>
                                       </a>
                                     ) : (
-                                      <div className="d-flex align-items-center justify-content-between">
+                                      <div className="d-flex align-items-center justify-content-between p-2">
                                         <div className="d-flex align-items-center gap-2">
-                                          <i className="bi bi-file-earmark-pdf fs-4 text-danger" />
-                                          <div>
-                                            <div className="fw-semibold">Receipt PDF</div>
-                                            <div className="text-muted small">Click to open</div>
-                                          </div>
+                                          <i className="bi bi-file-earmark-pdf fs-3 text-danger" />
+                                          <div className="small fw-bold">PDF Document</div>
                                         </div>
-
-                                        <a className="btn btn-sm btn-outline-dark" style={{ borderRadius: 10 }} href={url} target="_blank" rel="noreferrer">
-                                          View
+                                        <a
+                                          className="btn btn-sm btn-outline-dark rounded-pill px-3"
+                                          href={url}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                        >
+                                          View PDF
                                         </a>
                                       </div>
                                     )}
@@ -496,20 +601,12 @@ export default function ReceiptUploadPage() {
                                 </div>
                               ))}
                             </div>
-
-                            <div className="text-muted small mt-2">
-                              If rejected, please re-upload a clearer receipt or correct Reg No.
-                            </div>
                           </div>
                         ))}
                       </div>
                     )}
                   </div>
                 </div>
-
-                <small className="text-muted d-block mt-3">
-                  Tip: Open directly: <code>/parent/upload-receipt?reg_no=REG123</code>
-                </small>
               </div>
             </div>
 

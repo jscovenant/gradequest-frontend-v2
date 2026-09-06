@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getUser, logout } from "../../utils/token";
+import { publicApi } from "../../utils/axios";
 import { getUnreadNotifications, markNotificationRead, type SystemNote } from "../../api/notificationsApi";
 import {
   getUnreadInvoiceNotifications,
@@ -176,7 +177,62 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
     }
   };
 
+  const [platformStatus, setPlatformStatus] = useState<{
+    maintenance_mode: boolean;
+    is_scheduled: boolean;
+    start_time?: string | null;
+    end_time?: string | null;
+    message?: string;
+  } | null>(null);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+
+  useEffect(() => {
+    publicApi.get("/platform-status")
+      .then((res) => {
+        if (res.data?.maintenance_mode || res.data?.is_scheduled) {
+          setPlatformStatus(res.data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   return (
+    <>
+      {platformStatus?.maintenance_mode && !bannerDismissed && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1050,
+            background: "linear-gradient(90deg, #9a3412 0%, #c2410c 100%)",
+            color: "#ffffff",
+            padding: "8px 20px",
+            fontSize: 13,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.18)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ background: "rgba(255,255,255,0.22)", padding: "2px 8px", borderRadius: 4, fontWeight: 800, fontSize: 11, textTransform: "uppercase" }}>
+              Read-Only Mode
+            </span>
+            <span>
+              <strong>Platform Notice:</strong> {platformStatus.message || "We are working harder to make things better, please hold on..."} New entries, results publishing, CBT exams, and payments are temporarily paused.
+            </span>
+          </div>
+          <button
+            onClick={() => setBannerDismissed(true)}
+            style={{ background: "none", border: "none", color: "#ffffff", fontSize: 18, cursor: "pointer", opacity: 0.85, padding: "0 6px" }}
+            title="Dismiss notice"
+          >
+            &times;
+          </button>
+        </div>
+      )}
     <nav className="navbar gq-topnav d-flex justify-content-between align-items-center">
       {/* LEFT: Toggle + Title */}
       <div className="d-flex align-items-center gap-3">
@@ -196,7 +252,7 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
           <h5 className="gq-topnav__title">
             {title ?? "Dashboard"}
           </h5>
-          <div className="gq-topnav__subtitle">GradeQuest workspace</div>
+          <div className="gq-topnav__subtitle">GradiosEdu workspace</div>
         </div>
       </div>
 
@@ -453,7 +509,7 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
             </li>
           </ul>
         </div>
-                ) }
+                )}
         
 
 
@@ -473,9 +529,7 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
                 onError={handleImageError}
               />
             ) : (
-              <div
-                className="gq-avatar"
-              >
+              <div className="gq-avatar">
                 {user ? getInitials(user.firstname) : "U"}
               </div>
             )}
@@ -549,5 +603,6 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
         </div>
       </div>
     </nav>
+    </>
   );
 }

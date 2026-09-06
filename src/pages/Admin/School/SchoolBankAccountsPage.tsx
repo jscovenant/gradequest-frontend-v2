@@ -82,6 +82,63 @@ export default function SchoolBankAccountsPage() {
   const [acceptsOnlinePayment, setAcceptsOnlinePayment] = useState(false); // NEW
   const [sortOrder, setSortOrder] = useState<number>(0);
 
+  // Security OTP State
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [maskedEmail, setMaskedEmail] = useState("");
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpCountdown, setOtpCountdown] = useState(0);
+  const [otpError, setOtpError] = useState("");
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [pendingAction, setPendingAction] = useState<((otp: string) => Promise<any>) | null>(null);
+
+  useEffect(() => {
+    if (otpCountdown <= 0) return;
+    const timer = setInterval(() => {
+      setOtpCountdown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [otpCountdown]);
+
+  const requestSecurityOtp = async (actionDesc: string = "modify school bank account settings") => {
+    setOtpSending(true);
+    setOtpError("");
+    try {
+      const res = await authApi.post("/security/otp/request", {
+        action: "bank_account_update",
+        action_description: actionDesc,
+      });
+      setMaskedEmail(res.data.masked_email || "School Proprietor Email");
+      setOtpCountdown(60);
+      setShowOtpModal(true);
+      return true;
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Unable to request security verification code.");
+      return false;
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const submitWithOtp = async () => {
+    if (!otpCode || otpCode.length !== 6) {
+      setOtpError("Please enter the 6-digit code sent to the proprietor's email.");
+      return;
+    }
+    setVerifyingOtp(true);
+    setOtpError("");
+    try {
+      if (pendingAction) {
+        await pendingAction(otpCode);
+      }
+    } catch (err: any) {
+      setOtpError(err?.response?.data?.message || "Verification failed. Please check the code.");
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
+
   const resetForm = () => {
     setEditing(null);
     setBankName("");
@@ -90,7 +147,7 @@ export default function SchoolBankAccountsPage() {
     setAccountNumber("");
     setCurrency("NGN");
     setIsActive(true);
-    setAcceptsOnlinePayment(false); // NEW
+    setAcceptsOnlinePayment(true);
     setSortOrder(0);
     setVerified(false);
   };
@@ -108,7 +165,7 @@ export default function SchoolBankAccountsPage() {
     setAccountNumber(row.account_number || "");
     setCurrency(row.currency || "NGN");
     setIsActive(isTruthy(row.is_active));
-    setAcceptsOnlinePayment(billingPaymentMode === "online");
+    setAcceptsOnlinePayment(acceptsOnline(row) || billingPaymentMode === "online");
     setSortOrder(Number(row.sort_order ?? 0));
     setVerified(true); // assume verified if editing existing
     setShowForm(true);
@@ -215,12 +272,13 @@ export default function SchoolBankAccountsPage() {
     return true;
   };
 
-  const save = async () => {
+  const save = async (securityOtp?: any) => {
     setError("");
     if (!validateForm()) return;
     setSaving(true);
     try {
-      const payload = {
+      const otpString = typeof securityOtp === "string" && securityOtp.trim().length > 0 ? securityOtp.trim() : undefined;
+      const payload: any = {
         bank_name: bankName.trim(),
         bank_code: bankCode.trim() || null,
         account_name: accountName.trim(),
@@ -228,8 +286,11 @@ export default function SchoolBankAccountsPage() {
         currency: currency.trim() || "NGN",
         is_active: isActive,
         online_payment_enabled: acceptsOnlinePayment,
-        sort_order: Number.isFinite(sortOrder)? sortOrder : 0,
+        sort_order: Number.isFinite(sortOrder) ? sortOrder : 0,
       };
+      if (otpString) {
+        payload.security_otp = otpString;
+      }
       if (editing?.id) {
         await authApi.put(`/school/bank-accounts/${editing.id}`, payload);
       } else {
@@ -237,26 +298,49 @@ export default function SchoolBankAccountsPage() {
       }
       await load();
       setShowForm(false);
+      setShowOtpModal(false);
+      setOtpCode("");
       resetForm();
     } catch (e: any) {
-      console.error(e);
-      setError(e?.response?.data?.message || "Failed to save bank account.");
+      if (e?.response?.data?.otp_required) {
+        setError("");
+        setOtpError("");
+        setPendingAction(() => (otp: string) => save(otp));
+        await requestSecurityOtp(editing?.id ? `Update Bank Account (${bankName} - ${accountNumber})` : `Connect New Bank Account (${bankName} - ${accountNumber})`);
+      } else {
+        console.error(e);
+        setError(e?.response?.data?.message || "Failed to save bank account.");
+        setOtpError(e?.response?.data?.message || "Verification failed.");
+      }
     } finally {
       setSaving(false);
     }
   };
 
-  const remove = async (row: SchoolBankAccount) => {
-    const ok = window.confirm(`Delete this bank account?\n\n${row.bank_name} - ${row.account_number}`);
-    if (!ok) return;
+  const remove = async (row: SchoolBankAccount, securityOtp?: any) => {
+    const otpString = typeof securityOtp === "string" && securityOtp.trim().length > 0 ? securityOtp.trim() : undefined;
+    if (!otpString) {
+      const ok = window.confirm(`Delete this bank account?\n\n${row.bank_name} - ${row.account_number}`);
+      if (!ok) return;
+    }
     setDeletingId(row.id);
     setError("");
     try {
-      await authApi.delete(`/school/bank-accounts/${row.id}`);
+      await authApi.delete(`/school/bank-accounts/${row.id}`, {
+        data: otpString ? { security_otp: otpString } : undefined,
+      });
       await load();
+      setShowOtpModal(false);
+      setOtpCode("");
     } catch (e: any) {
-      console.error(e);
-      setError(e?.response?.data?.message || "Failed to delete bank account.");
+      if (e?.response?.data?.otp_required) {
+        setPendingAction(() => (otp: string) => remove(row, otp));
+        await requestSecurityOtp(`Delete Bank Account (${row.bank_name} - ${row.account_number})`);
+      } else {
+        console.error(e);
+        setError(e?.response?.data?.message || "Failed to delete bank account.");
+        setOtpError(e?.response?.data?.message || "Verification failed.");
+      }
     } finally {
       setDeletingId(null);
     }
@@ -299,50 +383,44 @@ export default function SchoolBankAccountsPage() {
   return (
     <>
       <style>{`
-       .db-main {
-          background: var(--bs-body-bg, #f5f1eb);
+        /* ======= SchoolBankAccountsPage - Modern SaaS style ======= */
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        .db-main {
+          background: #F8FAFC;
           min-height: 100vh;
-          font-family: "DM Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-          padding: 28px 28px 0;
+          font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+          padding: 24px 28px 0;
         }
-       .db-hero {
-          background: #0f172a;
-          border-radius: var(--bs-border-radius-lg, 16px);
+        .db-hero {
+          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
+          border-radius: 18px;
           padding: 32px 36px;
           position: relative;
           overflow: hidden;
-          margin: 10px 0 18px;
-          border: 1px solid rgba(255,255,255,0.06);
+          margin: 10px 0 24px;
+          box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
         }
-       .db-hero::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background-image: radial-gradient(circle, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
-          background-size: 24px 24px;
-          pointer-events: none;
-        }
-       .db-hero-glow {
+        .db-hero-glow {
           position: absolute;
           top: -60px;
           right: -60px;
           width: 320px;
           height: 320px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(201, 168, 76, 0.10) 0%, transparent 65%);
+          background: radial-gradient(circle, rgba(217, 119, 6, 0.15) 0%, transparent 65%);
           pointer-events: none;
         }
-       .db-hero-glow2 {
+        .db-hero-glow2 {
           position: absolute;
           bottom: -40px;
           left: 30%;
           width: 200px;
           height: 200px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(99, 102, 241, 0.07) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(37, 99, 235, 0.10) 0%, transparent 70%);
           pointer-events: none;
         }
-       .db-hero-inner {
+        .db-hero-inner {
           position: relative;
           z-index: 1;
           display: flex;
@@ -352,89 +430,85 @@ export default function SchoolBankAccountsPage() {
           flex-wrap: wrap;
         }
         @media (min-width: 768px) {.db-hero-inner { flex-wrap: nowrap; } }
-       .db-session-badge {
+        .db-session-badge {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          font-size: 11px;
-          font-weight: 500;
-          letter-spacing: 0.12em;
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
           text-transform: uppercase;
-          color: #e8c97a;
-          background: rgba(201, 168, 76, 0.10);
-          border: 1px solid rgba(201, 168, 76, 0.22);
+          color: #FBBF24;
+          background: rgba(217, 119, 6, 0.20);
+          border: 1px solid rgba(217, 119, 6, 0.35);
           border-radius: 100px;
           padding: 4px 12px;
-          margin-bottom: 14px;
+          margin-bottom: 12px;
         }
-       .db-session-dot {
+        .db-session-dot {
           width: 6px;
           height: 6px;
           border-radius: 50%;
-          background: #22c55e;
+          background: #10B981;
           animation: dbPulse 2s ease infinite;
         }
         @keyframes dbPulse {
           0%,100% { opacity: 1; transform: scale(1); }
           50% { opacity: 0.4; transform: scale(1.5); }
         }
-       .db-greeting {
-          font-family: "Lora", Georgia, serif;
-          font-size: clamp(22px, 2.5vw, 32px);
-          font-weight: 700;
+        .db-greeting {
+          font-size: 26px;
+          font-weight: 800;
           color: #fff;
           line-height: 1.1;
           margin-bottom: 8px;
         }
-       .db-greeting em { font-style: italic; color: #e8c97a; }
-       .db-hero-sub {
+        .db-greeting em { font-style: normal; color: #FBBF24; }
+        .db-hero-sub {
           font-size: 13.5px;
-          font-weight: 300;
-          color: #64748b;
-          line-height: 1.65;
+          color: #CBD5E1;
+          line-height: 1.6;
           max-width: 680px;
-          margin-bottom: 18px;
+          margin-bottom: 20px;
         }
-       .db-hero-btns { display: flex; gap: 10px; flex-wrap: wrap; }
-       .db-btn-gold {
+        .db-hero-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+        .db-btn-gold {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          padding: 10px 20px;
-          font-family: "DM Sans", sans-serif;
+          padding: 9px 18px;
           font-size: 13px;
-          font-weight: 600;
-          color: #0f172a;
-          background: #c9a84c;
+          font-weight: 700;
+          color: #FFFFFF;
+          background: #D97706;
           border: none;
           border-radius: 10px;
           cursor: pointer;
-          transition: background 0.2s, transform 0.2s;
+          transition: all 0.2s ease;
           white-space: nowrap;
         }
-       .db-btn-gold:hover { background: #e8c97a; transform: translateY(-1px); }
-       .db-btn-gold:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
-       .db-btn-outline {
+        .db-btn-gold:hover { background: #B45309; transform: translateY(-1px); color: #FFFFFF; }
+        .db-btn-gold:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+        .db-btn-outline {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          padding: 10px 20px;
-          font-family: "DM Sans", sans-serif;
+          padding: 9px 18px;
           font-size: 13px;
-          font-weight: 400;
-          color: rgba(255, 255, 255, 0.7);
-          background: transparent;
-          border: 1px solid rgba(255, 255, 255, 0.14);
+          font-weight: 600;
+          color: #FFFFFF;
+          background: rgba(255, 255, 255, 0.10);
+          border: 1px solid rgba(255, 255, 255, 0.20);
           border-radius: 10px;
           cursor: pointer;
-          transition: background 0.2s, border-color 0.2s, color 0.2s;
+          transition: all 0.2s ease;
           white-space: nowrap;
         }
-       .db-btn-outline:hover { background: rgba(255, 255, 255, 0.06); color: #fff; border-color: rgba(255, 255, 255, 0.28); }
-       .db-btn-outline:disabled { opacity: 0.55; cursor: not-allowed; }
-       .db-hero-stat-card {
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.09);
+        .db-btn-outline:hover { background: rgba(255, 255, 255, 0.18); color: #fff; }
+        .db-btn-outline:disabled { opacity: 0.55; cursor: not-allowed; }
+        .db-hero-stat-card {
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.15);
           backdrop-filter: blur(8px);
           border-radius: 14px;
           padding: 20px 24px;
@@ -442,38 +516,37 @@ export default function SchoolBankAccountsPage() {
           margin-left: auto;
           align-self: flex-end;
         }
-       .db-hero-stat-row { display: flex; flex-direction: column; gap: 10px; }
-       .db-hero-stat-item { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-       .db-hero-stat-label { font-size: 12px; font-weight: 300; color: #64748b; }
-       .db-hero-stat-val { font-family: "Lora", serif; font-size: 22px; font-weight: 700; color: #fff; }
-       .db-panel {
+        .db-hero-stat-row { display: flex; flex-direction: column; gap: 10px; }
+        .db-hero-stat-item { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+        .db-hero-stat-label { font-size: 12px; font-weight: 400; color: #CBD5E1; }
+        .db-hero-stat-val { font-size: 20px; font-weight: 800; color: #FBBF24; }
+        .db-panel {
           background: #fff;
-          border: 1px solid #ede8e0;
-          border-radius: 14px;
+          border: 1px solid #E2E8F0;
+          border-radius: 16px;
           overflow: hidden;
-          box-shadow: 0 2px 10px rgba(15,23,42,0.04);
-          margin-bottom: 18px;
+          box-shadow: 0 4px 16px rgba(15,39,68,0.03);
+          margin-bottom: 24px;
         }
-       .db-panel-head {
+        .db-panel-head {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 18px;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+          padding: 18px 20px;
+          border-bottom: 1px solid #F1F5F9;
           gap: 12px;
           flex-wrap: wrap;
         }
-       .db-panel-title {
-          font-family: "Lora", serif;
+        .db-panel-title {
           font-size: 16px;
           font-weight: 700;
-          color: #1a1a2e;
+          color: #0F2744;
           margin: 0;
         }
-       .db-panel-sub {
+        .db-panel-sub {
           font-size: 11.5px;
-          font-weight: 300;
-          color: #9a8a7a;
+          font-weight: 400;
+          color: #64748B;
           margin: 0;
         }
        .db-refresh-btn {
@@ -1069,7 +1142,7 @@ export default function SchoolBankAccountsPage() {
                           <button
                             type="button"
                             className="db-btn-gold ms-auto"
-                            onClick={save}
+                            onClick={() => save()}
                             style={{ borderRadius: 12, padding: "10px 14px" }}
                             disabled={saving ||!verified}
                           >
@@ -1120,6 +1193,70 @@ export default function SchoolBankAccountsPage() {
             <div className="mt-auto">
               <Footer />
             </div>
+          
+      {/* Proprietor Security Guard OTP Modal */}
+      {showOtpModal && (
+        <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.65)", zIndex: 1050 }}>
+          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: 460 }}>
+            <div className="modal-content" style={{ borderRadius: 16, border: "1px solid rgba(211,0,176,0.25)", overflow: "hidden", boxShadow: "0 20px 50px rgba(0,0,0,0.3)" }}>
+              <div className="modal-header text-white p-3 border-0" style={{ background: "linear-gradient(135deg, #0d0614 0%, #1e092b 100%)" }}>
+                <h5 className="modal-title fs-6 fw-bold text-white d-flex align-items-center gap-2 m-0">
+                  <i className="bi bi-shield-lock-fill" style={{ color: "#ffc857" }} />
+                  School Proprietor Security Guard
+                </h5>
+                <button type="button" className="btn-close btn-close-white" onClick={() => setShowOtpModal(false)} />
+              </div>
+              <div className="modal-body p-4 text-center">
+                <div className="badge bg-warning text-dark px-3 py-2 mb-3 rounded-pill fw-bold" style={{ fontSize: "12px" }}>
+                  <i className="bi bi-exclamation-triangle-fill me-1" /> High-Security Verification
+                </div>
+                <h6 className="fw-bold mb-2 text-dark">Confirm School Bank Account Details</h6>
+                <p className="text-muted small mb-3">
+                  To protect school fee payments from unauthorized alterations, a <strong>6-digit security verification code</strong> has been sent to the school proprietor's email:
+                  <br />
+                  <span className="badge bg-light text-dark border mt-2 px-3 py-1 fs-7">{maskedEmail || "Proprietor Email"}</span>
+                </p>
+
+                <div className="my-3">
+                  <input
+                    type="text"
+                    maxLength={6}
+                    className="form-control form-control-lg text-center fw-bold fs-2 letter-spacing-4"
+                    style={{ letterSpacing: "8px", borderRadius: 12, border: "2px solid #d300b0", color: "#1a1a2e" }}
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                    placeholder="000000"
+                    autoFocus
+                  />
+                </div>
+
+                {otpError && <div className="alert alert-danger py-2 px-3 small">{otpError}</div>}
+
+                <div className="d-flex justify-content-between align-items-center mt-3 pt-2">
+                  <button
+                    type="button"
+                    className="btn btn-link btn-sm text-decoration-none p-0"
+                    disabled={otpCountdown > 0 || otpSending}
+                    onClick={() => requestSecurityOtp("resend verification code for bank account")}
+                  >
+                    {otpSending ? "Sending code..." : otpCountdown > 0 ? `Resend code in ${otpCountdown}s` : "Resend Code"}
+                  </button>
+                  <button
+                    type="button"
+                    className="db-btn-gold px-4 fw-bold"
+                    style={{ borderRadius: 10, padding: "9px 18px" }}
+                    disabled={otpCode.length !== 6 || verifyingOtp}
+                    onClick={submitWithOtp}
+                  >
+                    {verifyingOtp ? "Verifying..." : "Confirm & Save"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
           </main>
         </div>
       </div>

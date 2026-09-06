@@ -6,18 +6,38 @@ import { FeatureProvider } from "./contexts/FeatureContext";
 import OnboardingGuard from "./auth/OnboardingGuard";
 import Loader from "./components/ui/dashboardLoader";
 import { isCustomPortalHost } from "./utils/portal";
+import ErrorBoundary from "./components/ErrorBoundary";
 
-const Login = lazy(() => import("./pages/login"));
-const HomePage = lazy(() => import("./pages/HomePage"));
-const Signup = lazy(() => import("./pages/signup"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
+import Login from "./pages/login";
+import HomePage from "./pages/HomePage";
+import Signup from "./pages/signup";
+import Dashboard from "./pages/Dashboard";
+
+function lazyWithRetry<T extends React.ComponentType<any>>(factory: () => Promise<{ default: T }>) {
+  return lazy(async () => {
+    try {
+      return await factory();
+    } catch (error) {
+      console.warn("Retrying chunk import after failure...", error);
+      await new Promise((r) => setTimeout(r, 400));
+      return await factory();
+    }
+  });
+}
 const Unauthorized = lazy(() => import("./pages/Unauthorized"));
+const NotFoundPage = lazy(() => import("./pages/Status/NotFoundPage"));
+const ForbiddenPage = lazy(() => import("./pages/Status/ForbiddenPage"));
+const ServerErrorPage = lazy(() => import("./pages/Status/ServerErrorPage"));
+const MaintenancePage = lazy(() => import("./pages/Status/MaintenancePage"));
+const SubscriptionRequiredPage = lazy(() => import("./pages/Status/SubscriptionRequiredPage"));
+const SuperAdminDashboard = lazy(() => import("./components/DashboardPages/SuperAdminDashboard"));
 const StudentsPage = lazy(() => import("./pages/Admin/students/StudentsPage"));
 const AttendancePage = lazy(() => import("./pages/Admin/students/AttendancePage"));
 const StudentReportPage = lazy(() => import("./pages/Admin/students/StudentReportPage"));
 const StudentRegisterPage = lazy(() => import("./pages/Admin/students/StudentRegisterPage"));
 const FinancialRecords = lazy(() => import("./pages/Admin/fianance/FinancialRecord"));
 const AddResultV2Page = lazy(() => import("./pages/Admin/StudentResult/AddResultV2Page"));
+const AdminStudentResultLookupPage = lazy(() => import("./pages/Admin/StudentResult/AdminStudentResultLookupPage"));
 const ResultBatchSetupPage = lazy(() => import("./pages/Admin/StudentResult/ResultBatchSetupPage"));
 const ResultUploadPage = lazy(() => import("./pages/Admin/StudentResult/ResultUploadPage"));
 const AdminResultReviewPage = lazy(() => import("./pages/Admin/StudentResult/AdminResultReviewPage"));
@@ -40,7 +60,7 @@ const SettingsPage = lazy(() => import("./pages/Admin/School/SettingsPage"));
 const PromoteStudentsPage = lazy(() => import("./pages/Admin/students/PromoteStudentsPage"));
 const BillingPage = lazy(() => import("./pages/Admin/Billing/BillingPage"));
 const CheckoutPage = lazy(() => import("./pages/Admin/Billing/CheckoutPage"));
-const GradequestInvoicePaymentPage = lazy(() => import("./pages/Admin/Billing/GradequestInvoicePaymentPage"));
+const GradiosEduInvoicePaymentPage = lazy(() => import("./pages/Admin/Billing/GradiosEduInvoicePaymentPage"));
 const WalletPage = lazy(() => import("./pages/Admin/Wallet/WalletPage"));
 const AdminUserDetailsPage = lazy(() => import("./pages/Super-Admin/AdminUserDetailsPage"));
 const SubscribersManagementPage = lazy(() => import("./pages/Super-Admin/SubscribersManagementPage"));
@@ -64,11 +84,17 @@ const StudentMyFeesPage = lazy(() => import("./pages/Admin/students/StudentMyFee
 const StudentMySubjectsPage = lazy(() => import("./pages/Admin/students/StudentMySubjectsPage"));
 const ParentChildrenPage = lazy(() => import("./pages/Admin/Parent/ParentChildrenPage"));
 const SchoolBankAccountsPage = lazy(() => import("./pages/Admin/School/SchoolBankAccountsPage"));
+const SchoolOperatorsPage = lazy(() => import("./pages/Admin/School/SchoolOperatorsPage"));
 const ChildFeeDetailsPage = lazy(() => import("./pages/Admin/Parent/ChildFeeDetailsPage"));
+const ParentAttendancePage = lazy(() => import("./pages/Admin/Parent/ParentAttendancePage"));
+const ParentCommunicationPage = lazy(() => import("./pages/Admin/Parent/ParentCommunicationPage"));
+const ParentSchoolInfoPage = lazy(() => import("./pages/Admin/Parent/ParentSchoolInfoPage"));
+const ParentResultsPage = lazy(() => import("./pages/Admin/Parent/ParentResultsPage"));
 const ReceiptUploadPage = lazy(() => import("./pages/Admin/Fees/ReceiptUploadPage"));
 const ParentPaymentSummaryPage = lazy(() => import("./pages/Admin/Parent/ParentPaymentSummaryPage"));
 const ResultPinsPage = lazy(() => import("./pages/Admin/StudentResult/ResultPinsPage"));
 const CheckResultPage = lazy(() => import("./pages/Admin/StudentResult/CheckResultPage"));
+const VerifyResultPage = lazy(() => import("./pages/VerifyResultPage"));
 const OnboardingPage = lazy(() => import("./pages/Onboarding/OnboardingPage"));
 const ProfileSettingsPage = lazy(() => import("./pages/ProfileSettingsPage"));
 const NotificationsPage = lazy(() => import("./pages/Notification/NotificationsPage"));
@@ -89,6 +115,7 @@ const WhatsAppSettingsPage = lazy(() => import("./pages/Admin/School/WhatsAppSet
 const AiCreditsPage = lazy(() => import("./pages/Admin/School/AiCreditsPage"));
 const AiLessonPlanPage = lazy(() => import("./pages/Admin/School/AiLessonPlanPage"));
 const AiFeeCollectionAssistantPage = lazy(() => import("./pages/Admin/Fees/AiFeeCollectionAssistantPage"));
+const FeePolicyPage = lazy(() => import("./pages/Admin/Fees/FeePolicyPage"));
 const OnlinePayFeesPage = lazy(() => import("./pages/Admin/Billing/OnlinePayFeesPage"));
 const PublicFeePaymentPage = lazy(() => import("./pages/PublicFeePaymentPage"));
 const PublicCbtAccessPage = lazy(() => import("./pages/PublicCbtAccessPage"));
@@ -99,35 +126,50 @@ const SalesPayoutSettingsPage = lazy(() => import("./pages/Sales/SalesPayoutSett
 const SalesMarketingKitPage = lazy(() => import("./pages/Sales/SalesMarketingKitPage"));
 const SalesMarketingMaterialsPage = lazy(() => import("./pages/Super-Admin/SalesMarketingMaterialsPage"));
 const PublicRepresentativeSalesPage = lazy(() => import("./pages/PublicRepresentativeSalesPage"));
+const PublicRepresentativeRegisterPage = lazy(() => import("./pages/PublicRepresentativeRegisterPage"));
 const ChangeInitialPasswordPage = lazy(() => import("./pages/ChangeInitialPasswordPage"));
 const SupportTicketsPage = lazy(() => import("./pages/Support/SupportTicketsPage"));
 const HostelManagementPage = lazy(() => import("./pages/Admin/Hostel/HostelManagementPage"));
 const TransportManagementPage = lazy(() => import("./pages/Admin/Transport/TransportManagementPage"));
 const WithdrawnStudentResultsPage = lazy(() => import("./pages/Admin/StudentResult/WithdrawnStudentResultsPage"));
 const TranscriptsPage = lazy(() => import("./pages/Admin/StudentResult/TranscriptsPage"));
+const NewsletterSubscribersPage = lazy(() => import("./pages/Super-Admin/NewsletterSubscribersPage"));
+const PublicBlogDetailPage = lazy(() => import("./pages/PublicBlogDetailPage"));
 
 function App() {
   return (
     <BrowserRouter>
-      <FeatureProvider>
-        <Suspense fallback={<Loader message="Preparing page..." />}>
+      <ErrorBoundary>
+        <FeatureProvider>
+          <Suspense fallback={<Loader message="Preparing page..." />}>
         <Routes>
           {/*  PUBLIC ROUTES (NO GUARDS) */}
           <Route path="/" element={isCustomPortalHost() ? <Navigate to="/login" replace /> : <HomePage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Signup />} />
+          <Route path="/sales-representative/register" element={<PublicRepresentativeRegisterPage />} />
+          <Route path="/become-a-partner" element={<PublicRepresentativeRegisterPage />} />
           <Route path="/sales-page/:code" element={<PublicRepresentativeSalesPage />} />
           <Route path="/check-result" element={<CheckResultPage />} />
+          <Route path="/results/check" element={<CheckResultPage />} />
+          <Route path="/results/check-result" element={<CheckResultPage />} />
+          <Route path="/check-term-result" element={<CheckResultPage />} />
+          <Route path="/student/check-result" element={<CheckResultPage />} />
+          <Route path="/verify-result" element={<VerifyResultPage />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
           <Route path="/payment-instructions/" element={<PaymentInstructionsPage />} />
           <Route path="/pay-school-fee" element={<PublicFeePaymentPage />} />
+          <Route path="/pay-fees" element={<PublicFeePaymentPage />} />
+          <Route path="/pay-fee" element={<PublicFeePaymentPage />} />
+          <Route path="/payonline" element={<PublicFeePaymentPage />} />
           <Route path="/cbt/access" element={<PublicCbtAccessPage />} />
           <Route path="/cbt/offline-runner" element={<OfflineCbtRunnerPage />} />
           <Route path="/book-demo" element={<BookDemo />} />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/terms-and-conditions" element={<TermsAndConditionsPage />} />
-           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/blog/:slug" element={<PublicBlogDetailPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           {/*  PROTECTED ROUTES (RequireAuth + OnboardingGuard) */}
           <Route
@@ -151,7 +193,23 @@ function App() {
           <Route
             path="/support"
             element={
-              <RequireAuth roles={["Admin"]}>
+              <RequireAuth roles={["Admin", "Teacher", "Super-Admin", "Platform-Staff", "Student", "Parent", "Bursar", "Sales-Representative"]}>
+                <SupportTicketsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/helpdesk"
+            element={
+              <RequireAuth roles={["Admin", "Teacher", "Super-Admin", "Platform-Staff", "Student", "Parent", "Bursar", "Sales-Representative"]}>
+                <SupportTicketsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/contact-support"
+            element={
+              <RequireAuth roles={["Admin", "Teacher", "Super-Admin", "Platform-Staff", "Student", "Parent", "Bursar", "Sales-Representative"]}>
                 <SupportTicketsPage />
               </RequireAuth>
             }
@@ -306,6 +364,57 @@ function App() {
           />
 
           <Route
+            path="/results/student-editor"
+            element={
+              <RequireAuth roles={["Admin", "Teacher", "Super-Admin", "Platform-Staff"]}>
+                <OnboardingGuard>
+                  <AdminStudentResultLookupPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/results/lookup"
+            element={
+              <RequireAuth roles={["Admin", "Teacher", "Super-Admin", "Platform-Staff"]}>
+                <OnboardingGuard>
+                  <AdminStudentResultLookupPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/students/results/edit"
+            element={
+              <RequireAuth roles={["Admin", "Teacher", "Super-Admin", "Platform-Staff"]}>
+                <OnboardingGuard>
+                  <AdminStudentResultLookupPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/result-editor"
+            element={
+              <RequireAuth roles={["Admin", "Teacher", "Super-Admin", "Platform-Staff"]}>
+                <OnboardingGuard>
+                  <AdminStudentResultLookupPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/students/results/lookup"
+            element={
+              <RequireAuth roles={["Admin", "Teacher", "Super-Admin", "Platform-Staff"]}>
+                <OnboardingGuard>
+                  <AdminStudentResultLookupPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
             path="/students/results/batch"
             element={
               <RequireAuth roles={["Admin", "Teacher"]}>
@@ -350,6 +459,39 @@ function App() {
           />
 
           <Route
+            path="/results/pins"
+            element={
+              <RequireAuth roles={["Admin"]}>
+                <OnboardingGuard>
+                  <ResultPinsPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/admin/result-monitoring"
+            element={
+              <RequireAuth roles={["Admin"]}>
+                <OnboardingGuard>
+                  <Navigate to="/result/monitor" replace />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/admin/academic-alerts"
+            element={
+              <RequireAuth roles={["Admin"]}>
+                <OnboardingGuard>
+                  <Navigate to="/result/monitor" replace />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
             path="/results/design"
             element={
               <RequireAuth roles={["Admin"]}>
@@ -363,7 +505,37 @@ function App() {
           <Route
             path="/students/results/show"
             element={
-              <RequireAuth roles={["Admin", "Teacher", "Student"]}>
+              <RequireAuth roles={["Admin", "Teacher", "Student", "Parent", "Super Admin", "SuperAdmin"]}>
+                <OnboardingGuard>
+                  <ShowResult />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/show-result"
+            element={
+              <RequireAuth roles={["Admin", "Teacher", "Student", "Parent", "Super Admin", "SuperAdmin"]}>
+                <OnboardingGuard>
+                  <ShowResult />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/results/show"
+            element={
+              <RequireAuth roles={["Admin", "Teacher", "Student", "Parent", "Super Admin", "SuperAdmin"]}>
+                <OnboardingGuard>
+                  <ShowResult />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/results/show-result"
+            element={
+              <RequireAuth roles={["Admin", "Teacher", "Student", "Parent", "Super Admin", "SuperAdmin"]}>
                 <OnboardingGuard>
                   <ShowResult />
                 </OnboardingGuard>
@@ -377,6 +549,17 @@ function App() {
               <RequireAuth roles={["Admin"]}>
                 <OnboardingGuard>
                   <AcademicCalendarPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/results/broadsheet"
+            element={
+              <RequireAuth roles={["Admin", "Teacher"]}>
+                <OnboardingGuard>
+                  <AdminResultReviewPage />
                 </OnboardingGuard>
               </RequireAuth>
             }
@@ -553,7 +736,7 @@ function App() {
           <Route
             path="/school/settings"
             element={
-              <RequireAuth roles={["Admin"]}>
+              <RequireAuth roles={["Admin", "Bursar"]}>
                 <OnboardingGuard>
                   <SettingsPage />
                 </OnboardingGuard>
@@ -561,12 +744,23 @@ function App() {
             }
           />
 
-            <Route
-            path="/school/settings"
+          <Route
+            path="/settings"
             element={
-              <RequireAuth roles={["Admin"]}>
+              <RequireAuth roles={["Admin", "Bursar"]}>
                 <OnboardingGuard>
                   <SettingsPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/fees/policy"
+            element={
+              <RequireAuth roles={["Admin", "Bursar"]}>
+                <OnboardingGuard>
+                  <FeePolicyPage />
                 </OnboardingGuard>
               </RequireAuth>
             }
@@ -574,7 +768,7 @@ function App() {
           <Route
             path="/settings/ai-credits"
             element={
-              <RequireAuth roles={["Admin"]}>
+              <RequireAuth roles={["Admin", "Teacher", "Bursar"]}>
                 <OnboardingGuard>
                   <AiCreditsPage />
                 </OnboardingGuard>
@@ -593,7 +787,7 @@ function App() {
           <Route
             path="/fees/ai-collection"
             element={
-              <RequireAuth roles={["Admin"]}>
+              <RequireAuth roles={["Admin", "Bursar"]}>
                 <OnboardingGuard>
                   <AiFeeCollectionAssistantPage />
                 </OnboardingGuard>
@@ -617,6 +811,27 @@ function App() {
               <RequireAuth roles={["Admin"]}>
                 <OnboardingGuard>
                   <SchoolBankAccountsPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/school/operators"
+            element={
+              <RequireAuth roles={["Admin"]}>
+                <OnboardingGuard>
+                  <SchoolOperatorsPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/school/operators"
+            element={
+              <RequireAuth roles={["Admin"]}>
+                <OnboardingGuard>
+                  <SchoolOperatorsPage />
                 </OnboardingGuard>
               </RequireAuth>
             }
@@ -733,6 +948,100 @@ function App() {
           />
 
           <Route
+            path="/parent/results"
+            element={
+              <RequireAuth roles={["Parent"]}>
+                <OnboardingGuard>
+                  <ParentResultsPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/parent/students/:studentId/results"
+            element={
+              <RequireAuth roles={["Parent"]}>
+                <OnboardingGuard>
+                  <ParentResultsPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/parent/attendance"
+            element={
+              <RequireAuth roles={["Parent"]}>
+                <OnboardingGuard>
+                  <ParentAttendancePage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/parent/attendance/history"
+            element={
+              <RequireAuth roles={["Parent"]}>
+                <OnboardingGuard>
+                  <ParentAttendancePage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/parent/communication"
+            element={
+              <RequireAuth roles={["Parent"]}>
+                <OnboardingGuard>
+                  <ParentCommunicationPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/parent/messages"
+            element={
+              <RequireAuth roles={["Parent"]}>
+                <OnboardingGuard>
+                  <ParentCommunicationPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/parent/announcements"
+            element={
+              <RequireAuth roles={["Parent"]}>
+                <OnboardingGuard>
+                  <ParentCommunicationPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/parent/calendar"
+            element={
+              <RequireAuth roles={["Parent"]}>
+                <OnboardingGuard>
+                  <ParentSchoolInfoPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/parent/events"
+            element={
+              <RequireAuth roles={["Parent"]}>
+                <OnboardingGuard>
+                  <ParentSchoolInfoPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
             path="/billing"
             element={
               <RequireAuth roles={["Admin"]}>
@@ -748,23 +1057,14 @@ function App() {
             element={
               <RequireAuth roles={["Admin"]}>
                 <OnboardingGuard>
-                  <GradequestInvoicePaymentPage />
+                  <GradiosEduInvoicePaymentPage />
                 </OnboardingGuard>
               </RequireAuth>
             }
           />
 
           
-          <Route
-            path="/payonline"
-            element={
-              <RequireAuth roles={["Admin"]}>
-                <OnboardingGuard>
-                  <OnlinePayFeesPage studentFeeId={123} studentName="John Doe" termLabel="First Term, 2025/2026" balanceDue={5000} />
-                </OnboardingGuard>
-              </RequireAuth>
-            }
-          />
+
 
 
           <Route
@@ -780,13 +1080,11 @@ function App() {
 
           <Route
             path="/checkout"
-            element={
-              <RequireAuth roles={["Admin"]}>
-                <OnboardingGuard>
-                  <CheckoutPage />
-                </OnboardingGuard>
-              </RequireAuth>
-            }
+            element={<Navigate to="/wallet" replace />}
+          />
+          <Route
+            path="/subscriptions/checkout"
+            element={<Navigate to="/wallet" replace />}
           />
 
 
@@ -902,6 +1200,16 @@ function App() {
             }
           />
           <Route
+            path="/superadmin/newsletter-subscribers"
+            element={
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["marketing"]}>
+                <OnboardingGuard>
+                  <NewsletterSubscribersPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
             path="/superadmin/send-message"
             element={
               <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["marketing"]}>
@@ -971,6 +1279,36 @@ function App() {
               </RequireAuth>
             }
           />
+          <Route
+            path="/superadmin"
+            element={
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]}>
+                <OnboardingGuard>
+                  <SuperAdminDashboard />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/superadmin/dashboard"
+            element={
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]}>
+                <OnboardingGuard>
+                  <SuperAdminDashboard />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/superadmin/command-center"
+            element={
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]}>
+                <OnboardingGuard>
+                  <SuperAdminDashboard />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
 
           {/* Student */}
           <Route
@@ -997,7 +1335,7 @@ function App() {
              <Route
             path="/user/profile"
             element={
-              <RequireAuth roles={["Student", "Parent", "Teacher", "Admin", "Bursar", "Super-Admin", "Platform-Staff", "Sales-Representative"]}>
+              <RequireAuth>
                 <OnboardingGuard>
                   <ProfileSettingsPage />
                 </OnboardingGuard>
@@ -1005,12 +1343,20 @@ function App() {
             }
           />
 
+          {/* SaaS Status & Error Pages */}
+          <Route path="/404" element={<NotFoundPage />} />
+          <Route path="/403" element={<ForbiddenPage />} />
+          <Route path="/unauthorized" element={<ForbiddenPage />} />
+          <Route path="/500" element={<ServerErrorPage />} />
+          <Route path="/maintenance" element={<MaintenancePage />} />
+          <Route path="/upgrade-required" element={<SubscriptionRequiredPage />} />
 
-     
-
+          {/* Wildcard 404 Catch-All */}
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
         </Suspense>
       </FeatureProvider>
+      </ErrorBoundary>
     </BrowserRouter>
   );
 }

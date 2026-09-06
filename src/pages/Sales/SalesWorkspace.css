@@ -1,6 +1,6 @@
-.sales-work-main { min-height: 100vh; background: #f5f7fb; overflow-x: hidden; }
+.sales-work-main { min-height: 100vh; background: #F8FAFC; overflow-x: hidden; }
 .sales-work-shell { width: 100%; max-width: 1360px; margin: 0 auto; }
-.sales-work-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: center; padding: 24px; border-radius: 16px; color: #fff; background: linear-gradient(135deg, #0f172a 0%, #164e63 54%, #0f766e 100%); box-shadow: 0 18px 48px rgba(15,23,42,.14); margin-bottom: 18px; }
+.sales-work-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: center; padding: 28px 32px; border-radius: 18px; color: #fff; background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%); box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15); margin-bottom: 24px; position: relative; overflow: hidden; }
 .sales-work-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: #a7f3d0; }
 .sales-work-hero h1 { margin: 8px 0; font-size: clamp(26px, 4vw, 38px); font-weight: 900; letter-spacing: 0; }
 .sales-work-hero p { max-width: 720px; margin: 0; color: rgba(255,255,255,.78); line-height: 1.65; }

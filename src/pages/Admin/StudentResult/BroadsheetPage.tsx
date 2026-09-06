@@ -367,17 +367,23 @@ export default function BroadsheetPage() {
   return (
     <>
       <style>{`
-        .bs-hero{background:linear-gradient(135deg,var(--gq-dark,#050008),#180820);border-radius:14px;box-shadow:0 18px 42px rgba(5,0,8,.12)}
-        .bs-pill{background:rgba(255,255,255,.08)!important;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.82)!important}
-        .bs-pill-gold{background:rgba(255,200,87,.16)!important;border:1px solid rgba(255,200,87,.26);color:var(--gq-secondary,#ffc857)!important}
-        .bs-panel{background:rgba(255,255,255,.06)!important;border:1px solid rgba(255,255,255,.1)!important;border-radius:14px!important}
-        .bs-card{border:1px solid var(--gq-border,rgba(5,0,8,.09))!important;border-radius:14px!important;box-shadow:0 10px 28px rgba(5,0,8,.045)!important}
-        .bs-btn-primary{background:var(--gq-primary,#d300b0)!important;border-color:var(--gq-primary,#d300b0)!important;color:#fff!important}
-        .bs-btn-gold{background:var(--gq-secondary,#ffc857)!important;border-color:var(--gq-secondary,#ffc857)!important;color:var(--gq-dark,#050008)!important}
-        .bs-btn-soft{background:var(--gq-surface-soft,#fbf7f8)!important;border-color:rgba(5,0,8,.08)!important;color:#5f5147!important}
-        .bs-table-wrap{border:1px solid rgba(5,0,8,.07);border-radius:14px;overflow:auto;max-height:70vh}
-        .bs-table thead{position:sticky;top:0;z-index:2}.bs-table thead th{background:var(--gq-surface-soft,#fbf7f8)!important;color:#74675e!important;border-bottom:1px solid rgba(5,0,8,.08)!important}
-        .bs-table td{border-bottom:1px solid rgba(5,0,8,.06)!important}.bs-total-badge{background:var(--gq-primary,#d300b0)!important}.bs-highlight{background:rgba(211,0,176,.06)!important}
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        .bs-main{background:#F8FAFC;min-height:100vh;font-family:'Plus Jakarta Sans',system-ui,-apple-system,sans-serif;padding:calc(66px + 24px) 28px 40px!important}
+        @media(max-width:767.98px){
+          .bs-main{padding:calc(66px + 16px) 14px 36px!important}
+          .bs-hero{padding:20px 18px!important;border-radius:14px!important;margin-top:8px!important}
+        }
+        .bs-hero{background:linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);border-radius:18px;box-shadow:0 10px 30px -5px rgba(15,39,68,0.15)}
+        .bs-pill{background:rgba(255,255,255,.12)!important;border:1px solid rgba(255,255,255,.2);color:#FFFFFF!important}
+        .bs-pill-gold{background:rgba(217,119,6,.22)!important;border:1px solid rgba(217,119,6,.4);color:#FBBF24!important}
+        .bs-panel{background:rgba(255,255,255,.08)!important;border:1px solid rgba(255,255,255,.15)!important;border-radius:14px!important}
+        .bs-card{border:1px solid #E2E8F0!important;border-radius:16px!important;box-shadow:0 4px 16px rgba(15,39,68,0.03)!important;background:#FFFFFF!important}
+        .bs-btn-primary{background:#0F2744!important;border-color:#0F2744!important;color:#fff!important}
+        .bs-btn-gold{background:#D97706!important;border-color:#D97706!important;color:#FFFFFF!important}
+        .bs-btn-soft{background:#F8FAFC!important;border-color:#E2E8F0!important;color:#0F2744!important}
+        .bs-table-wrap{border:1px solid #E2E8F0;border-radius:14px;overflow:auto;max-height:70vh;background:#fff}
+        .bs-table thead{position:sticky;top:0;z-index:2}.bs-table thead th{background:#F8FAFC!important;color:#64748B!important;border-bottom:1px solid #E2E8F0!important}
+        .bs-table td{border-bottom:1px solid #F1F5F9!important}.bs-total-badge{background:#0F2744!important}.bs-highlight{background:rgba(217,119,6,.08)!important}
       `}</style>
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       <PageTitle title="Broadsheet" />
@@ -386,12 +392,12 @@ export default function BroadsheetPage() {
         <div className="row">
           <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-          <main className="col-md-9 col-lg-10 ms-auto gq-app-main d-flex flex-column">
+          <main className="col-md-9 col-lg-10 ms-auto gq-app-main bs-main d-flex flex-column min-vh-100">
             {(loading || computing) && <Loader message={computing ? "Computing broadsheet..." : "Loading broadsheet..."} />}
 
             {/* HERO */}
             <div
-              className="bs-hero mt-4 p-4 position-relative overflow-hidden"
+              className="bs-hero p-4 position-relative overflow-hidden"
               style={{
                 borderRadius: 16,
               }}

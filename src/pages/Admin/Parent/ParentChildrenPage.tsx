@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "../../../utils/axios";
+import { resolveMediaUrl } from "../../../utils/apiUrl";
 
 import TopNav from "../../../components/LayoutComponents/TopNav";
 import Sidebar from "../../../components/LayoutComponents/Sidebar";
@@ -115,115 +116,302 @@ export default function ParentChildrenPage() {
 
   return (
     <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+        .parent-ch-main {
+          background: #F8FAFC;
+          min-height: 100vh;
+          font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+          padding: calc(66px + 24px) 28px 40px !important;
+        }
+
+        @media (max-width: 767.98px) {
+          .parent-ch-main {
+            padding: calc(66px + 16px) 14px 36px !important;
+          }
+          .parent-hero {
+            padding: 20px 18px !important;
+            border-radius: 14px !important;
+            margin-bottom: 16px !important;
+          }
+          .parent-greeting {
+            font-size: 20px !important;
+          }
+          .parent-hero-sub {
+            font-size: 12.5px !important;
+          }
+        }
+
+        .parent-hero {
+          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
+          border-radius: 18px;
+          padding: 32px 36px;
+          color: #FFFFFF;
+          margin-bottom: 24px;
+          box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
+          position: relative;
+          overflow: hidden;
+        }
+
+        .parent-hero::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background-image:
+            linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+          background-size: 32px 32px;
+          pointer-events: none;
+        }
+
+        .parent-hero-glow {
+          position: absolute;
+          top: -40px;
+          right: -40px;
+          width: 320px;
+          height: 320px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(217, 119, 6, 0.18) 0%, transparent 65%);
+          pointer-events: none;
+        }
+
+        .parent-hero-inner {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 24px;
+        }
+
+        .parent-session-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: #FBBF24;
+          background: rgba(217, 119, 6, 0.2);
+          border: 1px solid rgba(217, 119, 6, 0.35);
+          border-radius: 100px;
+          padding: 4px 12px;
+          margin-bottom: 12px;
+        }
+
+        .parent-session-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: #10B981;
+          box-shadow: 0 0 6px #10B981;
+        }
+
+        .parent-greeting {
+          font-size: 26px;
+          font-weight: 800;
+          color: #FFFFFF;
+          line-height: 1.1;
+          margin-bottom: 8px;
+        }
+
+        .parent-greeting em {
+          font-style: normal;
+          color: #FBBF24;
+        }
+
+        .parent-hero-sub {
+          font-size: 13.5px;
+          color: #CBD5E1;
+          line-height: 1.6;
+          max-width: 520px;
+          margin-bottom: 0;
+        }
+
+        .parent-stat-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 16px;
+          margin-bottom: 24px;
+        }
+
+        @media (max-width: 1100px) {
+          .parent-stat-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
+        @media (max-width: 600px) {
+          .parent-stat-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        .parent-stat-card {
+          background: #FFFFFF;
+          border: 1px solid rgba(15, 39, 68, 0.08);
+          border-radius: 16px;
+          padding: 20px 24px;
+          box-shadow: 0 2px 10px rgba(15, 39, 68, 0.04);
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .parent-stat-card:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 8px 24px rgba(15, 39, 68, 0.08);
+          border-color: rgba(217, 119, 6, 0.25);
+        }
+
+        .parent-stat-icon-wrap {
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
+          margin-bottom: 14px;
+        }
+
+        .parent-stat-title {
+          font-size: 12px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: #64748B;
+          margin-bottom: 6px;
+        }
+
+        .parent-stat-val {
+          font-size: 24px;
+          font-weight: 800;
+          color: #0F2744;
+          line-height: 1.1;
+        }
+
+        .parent-panel {
+          background: #FFFFFF;
+          border: 1px solid rgba(15, 39, 68, 0.08);
+          border-radius: 16px;
+          box-shadow: 0 2px 10px rgba(15, 39, 68, 0.04);
+          overflow: hidden;
+          margin-bottom: 24px;
+        }
+
+        .parent-panel-head {
+          padding: 18px 24px;
+          border-bottom: 1px solid #E2E8F0;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+
+        .parent-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 13px;
+        }
+
+        .parent-table th {
+          background: #F8FAFC;
+          padding: 12px 16px;
+          font-weight: 700;
+          color: #475569;
+          font-size: 11.5px;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          border-bottom: 1px solid #E2E8F0;
+        }
+
+        .parent-table td {
+          padding: 14px 16px;
+          border-bottom: 1px solid #F1F5F9;
+          color: #1E293B;
+          vertical-align: middle;
+        }
+
+        .parent-table tr:hover td {
+          background: #F8FAFC;
+        }
+      `}</style>
+
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-      <PageTitle title="Manage Parent-Children" />
+      <PageTitle title="My Children" />
 
       <div className="container-fluid">
         <div className="row">
-          <Sidebar sidebarOpen={sidebarOpen} />
+          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-          <main
-            className="col-md-9 col-lg-10 ms-auto px-4 d-flex flex-column min-vh-100"
-            style={{ backgroundColor: "#f8f9fa" }}
-          >
-            {loading && <Loader message="Loading children..." />}
+          <main className="col-md-9 col-lg-10 ms-auto gq-app-main parent-ch-main d-flex flex-column min-vh-100">
+            {loading && <Loader message="Loading children directory..." />}
 
-            {/* Hero */}
-            <div
-              className="mt-4 p-4 position-relative overflow-hidden"
-              style={{
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                borderRadius: "16px",
-                boxShadow: "0 10px 30px rgba(102, 126, 234, 0.3)",
-              }}
-            >
-              <div className="row align-items-center position-relative">
-                <div className="col-md-8">
-                  <span
-                    className="badge px-3 py-2 mb-3"
-                    style={{
-                      backgroundColor: "rgba(255, 255, 255, 0.2)",
-                      color: "#fff",
-                      borderRadius: "20px",
-                      fontSize: "0.75rem",
-                      fontWeight: 500,
-                    }}
-                  >
-                    <i className="bi bi-people me-1"></i>
-                    Parent Portal
-                  </span>
+            {/* ── Signature Hero ── */}
+            <div className="parent-hero">
+              <div className="parent-hero-glow" />
+              <div className="parent-hero-inner">
+                <div>
+                  <div className="parent-session-badge">
+                    <span className="parent-session-dot" />
+                    Family Directory
+                  </div>
 
-                  <h2 className="fw-bold text-white mb-2">
-                    {getGreeting()}, {parentName}! 👋
-                  </h2>
+                  <h1 className="parent-greeting">
+                    {getGreeting()}, <em>{parentName}!</em> 👋
+                  </h1>
 
-                  <p className="text-white mb-0" style={{ opacity: 0.9, fontSize: "1rem" }}>
-                    Here’s your children list with quick indicators—class, attendance, fees and results.
+                  <p className="parent-hero-sub">
+                    Direct access to each child’s attendance, continuous assessment reports, term broadsheets, and fee breakdown.
                   </p>
                 </div>
 
-                <div className="col-md-4 d-none d-md-block text-end">
+                <div className="d-flex gap-2">
                   <button
-                    className="btn btn-light px-4 py-2"
-                    style={{ borderRadius: 10, fontWeight: 600 }}
+                    className="btn btn-outline-light px-4 py-2"
+                    style={{ borderRadius: 10, fontWeight: 700, backdropFilter: "blur(8px)" }}
                     onClick={() => fetchChildren()}
                   >
-                    <i className="bi bi-arrow-clockwise me-2"></i>
+                    <i className="bi bi-arrow-clockwise me-2" />
                     Refresh
+                  </button>
+                  <button
+                    className="btn btn-warning px-4 py-2"
+                    style={{ borderRadius: 10, fontWeight: 700, color: "#0F2744", background: "#FBBF24" }}
+                    onClick={() => navigate("/dashboard")}
+                  >
+                    <i className="bi bi-speedometer2 me-2" />
+                    Dashboard
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* Stats Cards */}
-            <div className="row g-3 mb-4 mt-1">
-              {stats.map(({ title, value, icon }, index) => {
-                const colors = [
-                  { gradient: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", icon: "#667eea", bg: "#f0edff" },
-                  { gradient: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)", icon: "#f5576c", bg: "#fff0f3" },
-                  { gradient: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)", icon: "#00f2fe", bg: "#e6f9ff" },
-                  { gradient: "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)", icon: "#38f9d7", bg: "#e6fff9" },
-                ];
+            {/* ── Stat Cards ── */}
+            <div className="parent-stat-grid">
+              {stats.map(({ title, value, icon }, idx) => {
+                const meta = [
+                  { color: "#10B981", bg: "rgba(16, 185, 129, 0.12)" },
+                  { color: "#2563EB", bg: "rgba(37, 99, 235, 0.12)" },
+                  { color: "#059669", bg: "rgba(5, 150, 105, 0.12)" },
+                  { color: "#D97706", bg: "rgba(217, 119, 6, 0.12)" },
+                ][idx % 4];
 
                 return (
-                  <div className="col-md-6 col-lg-3" key={title}>
-                    <div
-                      className="card border-0 h-100 position-relative overflow-hidden"
-                      style={{
-                        borderRadius: 12,
-                        boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-                        transition: "transform 0.2s, box-shadow 0.2s",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = "translateY(-4px)";
-                        e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.12)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)";
-                      }}
-                    >
-                      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: colors[index].gradient }} />
-
-                      <div className="card-body p-4">
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                          <div className="p-2 rounded-3" style={{ backgroundColor: colors[index].bg }}>
-                            <i className={`bi bi-${icon} fs-4`} style={{ color: colors[index].icon }} />
-                          </div>
-                          <i className="bi bi-three-dots-vertical text-muted" style={{ cursor: "pointer" }} />
-                        </div>
-
-                        <p className="text-muted mb-1 small">{title}</p>
-                        <h3 className="fw-bold mb-0" style={{ color: "#1e293b" }}>
-                          {value}
-                        </h3>
-
-                        <div className="mt-3 pt-3" style={{ borderTop: "1px solid #f1f5f9" }}>
-                          <small className="text-muted d-flex align-items-center gap-1">
-                            <i className="bi bi-shield-check text-success" />
-                            Live data from your account
-                          </small>
-                        </div>
+                  <div className="parent-stat-card" key={title}>
+                    <div className="d-flex align-items-start justify-content-between">
+                      <div>
+                        <div className="parent-stat-title">{title}</div>
+                        <div className="parent-stat-val">{value}</div>
+                      </div>
+                      <div
+                        className="parent-stat-icon-wrap"
+                        style={{ backgroundColor: meta.bg, color: meta.color }}
+                      >
+                        <i className={`bi bi-${icon}`} />
                       </div>
                     </div>
                   </div>
@@ -231,102 +419,158 @@ export default function ParentChildrenPage() {
               })}
             </div>
 
-            {/* Search + Table */}
-            <div className="card border-0 shadow-sm mb-5" style={{ borderRadius: 12 }}>
-              <div className="card-body p-4">
-                <div className="d-flex flex-wrap justify-content-between align-items-center mb-3">
-                  <div>
-                    <h6 className="fw-semibold mb-0" style={{ color: "#1e293b" }}>
-                      My Children
-                    </h6>
-                    <small className="text-muted">Search and manage selection</small>
-                  </div>
-
-                  <div className="mt-2 mt-md-0" style={{ minWidth: 280 }}>
-                    <input
-                      className="form-control"
-                      placeholder="Search by name, reg no, class..."
-                      value={q}
-                      onChange={(e) => setQ(e.target.value)}
-                      style={{ borderRadius: 10 }}
-                    />
+            {/* ── Children Directory Table ── */}
+            <div className="parent-panel mb-5">
+              <div className="parent-panel-head">
+                <div>
+                  <h2 style={{ fontSize: "16px", fontWeight: 800, color: "#0F2744", margin: 0 }}>
+                    <i className="bi bi-people-fill text-primary me-2" />
+                    All Enrolled Children ({filtered.length})
+                  </h2>
+                  <div style={{ fontSize: "12px", color: "#64748B", marginTop: "2px" }}>
+                    Select a student to view academic records or clear fees
                   </div>
                 </div>
 
-                <div className="table-responsive">
-                  <table className="table align-middle">
-                    <thead>
-                      <tr className="text-muted small">
-                        <th>Student</th>
-                        <th>Class</th>
-                        <th>Attendance (30d)</th>
-                        <th>Fee Balance</th>
-                        <th>Results</th>
-                        <th></th>
-                      </tr>
-                    </thead>
+                <div style={{ minWidth: 260 }}>
+                  <input
+                    className="form-control"
+                    placeholder="Search by name, reg no, class..."
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    style={{ borderRadius: 10, fontSize: "13px" }}
+                  />
+                </div>
+              </div>
 
-                    <tbody>
-                      {filtered.map((c) => (
+              <div className="table-responsive">
+                <table className="parent-table">
+                  <thead>
+                    <tr>
+                      <th>Student</th>
+                      <th>Class</th>
+                      <th>Attendance (30d)</th>
+                      <th>Fee Balance</th>
+                      <th>Results Available</th>
+                      <th className="text-end">Actions</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {filtered.map((c) => {
+                      const balance = Number(c.fee_balance || 0);
+                      const isClear = balance <= 0;
+                      const initials = (c.name || "Student")
+                        .split(" ")
+                        .map((w) => w[0])
+                        .slice(0, 2)
+                        .join("")
+                        .toUpperCase();
+
+                      return (
                         <tr key={c.id}>
                           <td>
-                            <div className="d-flex align-items-center gap-2">
-                              <img
-                                src={c.photo || "http://localhost:8000/img/profile.png"}
-                                alt="Student"
-                                style={{ width: 40, height: 40, borderRadius: 12, objectFit: "cover" }}
-                              />
+                            <div className="d-flex align-items-center gap-3">
+                              <div
+                                style={{
+                                  width: 44,
+                                  height: 44,
+                                  borderRadius: 12,
+                                  background: "#0A192F",
+                                  color: "#FBBF24",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontWeight: 800,
+                                  fontSize: 14,
+                                  overflow: "hidden",
+                                  flexShrink: 0,
+                                  border: "1.5px solid rgba(15, 39, 68, 0.12)",
+                                }}
+                              >
+                                {c.photo ? (
+                                  <img
+                                    src={resolveMediaUrl(c.photo, "/media/profile.jpg")}
+                                    alt={c.name}
+                                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                    onError={(e) => {
+                                      (e.target as HTMLElement).style.display = "none";
+                                    }}
+                                  />
+                                ) : null}
+                                <span>{initials}</span>
+                              </div>
                               <div>
-                                <div className="fw-semibold">{c.name}</div>
-                                <small className="text-muted">{c.reg_no || "N/A"}</small>
+                                <div style={{ fontWeight: 700, color: "#0F2744", fontSize: 14 }}>{c.name}</div>
+                                <small className="text-muted">Reg No: <strong>{c.reg_no || "N/A"}</strong></small>
                               </div>
                             </div>
                           </td>
 
-                          <td>{c.class || "—"}</td>
+                          <td>
+                            <span className="badge bg-light text-dark border px-2 py-1 fw-bold">{c.class || "—"}</span>
+                          </td>
 
                           <td>
-                            <span className="badge bg-light text-dark" style={{ borderRadius: 20 }}>
-                              {c.attendance_rate_30d}%
+                            <div className="d-flex align-items-center gap-2">
+                              <div className="progress flex-grow-1" style={{ height: 6, width: 60, borderRadius: 999 }}>
+                                <div
+                                  className={`progress-bar ${c.attendance_rate_30d >= 75 ? "bg-success" : c.attendance_rate_30d >= 50 ? "bg-warning" : "bg-danger"}`}
+                                  style={{ width: `${Math.min(100, c.attendance_rate_30d || 0)}%` }}
+                                />
+                              </div>
+                              <span style={{ fontWeight: 700, fontSize: "12px" }}>{c.attendance_rate_30d}%</span>
+                            </div>
+                          </td>
+
+                          <td style={{ fontWeight: 700, color: isClear ? "#15803D" : "#B91C1C", fontSize: 13.5 }}>
+                            {money(c.fee_balance)}
+                          </td>
+
+                          <td>
+                            <span className="badge bg-primary-subtle text-primary border border-primary-subtle fw-bold px-2 py-1">
+                              <i className="bi bi-award me-1" />
+                              {c.results_count} term result{c.results_count !== 1 ? "s" : ""}
                             </span>
                           </td>
 
-                          <td className="fw-semibold">{money(c.fee_balance)}</td>
-
-                          <td>{c.results_count}</td>
-
                           <td className="text-end">
                             <div className="d-flex justify-content-end gap-2">
-                                <button
-                                  className="btn btn-sm btn-outline-primary"
-                                  style={{ borderRadius: 10 }}
-                                  onClick={() => navigate(`/parent/results?student_id=${c.id}`)}
-                                >
-                                  Results
-                                </button>
+                              <button
+                                className="btn btn-sm btn-outline-dark"
+                                style={{ borderRadius: 8, fontWeight: 700, fontSize: "12px" }}
+                                onClick={() => navigate(`/parent/results?student_id=${c.id}`)}
+                                title="View Academic Results and Broadsheet"
+                              >
+                                <i className="bi bi-file-earmark-bar-graph me-1 text-primary" />
+                                Broadsheet
+                              </button>
 
-                                <button
-                                  className="btn btn-sm btn-primary"
-                                  style={{ borderRadius: 10 }}
-                                  onClick={() => navigate(`/parent/students/${c.id}/fees`)}
-                                >
-                                  Fees
-                                </button>
-                              </div>
+                              <button
+                                className="btn btn-sm btn-primary"
+                                style={{ borderRadius: 8, fontWeight: 700, fontSize: "12px" }}
+                                onClick={() => navigate(`/parent/students/${c.id}/fees`)}
+                                title="View Fee Breakdown & Payment Details"
+                              >
+                                <i className="bi bi-receipt me-1" />
+                                Fees
+                              </button>
+                            </div>
                           </td>
                         </tr>
-                      ))}
+                      );
+                    })}
 
-                      {!loading && filtered.length === 0 && (
-                        <tr>
-                          <td colSpan={6} className="text-center text-muted py-4">
-                            No children found.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                    {!loading && filtered.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="text-center text-muted py-5">
+                          <i className="bi bi-search fs-2 d-block mb-2 text-secondary" />
+                          No children found matching your search.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
 

@@ -800,11 +800,11 @@ export default function BookDemo() {
                 Back to site
               </a>
 
-        <a href="/" className="ft-logo" aria-label="GradeQuest home">     
+        <a href="/" className="ft-logo" aria-label="SchoolProfit home">     
         <div className="ft-logo-wrap">
           <img
-            src="/media/logo/gradequest-logo.png"
-            alt="GradeQuest logo"
+            src="/media/logo/schoolprofit-icon.svg"
+            alt="SchoolProfit logo"
             className="ft-logo-img"
           />
         </div>
@@ -819,7 +819,7 @@ export default function BookDemo() {
                 No pressure.
               </h1>
               <p className="bd-panel-desc">
-                A GradeQuest specialist will walk you through the platform live
+                A SchoolProfit specialist will walk you through the platform live
                 — results, fees, AI monitoring, and analytics — tailored to your
                 school&apos;s size and needs.
               </p>
@@ -923,7 +923,7 @@ export default function BookDemo() {
                       className="bd-btn-primary"
                       style={{ textDecoration: "none" }}
                     >
-                      Back to GradeQuest
+                      Back to SchoolProfit
                     </a>
                   </div>
                 ) : (

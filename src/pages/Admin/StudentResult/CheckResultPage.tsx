@@ -1,5 +1,6 @@
 // src/pages/Public/CheckResultPage.tsx
 import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { publicApi } from "../../../utils/axios";
 import { useToast } from "../../../contexts/ToastContext";
 import Footer from "../../../components/LayoutComponents/Footer";
@@ -8,6 +9,7 @@ import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import QRCode from "qrcode";
 import PageTitle from "../../../components/PageTitle";
+import { getAppBaseUrl } from "../../../utils/apiUrl";
 
 /** -----------------------------
  * Types (same spirit as ShowResult)
@@ -213,8 +215,12 @@ function resolveReportColumns(
   sectionId: number | null | undefined,
   term: string
 ): ReportColumnOptions {
+  if (!Array.isArray(rules) || rules.length === 0) {
+    return { ...defaultReportColumnOptions };
+  }
   const matched = rules
     .map((rule) => {
+      if (!rule) return { rule, score: -1 };
       const ruleSection = rule.section_id ?? "all";
       const sectionMatches = ruleSection === "all" || Number(ruleSection) === Number(sectionId);
       const termMatches = normalizeTerm(rule.term) === "all" || normalizeTerm(rule.term) === normalizeTerm(term);
@@ -225,7 +231,7 @@ function resolveReportColumns(
     .sort((a, b) => a.score - b.score);
 
   return matched.reduce(
-    (columns, item) => ({ ...columns, ...(item.rule.columns || {}) }),
+    (columns, item) => ({ ...columns, ...(item?.rule?.columns || {}) }),
     { ...defaultReportColumnOptions }
   );
 }
@@ -374,10 +380,9 @@ export default function CheckResultPage() {
         term,
         session,
       };
-
       const encodedPayload = encodeURIComponent(JSON.stringify(qrPayload));
-      const verificationBaseUrl = "https://gradequest.com.ng";
-      const verificationUrl = `${verificationBaseUrl}/verify-result?data=${encodedPayload}`;
+      const verificationBaseUrl = getAppBaseUrl();
+      const verificationUrl = `${verificationBaseUrl}/verify-result?data=${encodedPayload}&reg_no=${encodeURIComponent(qrPayload.reg_no || "")}&term=${encodeURIComponent(qrPayload.term)}&session=${encodeURIComponent(qrPayload.session)}`;
 
       const generatedQR = await QRCode.toDataURL(verificationUrl);
       setQrDataUrl(generatedQR);
@@ -552,14 +557,17 @@ export default function CheckResultPage() {
   // Determine CA columns
   const { maxCAColumns, caColumnValue } = useMemo(() => {
     let caColValue = 0;
+    if (!Array.isArray(term_result) || term_result.length === 0) {
+      return { maxCAColumns: 0, caColumnValue: 0 };
+    }
     for (let subject of term_result) {
-      const caArray = parseCA((subject as any).ca);
+      const caArray = parseCA((subject as any)?.ca);
       if (caArray.length > 0) {
         caColValue = Math.round(40 / caArray.length);
         break;
       }
     }
-    const max = Math.max(...term_result.map((s) => parseCA((s as any).ca).length), 0);
+    const max = Math.max(...term_result.map((s) => parseCA((s as any)?.ca).length), 0);
     return { maxCAColumns: max, caColumnValue: caColValue };
   }, [term_result]);
 
@@ -577,26 +585,28 @@ export default function CheckResultPage() {
   const showCumulativeTotal = activeReportColumns.show_cumulative_total;
   const showCumulativeAverage = activeReportColumns.show_cumulative_average;
 
-  const hasLegacyColumns = !isV2 && term_result.length > 0;
+  const hasLegacyColumns = !isV2 && Array.isArray(term_result) && term_result.length > 0;
   const hideFirstTermLegacy = hasLegacyColumns
-    ? !activeReportColumns.show_first_term || (term_result as LegacyTermResult[]).every((s) => isEmpty((s as any).firstterm))
+    ? !activeReportColumns.show_first_term || (term_result as LegacyTermResult[]).every((s) => isEmpty((s as any)?.firstterm))
     : true;
   const hideSecondTerm = hasLegacyColumns
-    ? !activeReportColumns.show_second_term || (term_result as LegacyTermResult[]).every((s) => isEmpty(s.secondterm))
+    ? !activeReportColumns.show_second_term || (term_result as LegacyTermResult[]).every((s) => isEmpty(s?.secondterm))
     : true;
   const hideCummAvgLegacy = hasLegacyColumns
-    ? !activeReportColumns.show_cumulative_average || (term_result as LegacyTermResult[]).every((s) => isEmpty(s.average))
+    ? !activeReportColumns.show_cumulative_average || (term_result as LegacyTermResult[]).every((s) => isEmpty(s?.average))
     : true;
 
-  const hideGrade = term_result.every((s: any) => isEmpty(s.grade));
-  const hideRemark = term_result.every((s: any) => isEmpty(s.remark));
-  const performanceRows = term_result
-    .map((subject: any) => ({
-      name: getSubjectName(subject),
-      total: Math.max(0, Math.min(100, Number(subject.total) || 0)),
-      grade: String(subject.grade || "N/A").toUpperCase(),
-    }))
-    .sort((a, b) => b.total - a.total);
+  const hideGrade = Array.isArray(term_result) ? term_result.every((s: any) => isEmpty(s?.grade)) : true;
+  const hideRemark = Array.isArray(term_result) ? term_result.every((s: any) => isEmpty(s?.remark)) : true;
+  const performanceRows = Array.isArray(term_result)
+    ? term_result
+        .map((subject: any) => ({
+          name: getSubjectName(subject),
+          total: Math.max(0, Math.min(100, Number(subject?.total) || 0)),
+          grade: String(subject?.grade || "N/A").toUpperCase(),
+        }))
+        .sort((a, b) => b.total - a.total)
+    : [];
   const topPerformanceRows = performanceRows.slice(0, 6);
   const gradeCounts = performanceRows.reduce<Record<string, number>>((acc, row) => {
     const key = row.grade && row.grade !== "N/A" ? row.grade.charAt(0) : "N/A";
@@ -646,217 +656,637 @@ export default function CheckResultPage() {
     }
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
-    <>
-    <PageTitle title="Check Result" />
-      <div className="container" style={{ maxWidth: 1200 }}>
-        {/* Hero */}
-        <div
-          className="mt-4 p-4 position-relative overflow-hidden"
-          style={{
-            background: `linear-gradient(135deg, ${themePrimary} 0%, #6366f1 100%)`,
-            borderRadius: "16px",
-            boxShadow: "0 10px 30px rgba(0, 0, 0, 0.15)",
-          }}
-        >
-          <div
-            style={{
-              position: "absolute",
-              top: "-50px",
-              right: "-50px",
-              width: "220px",
-              height: "220px",
-              background: "rgba(255, 255, 255, 0.12)",
-              borderRadius: "50%",
-              filter: "blur(40px)",
-            }}
-          />
-          <div
-            style={{
-              position: "absolute",
-              bottom: "-30px",
-              left: "-30px",
-              width: "160px",
-              height: "160px",
-              background: "rgba(255, 255, 255, 0.12)",
-              borderRadius: "50%",
-              filter: "blur(40px)",
-            }}
-          />
+    <main className="gq-cr-page">
+      <PageTitle title="Student Result Checker | GradiosEdu" />
 
-          <div className="row align-items-center position-relative">
-            <div className="col-md-8">
-              <span
-                className="badge px-3 py-2 mb-3 d-inline-flex align-items-center gap-2"
-                style={{
-                  backgroundColor: "rgba(255, 255, 255, 0.2)",
-                  color: "#fff",
-                  borderRadius: "20px",
-                  fontSize: "0.75rem",
-                  fontWeight: 600,
-                }}
-              >
-                <i className="bi bi-search"></i>
-                Public Result Portal
-              </span>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Cinzel:wght@600;700;800&display=swap');
 
-              <h2 className="fw-bold text-white mb-2">Check Result with PIN</h2>
-              <p className="text-white mb-0" style={{ opacity: 0.95 }}>
-                Enter your registration number and result PIN to view the current term result.
+        .gq-cr-page {
+          min-height: 100vh;
+          background: #f8fafc;
+          color: #0f172a;
+          padding: 24px 16px 60px;
+          font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+        }
+
+        .gq-cr-shell {
+          max-width: 1200px;
+          margin: 0 auto;
+        }
+
+        /* ── Top Bar with Security Badges ── */
+        .gq-cr-topbar {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 16px;
+          padding: 12px 24px;
+          margin-bottom: 20px;
+          box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+        }
+
+        .gq-cr-brand {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          text-decoration: none;
+          color: #0f172a;
+        }
+
+        .gq-cr-logo-badge {
+          width: 36px;
+          height: 36px;
+          border-radius: 10px;
+          background: linear-gradient(135deg, #f59e0b, #d97706);
+          color: #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 900;
+          font-size: 16px;
+          box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
+        }
+
+        .gq-cr-brand-title {
+          font-weight: 800;
+          font-size: 16px;
+          color: #0f172a;
+          line-height: 1.1;
+          letter-spacing: -0.02em;
+        }
+
+        .gq-cr-brand-sub {
+          font-size: 10.5px;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: #64748b;
+          font-weight: 700;
+        }
+
+        .gq-cr-badge-row {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          font-size: 12px;
+          color: #475569;
+          font-weight: 600;
+        }
+
+        .gq-cr-badge-item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .gq-cr-badge-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #10b981;
+          box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+        }
+
+        /* ── Hero Banner ── */
+        .gq-cr-hero {
+          background: linear-gradient(135deg, #090e1f 0%, #151d38 60%, #1a2244 100%);
+          border-radius: 20px;
+          padding: 32px 36px;
+          color: #ffffff;
+          position: relative;
+          overflow: hidden;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          box-shadow: 0 16px 36px rgba(9, 14, 31, 0.18);
+          margin-bottom: 24px;
+        }
+
+        .gq-cr-hero::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background-image: radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px);
+          background-size: 24px 24px;
+          pointer-events: none;
+        }
+
+        .gq-cr-hero > * {
+          position: relative;
+          z-index: 1;
+        }
+
+        .gq-cr-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: rgba(245, 158, 11, 0.16);
+          border: 1px solid rgba(245, 158, 11, 0.35);
+          color: #fbbf24;
+          padding: 6px 14px;
+          border-radius: 999px;
+          font-size: 11.5px;
+          font-weight: 800;
+          margin-bottom: 14px;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+        }
+
+        .gq-cr-title {
+          font-family: 'Playfair Display', Georgia, serif;
+          font-size: clamp(22px, 3.2vw, 32px);
+          font-weight: 800;
+          margin-bottom: 8px;
+          color: #ffffff;
+          line-height: 1.2;
+        }
+
+        .gq-cr-desc {
+          font-size: 14px;
+          color: rgba(255, 255, 255, 0.82);
+          max-width: 680px;
+          line-height: 1.5;
+          margin: 0;
+        }
+
+        /* ── Left Form Card ── */
+        .gq-cr-form-card {
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 18px;
+          padding: 24px;
+          box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+        }
+
+        .gq-cr-card-head {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding-bottom: 16px;
+          margin-bottom: 20px;
+          border-bottom: 1px solid #f1f5f9;
+          font-weight: 800;
+          font-size: 15px;
+          color: #0f172a;
+        }
+
+        .gq-cr-label {
+          display: block;
+          font-size: 13px;
+          font-weight: 700;
+          color: #334155;
+          margin-bottom: 6px;
+        }
+
+        .gq-cr-input {
+          width: 100%;
+          padding: 12px 14px;
+          border-radius: 12px;
+          border: 1px solid #cbd5e1;
+          font-size: 14px;
+          font-family: inherit;
+          color: #0f172a;
+          background: #ffffff;
+          transition: all 0.2s ease;
+          outline: none;
+        }
+
+        .gq-cr-input:focus {
+          border-color: #f59e0b;
+          box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
+        }
+
+        .gq-cr-btn-submit {
+          width: 100%;
+          padding: 13px 20px;
+          border-radius: 12px;
+          background: linear-gradient(135deg, #0f172a, #1e293b);
+          color: #ffffff;
+          font-weight: 800;
+          font-size: 14px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          transition: all 0.2s ease;
+          box-shadow: 0 4px 14px rgba(15, 23, 42, 0.15);
+        }
+
+        .gq-cr-btn-submit:hover:not(:disabled) {
+          background: linear-gradient(135deg, #f59e0b, #d97706);
+          color: #090e17;
+          transform: translateY(-1px);
+          box-shadow: 0 6px 18px rgba(245, 158, 11, 0.3);
+        }
+
+        .gq-cr-btn-submit:disabled {
+          opacity: 0.65;
+          cursor: not-allowed;
+        }
+
+        .gq-cr-btn-clear {
+          width: 100%;
+          padding: 10px 18px;
+          border-radius: 12px;
+          background: #f1f5f9;
+          color: #475569;
+          font-weight: 700;
+          font-size: 13px;
+          border: 1px solid #e2e8f0;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          transition: all 0.2s ease;
+        }
+
+        .gq-cr-btn-clear:hover {
+          background: #e2e8f0;
+          color: #0f172a;
+        }
+
+        .gq-cr-notice-box {
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          padding: 12px 14px;
+          font-size: 12px;
+          color: #64748b;
+          line-height: 1.5;
+          display: flex;
+          gap: 10px;
+          align-items: flex-start;
+          margin-top: 14px;
+        }
+
+        /* ── Empty State / Result Preview Area ── */
+        .gq-cr-empty-card {
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 18px;
+          padding: 48px 32px;
+          text-align: center;
+          box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+        }
+
+        .gq-cr-empty-icon {
+          width: 72px;
+          height: 72px;
+          border-radius: 20px;
+          background: rgba(245, 158, 11, 0.1);
+          color: #f59e0b;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 32px;
+          margin-bottom: 20px;
+          border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+
+        .gq-cr-step-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 14px;
+          margin-top: 28px;
+          text-align: left;
+        }
+
+        .gq-cr-step-item {
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 14px;
+          padding: 14px;
+        }
+
+        .gq-cr-step-num {
+          font-weight: 900;
+          font-size: 11px;
+          color: #f59e0b;
+          text-transform: uppercase;
+          margin-bottom: 4px;
+        }
+
+        .gq-cr-step-title {
+          font-weight: 700;
+          font-size: 13px;
+          color: #0f172a;
+          margin-bottom: 4px;
+        }
+
+        .gq-cr-step-desc {
+          font-size: 11.5px;
+          color: #64748b;
+          line-height: 1.4;
+          margin: 0;
+        }
+
+        .gq-cr-toolbar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 14px;
+          padding: 12px 18px;
+          margin-bottom: 16px;
+          box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+
+        @media (max-width: 768px) {
+          .gq-cr-topbar {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+          }
+          .gq-cr-badge-row {
+            flex-wrap: wrap;
+            gap: 10px;
+          }
+          .gq-cr-step-grid {
+            grid-template-columns: 1fr;
+          }
+          .gq-cr-toolbar {
+            flex-direction: column;
+            align-items: stretch;
+          }
+        }
+      `}</style>
+
+      <div className="gq-cr-shell">
+        {/* ── Top Bar with Security Badges ── */}
+        <header className="gq-cr-topbar">
+          <Link to="/" className="gq-cr-brand">
+            <div className="gq-cr-logo-badge">GQ</div>
+            <div>
+              <div className="gq-cr-brand-title">GradiosEdu Portal</div>
+              <div className="gq-cr-brand-sub">Academic Records & Result Verification</div>
+            </div>
+          </Link>
+
+          <div className="gq-cr-badge-row">
+            <div className="gq-cr-badge-item">
+              <span className="gq-cr-badge-dot" />
+              <span>256-Bit Encrypted</span>
+            </div>
+            <div className="gq-cr-badge-item d-none d-md-flex">
+              <i className="bi bi-shield-check text-warning" />
+              <span>Cryptographic PIN Verification</span>
+            </div>
+            <Link to="/verify-result" className="btn btn-sm btn-outline-secondary" style={{ borderRadius: "8px", fontSize: "12px", fontWeight: 600 }}>
+              Verify QR Seal
+            </Link>
+          </div>
+        </header>
+
+        {/* ── Hero Banner ── */}
+        <section className="gq-cr-hero">
+          <div className="row align-items-center">
+            <div className="col-lg-8">
+              <div className="gq-cr-pill">
+                <i className="bi bi-patch-check-fill" /> Official Result Checker
+              </div>
+              <h1 className="gq-cr-title">
+                Student Academic Report & Result Portal
+              </h1>
+              <p className="gq-cr-desc">
+                Access certified continuous assessment broadsheets, subject breakdowns, and official termly report cards with your school admission number and result PIN.
               </p>
             </div>
 
-            {data?.school_info?.name ? (
-              <div className="col-md-4 d-none d-md-block text-end">
+            {data?.school_info?.name && (
+              <div className="col-lg-4 d-none d-lg-block text-end">
                 <div
                   style={{
-                    background: "rgba(255, 255, 255, 0.16)",
-                    backdropFilter: "blur(10px)",
+                    background: "rgba(255, 255, 255, 0.12)",
+                    backdropFilter: "blur(12px)",
                     borderRadius: "16px",
-                    padding: "1.25rem",
-                    border: "1px solid rgba(255, 255, 255, 0.25)",
+                    padding: "16px 20px",
+                    border: "1px solid rgba(255, 255, 255, 0.22)",
+                    textAlign: "left",
+                    display: "inline-block",
                   }}
                 >
-                  <div className="text-white fw-semibold">{data.school_info.name}</div>
-                  <small className="text-white d-block" style={{ opacity: 0.85 }}>
-                    {data.class_name}
-                  </small>
-                  <small className="text-white d-block mt-2" style={{ opacity: 0.75 }}>
-                    Source: {String(data.source).toUpperCase()}
-                  </small>
+                  <div style={{ fontSize: "11px", textTransform: "uppercase", color: "#fbbf24", fontWeight: 800 }}>Certified School</div>
+                  <div style={{ fontSize: "15px", fontWeight: 800, color: "#ffffff", marginTop: "2px" }}>{data.school_info.name}</div>
+                  <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.8)", marginTop: "2px" }}>{data.class_name}</div>
                 </div>
               </div>
-            ) : null}
+            )}
           </div>
-        </div>
+        </section>
 
-        <div className="row g-4 mt-2">
-          {/* LEFT: form + actions */}
+        {/* ── Main Layout: Form & Result Sheet ── */}
+        <div className="row g-4">
+          {/* Left Column: Form & Action Cards */}
           <div className="col-lg-4">
             <form onSubmit={onCheck}>
-              <div className="card shadow-sm border-0" style={{ borderRadius: 12 }}>
-                <div className="card-body p-4">
-                  <div className="mb-3">
-                    <label className="form-label fw-semibold">Registration Number</label>
+              <div className="gq-cr-form-card">
+                <div className="gq-cr-card-head">
+                  <i className="bi bi-shield-lock text-warning" style={{ fontSize: "18px" }} />
+                  <span>Enter Student Credentials</span>
+                </div>
+
+                <div className="mb-3">
+                  <label className="gq-cr-label">Student Registration / Admission No</label>
+                  <div className="position-relative">
                     <input
-                      className="form-control"
-                      placeholder="e.g. GQA/2025/001"
+                      className="gq-cr-input"
+                      placeholder="e.g. GQA/2026/001"
                       value={regNo}
                       onChange={(e) => setRegNo(e.target.value)}
                       autoComplete="off"
                       required
                     />
                   </div>
+                  <small style={{ fontSize: "11px", color: "#64748b", marginTop: "4px", display: "block" }}>
+                    Assigned admission identifier by the school
+                  </small>
+                </div>
 
-                  <div className="mb-3">
-                    <label className="form-label fw-semibold">Result PIN</label>
-                    <input
-                      className="form-control"
-                      placeholder="Enter PIN"
-                      value={pin}
-                      onChange={(e) => setPin(e.target.value)}
-                      autoComplete="off"
-                      required
-                    />
-                  </div>
+                <div className="mb-3">
+                  <label className="gq-cr-label">Result Checking PIN</label>
+                  <input
+                    className="gq-cr-input"
+                    placeholder="e.g. GQ-7842-9901-X812"
+                    value={pin}
+                    onChange={(e) => setPin(e.target.value)}
+                    autoComplete="off"
+                    required
+                  />
+                  <small style={{ fontSize: "11px", color: "#64748b", marginTop: "4px", display: "block" }}>
+                    12-digit authentic termly scratch PIN
+                  </small>
+                </div>
 
-                  <div className="d-grid gap-2 mt-3">
-                    <button
-                      type="submit"
-                      className="btn btn-primary"
-                      style={{
-                        borderRadius: 12,
-                        padding: "10px 14px",
-                        fontWeight: 800,
-                        backgroundColor: themePrimary,
-                        borderColor: themePrimary,
-                      }}
-                      disabled={!canSubmit}
-                    >
-                      {checking ? (
-                        <>
-                          <span className="spinner-border spinner-border-sm me-2" />
-                          Checking...
-                        </>
-                      ) : (
-                        <>
-                          <i className="bi bi-search me-2" />
-                          Check Result
-                        </>
-                      )}
-                    </button>
+                <div className="d-grid gap-2 mt-4">
+                  <button
+                    type="submit"
+                    className="gq-cr-btn-submit"
+                    disabled={!canSubmit}
+                  >
+                    {checking ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm" />
+                        Verifying Credentials...
+                      </>
+                    ) : (
+                      <>
+                        <i className="bi bi-search" />
+                        Check Result
+                      </>
+                    )}
+                  </button>
 
-                    <button
-                      type="button"
-                      className="btn btn-light"
-                      style={{ borderRadius: 12, padding: "10px 14px" }}
-                      onClick={resetForm}
-                      disabled={checking}
-                    >
-                      <i className="bi bi-arrow-counterclockwise me-2" />
-                      Clear
-                    </button>
+                  <button
+                    type="button"
+                    className="gq-cr-btn-clear"
+                    onClick={resetForm}
+                    disabled={checking}
+                  >
+                    <i className="bi bi-arrow-counterclockwise" />
+                    Clear Form
+                  </button>
+                </div>
 
-                    <div className="alert alert-light border mb-0">
-                      <i className="bi bi-shield-lock me-2" />
-                      If fees are unpaid, access may be restricted by the school.
-                    </div>
+                <div className="gq-cr-notice-box">
+                  <i className="bi bi-info-circle text-primary" style={{ fontSize: "16px", marginTop: "2px" }} />
+                  <div>
+                    <strong>Bursary Notice:</strong> Academic results are accessible to students with full fee clearance. Contact your institution's bursary if restricted.
                   </div>
                 </div>
               </div>
             </form>
 
             {data && (
-              <div className="card border-0 shadow-sm mt-4" style={{ borderRadius: 12 }}>
-                <div className="card-body p-3 d-grid gap-2">
-                
+              <div className="gq-cr-form-card mt-3">
+                <div className="gq-cr-card-head">
+                  <i className="bi bi-file-earmark-text text-success" style={{ fontSize: "18px" }} />
+                  <span>Document Export</span>
+                </div>
 
+                <div className="d-grid gap-2">
                   <button
                     type="button"
-                    className="btn btn-outline-secondary"
-                    style={{ borderRadius: 12 }}
+                    className="btn btn-primary"
+                    style={{ borderRadius: "12px", padding: "12px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
                     onClick={downloadPDF}
                     disabled={downloading}
                   >
                     {downloading ? (
                       <>
-                        <span className="spinner-border spinner-border-sm me-2" />
-                        Downloading...
+                        <span className="spinner-border spinner-border-sm" />
+                        Generating PDF...
                       </>
                     ) : (
                       <>
-                        <i className="bi bi-file-earmark-pdf me-2" />
-                        Download PDF
+                        <i className="bi bi-file-earmark-pdf" />
+                        Download Official PDF
                       </>
                     )}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary"
+                    style={{ borderRadius: "12px", padding: "10px", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
+                    onClick={handlePrint}
+                  >
+                    <i className="bi bi-printer" />
+                    Print Report Sheet
                   </button>
                 </div>
               </div>
             )}
           </div>
 
-          {/* RIGHT: actual report sheet (same layout logic as ShowResult) */}
+          {/* Right Column: Result Sheet View or Empty Guidance State */}
           <div className="col-lg-8">
             {!data ? (
-              <div className="card shadow-sm border-0" style={{ borderRadius: 12 }}>
-                <div className="card-body p-4">
-                  <div className="alert alert-light border mb-0">
-                    <i className="bi bi-info-circle me-2" />
-                    Enter Reg No and PIN, then click <b>Check Result</b>.
+              <div className="gq-cr-empty-card">
+                <div className="gq-cr-empty-icon">
+                  <i className="bi bi-mortarboard-fill" />
+                </div>
+                <h3 style={{ fontFamily: "'Playfair Display', serif", fontWeight: 800, fontSize: "24px", color: "#0f172a", marginBottom: "8px" }}>
+                  Certified Academic Record Verification
+                </h3>
+                <p style={{ color: "#64748b", fontSize: "14px", maxWidth: "520px", margin: "0 auto 20px", lineHeight: 1.5 }}>
+                  Enter your student admission number and result checking PIN on the left to securely retrieve, view, and print your certified termly report card.
+                </p>
+
+                <div className="gq-cr-step-grid">
+                  <div className="gq-cr-step-item">
+                    <div className="gq-cr-step-num">Step 01</div>
+                    <div className="gq-cr-step-title">Enter Reg Number</div>
+                    <p className="gq-cr-step-desc">Type your unique admission identifier assigned by your school.</p>
+                  </div>
+                  <div className="gq-cr-step-item">
+                    <div className="gq-cr-step-num">Step 02</div>
+                    <div className="gq-cr-step-title">Enter Result PIN</div>
+                    <p className="gq-cr-step-desc">Input your 12-digit termly scratch card PIN obtained from the school.</p>
+                  </div>
+                  <div className="gq-cr-step-item">
+                    <div className="gq-cr-step-num">Step 03</div>
+                    <div className="gq-cr-step-title">View & Download</div>
+                    <p className="gq-cr-step-desc">Instantly inspect cumulative broadsheet grades and download verified PDF.</p>
                   </div>
                 </div>
               </div>
             ) : (
-              <div
-                style={{
-                  padding: "10px",
-                  background: themeBg,
-                  borderRadius: 12,
-                }}
-              >
-                {/* Result Sheet */}
+              <div>
+                {/* Result Toolbar */}
+                <div className="gq-cr-toolbar">
+                  <div className="d-flex align-items-center gap-2">
+                    <span className="badge bg-success px-3 py-2" style={{ borderRadius: "8px", fontSize: "12px", fontWeight: 700 }}>
+                      <i className="bi bi-patch-check-fill me-1" /> Certified Result
+                    </span>
+                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a" }}>
+                      {studentFullName} · {data.class_name}
+                    </span>
+                  </div>
+
+                  <div className="d-flex align-items-center gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-secondary"
+                      style={{ borderRadius: "8px", fontSize: "12px", fontWeight: 600 }}
+                      onClick={handlePrint}
+                    >
+                      <i className="bi bi-printer me-1" /> Print
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      style={{ borderRadius: "8px", fontSize: "12px", fontWeight: 700 }}
+                      onClick={downloadPDF}
+                      disabled={downloading}
+                    >
+                      <i className="bi bi-file-earmark-pdf me-1" /> PDF
+                    </button>
+                  </div>
+                </div>
+
                 <div
-                  id="result-sheet"
+                  style={{
+                    padding: "10px",
+                    background: themeBg,
+                    borderRadius: 16,
+                    border: "1px solid #e2e8f0",
+                    boxShadow: "0 4px 16px rgba(15, 23, 42, 0.04)",
+                  }}
+                >
+                  {/* Result Sheet */}
+                  <div
+                    id="result-sheet"
                   style={{
                     width: "min(780px, 100%)",
                     margin: "auto",
@@ -1378,47 +1808,52 @@ export default function CheckResultPage() {
                         ...customBlockStyle("signature"),
                       }}
                     >
-                      {displayOptions.show_signature ? (
+                      {displayOptions.show_signature && (school_info?.principal_signature || (school_info as any)?.stamp) ? (
                         <div style={{ display: "flex", alignItems: "end", gap: 18 }}>
-                          <div style={{ textAlign: "center" }}>
+                          {school_info?.principal_signature ? (
+                            <div style={{ textAlign: "center" }}>
+                              <img
+                                src={school_info.principal_signature}
+                                alt="Principal/HM Signature"
+                                style={{
+                                  width: "120px",
+                                  height: "60px",
+                                  objectFit: "contain",
+                                }}
+                              />
+                              <p style={{ margin: 0, color: themePrimary, fontWeight: 700 }}>Principal/HM Signature</p>
+                            </div>
+                          ) : null}
+                          {(school_info as any)?.stamp ? (
                             <img
-                              src={school_info?.principal_signature || "/media/result/default-signature.svg"}
-                              alt="Principal/HM Signature"
-                              style={{
-                                width: "120px",
-                                height: "60px",
-                                objectFit: "contain",
-                              }}
+                              src={(school_info as any).stamp}
+                              alt="School stamp"
+                              style={{ width: 68, height: 68, objectFit: "contain", transform: "rotate(-8deg)" }}
                             />
-                            <p style={{ margin: 0, color: themePrimary, fontWeight: 700 }}>Principal/HM Signature</p>
-                          </div>
-                          <img
-                            src="/media/result/default-stamp.svg"
-                            alt="School stamp"
-                            style={{ width: 68, height: 68, objectFit: "contain", transform: "rotate(-8deg)" }}
-                          />
+                          ) : null}
                         </div>
                       ) : <div />}
 
-                      {displayOptions.show_qr_code ? <div style={{ textAlign: "center" }}>
-                        <img src={qrDataUrl || "/media/result/default-qrcode.svg"} alt="QR Code" style={{ width: "100px", height: "100px" }} />
-                        <p style={{ margin: 0, color: themePrimary, fontWeight: 700 }}>Verify Result</p>
-                      </div> : <div />}
-                    </div>
+                      {displayOptions.show_qr_code ? (
+                        <div style={{ textAlign: "center" }}>
+                          <img src={qrDataUrl || "/media/result/default-qrcode.svg"} alt="QR Code" style={{ width: "100px", height: "100px" }} />
+                          <p style={{ margin: 0, color: themePrimary, fontWeight: 700 }}>Verify Result</p>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </div>
-
-                <div className="mt-3">
-                  <Footer />
-                </div>
               </div>
-            )}
+            </div>
           </div>
-        </div>
-
-        <div className="mb-4" />
+        )}
       </div>
-    </>
-  );
+    </div>
+
+    <div className="mt-5">
+      <Footer />
+    </div>
+  </div>
+</main>
+);
 }

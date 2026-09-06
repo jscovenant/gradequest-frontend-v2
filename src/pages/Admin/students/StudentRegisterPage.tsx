@@ -229,24 +229,45 @@ export default function StudentRegisterPage() {
 
         /* ── Sticky action bar ── */
         .sr-action-bar {
-          position:fixed; bottom:0; left:0; right:0; z-index:900;
-          background:#fff; border-top:1px solid #ede8e0;
-          box-shadow:0 -4px 24px rgba(0,0,0,.07);
-          display:flex; align-items:center; justify-content:space-between; gap:12px;
-          padding:14px 28px; flex-wrap:wrap;
+          position: fixed;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          z-index: 1020;
+          background: rgba(255,255,255,0.95);
+          backdrop-filter: blur(12px);
+          border-top: 1px solid #ede8e0;
+          box-shadow: 0 -4px 20px rgba(0,0,0,0.06);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 12px 28px;
+          flex-wrap: wrap;
+          transition: left 0.3s ease;
         }
-        .sr-action-status { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:300; color:#9a8a7a; }
+
+        @media (min-width: 768px) {
+          .sr-action-bar {
+            left: var(--gq-sidebar-width, 280px);
+          }
+          .gq-sidebar-collapsed .sr-action-bar {
+            left: var(--gq-sidebar-collapsed-width, 80px);
+          }
+        }
+
+        .sr-action-status { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:400; color:#7a6a5a; }
         .sr-action-status-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
         .sr-action-status-dot--ok   { background:#22c55e; }
         .sr-action-status-dot--warn { background:#f59e0b; }
         .sr-action-btns { display:flex; gap:10px; align-items:center; }
 
-        .sr-cancel-btn { display:inline-flex; align-items:center; gap:7px; padding:11px 20px; font-size:13.5px; font-weight:400; color:#7a6a5a; background:#f5f1eb; border:1px solid #e5ddd3; border-radius:9px; cursor:pointer; transition:background .2s; }
+        .sr-cancel-btn { display:inline-flex; align-items:center; gap:7px; padding:10px 18px; font-size:13px; font-weight:500; color:#7a6a5a; background:#f5f1eb; border:1px solid #e5ddd3; border-radius:9px; cursor:pointer; transition:background .2s; }
         .sr-cancel-btn:hover { background:#ede8e0; }
         .sr-cancel-btn:disabled { opacity:.5; cursor:not-allowed; }
 
-        .sr-submit-btn { display:inline-flex; align-items:center; gap:8px; padding:11px 24px; font-size:13.5px; font-weight:500; color:#fff; background:#1a1a2e; border:none; border-radius:9px; cursor:pointer; transition:background .2s,transform .2s,box-shadow .2s; }
-        .sr-submit-btn:hover:not(:disabled) { background:#0a0f1e; transform:translateY(-1px); box-shadow:0 6px 20px rgba(0,0,0,.16); }
+        .sr-submit-btn { display:inline-flex; align-items:center; gap:8px; padding:10px 22px; font-size:13.5px; font-weight:600; color:#fff; background:#1a1a2e; border:none; border-radius:9px; cursor:pointer; transition:background .2s,transform .2s,box-shadow .2s; }
+        .sr-submit-btn:hover:not(:disabled) { background:#0a0f1e; transform:translateY(-1px); box-shadow:0 4px 14px rgba(0,0,0,.14); }
         .sr-submit-btn:disabled { opacity:.5; cursor:not-allowed; }
         .sr-submit-btn--ready { background:#c9a84c; color:#0f172a; }
         .sr-submit-btn--ready:hover:not(:disabled) { background:#e8c97a; }
@@ -261,9 +282,9 @@ export default function StudentRegisterPage() {
 
       <div className="container-fluid">
         <div className="row">
-          <Sidebar sidebarOpen={sidebarOpen} />
+          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-          <main className="col-md-9 col-lg-10 ms-auto sr-main">
+          <main className="col-md-9 col-lg-10 ms-auto db-main sr-main">
             {pageLoading && <Loader message="Loading registration options…" />}
 
             {/* ── Hero ── */}

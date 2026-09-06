@@ -170,6 +170,7 @@ export default function AddResultV2Page() {
 
   useEffect(() => {
     const t = window.setTimeout(() => setPageLoading(false), 120);
+    authApi.get("/admin/ai/credits").then((r) => setAiCredits(r.data?.data || null)).catch(() => undefined);
     return () => window.clearTimeout(t);
   }, []);
 
@@ -223,6 +224,16 @@ export default function AddResultV2Page() {
   const [saving, setSaving] = useState(false);
   const [computing, setComputing] = useState(false);
   const [aiCommenting, setAiCommenting] = useState(false);
+  const [aiCredits, setAiCredits] = useState<{
+    remaining_credits: number;
+    is_plus_active?: boolean;
+    user_allocation?: {
+      allocated_credits: number;
+      used_credits: number;
+      remaining_credits: number;
+      is_unlimited: boolean;
+    } | null;
+  } | null>(null);
 
   const overallAverage = useMemo(() => {
   // no scores yet
@@ -949,124 +960,364 @@ export default function AddResultV2Page() {
 
   return (
     <>
-    <PageTitle title="Add New Result" />
-      <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-      <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+      <PageTitle title="Upload Results" />
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        .db-main {
+          padding: 24px 28px 48px;
+          background: #F8FAFC;
+          font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+          min-height: 100vh;
+        }
 
-      <main className="gq-app-main result-entry-main ms-auto" style={contentStyle}>
-        <div className="container-fluid py-4">
-          {pageLoading ? (
-            <CenterLoader label="Preparing Result Module..." />
-          ) : (
-            <>
-              <div className="d-flex align-items-center justify-content-between mb-3">
-                <div>
-                  <h4 className="mb-0">Upload Results</h4>
-                  <div className="text-muted small">Auto-save drafts • Batch progress sidebar • Faster entry for teachers</div>
+        /* Hero */
+        .db-hero {
+          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
+          border-radius: 18px;
+          padding: 32px 36px;
+          position: relative;
+          overflow: hidden;
+          margin-bottom: 24px;
+          box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
+        }
+        .db-hero-glow {
+          position: absolute;
+          top: -90px;
+          right: -40px;
+          width: 380px;
+          height: 380px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(217, 119, 6, 0.15), transparent 70%);
+          pointer-events: none;
+        }
+        .db-hero-inner {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 28px;
+          flex-wrap: wrap;
+        }
+        .db-kicker {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: #FBBF24;
+          background: rgba(217, 119, 6, 0.20);
+          border: 1px solid rgba(217, 119, 6, 0.35);
+          border-radius: 999px;
+          padding: 4px 12px;
+          margin-bottom: 12px;
+        }
+        .db-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: #10B981;
+        }
+        .db-title {
+          font-size: 26px;
+          font-weight: 800;
+          color: #fff;
+          line-height: 1.1;
+          margin: 0 0 8px;
+        }
+        .db-title em {
+          color: #FBBF24;
+          font-style: normal;
+        }
+        .db-hero-sub {
+          font-size: 13.5px;
+          color: #CBD5E1;
+          line-height: 1.6;
+          max-width: 600px;
+          margin: 0;
+        }
+        .db-btn-gold {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: #D97706;
+          color: #FFFFFF;
+          font-weight: 700;
+          font-size: 13px;
+          padding: 9px 18px;
+          border-radius: 10px;
+          border: none;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          text-decoration: none;
+        }
+        .db-btn-gold:hover {
+          background: #B45309;
+          transform: translateY(-1px);
+          color: #FFFFFF;
+        }
+        .db-btn-outline-gold {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: rgba(255, 255, 255, 0.10);
+          border: 1px solid rgba(255, 255, 255, 0.20);
+          color: #FFFFFF;
+          font-weight: 600;
+          font-size: 12.5px;
+          padding: 8px 16px;
+          border-radius: 10px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .db-btn-outline-gold:hover {
+          background: rgba(255, 255, 255, 0.18);
+          color: #fff;
+        }
+
+        /* Panel */
+        .db-panel {
+          background: #fff;
+          border: 1px solid #E2E8F0;
+          border-radius: 16px;
+          box-shadow: 0 4px 16px rgba(15, 39, 68, 0.03);
+          overflow: hidden;
+        }
+        .db-panel-head {
+          padding: 18px 20px;
+          border-bottom: 1px solid #E2E8F0;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          flex-wrap: wrap;
+          background: #fff;
+        }
+        .db-panel-title {
+          font-size: 16px;
+          font-weight: 800;
+          color: #0F2744;
+          margin: 0;
+        }
+        .db-panel-sub {
+          font-size: 12px;
+          color: #64748B;
+          margin: 2px 0 0;
+        }
+
+        /* Stepper Pills */
+        .db-nav-pills {
+          display: flex;
+          gap: 10px;
+          border-bottom: 1px solid #E2E8F0;
+          padding-bottom: 16px;
+          margin-bottom: 24px;
+        }
+        .db-step-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 9px 18px;
+          border-radius: 10px;
+          font-size: 13px;
+          font-weight: 600;
+          border: 1px solid #E2E8F0;
+          background: #fff;
+          color: #64748B;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .db-step-btn.active {
+          background: #0F2744;
+          color: #FBBF24;
+          border-color: #0F2744;
+          box-shadow: 0 4px 14px rgba(15, 39, 68, 0.15);
+        }
+        .db-step-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+      `}</style>
+
+      <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title="Student Result Entry" />
+
+      <div className="container-fluid">
+        <div className="row">
+          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+          <main className="col-md-9 col-lg-10 ms-auto db-main">
+            {pageLoading ? (
+              <CenterLoader label="Preparing Result Module..." />
+            ) : (
+              <>
+                {/* ═══ HERO ═══ */}
+                <div className="db-hero">
+                  <div className="db-hero-glow" />
+                  <div className="db-hero-inner">
+                    <div>
+                      <div className="db-kicker">
+                        <span className="db-dot" />
+                        Academic Assessment & Grade Entry
+                      </div>
+                      <h1 className="db-title">
+                        Student Result <em>Entry</em>
+                      </h1>
+                      <p className="db-hero-sub">
+                        Fast-track batch score uploading, continuous assessment recording, and AI-assisted narrative feedback remarks.
+                      </p>
+                    </div>
+
+                    <div className="d-flex gap-2 flex-wrap justify-content-end">
+                      <button className="db-btn-outline-gold" onClick={loadDraft}>
+                        <i className="bi bi-file-earmark-arrow-up" />
+                        Load Draft
+                      </button>
+                      <button
+                        className="btn btn-sm btn-outline-danger"
+                        style={{ borderRadius: 8, fontSize: 12.5 }}
+                        onClick={clearDraft}
+                      >
+                        <i className="bi bi-trash me-1" />
+                        Clear Draft
+                      </button>
+                      <button
+                        className="btn btn-sm btn-outline-secondary"
+                        style={{ borderRadius: 8, fontSize: 12.5 }}
+                        onClick={resetAll}
+                      >
+                        <i className="bi bi-arrow-counterclockwise me-1" />
+                        Reset
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="d-flex gap-2 flex-wrap justify-content-end">
-                  <button className="btn btn-outline-primary btn-sm" onClick={loadDraft}>
-                    Load saved draft
-                  </button>
-                  <button className="btn btn-outline-danger btn-sm" onClick={clearDraft}>
-                    Clear draft
-                  </button>
-                  <button className="btn btn-outline-secondary btn-sm" onClick={resetAll}>
-                    Reset
-                  </button>
-                </div>
-              </div>
-
-              <div className="row g-3">
-                {/* MAIN */}
-                <div className={showBatchSidebar ? "col-lg-9" : "col-12"}>
-                  {/* Stepper */}
-                  {!directMode && (
-                    <ul className="nav nav-pills mb-4">
-                      <li className="nav-item">
-                        <button className={`nav-link ${step === 1 ? "active" : ""}`} onClick={() => setStep(1)}>
-                          1. Search
-                        </button>
-                      </li>
-                      <li className="nav-item">
+                <div className="row g-3">
+                  {/* MAIN */}
+                  <div className={showBatchSidebar ? "col-lg-9" : "col-12"}>
+                    {/* Stepper */}
+                    {!directMode && (
+                      <div className="db-nav-pills">
                         <button
-                          className={`nav-link ${step === 2 ? "active" : ""}`}
+                          className={`db-step-btn ${step === 1 ? "active" : ""}`}
+                          onClick={() => setStep(1)}
+                        >
+                          <i className="bi bi-search" />
+                          1. Student Search
+                        </button>
+                        <button
+                          className={`db-step-btn ${step === 2 ? "active" : ""}`}
                           onClick={() => student && setStep(2)}
                           disabled={!student}
                         >
-                          2. Scores
+                          <i className="bi bi-card-checklist" />
+                          2. Subject Scores Entry
                         </button>
-                      </li>
-                      <li className="nav-item">
-                        <button className={`nav-link ${step === 3 ? "active" : ""}`} onClick={() => setStep(3)} disabled={step !== 3}>
-                          3. Review
+                        <button
+                          className={`db-step-btn ${step === 3 ? "active" : ""}`}
+                          onClick={() => setStep(3)}
+                          disabled={step !== 3}
+                        >
+                          <i className="bi bi-check2-circle" />
+                          3. Review & Summary
                         </button>
-                      </li>
-                    </ul>
-                  )}
+                      </div>
+                    )}
 
-                  {/* STEP 1 */}
-                  {!directMode && step === 1 && (
-                    <div className="card">
-                      <div className="card-body">
-                        <div className="row g-2 align-items-end">
-                          <div className="col-md-8">
-                            <label className="form-label">Admission Number</label>
-                            <input
-                              className="form-control"
-                              value={admissionNo}
-                              onChange={(e) => setAdmissionNo(e.target.value)}
-                              placeholder="Enter admission number"
-                            />
-                          </div>
-                          <div className="col-md-4">
-                            <button className="btn btn-primary w-100" onClick={handleSearch} disabled={searching}>
-                              {searching ? (
-                                <>
-                                  <span className="spinner-border spinner-border-sm me-2" />
-                                  Searching...
-                                </>
-                              ) : (
-                                "Search"
-                              )}
-                            </button>
+                    {/* STEP 1 */}
+                    {!directMode && step === 1 && (
+                      <div className="db-panel mb-4">
+                        <div className="db-panel-head">
+                          <div>
+                            <h5 className="db-panel-title">Search Student</h5>
+                            <p className="db-panel-sub">Enter admission number to load candidate profile and curriculum</p>
                           </div>
                         </div>
+                        <div className="p-4">
+                          <div className="row g-3 align-items-end">
+                            <div className="col-md-8">
+                              <label className="db-form-label fw-bold">Admission Number</label>
+                              <input
+                                className="form-control"
+                                style={{ borderRadius: 10, padding: "10px 14px" }}
+                                value={admissionNo}
+                                onChange={(e) => setAdmissionNo(e.target.value)}
+                                placeholder="Enter admission number e.g. STU-2024-001"
+                                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                              />
+                            </div>
+                            <div className="col-md-4">
+                              <button
+                                className="db-btn-gold w-100 justify-content-center"
+                                style={{ padding: "11px 18px" }}
+                                onClick={handleSearch}
+                                disabled={searching}
+                              >
+                                {searching ? (
+                                  <>
+                                    <span className="spinner-border spinner-border-sm me-2" />
+                                    Searching...
+                                  </>
+                                ) : (
+                                  <>
+                                    <i className="bi bi-search" />
+                                    Search Student
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
 
-                        <div className="alert alert-info mt-3 mb-0">
-                          Tip: Use <strong>Load saved draft</strong> to continue where you stopped.
+                          <div className="alert alert-light border mt-4 mb-0 d-flex align-items-center gap-2" style={{ background: "#faf8f5" }}>
+                            <i className="bi bi-info-circle text-warning fs-5" />
+                            <div className="small text-muted">
+                              Tip: If you previously worked on results for this student, click <strong>Load Draft</strong> in the header to resume instantly.
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Student Info */}
-                  {student && step !== 1 && (
-                    <div className="card mb-3">
-                      <div className="card-body">
-                        <div className="row align-items-center g-3">
-                          <div className="col">
-                            <div className="fw-bold">
-                              {student.firstname} {student.surname} <span className="text-muted">({student.reg_no})</span>
+                    {/* Student Info */}
+                    {student && step !== 1 && (
+                      <div className="db-panel mb-4">
+                        <div className="p-3 d-flex flex-wrap align-items-center justify-content-between gap-3" style={{ background: "#faf8f5" }}>
+                          <div>
+                            <div className="d-flex align-items-center gap-2">
+                              <h5 className="mb-0" style={{ fontFamily: "Playfair Display, serif", color: "#1a1a2e" }}>
+                                {student.firstname} {student.surname}
+                              </h5>
+                              <span className="badge" style={{ background: "rgba(201,168,76,0.18)", color: "#926b14", border: "1px solid rgba(201,168,76,0.3)" }}>
+                                {student.reg_no}
+                              </span>
                             </div>
-                            <div className="text-muted small">
-                              Class: {student.level?.name || "N/A"} • Dept: {department || "N/A"} • Term: {term || "N/A"} • Session:{" "}
-                              {session || "N/A"}
+                            <div className="text-muted small mt-1">
+                              Class: <strong>{student.level?.name || "N/A"}</strong> • Dept: <strong>{department || "N/A"}</strong> • Term: <strong>{term || "N/A"}</strong> • Session: <strong>{session || "N/A"}</strong>
                             </div>
                           </div>
-                          <div className="col-md-4 text-md-end">
-                            <button className="btn btn-outline-primary me-2" onClick={handleResolveBatch} disabled={!!batchId}>
+                          <div className="d-flex align-items-center gap-2">
+                            <button
+                              className="btn btn-sm btn-outline-primary"
+                              style={{ borderRadius: 8 }}
+                              onClick={handleResolveBatch}
+                              disabled={!!batchId}
+                            >
+                              <i className="bi bi-layers me-1" />
                               {batchId ? `Batch Ready (#${batchId})` : "Prepare Batch"}
                             </button>
-                            <button className="btn btn-outline-secondary" onClick={() => setStep(1)}>
-                              Search another
+                            <button
+                              className="btn btn-sm btn-outline-secondary"
+                              style={{ borderRadius: 8 }}
+                              onClick={() => setStep(1)}
+                            >
+                              <i className="bi bi-search me-1" />
+                              Change Student
                             </button>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
                   {/* STEP 2 */}
                   {step === 2 && student && (
@@ -1248,11 +1499,18 @@ export default function AddResultV2Page() {
                               <div className="text-muted small">Generate draft comments, then review before saving.</div>
                             </div>
                             <div className="d-flex align-items-center justify-content-end gap-2 flex-wrap">
+                              {aiCredits && aiCredits.is_plus_active && (
+                                <span className="badge text-bg-light border" style={{ fontSize: "11px" }}>
+                                  <i className="bi bi-stars text-warning me-1" />
+                                  Quota: {aiCredits.user_allocation ? (aiCredits.user_allocation.is_unlimited ? "Unlimited" : `${aiCredits.user_allocation.remaining_credits} credits`) : `${aiCredits.remaining_credits} credits`}
+                                </span>
+                              )}
                               <button
                                 type="button"
                                 className="btn btn-outline-primary btn-sm"
                                 onClick={generateAiComments}
-                                disabled={!student || !batchId || aiCommenting || saving}
+                                disabled={!student || !batchId || aiCommenting || saving || (aiCredits && aiCredits.is_plus_active === false)}
+                                title={aiCredits && aiCredits.is_plus_active === false ? "Requires GradiosEdu Plus" : "1 credit per generation"}
                               >
                                 {aiCommenting ? (
                                   <>
@@ -1454,64 +1712,75 @@ export default function AddResultV2Page() {
                 {/* BATCH SIDEBAR */}
                 {showBatchSidebar && (
                   <div className="col-lg-3">
-                    <div className="card position-sticky" style={{ top: 16 }}>
-                      <div className="card-body">
-                        <div className="d-flex align-items-center justify-content-between">
-                          <h6 className="mb-0">Batch Sidebar</h6>
-                          <span className="badge text-bg-dark">{batchId ? `#${batchId}` : "No Batch"}</span>
+                    <div className="db-panel position-sticky" style={{ top: 20 }}>
+                      <div className="db-panel-head">
+                        <div>
+                          <h6 className="db-panel-title">Batch Workstation</h6>
+                          <p className="db-panel-sub">{term || "—"} • {session || "—"}</p>
+                        </div>
+                        <span className="badge" style={{ background: "#1a1028", color: "#e8c97a", border: "1px solid rgba(201,168,76,0.3)" }}>
+                          {batchId ? `#${batchId}` : "No Batch"}
+                        </span>
+                      </div>
+
+                      <div className="p-3">
+                        <div className="small text-muted mb-3">
+                          Class: <strong>{student?.level?.name || "—"}</strong>
                         </div>
 
-                        <div className="text-muted small mt-2">
-                          {term || "—"} • {session || "—"} <br />
-                          Class: {student?.level?.name || "—"}
+                        <div className="d-flex align-items-center justify-content-between py-2 border-top border-bottom">
+                          <div className="small fw-bold text-dark">Completed Students</div>
+                          <span className="db-badge db-badge--green">{completedStudents.length}</span>
                         </div>
 
-                        <hr />
-
-                        <div className="d-flex align-items-center justify-content-between">
-                          <div className="fw-semibold">Students completed</div>
-                          <span className="badge text-bg-success">{completedStudents.length}</span>
-                        </div>
-
-                        <div className="mt-2" style={{ maxHeight: 260, overflow: "auto" }}>
+                        <div className="mt-3" style={{ maxHeight: 240, overflowY: "auto" }}>
                           {completedStudents.length === 0 ? (
-                            <div className="text-muted small">No saved students yet for this batch.</div>
+                            <div className="text-muted small py-3 text-center">No saved students yet for this batch.</div>
                           ) : (
-                            <ul className="list-group">
+                            <div className="d-flex flex-column gap-2">
                               {completedStudents.map((s) => (
-                                <li key={s.student_id} className="list-group-item py-2">
-                                  <div className="fw-semibold">{s.name}</div>
-                                  <div className="small text-muted">{s.reg_no}</div>
-                                </li>
+                                <div key={s.student_id} className="p-2 rounded-2 border bg-light small" style={{ borderColor: "#ede8e0" }}>
+                                  <div className="fw-bold" style={{ color: "#1a1a2e" }}>{s.name}</div>
+                                  <div className="text-muted" style={{ fontSize: 11 }}>{s.reg_no}</div>
+                                </div>
                               ))}
-                            </ul>
+                            </div>
                           )}
                         </div>
 
                         <div className="d-grid gap-2 mt-3">
-                          <button className="btn btn-outline-primary" onClick={handleComputeBatch} disabled={!batchId || computing}>
+                          <button
+                            className="db-btn-gold justify-content-center"
+                            onClick={handleComputeBatch}
+                            disabled={!batchId || computing}
+                          >
                             {computing ? (
                               <>
                                 <span className="spinner-border spinner-border-sm me-2" />
                                 Computing...
                               </>
                             ) : (
-                              "Compute Batch"
+                              <>
+                                <i className="bi bi-calculator" />
+                                Compute Batch
+                              </>
                             )}
                           </button>
 
-                          <button className="btn btn-outline-secondary" onClick={loadDraft}>
+                          <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 8 }} onClick={loadDraft}>
+                            <i className="bi bi-file-earmark-arrow-up me-1" />
                             Load Draft
                           </button>
 
-                          <button className="btn btn-outline-danger" onClick={clearCompletedForBatch} disabled={!batchId}>
+                          <button
+                            className="btn btn-sm btn-outline-danger"
+                            style={{ borderRadius: 8 }}
+                            onClick={clearCompletedForBatch}
+                            disabled={!batchId}
+                          >
+                            <i className="bi bi-trash me-1" />
                             Clear Completed List
                           </button>
-                        </div>
-
-                        <div className="small text-muted mt-3">
-                          This completed list is stored locally on this device. If you want it shared across devices/users, we’ll add a backend
-                          endpoint to list completed students per batch.
                         </div>
                       </div>
                     </div>
@@ -1519,16 +1788,18 @@ export default function AddResultV2Page() {
                 )}
               </div>
 
-              <div className="mt-4">
+              <div className="mt-5">
                 <Footer />
               </div>
             </>
           )}
-        </div>
-      </main>
-    </>
-  );
+        </main>
+      </div>
+    </div>
+  </>
+);
 }
+
 
 
 

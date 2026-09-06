@@ -8,7 +8,8 @@ import PageTitle from "../../../components/PageTitle";
 import CbtHtml from "../../../components/cbt/CbtHtml";
 import CbtRichEditor from "../../../components/cbt/CbtRichEditor";
 import { authApi } from "../../../utils/axios";
-import { getUser } from "../../../utils/token";
+import { getUser, getToken } from "../../../utils/token";
+import { getApiBaseUrl } from "../../../utils/apiUrl";
 import { useToast } from "../../../contexts/ToastContext";
 
 const safeAiError = (message: string | undefined, fallback: string) => {
@@ -311,6 +312,12 @@ export default function CbtExamsPage() {
   const [lessonNotesLoading, setLessonNotesLoading] = useState(false);
   const [aiForm, setAiForm] = useState(emptyAiForm);
   const [aiDraft, setAiDraft] = useState<AiQuestionDraft | null>(null);
+  const [aiCreditSummary, setAiCreditSummary] = useState<{
+    remaining_credits: number;
+    user_allocation?: { allocated_credits: number; used_credits: number; remaining_credits: number; is_unlimited: boolean } | null;
+    is_plus_active?: boolean;
+    ai_cbt_question_credit_cost?: number;
+  } | null>(null);
 
   const groups = useMemo(() => {
     const fromSections = (examDetail?.sections || []).flatMap((section) =>
@@ -395,6 +402,7 @@ export default function CbtExamsPage() {
       setSections(readList<SchoolSection>(sectionRes.data));
       setDepartments(departmentList);
       setSubjects(preferGeneralSubjects(Array.from(subjectMap.values())));
+      authApi.get("/admin/ai/credits").then((r) => setAiCreditSummary(r.data?.data || null)).catch(() => undefined);
     } catch (e: any) {
       showError(e?.response?.data?.message || "Unable to load CBT exams.");
     } finally {
@@ -806,10 +814,14 @@ export default function CbtExamsPage() {
     setAiFile(null);
     setAiModalOpen(true);
     loadLessonNoteSources();
+    authApi.get("/admin/ai/credits").then((r) => setAiCreditSummary(r.data?.data || null)).catch(() => undefined);
   }
 
   async function generateAiQuestions() {
     if (!selectedExamId) return showError("Select an exam first.");
+    if (aiCreditSummary && aiCreditSummary.is_plus_active === false) {
+      return showError("AI question generation is available on the GradiosEdu Plus package.");
+    }
     const selectedLessonNoteIds = Array.isArray(aiForm.lesson_note_ids) ? aiForm.lesson_note_ids : [];
     if (!aiFile && selectedLessonNoteIds.length === 0 && !aiForm.topics.trim() && !aiForm.source_text.trim()) return showError("Select one or more saved lesson notes, upload a note, or enter topics first.");
 
@@ -921,21 +933,23 @@ export default function CbtExamsPage() {
   async function downloadOfflineInstaller() {
     setSaving(true);
     try {
-      const res = await authApi.get("/cbt/offline/installer/download", { responseType: "blob" });
-      const blob = new Blob([res.data], { type: "application/vnd.microsoft.portable-executable" });
-      const url = window.URL.createObjectURL(blob);
+      const token = getToken?.() || "";
+      const base = getApiBaseUrl().replace(/\/+$/, "");
+      const directUrl = `${base}/public/cbt/offline/installer/download?token=${encodeURIComponent(token)}`;
+
+      showSuccess("Downloading GradiosEdu Offline CBT Setup (106 MB)... Check your browser's download bar.");
+
       const a = document.createElement("a");
-      a.href = url;
-      a.download = "GradeQuestOfflineCBTSetup.exe";
+      a.href = directUrl;
+      a.download = "GradiosEduOfflineCBTSetup.exe";
+      a.target = "_blank";
       document.body.appendChild(a);
       a.click();
       a.remove();
-      window.URL.revokeObjectURL(url);
-      showSuccess("Offline CBT installer download started.");
     } catch (e: any) {
-      showError(e?.response?.data?.message || "Unable to download the offline CBT installer.");
+      showError(e?.message || "Unable to start offline CBT download.");
     } finally {
-      setSaving(false);
+      setTimeout(() => setSaving(false), 2000);
     }
   }
 
@@ -1024,57 +1038,302 @@ export default function CbtExamsPage() {
   return (
     <>
       <style>{`
-        .cbt-main{min-height:100vh;background:#f4f7fb;margin-left:280px;width:calc(100% - 280px);padding:92px 24px 32px}
-        .cbt-shell{max-width:1480px;margin:0 auto}
-        .cbt-hero{background:#111827;color:#fff;border-radius:16px;padding:24px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:end;box-shadow:0 18px 44px rgba(15,23,42,.16)}
-        .cbt-eyebrow{color:#f7c948;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.12em}
-        .cbt-hero h1{font-family:'Playfair Display',serif;font-weight:900;margin:7px 0;font-size:clamp(28px,4vw,42px);letter-spacing:0}
-        .cbt-hero p{margin:0;color:rgba(255,255,255,.72);max-width:780px;line-height:1.65}
-        .cbt-hero-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
-        .cbt-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:14px}
-        .cbt-stat{background:#fff;border:1px solid #e3e8f2;border-radius:12px;padding:15px;box-shadow:0 10px 26px rgba(15,23,42,.05)}
-        .cbt-stat span{display:block;color:#64748b;font-size:12px;font-weight:800;text-transform:uppercase}.cbt-stat strong{display:block;color:#101827;font-size:25px;font-weight:900;margin-top:2px}
-        .cbt-grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px;align-items:start}
-        .cbt-builder{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:16px;margin-top:16px;align-items:start}
-        .cbt-panel{background:#fff;border:1px solid #e3e8f2;border-radius:14px;box-shadow:0 12px 32px rgba(15,23,42,.055);overflow:hidden}
-        .cbt-head{padding:17px 19px;border-bottom:1px solid #e7ecf4;background:#fff}.cbt-head h2{font-size:18px;font-weight:900;margin:0;color:#111827}.cbt-head p{margin:4px 0 0;color:#64748b;font-size:13px;line-height:1.5}
-        .cbt-body{padding:16px 18px}.cbt-label{display:block;font-size:10.5px;font-weight:900;color:#475569;text-transform:uppercase;margin:0 0 5px}
-        .cbt-input,.cbt-select,.cbt-textarea{width:100%;border:1px solid #d8e1ee;border-radius:9px;padding:9px 10px;margin:0;background:#fff;color:#111827;outline:none;transition:border-color .18s,box-shadow .18s}.cbt-input:focus,.cbt-select:focus,.cbt-textarea:focus{border-color:var(--bs-primary,#d300b0);box-shadow:0 0 0 3px rgba(211,0,176,.10)}.cbt-input,.cbt-select{height:40px}.cbt-textarea{min-height:86px;resize:vertical}.cbt-field{margin-bottom:12px}.cbt-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.cbt-form-grid .cbt-field-full{grid-column:1/-1}.cbt-section-label{display:flex;align-items:center;gap:8px;margin:2px 0 11px;color:#0f172a;font-size:12px;font-weight:900;text-transform:uppercase}.cbt-section-label:after{content:"";height:1px;background:#e5e7eb;flex:1}.cbt-mini-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.cbt-help{font-size:12px;color:#64748b;margin:-2px 0 12px;line-height:1.45}
-        .cbt-btn{border:0;border-radius:9px;padding:9px 12px;font-size:13px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;white-space:nowrap;transition:transform .18s,box-shadow .18s,background .18s}.cbt-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 8px 20px rgba(15,23,42,.10)}.cbt-btn:disabled{opacity:.55;cursor:not-allowed}.cbt-primary{background:var(--bs-primary,#d300b0);color:#fff}.cbt-soft{background:#eef2f7;color:#0f172a}.cbt-gold{background:#f7c948;color:#221827}.cbt-danger{background:#fee2e2;color:#991b1b}.cbt-ghost{background:#fff;color:#334155;border:1px solid #dbe3ef}
-        .cbt-table-wrap{overflow:auto}.cbt-table{width:100%;min-width:920px;border-collapse:separate;border-spacing:0}.cbt-table th{background:#f8fafc;color:#64748b;text-transform:uppercase;font-size:11px;letter-spacing:.08em;padding:12px 14px;border-bottom:1px solid #e5e7eb}.cbt-table td{padding:15px 14px;border-bottom:1px solid #eef2f7;vertical-align:middle}.cbt-table tbody tr:hover{background:#fbfdff}
-        .cbt-title{font-weight:900;color:#111827}.cbt-title-lg{font-size:18px}.cbt-sub{color:#64748b;font-size:12px;line-height:1.45}.cbt-pill{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:900;background:#eef2ff;color:#3730a3;text-transform:capitalize}.cbt-pill-neutral{background:#f1f5f9;color:#334155}.cbt-pill-green{background:#dcfce7;color:#166534}.cbt-pill-gold{background:#fef3c7;color:#92400e}
-        .cbt-status{display:inline-flex;border-radius:999px;padding:6px 10px;font-size:11px;font-weight:900;text-transform:capitalize}.cbt-status-live{background:#dcfce7;color:#166534}.cbt-status-draft{background:#fef3c7;color:#92400e}.cbt-status-closed{background:#e0f2fe;color:#075985}.cbt-status-muted{background:#f1f5f9;color:#475569}
-        .cbt-exam-name{display:flex;gap:10px;align-items:flex-start}.cbt-exam-icon{width:38px;height:38px;border-radius:10px;background:#111827;color:#fff;display:grid;place-items:center;flex:0 0 auto}.cbt-row-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-start}
-        .cbt-license{background:#0f172a;color:#e2e8f0;border-radius:12px;padding:12px;margin-top:12px;white-space:pre-wrap;overflow:auto;max-height:240px}
-        .cbt-option-row{display:grid;grid-template-columns:54px minmax(0,1fr) 86px;gap:8px;align-items:center;margin-bottom:8px}.cbt-option-check{display:flex;gap:6px;align-items:center;font-size:12px;font-weight:800;color:#475569}
-        .cbt-toggle{display:flex;align-items:flex-start;gap:9px;border:1px solid #e5e7eb;border-radius:10px;padding:10px 11px;margin-bottom:8px;background:#fbfdff}.cbt-toggle input{margin-top:3px}.cbt-toggle strong{display:block;color:#111827;font-size:13px}.cbt-toggle span{display:block;color:#64748b;font-size:12px;line-height:1.42}
-        .cbt-question-card{border:1px solid #e5e7eb;border-radius:12px;padding:13px;margin-bottom:10px;background:#fff}.cbt-question-card h3{font-size:14px;font-weight:900;margin:0 0 6px;color:#111827;line-height:1.5}.cbt-question-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.cbt-empty{border:1px dashed #cbd5e1;border-radius:14px;padding:24px;text-align:center;color:#64748b;background:#f8fafc}
-        .cbt-ai-note-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px;max-height:240px;overflow:auto;border:1px solid #e2e8f0;border-radius:12px;background:#fff;padding:10px}.cbt-ai-note-option{display:flex;gap:9px;align-items:flex-start;border:1px solid #e7ecf4;border-radius:10px;background:#fbfdff;padding:10px;cursor:pointer}.cbt-ai-note-option input{margin-top:3px;accent-color:var(--bs-primary,#d300b0)}.cbt-ai-note-option strong{display:block;color:#111827;font-size:12.5px;line-height:1.35}.cbt-ai-note-option small{display:block;color:#64748b;font-size:11px;line-height:1.35;margin-top:3px}.cbt-ai-format-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px}.cbt-ai-check{border:1px solid #dbe3ef;background:#fff;border-radius:10px;padding:10px;display:flex;gap:8px;align-items:center;font-size:12px;font-weight:900;color:#334155}.cbt-ai-check input{accent-color:var(--bs-primary,#d300b0)}.cbt-import-box{border:1px solid #dbe3ef;border-radius:13px;background:#fbfdff;padding:14px;margin-bottom:14px}.cbt-import-top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:end}.cbt-import-file{position:relative;border:1px dashed #cbd5e1;border-radius:12px;background:#fff;padding:12px;min-height:62px;display:flex;align-items:center;gap:10px}.cbt-import-file i{font-size:22px;color:var(--bs-primary,#d300b0)}.cbt-import-file strong{display:block;color:#111827;font-size:13px}.cbt-import-file span{display:block;color:#64748b;font-size:12px;line-height:1.35}.cbt-import-file input{position:absolute;inset:0;opacity:0;cursor:pointer}.cbt-import-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.cbt-import-guide{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.cbt-import-guide code{display:block;background:#fff;border:1px solid #e5e7eb;border-radius:9px;padding:8px;color:#334155;font-size:11px;white-space:normal}.cbt-import-result{border-top:1px solid #e5e7eb;margin-top:12px;padding-top:12px}.cbt-import-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px}.cbt-import-summary div{background:#fff;border:1px solid #e7ecf4;border-radius:10px;padding:9px}.cbt-import-summary span{display:block;color:#64748b;font-size:10px;font-weight:900;text-transform:uppercase}.cbt-import-summary strong{display:block;color:#111827;font-size:16px}.cbt-import-errors{border:1px solid #fecaca;background:#fff1f2;color:#991b1b;border-radius:10px;padding:10px;font-size:12px}.cbt-import-preview{display:grid;gap:8px;max-height:260px;overflow:auto}.cbt-import-preview-item{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px}.cbt-import-preview-item strong{display:block;color:#111827;font-size:13px;line-height:1.45}.cbt-import-preview-item span{display:inline-flex;margin:6px 6px 0 0}
-        .cbt-rich-editor{border:1px solid #d8e1ee;border-radius:12px;background:#fff;margin-bottom:12px;overflow:hidden}.cbt-rich-editor.is-disabled{opacity:.7}.cbt-rich-toolbar{display:flex;gap:6px;flex-wrap:wrap;padding:8px;border-bottom:1px solid #e5e7eb;background:#f8fafc}.cbt-rich-toolbar button{width:34px;height:32px;border:1px solid #dbe3ef;background:#fff;color:#334155;border-radius:8px;display:grid;place-items:center}.cbt-rich-toolbar button.is-active{background:var(--bs-primary,#d300b0);border-color:var(--bs-primary,#d300b0);color:#fff}.cbt-rich-toolbar button:disabled{opacity:.45;cursor:not-allowed}.cbt-rich-content{padding:12px}.cbt-rich-content .ProseMirror{outline:none;min-height:inherit}.cbt-rich-content .ProseMirror p.is-editor-empty:first-child:before{content:attr(data-placeholder);float:left;color:#94a3b8;pointer-events:none;height:0}
-        .cbt-html{color:#111827;line-height:1.55}.cbt-html p{margin:0 0 10px}.cbt-html table,.cbt-rich-content table{width:100%;border-collapse:collapse;margin:10px 0;table-layout:fixed}.cbt-html th,.cbt-html td,.cbt-rich-content th,.cbt-rich-content td{border:1px solid #cbd5e1;padding:8px;vertical-align:top}.cbt-html th,.cbt-rich-content th{background:#f1f5f9;font-weight:900}.cbt-html img,.cbt-rich-content img{max-width:100%;height:auto;border-radius:10px;border:1px solid #e5e7eb;margin:8px 0}.cbt-html ul,.cbt-html ol{padding-left:20px;margin:8px 0}.cbt-html blockquote{border-left:4px solid var(--bs-primary,#d300b0);padding-left:12px;color:#475569}
-        .cbt-builder-title{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-        .cbt-selected-strip{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;padding:14px 19px;background:#fbfdff;border-bottom:1px solid #e7ecf4}.cbt-selected-strip div{background:#fff;border:1px solid #e7ecf4;border-radius:10px;padding:10px}.cbt-selected-strip span{display:block;color:#64748b;font-size:11px;font-weight:800;text-transform:uppercase}.cbt-selected-strip strong{display:block;color:#111827;font-size:13px;margin-top:2px}
-        .cbt-modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.58);z-index:2050;display:flex;align-items:center;justify-content:center;padding:18px}
-        .cbt-modal{width:min(980px,100%);max-height:88vh;background:#fff;border-radius:18px;box-shadow:0 24px 80px rgba(15,23,42,.3);display:flex;flex-direction:column;overflow:hidden}.cbt-modal-sm{width:min(520px,100%)}
-        .cbt-modal-head{padding:18px 22px;border-bottom:1px solid #e5e7eb;display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
-        .cbt-modal-head h2{font-size:21px;font-weight:900;margin:0;color:#111827}.cbt-modal-head p{margin:4px 0 0;color:#64748b;font-size:13px}
-        .cbt-modal-body{padding:20px 22px;overflow:auto}.cbt-preview-question{border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-bottom:12px;background:#fff}.cbt-preview-question h3{font-size:15px;font-weight:900;color:#111827;margin:0 0 10px}.cbt-preview-option{display:flex;gap:9px;align-items:flex-start;padding:7px 0;color:#334155}.cbt-preview-option strong{min-width:24px;color:#111827}
-        .cbt-manual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.cbt-manual-card{border:1px solid #e3e8f2;border-radius:14px;background:#fbfdff;padding:15px}.cbt-manual-card h3{font-size:16px;font-weight:900;color:#111827;margin:0 0 8px}.cbt-manual-card ol{margin:0;padding-left:18px;color:#334155;line-height:1.65;font-size:13px}.cbt-manual-card li{margin-bottom:7px}.cbt-note{border-left:4px solid var(--bs-primary,#d300b0);background:#fdf2fb;color:#581c50;border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.55}
-        .cbt-setup-card,.cbt-license-panel,.cbt-settings-panel{display:none}.cbt-work-actions{display:flex;gap:10px;flex-wrap:wrap}.cbt-side-card{background:#fff;border:1px solid #e3e8f2;border-radius:14px;padding:16px;box-shadow:0 12px 32px rgba(15,23,42,.055)}.cbt-side-card h3{font-size:16px;font-weight:900;margin:0 0 6px;color:#111827}.cbt-side-card p{font-size:12px;color:#64748b;line-height:1.5;margin:0 0 12px}
-        @media(max-width:1199px){.cbt-main{margin-left:0;width:100%;padding:92px 16px 28px}.cbt-grid,.cbt-builder{grid-template-columns:1fr}.cbt-hero{grid-template-columns:1fr}.cbt-hero-actions{justify-content:flex-start}.cbt-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.cbt-selected-strip{grid-template-columns:repeat(2,minmax(0,1fr))}}
-        @media(max-width:640px){.cbt-stats,.cbt-selected-strip,.cbt-mini-grid,.cbt-import-top,.cbt-import-guide,.cbt-import-summary,.cbt-manual-grid,.cbt-ai-format-grid{grid-template-columns:1fr}.cbt-row-actions .cbt-btn,.cbt-import-actions .cbt-btn{width:100%}.cbt-table{min-width:760px}}
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        .cbt-main {
+          min-height: 100vh;
+          background: #F8FAFC;
+          padding: calc(var(--gq-topnav-height, 66px) + 24px) 28px 48px;
+          font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+        }
+        @media (max-width: 767.98px) {
+          .cbt-main {
+            padding: calc(var(--gq-topnav-height, 66px) + 16px) 16px 40px;
+          }
+        }
+        .cbt-shell { max-width: 100%; margin: 0 auto; }
+        .cbt-hero {
+          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
+          color: #fff;
+          border-radius: 18px;
+          padding: 32px 36px;
+          display: grid;
+          grid-template-columns: minmax(0,1fr) auto;
+          gap: 24px;
+          align-items: end;
+          box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
+          position: relative;
+          overflow: hidden;
+        }
+        .cbt-hero-glow {
+          position: absolute;
+          top: -60px;
+          right: -60px;
+          width: 320px;
+          height: 320px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(217, 119, 6, 0.15) 0%, transparent 65%);
+          pointer-events: none;
+        }
+        .cbt-eyebrow {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: #FBBF24;
+          background: rgba(217, 119, 6, 0.20);
+          border: 1px solid rgba(217, 119, 6, 0.35);
+          border-radius: 100px;
+          padding: 4px 12px;
+          margin-bottom: 12px;
+        }
+        .cbt-hero h1 {
+          font-weight: 800;
+          margin: 4px 0 8px;
+          font-size: 26px;
+          color: #fff;
+        }
+        .cbt-hero p {
+          margin: 0;
+          color: #CBD5E1;
+          max-width: 780px;
+          line-height: 1.6;
+          font-size: 13.5px;
+        }
+        .cbt-hero-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; position: relative; z-index: 1; }
+        .cbt-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+        .cbt-stat {
+          background: #fff;
+          border: 1px solid #E2E8F0;
+          border-radius: 14px;
+          padding: 18px 20px;
+          box-shadow: 0 4px 12px rgba(15, 39, 68, 0.03);
+        }
+        .cbt-stat span { display: block; color: #64748B; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+        .cbt-stat strong { display: block; color: #0F2744; font-size: 24px; font-weight: 800; margin-top: 4px; }
+        .cbt-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 18px; align-items: start; }
+        .cbt-builder { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; margin-top: 18px; align-items: start; }
+        .cbt-panel {
+          background: #fff;
+          border: 1px solid #E2E8F0;
+          border-radius: 16px;
+          box-shadow: 0 4px 16px rgba(15, 39, 68, 0.03);
+          overflow: hidden;
+        }
+        .cbt-head { padding: 18px 20px; border-bottom: 1px solid #E2E8F0; background: #fff; }
+        .cbt-head h2 { font-size: 16px; font-weight: 700; margin: 0; color: #0F2744; }
+        .cbt-head p { margin: 4px 0 0; color: #64748B; font-size: 13px; line-height: 1.5; }
+        .cbt-body { padding: 18px 20px; }
+        .cbt-label { display: block; font-size: 11.5px; font-weight: 700; color: #0F2744; text-transform: uppercase; margin: 0 0 5px; }
+        .cbt-input, .cbt-select, .cbt-textarea {
+          width: 100%;
+          border: 1px solid #E2E8F0;
+          border-radius: 10px;
+          padding: 9px 12px;
+          margin: 0;
+          background: #F8FAFC;
+          color: #0F2744;
+          outline: none;
+          font-size: 13px;
+          font-weight: 600;
+          transition: border-color .18s, box-shadow .18s;
+        }
+        .cbt-input:focus, .cbt-select:focus, .cbt-textarea:focus { border-color: #D97706; background: #fff; box-shadow: 0 0 0 3px rgba(217,119,6,.10); }
+        .cbt-input, .cbt-select { height: 40px; }
+        .cbt-textarea { min-height: 86px; resize: vertical; }
+        .cbt-field { margin-bottom: 14px; }
+        .cbt-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+        .cbt-form-grid .cbt-field-full { grid-column: 1/-1; }
+        .cbt-section-label { display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; color: #0F2744; font-size: 12px; font-weight: 800; text-transform: uppercase; }
+        .cbt-section-label:after { content: ""; height: 1px; background: #E2E8F0; flex: 1; }
+        .cbt-mini-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+        .cbt-help { font-size: 12px; color: #64748B; margin: -2px 0 12px; line-height: 1.45; }
+        .cbt-btn {
+          border: 0;
+          border-radius: 10px;
+          padding: 9px 16px;
+          font-size: 13px;
+          font-weight: 700;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          min-height: 38px;
+          white-space: nowrap;
+          cursor: pointer;
+          transition: all .2s ease;
+          text-decoration: none;
+        }
+        .cbt-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(15,39,68,.12); }
+        .cbt-btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+        .cbt-primary { background: #0F2744; color: #fff; }
+        .cbt-primary:hover:not(:disabled) { background: #1E3A8A; color: #fff; }
+        .cbt-soft { background: rgba(255,255,255,0.14); color: #fff; border: 1px solid rgba(255,255,255,0.25); }
+        .cbt-soft:hover:not(:disabled) { background: rgba(255,255,255,0.24); color: #fff; }
+        .cbt-gold { background: #D97706; color: #FFFFFF; }
+        .cbt-gold:hover:not(:disabled) { background: #B45309; color: #FFFFFF; }
+        .cbt-secondary { background: #EEF2F6; color: #0F2744; border: 1px solid #CBD5E1; font-weight: 700; }
+        .cbt-secondary:hover:not(:disabled) { background: #E2E8F0; color: #0F2744; border-color: #94A3B8; }
+        .cbt-ghost { background: #F1F5F9; color: #0F2744; border: 1px solid #CBD5E1; font-weight: 700; }
+        .cbt-ghost:hover:not(:disabled) { background: #E2E8F0; color: #0F2744; border-color: #94A3B8; }
+        .cbt-danger { background: #FEE2E2; color: #991B1B; border: 1px solid #FECACA; font-weight: 700; }
+        .cbt-danger:hover:not(:disabled) { background: #FCA5A5; color: #7F1D1D; }
+        .cbt-table-wrap { overflow: auto; }
+        .cbt-table { width: 100%; min-width: 920px; border-collapse: separate; border-spacing: 0; }
+        .cbt-table th { background: #F8FAFC; color: #64748B; text-transform: uppercase; font-size: 11.5px; font-weight: 700; letter-spacing: .04em; padding: 12px 14px; border-bottom: 1px solid #E2E8F0; }
+        .cbt-table td { padding: 14px; border-bottom: 1px solid #F1F5F9; vertical-align: middle; font-size: 13px; color: #334155; }
+        .cbt-table tbody tr:hover { background: #F8FAFC; }
+        .cbt-title { font-weight: 700; color: #0F2744; }
+        .cbt-title-lg { font-size: 16px; }
+        .cbt-sub { color: #64748B; font-size: 12px; line-height: 1.45; }
+        .cbt-pill { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 700; background: #EEF2FF; color: #3730A3; text-transform: capitalize; }
+        .cbt-pill-neutral { background: #F1F5F9; color: #334155; }
+        .cbt-pill-green { background: #DCFCE7; color: #166534; }
+        .cbt-pill-gold { background: #FEF3C7; color: #92400E; }
+        .cbt-status { display: inline-flex; border-radius: 999px; padding: 5px 10px; font-size: 11px; font-weight: 700; text-transform: capitalize; }
+        .cbt-status-live { background: #DCFCE7; color: #166534; }
+        .cbt-status-draft { background: #FEF3C7; color: #92400E; }
+        .cbt-status-closed { background: #E0F2FE; color: #075985; }
+        .cbt-status-muted { background: #F1F5F9; color: #475569; }
+        .cbt-exam-name { display: flex; gap: 10px; align-items: flex-start; }
+        .cbt-exam-icon { width: 38px; height: 38px; border-radius: 10px; background: #0F2744; color: #fff; display: grid; place-items: center; flex: 0 0 auto; }
+        .cbt-row-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-start; }
+        .cbt-license { background: #0F2744; color: #E2E8F0; border-radius: 12px; padding: 14px; margin-top: 12px; white-space: pre-wrap; overflow: auto; max-height: 240px; }
+        .cbt-option-row { display: grid; grid-template-columns: 54px minmax(0, 1fr) 86px; gap: 8px; align-items: center; margin-bottom: 8px; }
+        .cbt-option-check { display: flex; gap: 6px; align-items: center; font-size: 12px; font-weight: 700; color: #475569; }
+        .cbt-toggle { display: flex; align-items: flex-start; gap: 9px; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; background: #F8FAFC; }
+        .cbt-toggle input { margin-top: 3px; }
+        .cbt-toggle strong { display: block; color: #0F2744; font-size: 13px; }
+        .cbt-toggle span { display: block; color: #64748B; font-size: 12px; line-height: 1.42; }
+        .cbt-question-card { border: 1px solid #E2E8F0; border-radius: 12px; padding: 14px; margin-bottom: 10px; background: #fff; }
+        .cbt-question-card h3 { font-size: 14px; font-weight: 700; margin: 0 0 6px; color: #0F2744; line-height: 1.5; }
+        .cbt-question-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+        .cbt-empty { border: 1px dashed #CBD5E1; border-radius: 14px; padding: 24px; text-align: center; color: #64748B; background: #F8FAFC; }
+        .cbt-ai-note-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; max-height: 240px; overflow: auto; border: 1px solid #E2E8F0; border-radius: 12px; background: #fff; padding: 10px; }
+        .cbt-ai-note-option { display: flex; gap: 9px; align-items: flex-start; border: 1px solid #E2E8F0; border-radius: 10px; background: #F8FAFC; padding: 10px; cursor: pointer; }
+        .cbt-ai-note-option input { margin-top: 3px; }
+        .cbt-ai-note-option strong { display: block; color: #0F2744; font-size: 12.5px; line-height: 1.35; }
+        .cbt-ai-note-option small { display: block; color: #64748B; font-size: 11px; line-height: 1.35; margin-top: 3px; }
+        .cbt-ai-format-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+        .cbt-ai-check { border: 1px solid #E2E8F0; background: #fff; border-radius: 10px; padding: 10px; display: flex; gap: 8px; align-items: center; font-size: 12px; font-weight: 700; color: #334155; }
+        .cbt-import-box { border: 1px solid #E2E8F0; border-radius: 14px; background: #F8FAFC; padding: 16px; margin-bottom: 14px; }
+        .cbt-import-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; }
+        .cbt-import-file { position: relative; border: 1px dashed #CBD5E1; border-radius: 12px; background: #fff; padding: 12px; min-height: 62px; display: flex; align-items: center; gap: 10px; }
+        .cbt-import-file i { font-size: 22px; color: #0F2744; }
+        .cbt-import-file strong { display: block; color: #0F2744; font-size: 13px; }
+        .cbt-import-file span { display: block; color: #64748B; font-size: 12px; line-height: 1.35; }
+        .cbt-import-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+        .cbt-import-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+        .cbt-import-guide { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+        .cbt-import-guide code { display: block; background: #fff; border: 1px solid #E2E8F0; border-radius: 9px; padding: 8px; color: #334155; font-size: 11px; white-space: normal; }
+        .cbt-import-result { border-top: 1px solid #E2E8F0; margin-top: 12px; padding-top: 12px; }
+        .cbt-import-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+        .cbt-import-summary div { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; padding: 9px; }
+        .cbt-import-summary span { display: block; color: #64748B; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+        .cbt-import-summary strong { display: block; color: #0F2744; font-size: 16px; font-weight: 800; }
+        .cbt-import-errors { border: 1px solid #fecaca; background: #fff1f2; color: #991b1b; border-radius: 10px; padding: 10px; font-size: 12px; }
+        .cbt-import-preview { display: grid; gap: 8px; max-height: 260px; overflow: auto; }
+        .cbt-import-preview-item { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px; }
+        .cbt-import-preview-item strong { display: block; color: #0F2744; font-size: 13px; line-height: 1.45; }
+        .cbt-import-preview-item span { display: inline-flex; margin: 6px 6px 0 0; }
+        .cbt-rich-editor { border: 1px solid #E2E8F0; border-radius: 12px; background: #fff; margin-bottom: 12px; overflow: hidden; }
+        .cbt-rich-toolbar { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px; border-bottom: 1px solid #E2E8F0; background: #F8FAFC; }
+        .cbt-rich-toolbar button { width: 34px; height: 32px; border: 1px solid #E2E8F0; background: #fff; color: #334155; border-radius: 8px; display: grid; place-items: center; cursor: pointer; }
+        .cbt-rich-toolbar button.is-active { background: #0F2744; border-color: #0F2744; color: #fff; }
+        .cbt-rich-toolbar button:disabled { opacity: .45; cursor: not-allowed; }
+        .cbt-rich-content { padding: 12px; }
+        .cbt-rich-content .ProseMirror { outline: none; min-height: inherit; }
+        .cbt-html { color: #0F2744; line-height: 1.55; }
+        .cbt-html p { margin: 0 0 10px; }
+        .cbt-html table, .cbt-rich-content table { width: 100%; border-collapse: collapse; margin: 10px 0; table-layout: fixed; }
+        .cbt-html th, .cbt-html td, .cbt-rich-content th, .cbt-rich-content td { border: 1px solid #CBD5E1; padding: 8px; vertical-align: top; }
+        .cbt-html th, .cbt-rich-content th { background: #F1F5F9; font-weight: 700; }
+        .cbt-html img, .cbt-rich-content img { max-width: 100%; height: auto; border-radius: 10px; border: 1px solid #E2E8F0; margin: 8px 0; }
+        .cbt-html ul, .cbt-html ol { padding-left: 20px; margin: 8px 0; }
+        .cbt-html blockquote { border-left: 4px solid #D97706; padding-left: 12px; color: #475569; }
+        .cbt-builder-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        .cbt-selected-strip { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; padding: 14px 20px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; }
+        .cbt-selected-strip div { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px; }
+        .cbt-selected-strip span { display: block; color: #64748B; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+        .cbt-selected-strip strong { display: block; color: #0F2744; font-size: 13px; margin-top: 2px; }
+        .cbt-modal-backdrop { position: fixed; inset: 0; background: rgba(15, 39, 68, .55); backdrop-filter: blur(4px); z-index: 2050; display: flex; align-items: center; justify-content: center; padding: 18px; }
+        .cbt-modal { width: min(980px, 100%); max-height: 88vh; background: #fff; border-radius: 18px; box-shadow: 0 24px 80px rgba(15, 39, 68, .25); display: flex; flex-direction: column; overflow: hidden; }
+        .cbt-modal-sm { width: min(520px, 100%); }
+        .cbt-modal-head { padding: 18px 22px; border-bottom: 1px solid #E2E8F0; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+        .cbt-modal-head h2 { font-size: 18px; font-weight: 800; margin: 0; color: #0F2744; }
+        .cbt-modal-head p { margin: 4px 0 0; color: #64748B; font-size: 13px; }
+        .cbt-modal-body { padding: 20px 22px; overflow: auto; }
+        .cbt-preview-question { border: 1px solid #E2E8F0; border-radius: 14px; padding: 14px; margin-bottom: 12px; background: #fff; }
+        .cbt-preview-question h3 { font-size: 14px; font-weight: 700; color: #0F2744; margin: 0 0 10px; }
+        .cbt-preview-option { display: flex; gap: 9px; align-items: flex-start; padding: 7px 0; color: #334155; }
+        .cbt-preview-option strong { min-width: 24px; color: #0F2744; }
+        .cbt-manual-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+        .cbt-manual-card { border: 1px solid #E2E8F0; border-radius: 14px; background: #F8FAFC; padding: 16px; }
+        .cbt-manual-card h3 { font-size: 15px; font-weight: 700; color: #0F2744; margin: 0 0 8px; }
+        .cbt-manual-card ol { margin: 0; padding-left: 18px; color: #334155; line-height: 1.65; font-size: 13px; }
+        .cbt-manual-card li { margin-bottom: 7px; }
+        .cbt-note { border-left: 4px solid #D97706; background: #FFFBEB; color: #92400E; border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.55; }
+        .cbt-setup-card, .cbt-license-panel, .cbt-settings-panel { display: none; }
+        .cbt-work-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+        .cbt-side-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 14px; padding: 16px; box-shadow: 0 4px 12px rgba(15, 39, 68, 0.03); }
+        .cbt-side-card h3 { font-size: 15px; font-weight: 700; margin: 0 0 6px; color: #0F2744; }
+        .cbt-side-card p { font-size: 12px; color: #64748B; line-height: 1.5; margin: 0 0 12px; }
+        @media(max-width:1199px){
+          .cbt-grid, .cbt-builder { grid-template-columns: 1fr; }
+          .cbt-hero { grid-template-columns: 1fr; }
+          .cbt-hero-actions { justify-content: flex-start; }
+          .cbt-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .cbt-selected-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media(max-width:767.98px){
+          .cbt-main { padding: calc(var(--gq-topnav-height, 66px) + 12px) 12px 32px; overflow-x: hidden; max-width: 100vw; box-sizing: border-box; }
+          .cbt-shell { width: 100%; box-sizing: border-box; }
+          .cbt-hero { padding: 20px 16px; border-radius: 14px; gap: 14px; }
+          .cbt-hero h1 { font-size: 20px; }
+          .cbt-hero-actions { width: 100%; display: flex; flex-wrap: wrap; gap: 8px; }
+          .cbt-hero-actions .cbt-btn { flex: 1; min-width: 130px; text-align: center; justify-content: center; }
+          .cbt-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+          .cbt-stat { padding: 14px; border-radius: 12px; }
+          .cbt-stat strong { font-size: 20px; }
+          .cbt-form-grid { grid-template-columns: 1fr; gap: 10px; }
+          .cbt-mini-grid { grid-template-columns: 1fr; gap: 8px; }
+          .cbt-selected-strip { grid-template-columns: 1fr; padding: 12px; }
+          .cbt-table-wrap { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; display: block; }
+          .cbt-table { min-width: 680px; }
+          .cbt-option-row { grid-template-columns: 48px minmax(0, 1fr) auto; gap: 6px; }
+          .cbt-modal-backdrop { padding: 10px; }
+          .cbt-modal { max-height: 92vh; border-radius: 14px; }
+          .cbt-modal-head { padding: 14px 16px; }
+          .cbt-modal-body { padding: 16px 14px; }
+          .cbt-import-top { grid-template-columns: 1fr; }
+          .cbt-import-guide { grid-template-columns: 1fr; }
+          .cbt-import-summary { grid-template-columns: repeat(2, 1fr); }
+          .cbt-manual-grid { grid-template-columns: 1fr; }
+          .cbt-ai-format-grid { grid-template-columns: 1fr; }
+          .cbt-row-actions { flex-direction: column; width: 100%; }
+          .cbt-row-actions .cbt-btn { width: 100%; justify-content: center; }
+          .cbt-html table, .cbt-rich-content table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        }
+        @media(max-width:480px){
+          .cbt-stats { grid-template-columns: 1fr; }
+          .cbt-import-summary { grid-template-columns: 1fr; }
+          .cbt-hero-actions .cbt-btn { width: 100%; }
+        }
       `}</style>
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title="CBT Exams" />
       <PageTitle title="CBT Exams" />
       <div className="container-fluid">
         <div className="row">
           <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-          <main className="cbt-main">
+          <main className="col-md-9 col-lg-10 ms-auto db-main cbt-main">
             {loading && <Loader message="Loading CBT module..." />}
             <div className="cbt-shell">
               <section className="cbt-hero">
-                <div>
-                  <span className="cbt-eyebrow"><i className="bi bi-pc-display-horizontal" /> Online and Offline CBT</span>
+                <div className="cbt-hero-glow" />
+                <div style={{ position: 'relative', zIndex: 1 }}>
+                  <span className="cbt-eyebrow"><i className="bi bi-pc-display-horizontal me-1" /> Online and Offline CBT</span>
                   <h1>Computer Based Tests</h1>
                   <p>Manage exam setup, scheduling, question banks, student access, and offline CBT licensing from one workspace.</p>
                 </div>
@@ -1248,14 +1507,14 @@ export default function CbtExamsPage() {
                               <td><div className="cbt-title">{exam.questions_count ?? 0}</div><div className="cbt-sub">{exam.attempts_count ?? 0} attempt(s)</div></td>
                               <td>
                                 <div className="cbt-row-actions">
-                                  <button className="cbt-btn cbt-soft" type="button" disabled={saving} onClick={() => loadExam(exam.id)}><i className="bi bi-pencil-square" /> Builder</button>
+                                  <button className="cbt-btn cbt-secondary" type="button" disabled={saving} onClick={() => loadExam(exam.id)}><i className="bi bi-pencil-square" /> Builder</button>
                                   <button className="cbt-btn cbt-primary" type="button" disabled={saving || exam.status === "published"} title={exam.status === "published" ? "Reopen this exam before importing questions." : "Import questions from Word or Excel"} onClick={() => openWordImport(exam.id)}><i className="bi bi-file-earmark-arrow-up" /> Import File</button>
-                                  <button className="cbt-btn cbt-soft" type="button" disabled={saving} onClick={() => previewExam(exam.id)}><i className="bi bi-eye" /> Preview</button>
+                                  <button className="cbt-btn cbt-secondary" type="button" disabled={saving} onClick={() => previewExam(exam.id)}><i className="bi bi-eye" /> Preview</button>
                                   {exam.status === "draft" ? (
                                     <button className="cbt-btn cbt-gold" type="button" disabled={saving} onClick={() => publishExam(exam.id)}><i className="bi bi-send" /> Publish</button>
                                   ) : exam.status === "published" ? (
                                     <button
-                                      className="cbt-btn cbt-ghost"
+                                      className="cbt-btn cbt-secondary"
                                       type="button"
                                       onClick={() => reopenExam(exam.id)}
                                     >
@@ -1289,10 +1548,10 @@ export default function CbtExamsPage() {
                       <p>{examDetail ? `${questions.length} question(s) added. ${selectedIsPublished ? "Published exams cannot be edited." : "Draft exam is editable."}` : "Select Builder beside an exam to start adding questions."}</p>
                     </div>
                     <div className="cbt-work-actions">
-                      <button className="cbt-btn cbt-ghost" type="button" disabled={!examDetail || saving} onClick={() => downloadQuestionTemplate("docx")}>
+                      <button className="cbt-btn cbt-secondary" type="button" disabled={!examDetail || saving} onClick={() => downloadQuestionTemplate("docx")}>
                         <i className="bi bi-file-earmark-word" /> Word Template
                       </button>
-                      <button className="cbt-btn cbt-ghost" type="button" disabled={!examDetail || saving} onClick={() => downloadQuestionTemplate("xlsx")}>
+                      <button className="cbt-btn cbt-secondary" type="button" disabled={!examDetail || saving} onClick={() => downloadQuestionTemplate("xlsx")}>
                         <i className="bi bi-file-earmark-excel" /> Excel Template
                       </button>
                       <button className="cbt-btn cbt-primary" type="button" disabled={!examDetail || selectedIsPublished} onClick={() => {
@@ -1302,11 +1561,13 @@ export default function CbtExamsPage() {
                       }}>
                         <i className="bi bi-file-earmark-arrow-up" /> Import File
                       </button>
-                      <button className="cbt-btn cbt-gold" type="button" disabled={!examDetail || selectedIsPublished} onClick={() => {
-                        openAiGenerator();
-                      }}>
-                        <i className="bi bi-stars" /> Generate with AI
-                      </button>
+                      {aiCreditSummary?.is_plus_active !== false && (
+                        <button className="cbt-btn cbt-gold" type="button" disabled={!examDetail || selectedIsPublished} onClick={() => {
+                          openAiGenerator();
+                        }}>
+                          <i className="bi bi-stars" /> Generate with AI
+                        </button>
+                      )}
                     </div>
                   </div>
                   {examDetail && (
@@ -1972,7 +2233,7 @@ export default function CbtExamsPage() {
                 <div className="cbt-manual-card">
                   <h3>Offline CBT</h3>
                   <ol>
-                    <li>Install the GradeQuest Offline CBT app on the server computer.</li>
+                    <li>Install the GradiosEdu Offline CBT app on the server computer.</li>
                     <li>Create and publish an exam with Offline/LAN or Online and Offline mode.</li>
                     <li>Open Offline Package and click Download Offline Package close to exam time.</li>
                     <li>Upload the downloaded JSON package inside the offline app on the server computer.</li>
@@ -2019,6 +2280,26 @@ export default function CbtExamsPage() {
               </button>
             </div>
             <div className="cbt-modal-body">
+              <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 mb-3" style={{ background: "#f8fafc", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+                <div>
+                  <span className="text-muted small d-block">Generation Unit Cost</span>
+                  <strong>{aiCreditSummary?.ai_cbt_question_credit_cost ?? 5} credits</strong>
+                </div>
+                <div>
+                  <span className="text-muted small d-block">{aiCreditSummary?.user_allocation ? "Your AI Allowance" : "School Credits"}</span>
+                  <strong className="text-primary">
+                    {aiCreditSummary?.user_allocation
+                      ? (aiCreditSummary.user_allocation.is_unlimited ? "Unlimited" : `${aiCreditSummary.user_allocation.remaining_credits} credits remaining`)
+                      : `${aiCreditSummary?.remaining_credits ?? "-"} credits remaining`}
+                  </strong>
+                </div>
+              </div>
+              {aiCreditSummary && aiCreditSummary.is_plus_active === false && (
+                <div className="alert alert-warning py-2 px-3 mb-3 small" style={{ borderRadius: "10px" }}>
+                  <i className="bi bi-exclamation-triangle-fill me-1" />
+                  <strong>GradiosEdu Plus Required:</strong> AI Question generation requires an active GradiosEdu Plus subscription.
+                </div>
+              )}
               <div className="cbt-import-box">
                 <div className="row g-3">
                   <div className="col-12">
@@ -2101,7 +2382,7 @@ export default function CbtExamsPage() {
                   ))}
                 </div>
                 <div className="cbt-import-actions justify-content-start mt-3">
-                  <button className="cbt-btn cbt-gold" type="button" disabled={aiGenerating || aiImporting} onClick={generateAiQuestions}>
+                  <button className="cbt-btn cbt-gold" type="button" disabled={aiGenerating || aiImporting || (aiCreditSummary?.is_plus_active === false)} onClick={generateAiQuestions}>
                     <i className="bi bi-stars" /> {aiGenerating ? "Generating..." : "Generate Draft"}
                   </button>
                   <button className="cbt-btn cbt-primary" type="button" disabled={!aiDraft || aiGenerating || aiImporting} onClick={importAiDraft}>

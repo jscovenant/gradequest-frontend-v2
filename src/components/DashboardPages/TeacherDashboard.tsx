@@ -158,6 +158,16 @@ export default function TeacherDashboard() {
 
   // ===== Loading State =====
   const [loading, setLoading] = useState(true);
+  const [aiCredits, setAiCredits] = useState<{
+    remaining_credits: number;
+    is_plus_active?: boolean;
+    user_allocation?: {
+      allocated_credits: number;
+      used_credits: number;
+      remaining_credits: number;
+      is_unlimited: boolean;
+    } | null;
+  } | null>(null);
 
   // ===== Stats =====
   const [stats, setStats] = useState<StatCard[]>([
@@ -192,6 +202,7 @@ export default function TeacherDashboard() {
     const fetchAccess = authApi.get("/teacher/access-stats");
     const fetchActionCenter = authApi.get("/teacher/action-center");
     const fetchStudentPerformance = authApi.get("/teacher/student-performance");
+    authApi.get("/admin/ai/credits").then((r) => setAiCredits(r.data?.data || null)).catch(() => undefined);
 
     Promise.all([fetchSessionTerm, fetchCounts, fetchPerformance, fetchAccess, fetchActionCenter, fetchStudentPerformance])
       .then(([sessionRes, countsRes, perfRes, accessRes, actionRes, studentPerfRes]) => {
@@ -508,499 +519,563 @@ export default function TeacherDashboard() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;600;700&display=swap');
-        .teacher-db-main{
-          background:
-            linear-gradient(180deg, rgba(211,0,176,0.035), transparent 260px),
-            var(--bs-light,#fcf8f8);
-          min-height:100vh;
-          font-family:'DM Sans',system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-          overflow-x:hidden;
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+        .teacher-db-main {
+          background: #F8FAFC;
+          min-height: 100vh;
+          font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+          padding: 24px 28px 40px;
         }
-        .teacher-db-hero{
-          background:var(--bs-dark,#050008)!important;
-          border-radius:14px!important;
-          padding:32px 36px!important;
-          position:relative;
-          overflow:hidden;
-          margin-bottom:28px;
-          box-shadow:none!important;
+
+        @media (max-width: 767.98px) {
+          .teacher-db-main {
+            padding: 16px 12px 32px !important;
+          }
         }
-        .teacher-db-hero::before{
-          content:'';
-          position:absolute;
-          inset:0;
-          background-image:radial-gradient(circle,rgba(255,255,255,0.045) 1px,transparent 1px);
-          background-size:24px 24px;
-          pointer-events:none;
+
+        .teacher-db-hero {
+          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
+          border-radius: 18px;
+          padding: 32px 36px;
+          color: #FFFFFF;
+          margin-bottom: 24px;
+          box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
+          position: relative;
+          overflow: hidden;
         }
-        .teacher-db-hero-glow{
-          position:absolute;
-          top:-60px;
-          right:-60px;
-          width:320px;
-          height:320px;
-          border-radius:50%;
-          background:radial-gradient(circle,rgba(255,200,87,0.10) 0%,transparent 65%);
-          pointer-events:none;
+
+        @media (max-width: 767.98px) {
+          .teacher-db-hero {
+            padding: 20px 18px !important;
+            border-radius: 14px !important;
+            margin-bottom: 16px !important;
+          }
         }
-        .teacher-db-hero-glow2{
-          position:absolute;
-          bottom:-40px;
-          left:30%;
-          width:220px;
-          height:220px;
-          border-radius:50%;
-          background:radial-gradient(circle,rgba(211,0,176,0.06) 0%,transparent 70%);
-          pointer-events:none;
+
+        .teacher-db-hero::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background-image:
+            linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+          background-size: 32px 32px;
+          pointer-events: none;
         }
-        .teacher-db-hero-inner{
-          position:relative;
-          z-index:1;
-          display:flex;
-          align-items:center;
-          justify-content:space-between;
-          gap:32px;
-          flex-wrap:wrap;
+
+        .teacher-db-hero-glow {
+          position: absolute;
+          top: -40px;
+          right: -40px;
+          width: 320px;
+          height: 320px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(217, 119, 6, 0.2) 0%, transparent 65%);
+          pointer-events: none;
         }
-        .teacher-db-session-badge{
-          display:inline-flex;
-          align-items:center;
-          gap:7px;
-          font-size:11px;
-          font-weight:600;
-          letter-spacing:.12em;
-          text-transform:uppercase;
-          color:rgb(255,200,87);
-          background:rgba(255,200,87,0.10);
-          border:1px solid rgba(255,200,87,0.22);
-          border-radius:999px;
-          padding:4px 12px;
-          margin-bottom:14px;
+
+        .teacher-db-hero-glow2 {
+          position: absolute;
+          bottom: -40px;
+          left: 30%;
+          width: 220px;
+          height: 220px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(37, 99, 235, 0.15) 0%, transparent 70%);
+          pointer-events: none;
         }
-        .teacher-db-status-badge{
-          color:#d1fae5;
-          background:rgba(34,197,94,0.10);
-          border-color:rgba(34,197,94,0.22);
+
+        .teacher-db-hero-inner {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 24px;
         }
-        .teacher-db-dot{
-          width:6px;
-          height:6px;
-          border-radius:50%;
-          background:rgb(34,197,94);
-          animation:teacherDbPulse 2s ease infinite;
+
+        .teacher-db-session-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: #FBBF24;
+          background: rgba(217, 119, 6, 0.20);
+          border: 1px solid rgba(217, 119, 6, 0.35);
+          border-radius: 100px;
+          padding: 4px 12px;
+          margin-bottom: 12px;
         }
-        @keyframes teacherDbPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.5)}}
-        .teacher-db-greeting{
-          font-family:'Playfair Display',Georgia,serif;
-          font-size:clamp(24px,2.6vw,34px);
-          font-weight:900;
-          color:#fff;
-          line-height:1.1;
-          margin:0 0 8px;
+
+        .teacher-db-session-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: #10B981;
+          box-shadow: 0 0 6px #10B981;
         }
-        .teacher-db-greeting em{font-style:italic;color:rgb(255,200,87)}
-        .teacher-db-hero h2,
-        .teacher-db-hero .teacher-db-greeting{
-          font-family:'Playfair Display',Georgia,serif!important;
-          font-size:clamp(24px,2.6vw,34px)!important;
-          font-weight:900!important;
-          color:#fff!important;
-          line-height:1.1!important;
-          margin:0 0 8px!important;
+
+        .teacher-db-greeting {
+          font-size: 26px;
+          font-weight: 800;
+          color: #FFFFFF;
+          line-height: 1.1;
+          margin-bottom: 8px;
         }
-        .teacher-db-hero h2::after{
-          content:'';
+
+        .teacher-db-greeting em {
+          font-style: normal;
+          color: #FBBF24;
         }
-        .teacher-db-hero p{
-          color:rgba(255,255,255,0.42)!important;
-          font-size:13.5px!important;
-          font-weight:300!important;
-          line-height:1.65!important;
-          max-width:500px;
+
+        .teacher-db-hero-sub {
+          font-size: 13.5px;
+          color: #CBD5E1;
+          line-height: 1.6;
+          max-width: 520px;
+          margin-bottom: 20px;
         }
-        .teacher-db-hero-sub{
-          font-size:13.5px;
-          font-weight:300;
-          color:rgba(255,255,255,0.42);
-          line-height:1.65;
-          max-width:500px;
-          margin-bottom:24px;
+
+        @media (max-width: 767.98px) {
+          .teacher-db-greeting {
+            font-size: 20px !important;
+          }
+          .teacher-db-hero-sub {
+            font-size: 12.5px !important;
+            margin-bottom: 16px !important;
+          }
         }
-        .teacher-db-btn-gold,.teacher-db-btn-outline{
-          display:inline-flex;
-          align-items:center;
-          gap:7px;
-          padding:10px 20px;
-          font-size:13px;
-          font-weight:600;
-          border-radius:10px;
-          cursor:pointer;
-          transition:background .2s,transform .2s,border-color .2s,color .2s;
-          white-space:nowrap;
+
+        .teacher-db-hero-card {
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          backdrop-filter: blur(8px);
+          border-radius: 14px;
+          padding: 18px 22px;
+          min-width: 250px;
         }
-        .teacher-db-btn-gold{
-          color:#050008!important;
-          background:rgb(255,200,87)!important;
-          border:0!important;
-          box-shadow:none!important;
+
+        .teacher-db-btn-gold {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          padding: 9px 18px;
+          font-size: 13px;
+          font-weight: 700;
+          color: #0F2744;
+          background: #FBBF24;
+          border: none;
+          border-radius: 10px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          box-shadow: 0 4px 14px rgba(251, 191, 36, 0.3);
         }
-        .teacher-db-btn-gold:hover{background:#ffe0a0;transform:translateY(-1px)}
-        .teacher-db-btn-outline{
-          color:rgba(255,255,255,0.74)!important;
-          background:transparent!important;
-          border:1px solid rgba(255,255,255,0.14)!important;
+
+        .teacher-db-btn-gold:hover {
+          background: #F59E0B;
+          transform: translateY(-1px);
         }
-        .teacher-db-btn-outline:hover{background:rgba(255,255,255,0.06);color:#fff;border-color:rgba(255,255,255,0.28)}
-        .teacher-db-hero-card{
-          background:rgba(255,255,255,0.05);
-          border:1px solid rgba(255,255,255,0.09);
-          backdrop-filter:blur(8px);
-          border-radius:14px;
-          padding:20px 24px;
-          min-width:230px;
+
+        .teacher-db-btn-outline {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          padding: 9px 18px;
+          font-size: 13px;
+          font-weight: 600;
+          color: #FFFFFF;
+          background: rgba(255, 255, 255, 0.10);
+          border: 1px solid rgba(255, 255, 255, 0.20);
+          border-radius: 10px;
+          cursor: pointer;
+          transition: all 0.2s ease;
         }
-        .teacher-db-hero-label{
-          font-size:11px;
-          font-weight:600;
-          letter-spacing:.14em;
-          text-transform:uppercase;
-          color:rgb(255,200,87);
+
+        .teacher-db-btn-outline:hover {
+          background: rgba(255, 255, 255, 0.18);
+          color: #FFFFFF;
         }
-        .teacher-db-hero-stat{
-          display:flex;
-          align-items:center;
-          justify-content:space-between;
-          gap:16px;
+
+        @media (max-width: 575.98px) {
+          .teacher-db-btn-gold, .teacher-db-btn-outline {
+            width: 100% !important;
+            justify-content: center !important;
+          }
         }
-        .teacher-db-hero-stat span:first-child{font-size:12px;font-weight:300;color:rgba(255,255,255,0.34)}
-        .teacher-db-hero-stat span:last-child{font-family:'Playfair Display',Georgia,serif;font-size:18px;font-weight:700;color:rgb(255,200,87)}
-        .teacher-db-sep{height:1px;background:rgba(255,255,255,0.06);margin:12px 0}
-        .teacher-db-main .card{
-          background:#fff!important;
-          border:1px solid var(--bs-border-color,#ede8e0)!important;
-          border-radius:14px!important;
-          box-shadow:none!important;
+
+        /* ── Unified Stat Cards ── */
+        .t-stats-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 16px;
+          margin-bottom: 24px;
         }
-        .teacher-db-main .card:hover{
-          box-shadow:0 8px 28px rgba(0,0,0,0.07)!important;
+
+        @media (max-width: 1199px) {
+          .t-stats-grid { grid-template-columns: repeat(2, 1fr); }
         }
-        .teacher-db-main h6,
-        .teacher-db-main .fw-semibold{
-          color:#050008!important;
+
+        @media (max-width: 575px) {
+          .t-stats-grid { grid-template-columns: 1fr; }
         }
-        .teacher-db-main .text-muted,
-        .teacher-db-main small{
-          color:#9a8a7a!important;
+
+        .t-stat-card {
+          background: #FFFFFF;
+          border: 1px solid rgba(15, 39, 68, 0.08);
+          border-radius: 16px;
+          padding: 22px 20px;
+          position: relative;
+          overflow: hidden;
+          transition: all 0.25s ease;
+          box-shadow: 0 2px 10px rgba(15, 39, 68, 0.04);
         }
-        .teacher-db-main h3{
-          font-family:'Playfair Display',Georgia,serif;
-          font-weight:700!important;
-          color:#050008!important;
+
+        .t-stat-card:hover {
+          box-shadow: 0 8px 24px rgba(15, 39, 68, 0.08);
+          transform: translateY(-3px);
         }
-        .teacher-db-main .badge.text-bg-light{
-          background:rgba(255,200,87,0.10)!important;
-          color:#7a4b00!important;
-          border:1px solid rgba(255,200,87,0.20);
+
+        .t-stat-card::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 3px;
+          background: var(--stat-color, #D97706);
+          transform: scaleX(0);
+          transform-origin: left;
+          transition: transform 0.3s ease;
         }
-        .teacher-db-main .card .card-body.text-white{
-          color:#050008!important;
+
+        .t-stat-card:hover::before {
+          transform: scaleX(1);
         }
-        .teacher-db-main .card .card-body.text-white > i{
-          width:46px;
-          height:46px;
-          border-radius:12px;
-          display:flex!important;
-          align-items:center;
-          justify-content:center;
-          background:rgba(255,200,87,0.12);
-          color:#b45309;
-          margin-bottom:12px!important;
-          font-size:1.25rem!important;
+
+        .t-stat-head {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          margin-bottom: 14px;
         }
-        .teacher-db-main .card .card-body.text-white small{
-          opacity:1!important;
-          color:#9a8a7a!important;
+
+        .t-stat-icon {
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
+          background: var(--stat-bg, #FEF3C7);
+          color: var(--stat-color, #D97706);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
         }
-        .teacher-db-action-card{
-          background:#fff!important;
-          border:1px solid var(--bs-border-color,#ede8e0)!important;
-          border-radius:14px!important;
-          padding:22px 18px;
-          cursor:pointer;
-          transition:box-shadow .25s,transform .25s,border-color .25s;
-          min-height:132px;
+
+        .t-stat-label {
+          font-size: 12px;
+          font-weight: 600;
+          color: #64748B;
+          margin-bottom: 4px;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
         }
-        .teacher-db-action-card:hover{
-          box-shadow:0 8px 24px rgba(0,0,0,0.08)!important;
-          transform:translateY(-4px)!important;
-          border-color:rgba(255,200,87,0.28)!important;
+
+        .t-stat-val {
+          font-size: 28px;
+          font-weight: 800;
+          color: #0F2744;
+          line-height: 1;
         }
-        .teacher-db-action-icon{
-          width:46px;
-          height:46px;
-          border-radius:12px;
-          display:flex;
-          align-items:center;
-          justify-content:center;
-          background:var(--action-bg);
-          color:var(--action-color);
-          margin-bottom:12px;
+
+        .t-stat-footer {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-top: 14px;
+          padding-top: 12px;
+          border-top: 1px solid #F1F5F9;
+          font-size: 12px;
+          color: #64748B;
         }
-        .teacher-db-action-title{font-size:13.5px;font-weight:700;color:#050008;margin-bottom:4px}
-        .teacher-db-action-copy{font-size:11.5px;font-weight:300;color:#9a8a7a}
-        @media(max-width:767.98px){
-          .teacher-db-main{padding-left:16px!important;padding-right:16px!important}
-          .teacher-db-hero{padding:26px 22px}
+
+        /* ── Unified Panels ── */
+        .t-panel {
+          background: #FFFFFF;
+          border: 1px solid rgba(15, 39, 68, 0.08);
+          border-radius: 18px;
+          box-shadow: 0 4px 20px rgba(15, 39, 68, 0.06);
+          overflow: hidden;
+          margin-bottom: 24px;
+        }
+
+        .t-panel-head {
+          padding: 20px 24px;
+          border-bottom: 1px solid #E2E8F0;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+
+        .t-panel-title {
+          font-size: 16px;
+          font-weight: 800;
+          color: #0F2744;
+          margin: 0;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .t-panel-body {
+          padding: 24px;
+        }
+
+        /* ── Quick Actions Grid ── */
+        .t-qa-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 16px;
+          margin-bottom: 24px;
+        }
+
+        @media (max-width: 991px) {
+          .t-qa-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 575px) {
+          .t-qa-grid { grid-template-columns: 1fr; }
+        }
+
+        .t-qa-card {
+          background: #FFFFFF;
+          border: 1px solid rgba(15, 39, 68, 0.08);
+          border-radius: 16px;
+          padding: 20px;
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          cursor: pointer;
+          transition: all 0.25s ease;
+          box-shadow: 0 2px 8px rgba(15, 39, 68, 0.04);
+          text-decoration: none;
+          color: inherit;
+        }
+
+        .t-qa-card:hover {
+          box-shadow: 0 8px 24px rgba(15, 39, 68, 0.08);
+          transform: translateY(-3px);
+          border-color: rgba(217, 119, 6, 0.3);
+        }
+
+        .t-qa-icon {
+          width: 48px;
+          height: 48px;
+          border-radius: 14px;
+          background: var(--qa-bg, #FEF3C7);
+          color: var(--qa-color, #D97706);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 22px;
+          flex-shrink: 0;
+          transition: transform 0.3s ease;
+        }
+
+        .t-qa-card:hover .t-qa-icon {
+          transform: scale(1.1) rotate(-4deg);
+        }
+
+        .t-qa-title {
+          font-size: 14px;
+          font-weight: 800;
+          color: #0F2744;
+          margin-bottom: 2px;
+        }
+
+        .t-qa-desc {
+          font-size: 12px;
+          color: #64748B;
+          margin: 0;
         }
       `}</style>
+
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-<PageTitle title="Teacher Dashboard" />
+      <PageTitle title="Teacher Dashboard" />
+
       <div className="container-fluid">
         <div className="row">
-          <Sidebar sidebarOpen={sidebarOpen} />
+          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-          <main
-            className="col-md-9 col-lg-10 ms-auto teacher-db-main d-flex flex-column"
-          >
+          <main className="col-md-9 col-lg-10 ms-auto gq-app-main teacher-db-main d-flex flex-column min-vh-100">
             {loading && <Loader message="Loading dashboard..." />}
 
-            {/* Hero Section */}
-            <div
-              className="teacher-db-hero"
-              style={{
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                borderRadius: "16px",
-                boxShadow: "0 10px 30px rgba(102, 126, 234, 0.3)",
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  top: "-50px",
-                  right: "-50px",
-                  width: "200px",
-                  height: "200px",
-                  background: "rgba(255, 255, 255, 0.1)",
-                  borderRadius: "50%",
-                  filter: "blur(40px)",
-                }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "-30px",
-                  left: "-30px",
-                  width: "150px",
-                  height: "150px",
-                  background: "rgba(255, 255, 255, 0.1)",
-                  borderRadius: "50%",
-                  filter: "blur(40px)",
-                }}
-              />
+            {/* ── Signature GradiosEdu Hero ── */}
+            <div className="teacher-db-hero">
+              <div className="teacher-db-hero-glow" />
+              <div className="teacher-db-hero-glow2" />
 
               <div className="teacher-db-hero-inner">
-                <div className="col-md-8">
-                  <div className="d-flex align-items-center gap-2 mb-2">
-                    <span
-                      className="teacher-db-session-badge"
-                      style={{
-                        backgroundColor: "rgba(255, 255, 255, 0.2)",
-                        color: "#fff",
-                        borderRadius: "20px",
-                        fontSize: "0.75rem",
-                        fontWeight: "500",
-                      }}
-                    >
-                      <i className="bi bi-calendar-check me-1"></i>
-                      {academicSession || "Loading..."} - {currentTerm || "..."}
-                    </span>
-
-                    <span
-                      className="teacher-db-session-badge teacher-db-status-badge"
-                      style={{
-                        backgroundColor: "rgba(16, 185, 129, 0.9)",
-                        color: "#fff",
-                        borderRadius: "20px",
-                        fontSize: "0.75rem",
-                        fontWeight: "500",
-                      }}
-                    >
-                      <i className="bi bi-check-circle-fill me-1"></i>
-                      Teacher Dashboard
-                    </span>
+                <div>
+                  <div className="teacher-db-session-badge">
+                    <span className="teacher-db-session-dot" />
+                    {academicSession || "Academic Session"} · {currentTerm || "Active Term"}
                   </div>
 
-                  <h2 className="fw-bold text-white mb-2">{getGreeting()}, Teacher! </h2>
+                  <h1 className="teacher-db-greeting">
+                    {getGreeting()}, <em>Teacher.</em>
+                  </h1>
 
-                  <p className="text-white mb-4" style={{ opacity: 0.9, fontSize: "1rem" }}>
-                    Here's your teaching overview - classes, subjects, students and results activity.
+                  <p className="teacher-db-hero-sub">
+                    Welcome to your teaching workspace. Manage class attendance, upload term examination results, generate AI lesson plans, and track student performance.
                   </p>
 
                   <div className="d-flex gap-2 flex-wrap">
                     <button
                       className="teacher-db-btn-gold"
-                      style={{
-                        borderRadius: "10px",
-                        fontWeight: "500",
-                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
-                      }}
                       onClick={() => navigate("/results/upload")}
                     >
-                      <i className="bi bi-file-earmark-text"></i>
+                      <i className="bi bi-file-earmark-arrow-up-fill me-1" />
                       Upload Results
                     </button>
 
                     <button
                       className="teacher-db-btn-outline"
-                      style={{
-                        borderRadius: "10px",
-                        fontWeight: "500",
-                        backgroundColor: "rgba(255, 255, 255, 0.2)",
-                        color: "#fff",
-                        border: "1px solid rgba(255, 255, 255, 0.3)",
-                      }}
                       onClick={() => navigate("/students/attendance")}
                     >
-                      <i className="bi bi-clipboard-check"></i>
+                      <i className="bi bi-calendar2-check-fill me-1" />
                       Take Attendance
                     </button>
+
                     <button
                       className="teacher-db-btn-outline"
-                      style={{
-                        borderRadius: "10px",
-                        fontWeight: "500",
-                        backgroundColor: "rgba(255, 255, 255, 0.2)",
-                        color: "#fff",
-                        border: "1px solid rgba(255, 255, 255, 0.3)",
-                      }}
                       onClick={() => navigate("/settings/ai-lesson-plans")}
                     >
-                      <i className="bi bi-journal-text"></i>
+                      <i className="bi bi-journal-richtext me-1" />
                       AI Lesson Planner
+                    </button>
+
+                    <button
+                      className="teacher-db-btn-outline"
+                      onClick={() => navigate("/settings/ai-credits")}
+                    >
+                      <i className="bi bi-stars me-1 text-warning" />
+                      AI Credits
                     </button>
                   </div>
                 </div>
 
-                <div className="col-md-4 d-none d-md-block text-end">
-                  <div
-                    style={{
-                      background: "rgba(255, 255, 255, 0.15)",
-                      backdropFilter: "blur(10px)",
-                      borderRadius: "16px",
-                      padding: "1.5rem",
-                      border: "1px solid rgba(255, 255, 255, 0.2)",
-                    }}
-                  >
-                    <div className="d-flex align-items-center justify-content-between mb-3">
-                      <span className="text-white" style={{ fontSize: "0.9rem", opacity: 0.9 }}>
-                        Quick Stats
-                      </span>
-                      <i className="bi bi-graph-up text-white"></i>
+                {/* Hero Quick Glance */}
+                <div className="teacher-db-hero-card d-none d-md-block">
+                  <div className="d-flex align-items-center justify-content-between mb-3">
+                    <span style={{ fontSize: "11px", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "#FBBF24" }}>
+                      Quick Glance
+                    </span>
+                    <i className="bi bi-mortarboard-fill text-warning" />
+                  </div>
+
+                  <div className="d-flex flex-column gap-2">
+                    <div className="d-flex justify-content-between align-items-center">
+                      <span style={{ fontSize: "12.5px", color: "#CBD5E1" }}>My Students</span>
+                      <span style={{ fontSize: "15px", fontWeight: 800, color: "#FFFFFF" }}>{stats[0]?.value ?? 0}</span>
                     </div>
-                    <div className="d-flex flex-column gap-2">
-                      <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-white" style={{ fontSize: "0.85rem", opacity: 0.8 }}>
-                          My Students
-                        </span>
-                        <span className="text-white fw-bold">{stats[0].value}</span>
-                      </div>
-                      <div className="d-flex justify-content-between align-items-center">
-                        <span className="text-white" style={{ fontSize: "0.85rem", opacity: 0.8 }}>
-                          Completion
-                        </span>
-                        <span className="text-white fw-bold">{stats[3].value}</span>
-                      </div>
+                    <div className="d-flex justify-content-between align-items-center">
+                      <span style={{ fontSize: "12.5px", color: "#CBD5E1" }}>Result Completion</span>
+                      <span style={{ fontSize: "15px", fontWeight: 800, color: "#10B981" }}>{stats[3]?.value ?? "0%"}</span>
+                    </div>
+
+                    <div
+                      className="d-flex justify-content-between align-items-center pt-2 mt-1 border-top"
+                      style={{ borderColor: "rgba(255, 255, 255, 0.15)", cursor: "pointer" }}
+                      onClick={() => navigate("/settings/ai-credits")}
+                      title="Click to view AI credit details"
+                    >
+                      <span style={{ fontSize: "12px", color: "#CBD5E1" }}>
+                        <i className="bi bi-stars me-1 text-warning" /> AI Allowance
+                      </span>
+                      <span className="badge bg-warning text-dark fw-bold" style={{ fontSize: "11px" }}>
+                        {aiCredits?.is_plus_active
+                          ? (aiCredits.user_allocation?.is_unlimited ? "Unlimited" : `${aiCredits.user_allocation?.remaining_credits ?? aiCredits.remaining_credits ?? 0} credits`)
+                          : "Plus Active"}
+                      </span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Stats Cards */}
-            <div className="row g-3 mb-4">
-              {stats.map(({ title, value, icon }, index) => {
-                const colors = [
-                  { gradient: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", icon: "#667eea", bg: "#f0edff" },
-                  { gradient: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)", icon: "#f5576c", bg: "#fff0f3" },
-                  { gradient: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)", icon: "#00f2fe", bg: "#e6f9ff" },
-                  { gradient: "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)", icon: "#38f9d7", bg: "#e6fff9" },
-                ];
-
-                return (
-                  <div className="col-md-6 col-lg-3" key={title}>
-                    <div
-                      className="card border-0 h-100 position-relative overflow-hidden"
-                      style={{
-                        borderRadius: "12px",
-                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-                        transition: "transform 0.2s, box-shadow 0.2s",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = "translateY(-4px)";
-                        e.currentTarget.style.boxShadow = "0 8px 20px rgba(0, 0, 0, 0.12)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.08)";
-                      }}
-                    >
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          height: "4px",
-                          background: colors[index].gradient,
-                        }}
-                      />
-
-                      <div className="card-body p-4">
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                          <div className="p-2 rounded-3" style={{ backgroundColor: colors[index].bg }}>
-                            <i className={`bi bi-${icon} fs-4`} style={{ color: colors[index].icon }} />
-                          </div>
-                          <i className="bi bi-three-dots-vertical text-muted" style={{ cursor: "pointer" }} />
-                        </div>
-
-                        <p className="text-muted mb-1 small">{title}</p>
-                        <h3 className="fw-bold mb-0" style={{ color: "#1e293b" }}>
-                          {value}
-                        </h3>
-
-                        <div className="mt-3 pt-3" style={{ borderTop: "1px solid #f1f5f9" }}>
-                          <small className="text-muted d-flex align-items-center gap-1">
-                            <i className="bi bi-info-circle"></i>
-                            Based on your allocations
-                          </small>
-                        </div>
-                      </div>
+            {/* ── 4 Unified Stat Cards ── */}
+            <div className="t-stats-grid">
+              {[
+                { title: "My Students", value: stats[0]?.value ?? 0, icon: "people-fill", color: "#D97706", bg: "#FEF3C7", footer: "Enrolled in assigned classes" },
+                { title: "Assigned Subjects", value: stats[1]?.value ?? 0, icon: "book-fill", color: "#2563EB", bg: "#DBEAFE", footer: "Curriculum allocations" },
+                { title: "Assigned Classes", value: stats[2]?.value ?? 0, icon: "building", color: "#7C3AED", bg: "#EDE9FE", footer: "Active teaching arms" },
+                { title: "Result Batches", value: stats[3]?.value ?? "0%", icon: "award-fill", color: "#10B981", bg: "#D1FAE5", footer: "Entered and verified" },
+              ].map((c) => (
+                <div key={c.title} className="t-stat-card" style={{ ["--stat-color" as any]: c.color, ["--stat-bg" as any]: c.bg }}>
+                  <div className="t-stat-head">
+                    <div>
+                      <div className="t-stat-label">{c.title}</div>
+                      <div className="t-stat-val">{c.value}</div>
+                    </div>
+                    <div className="t-stat-icon">
+                      <i className={`bi bi-${c.icon}`} />
                     </div>
                   </div>
-                );
-              })}
+                  <div className="t-stat-footer">
+                    <i className="bi bi-info-circle text-muted" />
+                    <span>{c.footer}</span>
+                  </div>
+                </div>
+              ))}
             </div>
 
-            {/* Teacher Action Center */}
+            {/* ── Quick Actions Grid ── */}
+            <div className="t-qa-grid">
+              {[
+                { title: "Take Attendance", desc: "Mark daily classroom register", icon: "clipboard-check-fill", color: "#2563EB", bg: "#DBEAFE", route: "/students/attendance" },
+                { title: "Upload Results", desc: "Score entries & assessments", icon: "cloud-arrow-up-fill", color: "#D97706", bg: "#FEF3C7", route: "/results/upload" },
+                { title: "AI Lesson Planner", desc: "Generate term weekly lesson plans", icon: "journal-richtext", color: "#7C3AED", bg: "#EDE9FE", route: "/settings/ai-lesson-plans" },
+                { title: "Broadsheets & Reports", desc: "Class broadsheets & report cards", icon: "file-earmark-bar-graph-fill", color: "#10B981", bg: "#D1FAE5", route: "/reports" },
+              ].map((qa) => (
+                <div
+                  key={qa.title}
+                  className="t-qa-card"
+                  style={{ ["--qa-color" as any]: qa.color, ["--qa-bg" as any]: qa.bg }}
+                  onClick={() => navigate(qa.route)}
+                >
+                  <div className="t-qa-icon">
+                    <i className={`bi bi-${qa.icon}`} />
+                  </div>
+                  <div>
+                    <div className="t-qa-title">{qa.title}</div>
+                    <div className="t-qa-desc">{qa.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* ── Action Center & Attendance Insight ── */}
             <div className="row g-4 mb-4">
               <div className="col-xl-5">
-                <div className="card shadow-sm border-0 h-100" style={{ borderRadius: "12px" }}>
-                  <div className="card-body p-4">
-                    <div className="d-flex align-items-center justify-content-between mb-3">
-                      <div className="d-flex align-items-center gap-2">
-                        <div className="p-2 rounded-2" style={{ backgroundColor: "#e0f2fe" }}>
-                          <i className="bi bi-lightning-charge-fill" style={{ color: "#0284c7" }} />
-                        </div>
-                        <div>
-                          <h6 className="mb-0 fw-semibold" style={{ color: "#1e293b" }}>
-                            Action Center
-                          </h6>
-                          <small className="text-muted">Today&apos;s teaching priorities</small>
-                        </div>
-                      </div>
-                    </div>
+                <div className="t-panel h-100 mb-0">
+                  <div className="t-panel-head">
+                    <h2 className="t-panel-title">
+                      <i className="bi bi-lightning-charge-fill text-warning" />
+                      Priority Action Center
+                    </h2>
+                    <span className="badge bg-warning-subtle text-warning fw-bold px-2 py-1" style={{ borderRadius: 8 }}>
+                      {actionCenter.actions.length} Tasks
+                    </span>
+                  </div>
 
+                  <div className="t-panel-body">
                     <div className="d-flex flex-column gap-3">
                       {actionCenter.actions.map((action, index) => {
                         const tone = priorityTone(action.priority);
@@ -1009,8 +1084,8 @@ export default function TeacherDashboard() {
                           <button
                             key={`${action.label}-${index}`}
                             type="button"
-                            className="border rounded-3 p-3 text-start bg-white w-100"
-                            style={{ borderColor: tone.border, cursor: "pointer" }}
+                            className="border rounded-3 p-3 text-start bg-white w-100 transition-all"
+                            style={{ borderColor: tone.border, cursor: "pointer", transition: "all 0.2s ease" }}
                             onClick={() => navigate(action.route)}
                           >
                             <div className="d-flex gap-3">
@@ -1022,17 +1097,17 @@ export default function TeacherDashboard() {
                               </div>
                               <div style={{ minWidth: 0 }}>
                                 <div className="d-flex align-items-center gap-2 mb-1">
-                                  <h6 className="mb-0 fw-semibold text-truncate" style={{ color: "#0f172a" }}>
+                                  <h6 className="mb-0 fw-bold text-truncate" style={{ color: "#0F2744", fontSize: "14px" }}>
                                     {action.label}
                                   </h6>
                                   <span
                                     className="badge rounded-pill text-capitalize"
-                                    style={{ backgroundColor: tone.bg, color: tone.text }}
+                                    style={{ backgroundColor: tone.bg, color: tone.text, fontSize: "10.5px" }}
                                   >
                                     {action.priority}
                                   </span>
                                 </div>
-                                <p className="small mb-0" style={{ color: "#64748b", lineHeight: 1.5 }}>
+                                <p className="small mb-0" style={{ color: "#64748B", lineHeight: 1.5 }}>
                                   {action.description}
                                 </p>
                               </div>
@@ -1048,33 +1123,34 @@ export default function TeacherDashboard() {
               <div className="col-xl-7">
                 <div className="row g-4 h-100">
                   <div className="col-md-6">
-                    <div className="card shadow-sm border-0 h-100" style={{ borderRadius: "12px" }}>
-                      <div className="card-body p-4">
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                          <div>
-                            <h6 className="fw-semibold mb-1" style={{ color: "#1e293b" }}>
-                              Attendance Insight
-                            </h6>
-                            <small className="text-muted">{actionCenter.attendance.date || "Today"}</small>
-                          </div>
-                          <span className="badge rounded-pill text-bg-light">
-                            {actionCenter.attendance.attendance_rate}%
-                          </span>
+                    <div className="t-panel h-100 mb-0">
+                      <div className="t-panel-head">
+                        <div>
+                          <h2 className="t-panel-title" style={{ fontSize: "15px" }}>
+                            <i className="bi bi-calendar-check-fill text-success" />
+                            Attendance Insight
+                          </h2>
+                          <small className="text-muted">{actionCenter.attendance.date || "Today"}</small>
                         </div>
+                        <span className="badge bg-success-subtle text-success fw-bold px-2 py-1" style={{ borderRadius: 8 }}>
+                          {actionCenter.attendance.attendance_rate}%
+                        </span>
+                      </div>
 
+                      <div className="t-panel-body">
                         <ProgressBar value={actionCenter.attendance.attendance_rate} color="#16a34a" />
 
                         <div className="row g-2 mt-3">
                           {[
-                            { label: "Marked", value: actionCenter.attendance.marked_today, color: "#2563eb" },
-                            { label: "Present", value: actionCenter.attendance.present_today, color: "#16a34a" },
-                            { label: "Absent", value: actionCenter.attendance.absent_today, color: "#dc2626" },
-                            { label: "Late", value: actionCenter.attendance.late_today, color: "#f59e0b" },
+                            { label: "Marked", value: actionCenter.attendance.marked_today, color: "#2563EB" },
+                            { label: "Present", value: actionCenter.attendance.present_today, color: "#16A34A" },
+                            { label: "Absent", value: actionCenter.attendance.absent_today, color: "#DC2626" },
+                            { label: "Late", value: actionCenter.attendance.late_today, color: "#F59E0B" },
                           ].map((item) => (
                             <div className="col-6" key={item.label}>
-                              <div className="rounded-3 p-2" style={{ backgroundColor: "#f8fafc" }}>
-                                <div className="small text-muted">{item.label}</div>
-                                <div className="fw-bold" style={{ color: item.color }}>
+                              <div className="rounded-3 p-2 text-center" style={{ backgroundColor: "#F8FAFC", border: "1px solid #E2E8F0" }}>
+                                <div className="small text-muted" style={{ fontSize: "11px", fontWeight: 600 }}>{item.label}</div>
+                                <div className="fw-bold" style={{ color: item.color, fontSize: "16px" }}>
                                   {item.value}
                                 </div>
                               </div>
@@ -1084,14 +1160,14 @@ export default function TeacherDashboard() {
 
                         {actionCenter.attendance.classes_needing_attendance.length > 0 && (
                           <div className="mt-3">
-                            <div className="small fw-semibold mb-2" style={{ color: "#475569" }}>
-                              Not fully marked
+                            <div className="small fw-bold mb-2" style={{ color: "#0F2744" }}>
+                              Arms needing attendance:
                             </div>
                             <div className="d-flex flex-column gap-2">
                               {actionCenter.attendance.classes_needing_attendance.slice(0, 3).map((item) => (
-                                <div className="d-flex justify-content-between small" key={item.class_id}>
-                                  <span className="text-truncate">{item.class_name}</span>
-                                  <span className="text-danger fw-semibold">{item.missing_count} left</span>
+                                <div className="d-flex justify-content-between small p-2 rounded-2" style={{ background: "#FEF2F2", border: "1px solid #FEE2E2" }} key={item.class_id}>
+                                  <span className="text-truncate fw-semibold" style={{ color: "#991B1B" }}>{item.class_name}</span>
+                                  <span className="text-danger fw-bold">{item.missing_count} unmarked</span>
                                 </div>
                               ))}
                             </div>
@@ -1102,28 +1178,29 @@ export default function TeacherDashboard() {
                   </div>
 
                   <div className="col-md-6">
-                    <div className="card shadow-sm border-0 h-100" style={{ borderRadius: "12px" }}>
-                      <div className="card-body p-4">
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                          <div>
-                            <h6 className="fw-semibold mb-1" style={{ color: "#1e293b" }}>
-                              Result Progress
-                            </h6>
-                            <small className="text-muted">
-                              {actionCenter.results.completed_batches}/{actionCenter.results.total_batches} completed
-                            </small>
-                          </div>
-                          <span className="badge rounded-pill text-bg-light">
-                            {actionCenter.results.completion_percent}%
-                          </span>
+                    <div className="t-panel h-100 mb-0">
+                      <div className="t-panel-head">
+                        <div>
+                          <h2 className="t-panel-title" style={{ fontSize: "15px" }}>
+                            <i className="bi bi-file-earmark-check-fill text-primary" />
+                            Result Progress
+                          </h2>
+                          <small className="text-muted">
+                            {actionCenter.results.completed_batches}/{actionCenter.results.total_batches} completed
+                          </small>
                         </div>
+                        <span className="badge bg-primary-subtle text-primary fw-bold px-2 py-1" style={{ borderRadius: 8 }}>
+                          {actionCenter.results.completion_percent}%
+                        </span>
+                      </div>
 
-                        <ProgressBar value={actionCenter.results.completion_percent} color="#7c3aed" />
+                      <div className="t-panel-body">
+                        <ProgressBar value={actionCenter.results.completion_percent} color="#2563EB" />
 
                         <div className="mt-3">
                           <div className="d-flex justify-content-between small mb-2">
-                            <span className="text-muted">Pending batches</span>
-                            <span className="fw-semibold" style={{ color: "#0f172a" }}>
+                            <span className="text-muted fw-semibold">Pending Result Batches</span>
+                            <span className="fw-bold" style={{ color: "#0F2744" }}>
                               {actionCenter.results.pending_batches_count}
                             </span>
                           </div>
@@ -1134,86 +1211,45 @@ export default function TeacherDashboard() {
                                 <div
                                   key={batch.id}
                                   className="rounded-3 p-2"
-                                  style={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0" }}
+                                  style={{ backgroundColor: "#F8FAFC", border: "1px solid #E2E8F0" }}
                                 >
                                   <div className="d-flex justify-content-between gap-2 small">
-                                    <span className="fw-semibold text-truncate" style={{ color: "#334155" }}>
+                                    <span className="fw-bold text-truncate" style={{ color: "#0F2744" }}>
                                       {batch.class_name} - {batch.term}
                                     </span>
                                     <span className="text-muted">{batch.session}</span>
                                   </div>
-                                  <div className="small text-muted">
-                                    {batch.entered_count}/{batch.expected_count} students entered
+                                  <div className="small text-muted mt-1">
+                                    {batch.entered_count}/{batch.expected_count} scores entered
                                   </div>
                                 </div>
                               ))
                             ) : (
-                              <div className="small text-muted">No pending result batch found.</div>
+                              <div className="small text-muted p-3 text-center rounded-3" style={{ background: "#F8FAFC" }}>
+                                All current result batches are up to date!
+                              </div>
                             )}
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
-
-                  {actionCenter.attendance.frequent_absentees.length > 0 && (
-                    <div className="col-12">
-                      <div className="card shadow-sm border-0" style={{ borderRadius: "12px" }}>
-                        <div className="card-body p-4">
-                          <div className="d-flex align-items-center justify-content-between mb-3">
-                            <h6 className="fw-semibold mb-0" style={{ color: "#1e293b" }}>
-                              Attendance Follow-Up
-                            </h6>
-                            <small className="text-muted">Last 30 days</small>
-                          </div>
-
-                          <div className="row g-2">
-                            {actionCenter.attendance.frequent_absentees.slice(0, 4).map((student) => (
-                              <div className="col-sm-6" key={student.id}>
-                                <div className="rounded-3 p-3" style={{ backgroundColor: "#fff7ed" }}>
-                                  <div className="d-flex justify-content-between gap-2">
-                                    <div style={{ minWidth: 0 }}>
-                                      <div className="fw-semibold text-truncate" style={{ color: "#9a3412" }}>
-                                        {student.name}
-                                      </div>
-                                      <div className="small text-muted text-truncate">
-                                        {student.class_name} {student.reg_no ? `- ${student.reg_no}` : ""}
-                                      </div>
-                                    </div>
-                                    <span className="badge rounded-pill" style={{ backgroundColor: "#fed7aa", color: "#9a3412" }}>
-                                      {student.absences}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
 
-            {/* Charts Row */}
+            {/* ── Charts Row ── */}
             <div className="row g-4 mb-4">
               <div className="col-lg-8">
-                <div className="card shadow-sm border-0 h-100" style={{ borderRadius: "12px" }}>
-                  <div className="card-body p-4">
-                    <div className="d-flex justify-content-between align-items-center mb-4">
-                      <div className="d-flex align-items-center gap-2">
-                        <div className="p-2 rounded-2" style={{ backgroundColor: "#e0e7ff" }}>
-                          <i className="bi bi-activity" style={{ color: "#6366f1" }} />
-                        </div>
-                        <div>
-                          <h6 className="mb-0 fw-semibold" style={{ color: "#1e293b" }}>
-                            Results Activity
-                          </h6>
-                          <small className="text-muted">Recent days</small>
-                        </div>
-                      </div>
-                    </div>
+                <div className="t-panel h-100 mb-0">
+                  <div className="t-panel-head">
+                    <h2 className="t-panel-title">
+                      <i className="bi bi-activity text-primary" />
+                      Results Activity & Score Log
+                    </h2>
+                    <small className="text-muted">Recent assessment distribution</small>
+                  </div>
+                  <div className="t-panel-body">
                     <div style={{ height: 300 }}>
                       <canvas ref={accessChartRef} />
                     </div>
@@ -1222,19 +1258,15 @@ export default function TeacherDashboard() {
               </div>
 
               <div className="col-lg-4">
-                <div className="card shadow-sm border-0 h-100" style={{ borderRadius: "12px" }}>
-                  <div className="card-body p-4">
-                    <div className="d-flex align-items-center gap-2 mb-4">
-                      <div className="p-2 rounded-2" style={{ backgroundColor: "#dbeafe" }}>
-                        <i className="bi bi-bar-chart-fill" style={{ color: "#3b82f6" }} />
-                      </div>
-                      <div>
-                        <h6 className="mb-0 fw-semibold" style={{ color: "#1e293b" }}>
-                          Performance Trend
-                        </h6>
-                        <small className="text-muted">By term</small>
-                      </div>
-                    </div>
+                <div className="t-panel h-100 mb-0">
+                  <div className="t-panel-head">
+                    <h2 className="t-panel-title">
+                      <i className="bi bi-bar-chart-fill text-success" />
+                      Term Performance Trend
+                    </h2>
+                    <small className="text-muted">Average score by term</small>
+                  </div>
+                  <div className="t-panel-body">
                     <div style={{ height: 300 }}>
                       <canvas ref={performanceChartRef} />
                     </div>
@@ -1243,52 +1275,44 @@ export default function TeacherDashboard() {
               </div>
             </div>
 
-            {/* Student Performance Watch */}
-            <div className="card shadow-sm border-0 mb-4" style={{ borderRadius: "12px" }}>
-              <div className="card-body p-4">
-                <div className="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
-                  <div className="d-flex align-items-center gap-2">
-                    <div className="p-2 rounded-2" style={{ backgroundColor: "#dcfce7" }}>
-                      <i className="bi bi-person-lines-fill" style={{ color: "#16a34a" }} />
-                    </div>
-                    <div>
-                      <h6 className="mb-0 fw-semibold" style={{ color: "#1e293b" }}>
-                        Student Performance Watch
-                      </h6>
-                      <small className="text-muted">Strong performers and students needing support</small>
-                    </div>
-                  </div>
-
-                  <div className="d-flex flex-wrap gap-2">
-                    {[
-                      { label: "Tracked", value: studentPerformance.summary.tracked_students, color: "#2563eb" },
-                      { label: "Strong", value: studentPerformance.summary.strong_count, color: "#16a34a" },
-                      { label: "Needs support", value: studentPerformance.summary.struggling_count, color: "#dc2626" },
-                      { label: "Class avg", value: `${studentPerformance.summary.class_average}%`, color: "#7c3aed" },
-                    ].map((item) => (
-                      <div
-                        key={item.label}
-                        className="px-3 py-2 rounded-3"
-                        style={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0" }}
-                      >
-                        <div className="small text-muted" style={{ lineHeight: 1.1 }}>
-                          {item.label}
-                        </div>
-                        <div className="fw-bold" style={{ color: item.color }}>
-                          {item.value}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+            {/* ── Student Performance Watch ── */}
+            <div className="t-panel mb-4">
+              <div className="t-panel-head">
+                <div className="d-flex align-items-center gap-2">
+                  <h2 className="t-panel-title">
+                    <i className="bi bi-person-lines-fill text-warning" />
+                    Student Academic Performance Watch
+                  </h2>
                 </div>
 
+                <div className="d-flex flex-wrap gap-2">
+                  {[
+                    { label: "Tracked", value: studentPerformance.summary.tracked_students, color: "#2563EB" },
+                    { label: "High Honors", value: studentPerformance.summary.strong_count, color: "#16A34A" },
+                    { label: "Needs Support", value: studentPerformance.summary.struggling_count, color: "#DC2626" },
+                    { label: "Class Avg", value: `${studentPerformance.summary.class_average}%`, color: "#7C3AED" },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className="px-3 py-1 rounded-3"
+                      style={{ backgroundColor: "#F8FAFC", border: "1px solid #E2E8F0" }}
+                    >
+                      <span className="small text-muted me-2" style={{ fontSize: "11px", fontWeight: 600 }}>{item.label}:</span>
+                      <span className="fw-bold" style={{ color: item.color, fontSize: "13px" }}>{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="t-panel-body">
                 <div className="row g-4">
                   <div className="col-lg-6">
                     <div className="d-flex align-items-center justify-content-between mb-3">
-                      <h6 className="mb-0 fw-semibold" style={{ color: "#0f172a" }}>
-                        Needs support
+                      <h6 className="mb-0 fw-bold" style={{ color: "#991B1B", fontSize: "14px" }}>
+                        <i className="bi bi-exclamation-triangle-fill me-1" />
+                        Students Needing Support
                       </h6>
-                      <span className="badge rounded-pill text-bg-light">
+                      <span className="badge bg-danger-subtle text-danger fw-bold">
                         {studentPerformance.struggling_students.length}
                       </span>
                     </div>
@@ -1301,7 +1325,7 @@ export default function TeacherDashboard() {
                       ) : (
                         <div className="border rounded-3 p-4 text-center bg-white">
                           <i className="bi bi-check2-circle fs-3 text-success d-block mb-2" />
-                          <p className="mb-0 text-muted">No struggling students found from the available results.</p>
+                          <p className="mb-0 text-muted">No struggling students identified from available records.</p>
                         </div>
                       )}
                     </div>
@@ -1309,10 +1333,11 @@ export default function TeacherDashboard() {
 
                   <div className="col-lg-6">
                     <div className="d-flex align-items-center justify-content-between mb-3">
-                      <h6 className="mb-0 fw-semibold" style={{ color: "#0f172a" }}>
-                        Doing well
+                      <h6 className="mb-0 fw-bold" style={{ color: "#166534", fontSize: "14px" }}>
+                        <i className="bi bi-trophy-fill me-1" />
+                        Top Performing Students
                       </h6>
-                      <span className="badge rounded-pill text-bg-light">
+                      <span className="badge bg-success-subtle text-success fw-bold">
                         {studentPerformance.top_performers.length}
                       </span>
                     </div>
@@ -1325,97 +1350,10 @@ export default function TeacherDashboard() {
                       ) : (
                         <div className="border rounded-3 p-4 text-center bg-white">
                           <i className="bi bi-bar-chart fs-3 text-primary d-block mb-2" />
-                          <p className="mb-0 text-muted">Performance will appear after results are entered.</p>
+                          <p className="mb-0 text-muted">Performance analysis will appear once scores are uploaded.</p>
                         </div>
                       )}
                     </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="row g-3 mb-4">
-              <div className="col-md-6 col-lg-3">
-                <div
-                  className="card border-0 h-100"
-                  style={{
-                    borderRadius: "12px",
-                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                    cursor: "pointer",
-                    transition: "transform 0.2s",
-                  }}
-                  onClick={() => navigate("/students/attendance")}
-                  onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                >
-                  <div className="card-body p-4 text-white">
-                    <i className="bi bi-clipboard-check fs-2 mb-3 d-block"></i>
-                    <h6 className="fw-semibold mb-1">Take Attendance</h6>
-                    <small style={{ opacity: 0.9 }}>Mark daily attendance</small>
-                  </div>
-                </div>
-              </div>
-
-              <div className="col-md-6 col-lg-3">
-                <div
-                  className="card border-0 h-100"
-                  style={{
-                    borderRadius: "12px",
-                    background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-                    cursor: "pointer",
-                    transition: "transform 0.2s",
-                  }}
-                  onClick={() => navigate("/results/upload")}
-                  onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                >
-                  <div className="card-body p-4 text-white">
-                    <i className="bi bi-file-earmark-text fs-2 mb-3 d-block"></i>
-                    <h6 className="fw-semibold mb-1">Upload Results</h6>
-                    <small style={{ opacity: 0.9 }}>Enter and submit scores</small>
-                  </div>
-                </div>
-              </div>
-
-              <div className="col-md-6 col-lg-3">
-                <div
-                  className="card border-0 h-100"
-                  style={{
-                    borderRadius: "12px",
-                    background: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
-                    cursor: "pointer",
-                    transition: "transform 0.2s",
-                  }}
-                  onClick={() => navigate("/my-classes")}
-                  onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                >
-                  <div className="card-body p-4 text-white">
-                    <i className="bi bi-building fs-2 mb-3 d-block"></i>
-                    <h6 className="fw-semibold mb-1">My Classes</h6>
-                    <small style={{ opacity: 0.9 }}>See assigned classes</small>
-                  </div>
-                </div>
-              </div>
-
-              <div className="col-md-6 col-lg-3">
-                <div
-                  className="card border-0 h-100"
-                  style={{
-                    borderRadius: "12px",
-                    background: "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)",
-                    cursor: "pointer",
-                    transition: "transform 0.2s",
-                  }}
-                  onClick={() => navigate("/reports")}
-                  onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                >
-                  <div className="card-body p-4 text-white">
-                    <i className="bi bi-graph-up fs-2 mb-3 d-block"></i>
-                    <h6 className="fw-semibold mb-1">Reports</h6>
-                    <small style={{ opacity: 0.9 }}>Insights & summaries</small>
                   </div>
                 </div>
               </div>
@@ -1428,4 +1366,3 @@ export default function TeacherDashboard() {
     </>
   );
 }
-

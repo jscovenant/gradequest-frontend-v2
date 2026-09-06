@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Chart from "chart.js/auto";
 import { authApi } from "../../../utils/axios";
+import { resolveMediaUrl } from "../../../utils/apiUrl";
 import TopNav from "../../../components/LayoutComponents/TopNav";
 import Sidebar from "../../../components/LayoutComponents/Sidebar";
 import Footer from "../../../components/LayoutComponents/Footer";
@@ -105,22 +106,50 @@ const InfoRow = ({ label, value, icon }: { label: string; value?: string | null;
   </div>
 );
 
+const MERIT_MAP: Record<number, { text: string; label: string; badgeBg: string; badgeColor: string }> = {
+  1: { text: "Poor", label: "1 - Poor", badgeBg: "rgba(239,68,68,0.12)", badgeColor: "#dc2626" },
+  2: { text: "Fair", label: "2 - Fair", badgeBg: "rgba(245,158,11,0.14)", badgeColor: "#b45309" },
+  3: { text: "Good", label: "3 - Good", badgeBg: "rgba(59,130,246,0.12)", badgeColor: "#1d4ed8" },
+  4: { text: "Very Good", label: "4 - Very Good", badgeBg: "rgba(34,197,94,0.14)", badgeColor: "#15803d" },
+  5: { text: "Excellent", label: "5 - Excellent (Highest Merit)", badgeBg: "rgba(201,168,76,0.22)", badgeColor: "#b45309" },
+};
+
 const RatingRow = ({
   label, id, value, onChange,
-}: { label: string; id: number; value?: number; onChange: (v: number) => void; prefix: string }) => (
-  <div className="sp-rating-row">
-    <span className="sp-rating-label">{label}</span>
-    <div className="sp-rating-btns">
-      {[1, 2, 3, 4].map(n => (
-        <button key={n} type="button"
-          className={`sp-rating-btn ${value === n ? "sp-rating-btn--active" : ""}`}
-          onClick={() => onChange(n)}>
-          {n}
-        </button>
-      ))}
+}: { label: string; id: number; value?: number; onChange: (v: number) => void; prefix: string }) => {
+  const activeMerit = value ? MERIT_MAP[value] : null;
+  return (
+    <div className="sp-rating-row">
+      <div className="sp-rating-label-wrap">
+        <span className="sp-rating-label">{label}</span>
+        {activeMerit && (
+          <span
+            className="sp-merit-badge"
+            style={{ background: activeMerit.badgeBg, color: activeMerit.badgeColor }}
+          >
+            {activeMerit.text}
+          </span>
+        )}
+      </div>
+      <div className="sp-rating-btns">
+        {[1, 2, 3, 4, 5].map(n => {
+          const m = MERIT_MAP[n];
+          return (
+            <button
+              key={n}
+              type="button"
+              className={`sp-rating-btn ${value === n ? "sp-rating-btn--active" : ""}`}
+              onClick={() => onChange(n)}
+              title={`${label}: ${m.label}`}
+            >
+              {n}
+            </button>
+          );
+        })}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 /* ========================= COMPONENT ========================= */
 export default function StudentsPage() {
@@ -167,6 +196,12 @@ export default function StudentsPage() {
   /* Performance */
   const [performanceLabels, setPerformanceLabels] = useState<string[]>([]);
   const [performanceData, setPerformanceData]     = useState<number[]>([]);
+  const [performanceSummary, setPerformanceSummary] = useState<{
+    session?: string;
+    cumulative_average?: number;
+    highest_average?: number;
+    lowest_average?: number;
+  }>({});
 
   /*withdraw student */
   const [withdrawingStudent, setWithdrawingStudent] = useState<Student | null>(null);
@@ -189,8 +224,7 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
   const profileCache  = useRef<Record<number, CachedProfile>>({});
   const studentImportInputRef = useRef<HTMLInputElement | null>(null);
 
-  const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
-  const getPhoto = (photo?: string) => photo ? `${BASE_URL}/uploads/users/${photo}` : "/media/profile.jpg";
+  const getPhoto = (photo?: string) => resolveMediaUrl(photo, "/media/profile.jpg");
   const getGreeting = () => {
     const h = new Date().getHours();
     if (h < 12) return "Good morning"; if (h < 17) return "Good afternoon";
@@ -315,7 +349,10 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
 
     if (profileCache.current[student.id]) {
       const c = profileCache.current[student.id];
-      setStudentDetails(c.profile); setPerformanceLabels(c.performance.labels); setPerformanceData(c.performance.data);
+      setStudentDetails(c.profile);
+      setPerformanceLabels(c.performance.labels || []);
+      setPerformanceData(c.performance.data || []);
+      setPerformanceSummary((c.performance as any).summary || {});
       setAffectiveDomains(c.profile.affectiveDomains || []); setPsychomotorDomains(c.profile.psychomotorDomains || []);
       const aff: Record<number, number> = {}; const psy: Record<number, number> = {};
       Object.values(c.profile.affectiveRatings   || {}).forEach((r: any) => (aff[r.affective_id]  = r.rate));
@@ -336,8 +373,14 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
       setAffectiveRatings(aff); setPsychomotorRatings(psy);
       const labels = perf.data.averages?.map((a: any) => a.term) || [];
       const data   = perf.data.averages?.map((a: any) => Number(a.total_average)) || [];
-      setPerformanceLabels(labels); setPerformanceData(data);
-      profileCache.current[student.id] = { profile: pr.data, performance: { labels, data } };
+      const summary = {
+        session: perf.data.session || "",
+        cumulative_average: Number(perf.data.cumulative_average) || (data.length ? Math.round(data.reduce((a: number, b: number) => a + b, 0) / data.length) : 0),
+        highest_average: Number(perf.data.highest_average) || (data.length ? Math.max(...data) : 0),
+        lowest_average: Number(perf.data.lowest_average) || (data.length ? Math.min(...data) : 0),
+      };
+      setPerformanceLabels(labels); setPerformanceData(data); setPerformanceSummary(summary);
+      profileCache.current[student.id] = { profile: pr.data, performance: { labels, data, summary } as any };
     } catch (err: any) { showError(err?.response?.data?.message ?? "Failed to load profile"); }
     finally { setLoadingProfile(false); }
   };
@@ -346,6 +389,7 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
     setSelectedStudent(null); setStudentDetails(null); setIsEditMode(false);
     setEditedStudent({}); setPhotoFile(null); setPhotoPreview("");
     setPasswordVisible(false); setDecryptedPassword(""); setActiveProfileTab("overview");
+    setPerformanceSummary({});
   };
 
   /* ─── Edit ─── */
@@ -441,8 +485,15 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
     setLoadingPassword(true);
     try {
       const res = await authApi.post("/decrypt-password", { user_id: selectedStudent.id });
-      if (res.data.decrypted_password) { setDecryptedPassword(res.data.decrypted_password); setPasswordVisible(true); showSuccess("Decrypted."); }
-      else showError("Failed to decrypt.");
+      if (res.data.decrypted_password) {
+        setDecryptedPassword(res.data.decrypted_password);
+        setPasswordVisible(true);
+        showSuccess("Password decrypted.");
+      } else if (res.data.can_reset) {
+        showWarning?.(res.data.message || "Password cannot be decrypted with current key.");
+      } else {
+        showError(res.data.message || "Failed to decrypt.");
+      }
     } catch (err: any) { showError(err?.response?.data?.message || "Failed to decrypt."); }
     finally { setLoadingPassword(false); }
   };
@@ -458,14 +509,14 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
     const aff = Object.entries(affectiveRatings).map(([id, rate]) => ({ id: parseInt(id), rate }));
     const psy = Object.entries(psychomotorRatings).map(([id, rate]) => ({ id: parseInt(id), rate }));
     if (!aff.length && !psy.length) return showError("Select at least one rating.");
-    if ([...aff, ...psy].some(r => r.rate < 1 || r.rate > 4)) return showError("Ratings must be 1–4.");
+    if ([...aff, ...psy].some(r => r.rate < 1 || r.rate > 5)) return showError("Ratings must be 1–5.");
     setSavingRatings(true);
     try {
       const res = await authApi.post("/save-ratings", {
         user_id: selectedStudent.id, school_id: studentDetails.student.school_id,
         affective: aff, psychomotor: psy,
       });
-      showSuccess(res.data.message || "Ratings saved!");
+      showSuccess(res.data.message || "Ratings saved successfully!");
     } catch (err: any) { showError(err?.response?.data?.message || "Failed to save ratings."); }
     finally { setSavingRatings(false); }
   };
@@ -510,86 +561,81 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
          * Token bridge — Bootstrap compiles your Sass vars to these CSS custom props.
          * Fallbacks ensure correct values even without Bootstrap's CSS var emission.
          */
-        :root {
-          --sp-light:    var(--bs-light,     #fcf8f8);
-          --sp-dark:     var(--bs-dark,      #050008);
-          --sp-accent:   var(--bs-secondary, rgb(255,200,87));   /* amber  */
-          --sp-magenta:  var(--bs-primary,   rgb(211,0,176));    /* magenta */
-          --sp-success:  var(--bs-success,   rgb(34,197,94));
-          --sp-danger:   var(--bs-danger,    rgb(239,68,68));
-          --sp-warning:  var(--bs-warning,   rgb(245,158,11));
-          --sp-info:     var(--bs-info,      rgb(59,130,246));
-          --sp-border:   var(--bs-border-color, #ede8e0);
-          --sp-radius:   var(--bs-border-radius-lg, 14px);
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
-          --sp-accent-dim:    rgba(255,200,87,0.10);
-          --sp-accent-border: rgba(255,200,87,0.22);
-          --sp-accent-glow:   rgba(255,200,87,0.10);
-          --sp-magenta-dim:   rgba(211,0,176,0.08);
+        :root {
+          --sp-light:    #F8FAFC;
+          --sp-dark:     #0F2744;
+          --sp-accent:   #D97706;
+          --sp-magenta:  #0F2744;
+          --sp-success:  #10B981;
+          --sp-danger:   #EF4444;
+          --sp-warning:  #F59E0B;
+          --sp-info:     #2563EB;
+          --sp-border:   #E2E8F0;
+          --sp-radius:   16px;
+
+          --sp-accent-dim:    rgba(217,119,6,0.10);
+          --sp-accent-border: rgba(217,119,6,0.22);
+          --sp-accent-glow:   rgba(217,119,6,0.10);
+          --sp-magenta-dim:   rgba(15,39,68,0.08);
         }
 
         /* ── Page ── */
         .db-main {
           background: var(--sp-light);
           min-height: 100vh;
-          font-family: 'DM Sans', sans-serif;
-          padding: 28px 28px 0;
+          font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+          padding: 24px 28px 0;
         }
 
         /* ── Hero ── */
         .db-hero {
-          background: var(--sp-dark);          /* $dark — same dark sandwich pattern */
+          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
           border-radius: var(--sp-radius);
           padding: 32px 36px;
           position: relative; overflow: hidden;
           margin-bottom: 24px;
-        }
-        .db-hero::before {
-          content: ''; position: absolute; inset: 0;
-          background-image: radial-gradient(circle, rgba(255,255,255,.045) 1px, transparent 1px);
-          background-size: 24px 24px; pointer-events: none;
+          box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
         }
         /* Amber glow — $secondary */
-        .db-hero-glow  { position:absolute; top:-60px; right:-60px; width:320px; height:320px; border-radius:50%; background:radial-gradient(circle, rgba(255,200,87,.10) 0%, transparent 65%); pointer-events:none; }
-        /* Magenta glow — $primary, dim */
-        .db-hero-glow2 { position:absolute; bottom:-40px; left:30%; width:200px; height:200px; border-radius:50%; background:radial-gradient(circle, rgba(211,0,176,.06) 0%, transparent 70%); pointer-events:none; }
+        .db-hero-glow  { position:absolute; top:-60px; right:-60px; width:320px; height:320px; border-radius:50%; background:radial-gradient(circle, rgba(217,119,6,.15) 0%, transparent 65%); pointer-events:none; }
+        /* Magenta glow */
+        .db-hero-glow2 { position:absolute; bottom:-40px; left:30%; width:200px; height:200px; border-radius:50%; background:radial-gradient(circle, rgba(37,99,235,.10) 0%, transparent 70%); pointer-events:none; }
 
         .db-hero-inner { position:relative; z-index:1; display:flex; align-items:center; justify-content:space-between; gap:32px; flex-wrap:wrap; }
 
-        /* Session badge — amber, $secondary */
+        /* Session badge */
         .db-session-badge {
           display:inline-flex; align-items:center; gap:7px;
-          font-size:11px; font-weight:500; letter-spacing:.12em; text-transform:uppercase;
-          color: var(--sp-accent);
-          background: var(--sp-accent-dim);
-          border: 1px solid var(--sp-accent-border);
-          border-radius:999px; padding:4px 12px; margin-bottom:14px;
+          font-size:11.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+          color: #FBBF24;
+          background: rgba(217,119,6,0.20);
+          border: 1px solid rgba(217,119,6,0.35);
+          border-radius:999px; padding:4px 12px; margin-bottom:12px;
         }
-        /* Live dot — $success, data context */
+        /* Live dot */
         .db-session-dot { width:6px; height:6px; border-radius:50%; background: var(--sp-success); animation:dbPulse 2s ease infinite; }
         @keyframes dbPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.5)} }
 
-        /* Greeting — Playfair Display, consistent with all hero sections */
-        .db-greeting { font-family:'Playfair Display',serif; font-size:clamp(22px,2.5vw,32px); font-weight:900; color:#fff; line-height:1.1; margin-bottom:8px; }
-        /* Italic = magenta — consistent rule across all components */
-        .db-greeting em { font-style:italic; color: var(--sp-magenta); }
+        .db-greeting { font-size:26px; font-weight:800; color:#fff; line-height:1.1; margin-bottom:8px; }
+        .db-greeting em { font-style:normal; color: #FBBF24; }
 
-        .db-hero-sub { font-size:13.5px; font-weight:300; color:rgba(255,255,255,0.38); line-height:1.65; max-width:540px; margin-bottom:24px; }
+        .db-hero-sub { font-size:13.5px; color:#CBD5E1; line-height:1.6; max-width:540px; margin-bottom:20px; }
 
-        /* CTA buttons — amber primary + ghost, same as all dark-bg CTAs */
-        .db-btn-gold { display:inline-flex; align-items:center; gap:8px; padding:10px 20px; font-size:13px; font-weight:500; color:var(--sp-dark); background:var(--sp-accent); border:none; border-radius:10px; cursor:pointer; transition:background .2s,transform .2s; white-space:nowrap; }
-        .db-btn-gold:hover { background:#ffe0a0; transform:translateY(-1px); }
-        .db-btn-outline { display:inline-flex; align-items:center; gap:8px; padding:10px 20px; font-size:13px; font-weight:400; color:rgba(255,255,255,.75); background:transparent; border:1px solid rgba(255,255,255,.14); border-radius:10px; cursor:pointer; transition:background .2s,border-color .2s,color .2s; white-space:nowrap; }
-        .db-btn-outline:hover { background:rgba(255,255,255,.06); color:#fff; border-color:rgba(255,255,255,.28); }
+        /* CTA buttons */
+        .db-btn-gold { display:inline-flex; align-items:center; gap:8px; padding:9px 18px; font-size:13px; font-weight:700; color:#fff; background:var(--sp-accent); border:none; border-radius:10px; cursor:pointer; transition:all .2s ease; white-space:nowrap; }
+        .db-btn-gold:hover { background:#B45309; transform:translateY(-1px); }
+        .db-btn-outline { display:inline-flex; align-items:center; gap:8px; padding:9px 18px; font-size:13px; font-weight:600; color:#fff; background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.20); border-radius:10px; cursor:pointer; transition:all .2s ease; white-space:nowrap; }
+        .db-btn-outline:hover { background:rgba(255,255,255,.18); color:#fff; }
         .db-btn-outline:disabled { opacity:.5; cursor:not-allowed; }
 
-        /* Hero stat card — frosted dark surface */
-        .db-hero-stat-card { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09); backdrop-filter:blur(8px); border-radius:var(--sp-radius); padding:20px 24px; min-width:220px; }
+        /* Hero stat card */
+        .db-hero-stat-card { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); backdrop-filter:blur(8px); border-radius:var(--sp-radius); padding:20px 24px; min-width:220px; }
         .db-hero-stat-item { display:flex; justify-content:space-between; align-items:center; gap:16px; }
-        .db-hero-stat-label { font-size:12px; font-weight:300; color:rgba(255,255,255,0.28); }
-        /* Stat values — amber, $secondary */
-        .db-hero-stat-val { font-family:'Playfair Display',serif; font-size:18px; font-weight:700; color:var(--sp-accent); }
-        .db-hero-stat-sep { height:1px; background:rgba(255,255,255,.06); }
+        .db-hero-stat-label { font-size:12px; font-weight:400; color:#CBD5E1; }
+        .db-hero-stat-val { font-size:18px; font-weight:800; color:#FBBF24; }
+        .db-hero-stat-sep { height:1px; background:rgba(255,255,255,.08); }
 
         /* ── KPI stat cards ── */
         .db-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
@@ -835,6 +881,26 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
 
         /* Performance chart */
         .sp-chart-area { padding:20px; height:320px; }
+        .sp-perf-kpis { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; padding:16px 20px 0; }
+        @media(max-width:600px){ .sp-perf-kpis { grid-template-columns:1fr; } }
+        .sp-perf-kpi { background:var(--sp-light); border:1px solid var(--sp-border); border-radius:10px; padding:12px 14px; }
+        .sp-perf-kpi-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:#9a8a7a; margin-bottom:3px; }
+        .sp-perf-kpi-val { font-family:'Playfair Display',serif; font-size:18px; font-weight:700; color:var(--sp-dark); }
+
+        /* Rating scale legend */
+        .sp-rating-scale-legend { background:#fff; border:1px solid var(--sp-border); border-radius:10px; padding:12px 16px; margin-bottom:16px; }
+        .sp-rating-scale-title { font-size:12px; font-weight:600; color:var(--sp-dark); margin-bottom:8px; display:flex; align-items:center; }
+        .sp-rating-scale-items { display:flex; flex-wrap:wrap; gap:8px; }
+        .sp-scale-chip { font-size:11.5px; font-weight:600; padding:3px 9px; border-radius:6px; display:inline-flex; align-items:center; gap:4px; }
+        .sp-rating-label-wrap { display:flex; align-items:center; gap:8px; flex:1; min-width:0; }
+        .sp-merit-badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:6px; letter-spacing:0.02em; }
+
+        /* Action Buttons */
+        .db-action-btn { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:8px; cursor:pointer; transition:all .2s ease; border:1px solid transparent; flex-shrink:0; font-size:14px; text-decoration:none; }
+        .db-action-btn--view { color:rgb(180,83,9); background:var(--sp-accent-dim); border-color:var(--sp-accent-border); }
+        .db-action-btn--view:hover { background:rgba(255,200,87,0.28); transform:translateY(-1px); }
+        .db-action-btn--withdraw { color:rgb(185,28,28); background:rgba(239,68,68,0.08); border-color:rgba(239,68,68,0.22); }
+        .db-action-btn--withdraw:hover { background:rgba(239,68,68,0.18); transform:translateY(-1px); }
 
         /* Ratings */
         .sp-rating-section { margin-bottom:16px; }
@@ -1209,21 +1275,35 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
                           </td>
                           <td style={{ textAlign: "right" }}>
                             <div className="d-flex align-items-center justify-content-end gap-2">
-                              <button className="db-view-btn" onClick={() => openStudent(s)}>
-                                <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="4" stroke="currentColor" strokeWidth="1.3"/><circle cx="7" cy="7" r="1.5" fill="currentColor"/></svg>
-                                View
+                              <button
+                                className="db-action-btn db-action-btn--view"
+                                onClick={() => openStudent(s)}
+                                title={`View Profile: ${fullName(s)}`}
+                                aria-label="View Student Profile"
+                              >
+                                <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                                  <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+                                  <circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.4"/>
+                                </svg>
                               </button>
                               <button
-                                className="db-withdraw-btn"
-                                onClick={() => { setWithdrawingStudent(s); setConfirmWithdrawText(""); }}>
-                                <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 7h7M6 4l3 3-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M10 2h2a1 1 0 011 1v8a1 1 0 01-1 1h-2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
-                                Withdraw
+                                className="db-action-btn db-action-btn--withdraw"
+                                onClick={() => { setWithdrawingStudent(s); setConfirmWithdrawText(""); }}
+                                title={`Withdraw Student: ${fullName(s)}`}
+                                aria-label="Withdraw Student"
+                              >
+                                <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                                  <circle cx="6" cy="5" r="3" stroke="currentColor" strokeWidth="1.3"/>
+                                  <path d="M1 14c0-2.8 2.2-5 5-5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                                  <path d="M11 10l4 4M15 10l-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                                </svg>
                               </button>
                               <select
                                 className="db-status-select"
                                 value={["active", "alumni", "graduate"].includes(lifecycle) ? lifecycle : "active"}
                                 disabled={updatingLifecycleId === s.id}
                                 onChange={(e) => updateStudentLifecycle(s, e.target.value as "active" | "alumni" | "graduate")}
+                                title="Change student lifecycle status"
                               >
                                 <option value="active">Active</option>
                                 <option value="alumni">Alumni</option>
@@ -1580,21 +1660,69 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
                     <div className="sp-content-card">
                       <div className="sp-content-card-head">
                         <div>
-                          <div className="sp-content-card-title">Academic Performance</div>
-                          <div className="sp-content-card-sub">Average score per term (0–100).</div>
+                          <div className="sp-content-card-title">Academic Performance Trend</div>
+                          <div className="sp-content-card-sub">
+                            Term-by-term average performance {performanceSummary.session ? `for ${performanceSummary.session}` : ""}.
+                          </div>
                         </div>
-                        <span className="sp-count-badge">{performanceData.length} data points</span>
+                        <span className="sp-count-badge">{performanceData.length} terms recorded</span>
                       </div>
-                      {performanceData.length > 0
-                        ? <div className="sp-chart-area"><canvas ref={chartRef} /></div>
-                        : <div className="sp-empty"><div className="sp-empty-title">No performance data</div><div className="sp-empty-sub">Results haven't been uploaded yet for this student.</div></div>
-                      }
+
+                      {performanceData.length > 0 && (
+                        <div className="sp-perf-kpis">
+                          <div className="sp-perf-kpi">
+                            <div className="sp-perf-kpi-label">Cumulative Average</div>
+                            <div className="sp-perf-kpi-val" style={{ color: "rgb(180,83,9)" }}>
+                              {performanceSummary.cumulative_average ? `${performanceSummary.cumulative_average}%` : `${Math.round(performanceData.reduce((a,b)=>a+b,0)/performanceData.length)}%`}
+                            </div>
+                          </div>
+                          <div className="sp-perf-kpi">
+                            <div className="sp-perf-kpi-label">Highest Term Score</div>
+                            <div className="sp-perf-kpi-val" style={{ color: "rgb(21,128,61)" }}>
+                              {performanceSummary.highest_average ? `${performanceSummary.highest_average}%` : `${Math.max(...performanceData)}%`}
+                            </div>
+                          </div>
+                          <div className="sp-perf-kpi">
+                            <div className="sp-perf-kpi-label">Session</div>
+                            <div className="sp-perf-kpi-val" style={{ fontSize: 15, paddingTop: 3 }}>
+                              {performanceSummary.session || "Current Session"}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {performanceData.length > 0 ? (
+                        <div className="sp-chart-area"><canvas ref={chartRef} /></div>
+                      ) : (
+                        <div className="sp-empty">
+                          <div className="sp-empty-title">No performance trend recorded</div>
+                          <div className="sp-empty-sub">Scores and term averages will appear here once results are uploaded for this student.</div>
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {/* ═══ RATINGS ═══ */}
                   {activeProfileTab === "ratings" && (
                     <>
+                      {/* Rating Scale Legend */}
+                      <div className="sp-rating-scale-legend">
+                        <div className="sp-rating-scale-title">
+                          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ marginRight: 6 }}>
+                            <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.3"/>
+                            <path d="M8 7v4M8 5v.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                          </svg>
+                          Rating Scale Guide (Highest number = Highest merit):
+                        </div>
+                        <div className="sp-rating-scale-items">
+                          <span className="sp-scale-chip" style={{ background: "rgba(239,68,68,0.12)", color: "#dc2626" }}><b>1</b> · Poor</span>
+                          <span className="sp-scale-chip" style={{ background: "rgba(245,158,11,0.14)", color: "#b45309" }}><b>2</b> · Fair</span>
+                          <span className="sp-scale-chip" style={{ background: "rgba(59,130,246,0.12)", color: "#1d4ed8" }}><b>3</b> · Good</span>
+                          <span className="sp-scale-chip" style={{ background: "rgba(34,197,94,0.14)", color: "#15803d" }}><b>4</b> · Very Good</span>
+                          <span className="sp-scale-chip" style={{ background: "rgba(201,168,76,0.25)", color: "#b45309" }}><b>5</b> · Excellent (Highest Merit)</span>
+                        </div>
+                      </div>
+
                       {psychomotorDomains.length === 0 && affectiveDomains.length === 0 && (
                         <div className="sp-content-card">
                           <div className="sp-empty"><div className="sp-empty-title">No rating domains</div><div className="sp-empty-sub">No affective or psychomotor domains configured for this school.</div></div>
@@ -1608,7 +1736,7 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
                             </div>
                             <div>
                               <div className="sp-rating-head-title">Psychomotor Domain</div>
-                              <div className="sp-rating-head-sub">Rate 1 (low) to 4 (excellent)</div>
+                              <div className="sp-rating-head-sub">Rate 1 (Poor) to 5 (Excellent - Highest Merit)</div>
                             </div>
                             <span className="sp-count-badge" style={{ marginLeft: "auto" }}>{psychomotorDomains.length} skills</span>
                           </div>
@@ -1628,7 +1756,7 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
                             </div>
                             <div>
                               <div className="sp-rating-head-title">Affective Domain</div>
-                              <div className="sp-rating-head-sub">Rate 1 (low) to 4 (excellent)</div>
+                              <div className="sp-rating-head-sub">Rate 1 (Poor) to 5 (Excellent - Highest Merit)</div>
                             </div>
                             <span className="sp-count-badge" style={{ marginLeft: "auto" }}>{affectiveDomains.length} traits</span>
                           </div>

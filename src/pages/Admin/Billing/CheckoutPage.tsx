@@ -9,6 +9,24 @@ import { authApi } from "../../../utils/axios";
 import { useToast } from "../../../contexts/ToastContext";
 import PageTitle from "../../../components/PageTitle";
 
+type PromoInfo = {
+  enabled?: boolean;
+  applied?: boolean;
+  title?: string;
+  description?: string;
+  target_plan?: string;
+  min_students?: number;
+  current_students?: number;
+  has_min_students?: boolean;
+  is_target_plan?: boolean;
+  is_annual_billing?: boolean;
+  bonus_days?: number;
+  ends_at?: string | null;
+  max_claims?: number | null;
+  claims_count?: number;
+  reason?: string;
+};
+
 type Plan = {
   id: number;
   is_active?: boolean | number;
@@ -31,6 +49,7 @@ type Plan = {
   payable_amount?: number | null;
   carried_days?: number;
   projected_expiry?: string | null;
+  promo?: PromoInfo | null;
 };
 
 type SubDetails = {
@@ -87,7 +106,7 @@ function prettyRenewalSource(source?: string | null) {
   const s = (source || "").toLowerCase();
   if (!s) return "—";
   if (s === "wallet") return "Wallet";
-  if (s === "paystack") return "Paystack";
+  if (s === "paystack") return "Card / Online";
   if (s === "card") return "Card";
   return source || "—";
 }
@@ -146,10 +165,15 @@ export default function CheckoutPage() {
     [amountBeforeUpgradeCredit, upgradeCredit]
   );
 
+  const promo = selectedPlan?.promo;
+  const isPromoEligible = !!promo?.enabled && !!promo?.is_target_plan && (yearlyBilling || (selectedPlan?.duration_in_days || 0) >= 300);
+  const isPromoQualified = isPromoEligible && !!promo?.has_min_students;
+  const promoBonusDays = isPromoQualified ? (Number(promo?.bonus_days) || 365) : 0;
+
   const totalDurationDays = useMemo(() => {
     if (!selectedPlan) return 0;
-    return selectedPlan.duration_in_days * billingCycles + Number(selectedPlan.carried_days || 0);
-  }, [selectedPlan, billingCycles]);
+    return selectedPlan.duration_in_days * billingCycles + Number(selectedPlan.carried_days || 0) + promoBonusDays;
+  }, [selectedPlan, billingCycles, promoBonusDays]);
 
   const expiryDate = useMemo(() => {
     if (!totalDurationDays) return null;
@@ -160,7 +184,7 @@ export default function CheckoutPage() {
 
   const referenceFromQuery = useMemo(() => {
     const params = new URLSearchParams(location.search);
-    return params.get("reference");
+    return params.get("reference") || params.get("trxref");
   }, [location.search]);
 
   const planFromQuery = useMemo(() => {
@@ -715,7 +739,7 @@ export default function CheckoutPage() {
                   </h1>
 
                   <p className="db-hero-sub">
-                    Choose a plan and complete checkout securely. Paystack payments are one-time only, while wallet payments can optionally auto-renew.
+                    Choose a plan and complete checkout securely. Online card and transfer payments are processed through our 256-bit encrypted gateway, while wallet payments can optionally auto-renew.
                   </p>
 
                   <div className="db-hero-btns">
@@ -728,7 +752,7 @@ export default function CheckoutPage() {
                       ) : (
                         <>
                           <i className="bi bi-lock-fill" />
-                          Pay & Renew
+                          Make Payment
                         </>
                       )}
                     </button>
@@ -852,6 +876,11 @@ export default function CheckoutPage() {
                                   <div className="db-muted" style={{ fontSize: 12, marginTop: 2 }}>
                                     {p.duration_in_days} days access
                                   </div>
+                                  {p.promo?.enabled && p.promo?.is_target_plan && (
+                                    <span className="db-pill mt-1 d-inline-block" style={{ background: "rgba(245,158,11,0.15)", color: "#b45309", border: "1px solid rgba(245,158,11,0.3)", fontSize: 10 }}>
+                                      <i className="bi bi-gift-fill me-1" /> 2-for-1 Promo
+                                    </span>
+                                  )}
                                 </div>
 
                                 {disabled ? (
@@ -953,7 +982,7 @@ export default function CheckoutPage() {
                           >
                             <div className="db-strong">No plans available</div>
                             <div className="db-muted" style={{ fontSize: 12.5, marginTop: 4 }}>
-                              There are currently no active subscription plans. Please check again later or contact GradeQuest Support.
+                              There are currently no active subscription plans. Please check again later or contact GradiosEdu Support.
                             </div>
                           </div>
                         </div>
@@ -994,7 +1023,7 @@ export default function CheckoutPage() {
                         <span className="db-muted" style={{ fontSize: 12 }}>Duration</span>
                         <span className="db-strong" style={{ fontWeight: 800 }}>
                           {selectedPlan
-                            ? `${totalDurationDays} days${Number(selectedPlan.carried_days || 0) > 0 ? ` (${selectedPlan.duration_in_days * billingCycles} new + ${selectedPlan.carried_days} carried)` : yearlyBilling && yearlyEligible ? ` (${billingCycles} cycles)` : ""}`
+                            ? `${totalDurationDays} days${promoBonusDays > 0 ? ` (${selectedPlan.duration_in_days * billingCycles} paid + ${promoBonusDays} Promo Bonus Free)` : Number(selectedPlan.carried_days || 0) > 0 ? ` (${selectedPlan.duration_in_days * billingCycles} new + ${selectedPlan.carried_days} carried)` : yearlyBilling && yearlyEligible ? ` (${billingCycles} cycles)` : ""}`
                             : "—"}
                         </span>
                       </div>
@@ -1074,6 +1103,31 @@ export default function CheckoutPage() {
                           </div>
                         </>
                       )}
+
+                      {isPromoQualified && (
+                        <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 12, background: "linear-gradient(135deg, rgba(255,200,87,0.18) 0%, rgba(245,158,11,0.08) 100%)", border: "1px solid rgba(245,158,11,0.3)" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#92400e", fontWeight: 800, fontSize: 13 }}>
+                            <i className="bi bi-gift-fill" /> {promo?.title || "🎉 2-for-1 Launch Promo Applied!"}
+                          </div>
+                          <div style={{ fontSize: 12, color: "#78350f", marginTop: 4, lineHeight: 1.5 }}>
+                            You are paying for 1 Year and receiving <strong>+{promoBonusDays} Bonus Days FREE</strong> (2 Full Years Total Access).
+                          </div>
+                          <div style={{ fontSize: 11.5, color: "#16a34a", marginTop: 6, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
+                            <i className="bi bi-shield-check" /> ₦0 Platform Software Fee on School Fees for 2 Full Years
+                          </div>
+                        </div>
+                      )}
+
+                      {isPromoEligible && !isPromoQualified && (
+                        <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 12, background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.2)" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#4338ca", fontWeight: 800, fontSize: 12.5 }}>
+                            <i className="bi bi-stars" /> {promo?.title || "Buy 1 Year, Get +1 Year Free Promo"}
+                          </div>
+                          <div style={{ fontSize: 12, color: "#3730a3", marginTop: 4, lineHeight: 1.5 }}>
+                            This promo requires at least <strong>{promo?.min_students} active students</strong>. Your school currently has <strong>{promo?.current_students || 0} active students</strong>. Enroll {Math.max(1, (promo?.min_students || 100) - (promo?.current_students || 0))} more students to unlock 1 Year Free!
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {selectedPlan && yearlyEligible && (
@@ -1120,7 +1174,7 @@ export default function CheckoutPage() {
                             disabled={processing}
                           >
                             <i className="bi bi-credit-card" />
-                            Paystack
+                            Card / Bank
                           </button>
                         </div>
 
@@ -1163,7 +1217,7 @@ export default function CheckoutPage() {
 
                       <div className="db-muted" style={{ fontSize: 12, marginTop: 6 }}>
                         {paymentMethod === "card"
-                          ? "Paystack payments are one-time only. Auto-renew is not available for card payments."
+                          ? "Online card and bank payments are one-time only. Auto-renew is not available for card payments."
                           : "When enabled, wallet renewal will attempt to renew automatically from your wallet balance."}
                       </div>
                     </div>
@@ -1172,7 +1226,7 @@ export default function CheckoutPage() {
                       {paymentMethod === "card" ? (
                         <div className="db-note">
                           <i className="bi bi-info-circle me-1" />
-                          You will be redirected to Paystack to complete this payment. Future renewals will require a fresh payment.
+                          You will be redirected to the secure 256-bit encrypted checkout to complete this payment.
                         </div>
                       ) : (
                         <div className="db-note">
@@ -1199,15 +1253,15 @@ export default function CheckoutPage() {
                             <i className="bi bi-lock-fill" />
                             {paymentMethod === "wallet"
                               ? `Pay ${selectedPlan ? fmtNaira(totalAmount) : ""} with Wallet`
-                              : `Pay ${selectedPlan ? fmtNaira(totalAmount) : ""} with Paystack`}
+                              : `Make Payment ${selectedPlan ? fmtNaira(totalAmount) : ""}`}
                           </>
                         )}
                       </button>
 
                       <div className="db-muted" style={{ fontSize: 12, marginTop: 10 }}>
-                        <i className="bi bi-info-circle me-1" />
+                        <i className="bi bi-shield-check me-1" />
                         {paymentMethod === "card"
-                          ? "After Paystack payment, you’ll be redirected back for verification."
+                          ? "After completing payment, you will be redirected back for instant verification."
                           : "Wallet payment updates your subscription immediately after successful debit."}
                       </div>
                     </div>

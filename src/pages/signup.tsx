@@ -33,7 +33,6 @@ type FieldErrors = Partial<Record<keyof RegisterPayload, string>> & {
   general?: string;
 };
 
-/* ── Password strength ── */
 function getStrength(pw: string): { score: number; label: string; color: string } {
   if (!pw) return { score: 0, label: "", color: "transparent" };
   let score = 0;
@@ -42,74 +41,13 @@ function getStrength(pw: string): { score: number; label: string; color: string 
   if (/[0-9]/.test(pw)) score++;
   if (/[^A-Za-z0-9]/.test(pw)) score++;
   const map = [
-    { label: "Too short", color: "#ef4444" },
-    { label: "Weak", color: "#f97316" },
-    { label: "Fair", color: "#eab308" },
-    { label: "Good", color: "#22c55e" },
-    { label: "Strong", color: "#16a34a" },
+    { label: "Too short", color: "#EF4444" },
+    { label: "Weak", color: "#F97316" },
+    { label: "Fair", color: "#F59E0B" },
+    { label: "Good", color: "#10B981" },
+    { label: "Strong", color: "#059669" },
   ];
   return { score, ...map[score] };
-}
-
-/* ✅ EyeIcon defined ONCE (top-level) */
-function EyeIcon({ crossed }: { crossed: boolean }) {
-  return crossed ? (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <path
-        d="M2 8s2.5-5 6-5 6 5 6 5-2.5 5-6 5-6-5-6-5z"
-        stroke="currentColor"
-        strokeWidth="1.3"
-      />
-      <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.3" />
-      <path
-        d="M3 3l10 10"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinecap="round"
-      />
-    </svg>
-  ) : (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <path
-        d="M2 8s2.5-5 6-5 6 5 6 5-2.5 5-6 5-6-5-6-5z"
-        stroke="currentColor"
-        strokeWidth="1.3"
-      />
-      <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.3" />
-    </svg>
-  );
-}
-
-/* ── Input field component ── */
-interface FieldProps {
-  id: string;
-  label: string;
-  optional?: boolean;
-  hint?: string;
-  error?: string;
-  icon: React.ReactNode;
-  children: React.ReactElement;
-}
-
-function Field({ id, label, optional, hint, error, icon, children }: FieldProps) {
-  return (
-    <div className="sg-field" style={{ marginBottom: 16 }}>
-      <label className="sg-label" htmlFor={id}>
-        {label}
-        {optional && <span className="sg-optional">optional</span>}
-      </label>
-      <div className="sg-input-wrap">
-        <span className="sg-icon">{icon}</span>
-        {children}
-      </div>
-      {error && (
-        <p className="sg-err" role="alert">
-          {error}
-        </p>
-      )}
-      {!error && hint && <p className="sg-hint">{hint}</p>}
-    </div>
-  );
 }
 
 export default function Signup() {
@@ -132,19 +70,20 @@ export default function Signup() {
   });
 
   const [errors, setErrors] = useState<FieldErrors>({});
+
   useEffect(() => {
-    const timer = window.setTimeout(() => setLoading(false), 800);
+    const timer = window.setTimeout(() => setLoading(false), 600);
     return () => window.clearTimeout(timer);
   }, []);
 
   const strength = getStrength(form.password);
 
-  const step1Valid = form.school_name.trim() && form.address.trim();
-  const step2Valid = form.firstname.trim() && form.surname.trim() && form.phone.trim();
+  const step1Valid = Boolean(form.school_name.trim() && form.address.trim());
+  const step2Valid = Boolean(form.firstname.trim() && form.surname.trim() && form.phone.trim());
 
   const canSubmit = useMemo(
     () =>
-      !!(
+      Boolean(
         step1Valid &&
         step2Valid &&
         form.password.length >= 8 &&
@@ -203,727 +142,739 @@ export default function Signup() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,800;1,600&display=swap');
 
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+          --gq-auth-navy: #0F2744;
+          --gq-auth-gold: #D97706;
+          --gq-auth-border: #E2E8F0;
+          --gq-auth-bg: #F8FAFC;
+        }
 
-        .sg-page {
+        .gq-auth-wrapper {
           min-height: 100vh;
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          font-family: 'DM Sans', sans-serif;
-          background: #0a0f1e;
-        }
-        @media (max-width: 900px) {
-          .sg-page { grid-template-columns: 1fr; }
-          .sg-left  { display: none !important; }
+          display: flex;
+          background: var(--gq-auth-bg);
+          font-family: 'Plus Jakarta Sans', sans-serif;
         }
 
-        /* ══════════ LEFT ══════════ */
-        .sg-left {
-          position: relative;
-          background: #0a0f1e;
+        /* ── Left Visual Panel ── */
+        .gq-auth-left {
+          flex: 1;
+          background: linear-gradient(145deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          padding: 48px 52px;
+          padding: 48px;
+          position: relative;
+          overflow: hidden;
+          color: #FFFFFF;
+        }
+
+        @media (max-width: 991px) {
+          .gq-auth-left {
+            display: none;
+          }
+        }
+
+        .gq-auth-left-bg-art {
+          position: absolute;
+          inset: 0;
+          background-image:
+            radial-gradient(circle at 10% 20%, rgba(217, 119, 6, 0.15) 0%, transparent 40%),
+            radial-gradient(circle at 90% 80%, rgba(29, 78, 216, 0.2) 0%, transparent 45%);
+          pointer-events: none;
+        }
+
+        .gq-auth-brand-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 12px;
+          text-decoration: none;
+          z-index: 2;
+        }
+
+        .gq-auth-brand-logo {
+          width: 40px;
+          height: 40px;
+          object-fit: contain;
+          border-radius: 10px;
+        }
+
+        .gq-auth-brand-text {
+          font-size: 22px;
+          font-weight: 800;
+          color: #FFFFFF;
+          letter-spacing: -0.02em;
+        }
+
+        .gq-auth-left-content {
+          position: relative;
+          z-index: 2;
+          max-width: 500px;
+          margin: 40px 0;
+        }
+
+        .gq-auth-left-kicker {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 5px 14px;
+          border-radius: 999px;
+          background: rgba(217, 119, 6, 0.2);
+          border: 1px solid rgba(217, 119, 6, 0.4);
+          color: #FBBF24;
+          font-size: 11.5px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          margin-bottom: 20px;
+        }
+
+        .gq-auth-left-title {
+          font-family: 'Playfair Display', Georgia, serif;
+          font-size: clamp(28px, 3vw, 40px);
+          font-weight: 800;
+          line-height: 1.2;
+          color: #FFFFFF;
+          margin-bottom: 16px;
+        }
+
+        .gq-auth-left-title em {
+          font-style: italic;
+          color: #F59E0B;
+        }
+
+        .gq-benefits-list {
+          list-style: none;
+          padding: 0;
+          margin: 24px 0 0 0;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+
+        .gq-benefit-item {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          font-size: 14px;
+          color: #E2E8F0;
+        }
+
+        .gq-benefit-icon {
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          background: rgba(16, 185, 129, 0.2);
+          border: 1px solid rgba(16, 185, 129, 0.4);
+          color: #34D399;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 13px;
+          flex-shrink: 0;
+        }
+
+        .gq-auth-left-footer {
+          position: relative;
+          z-index: 2;
+          display: flex;
+          align-items: center;
+          gap: 20px;
+          font-size: 12px;
+          color: #94A3B8;
+        }
+
+        /* ── Right Form Panel ── */
+        .gq-auth-right {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 40px 24px;
+        }
+
+        .gq-auth-card {
+          width: 100%;
+          max-width: 500px;
+          background: #FFFFFF;
+          border: 1px solid var(--gq-auth-border);
+          border-radius: 20px;
+          padding: 36px 32px;
+          box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.06);
+        }
+
+        .gq-auth-mobile-logo {
+          display: none;
+          align-items: center;
+          gap: 10px;
+          text-decoration: none;
+          margin-bottom: 24px;
+        }
+
+        @media (max-width: 991px) {
+          .gq-auth-mobile-logo {
+            display: inline-flex;
+          }
+        }
+
+        /* Step Progress Header */
+        .gq-step-progress {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 24px;
+          padding-bottom: 16px;
+          border-bottom: 1px solid #F1F5F9;
+        }
+
+        .gq-step-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 13px;
+          font-weight: 700;
+          color: #94A3B8;
+          cursor: pointer;
+        }
+
+        .gq-step-item.active {
+          color: #0F2744;
+        }
+
+        .gq-step-num {
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          background: #F1F5F9;
+          color: #64748B;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          font-weight: 800;
+        }
+
+        .gq-step-item.active .gq-step-num {
+          background: #0F2744;
+          color: #FFFFFF;
+        }
+
+        .gq-form-title {
+          font-size: 22px;
+          font-weight: 800;
+          color: #0F2744;
+          margin-bottom: 6px;
+        }
+
+        .gq-form-subtitle {
+          font-size: 13px;
+          color: #64748B;
+          line-height: 1.5;
+          margin-bottom: 24px;
+        }
+
+        .gq-form-group {
+          margin-bottom: 16px;
+        }
+
+        .gq-form-label {
+          display: block;
+          font-size: 12.5px;
+          font-weight: 700;
+          color: #1E293B;
+          margin-bottom: 6px;
+        }
+
+        .gq-input-wrap {
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+
+        .gq-input-icon {
+          position: absolute;
+          left: 14px;
+          color: #94A3B8;
+          font-size: 16px;
+          pointer-events: none;
+        }
+
+        .gq-auth-input {
+          width: 100%;
+          height: 46px;
+          background: #FFFFFF;
+          border: 1.5px solid #E2E8F0;
+          border-radius: 10px;
+          padding: 0 14px 0 42px;
+          font-family: inherit;
+          font-size: 14px;
+          color: #0F172A;
+          outline: none;
+          transition: all 0.2s ease;
+        }
+
+        .gq-auth-input:focus {
+          border-color: #D97706;
+          box-shadow: 0 0 0 3.5px rgba(217, 119, 6, 0.15);
+        }
+
+        .gq-auth-input::placeholder {
+          color: #94A3B8;
+          font-size: 13px;
+        }
+
+        .gq-btn-eye {
+          position: absolute;
+          right: 12px;
+          background: none;
+          border: none;
+          color: #94A3B8;
+          cursor: pointer;
+          padding: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .gq-btn-eye:hover {
+          color: #0F2744;
+        }
+
+        .gq-field-err {
+          font-size: 11.5px;
+          color: #EF4444;
+          margin-top: 4px;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+
+        /* Password strength bar */
+        .gq-strength-bar-wrap {
+          margin-top: 6px;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .gq-strength-track {
+          flex: 1;
+          height: 4px;
+          background: #E2E8F0;
+          border-radius: 999px;
           overflow: hidden;
         }
-        .sg-left::before {
-          content: '';
-          position: absolute; inset: 0;
-          background-image: radial-gradient(circle, rgba(255,255,255,0.055) 1px, transparent 1px);
-          background-size: 28px 28px;
-          pointer-events: none;
-        }
-        .sg-left::after {
-          content: '';
-          position: absolute;
-          top: -80px; right: -80px;
-          width: 480px; height: 480px;
-          border-radius: 50%;
-          background: radial-gradient(circle, rgba(201,168,76,0.07) 0%, transparent 65%);
-          pointer-events: none;
+
+        .gq-strength-fill {
+          height: 100%;
+          transition: all 0.3s ease;
         }
 
-        .sg-orbit {
-          position: absolute; top: 50%; left: 50%;
-          transform: translate(-50%,-50%);
-          border-radius: 50%;
-          border: 1px solid rgba(201,168,76,0.06);
-          pointer-events: none;
-          animation: sgSpin linear infinite;
-        }
-        .sg-orbit:nth-child(1) { width: 340px; height: 340px; animation-duration: 34s; }
-        .sg-orbit:nth-child(2) { width: 500px; height: 500px; animation-duration: 55s; animation-direction:reverse; border-color:rgba(99,102,241,0.04); }
-        .sg-orbit:nth-child(3) { width: 680px; height: 680px; animation-duration: 85s; border-color:rgba(255,255,255,0.02); }
-        .sg-orbit-dot { position:absolute; top:-4px; left:50%; transform:translateX(-50%); width:8px; height:8px; border-radius:50%; background:#c9a84c; box-shadow:0 0 10px rgba(201,168,76,0.7); }
-
-        @keyframes sgSpin {
-          from { transform: translate(-50%,-50%) rotate(0deg); }
-          to   { transform: translate(-50%,-50%) rotate(360deg); }
+        .gq-strength-label {
+          font-size: 11px;
+          font-weight: 700;
         }
 
-        .sg-left-logo {
-          display: inline-flex; align-items: center; gap: 11px;
-          text-decoration: none; position: relative; z-index: 1;
-        }
-        .sg-mark {
-          width: 40px; height: 40px; border-radius: 10px;
-          background: linear-gradient(135deg, #c9a84c, #e8c97a);
-          display: flex; align-items: center; justify-content: center;
-        }
-        .sg-mark-name {
-          font-family: 'Lora', serif; font-size: 22px; font-weight: 700;
-          color: #fff; letter-spacing: -0.01em;
-        }
-        .sg-mark-pill {
-          font-size: 9px; font-weight: 500; letter-spacing: 0.1em;
-          text-transform: uppercase; color: #c9a84c;
-          background: rgba(201,168,76,0.12); border: 1px solid rgba(201,168,76,0.25);
-          border-radius: 100px; padding: 2px 7px;
-        }
-
-        .sg-left-body { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 48px 0 32px; }
-
-        .sg-left-headline {
-          font-family: 'Lora', serif; font-size: clamp(28px,2.8vw,42px);
-          font-weight: 700; color: #fff; line-height: 1.1; margin-bottom: 16px;
-        }
-        .sg-left-headline em { font-style: italic; color: #e8c97a; }
-
-        .sg-left-sub {
-          font-size: 14.5px; font-weight: 300; color: #64748b;
-          line-height: 1.8; max-width: 320px; margin-bottom: 44px;
+        .gq-auth-btn-submit {
+          width: 100%;
+          height: 48px;
+          background: #0F2744;
+          color: #FFFFFF;
+          font-family: inherit;
+          font-size: 14px;
+          font-weight: 700;
+          border: none;
+          border-radius: 10px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          transition: all 0.2s ease;
+          box-shadow: 0 4px 14px rgba(15, 39, 68, 0.2);
+          margin-top: 10px;
         }
 
-        /* Steps timeline on left */
-        .sg-steps { display: flex; flex-direction: column; gap: 0; }
-
-        .sg-step {
-          display: flex; gap: 16px; align-items: flex-start;
-          padding-bottom: 28px; position: relative;
-        }
-        .sg-step:last-child { padding-bottom: 0; }
-
-        /* Vertical connector */
-        .sg-step:not(:last-child)::after {
-          content: '';
-          position: absolute;
-          left: 15px; top: 32px;
-          width: 1px; bottom: 0;
-          background: rgba(201,168,76,0.15);
-        }
-
-        .sg-step-num {
-          width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
-          display: flex; align-items: center; justify-content: center;
-          font-family: 'Lora', serif; font-size: 12px; font-weight: 700;
-          transition: background 0.3s, color 0.3s, border-color 0.3s;
-        }
-
-        .sg-step-num--done {
-          background: rgba(201,168,76,0.15);
-          border: 1.5px solid rgba(201,168,76,0.4);
-          color: #c9a84c;
-        }
-        .sg-step-num--active {
-          background: #c9a84c;
-          border: 1.5px solid #c9a84c;
-          color: #0a0f1e;
-        }
-        .sg-step-num--pending {
-          background: transparent;
-          border: 1.5px solid rgba(255,255,255,0.1);
-          color: #334155;
-        }
-
-        .sg-step-info { padding-top: 4px; }
-        .sg-step-title {
-          font-size: 13.5px; font-weight: 500;
-          color: #94a3b8; margin-bottom: 2px;
-          transition: color 0.3s;
-        }
-        .sg-step-title--active { color: #e2e8f0; }
-        .sg-step-desc { font-size: 12px; font-weight: 300; color: #475569; }
-
-        /* Left footer quote */
-        .sg-left-quote { position: relative; z-index: 1; }
-        .sg-quote-text { font-family: 'Lora', serif; font-style: italic; font-size: 13.5px; color: #475569; line-height: 1.7; margin-bottom: 8px; }
-        .sg-quote-author { font-size: 11.5px; color: #334155; }
-        .sg-quote-line { display: inline-block; width: 18px; height: 1px; background: #c9a84c; opacity: 0.5; vertical-align: middle; margin-right: 7px; }
-
-        /* ══════════ RIGHT ══════════ */
-        .sg-right {
-          background: #faf8f5;
-          display: flex; flex-direction: column;
-          align-items: center; justify-content: center;
-          padding: 40px 40px 60px;
-          position: relative; overflow: hidden;
-        }
-        .sg-right::before {
-          content: '';
-          position: absolute; top: -80px; right: -80px;
-          width: 400px; height: 400px; border-radius: 50%;
-          background: radial-gradient(circle, rgba(180,83,9,0.05) 0%, transparent 70%);
-          pointer-events: none;
-        }
-        .sg-right::after {
-          content: '';
-          position: absolute; bottom: -60px; left: -60px;
-          width: 300px; height: 300px; border-radius: 50%;
-          background: radial-gradient(circle, rgba(201,168,76,0.06) 0%, transparent 70%);
-          pointer-events: none;
-        }
-
-        .sg-form-wrap {
-          width: 100%; max-width: 440px;
-          position: relative; z-index: 1;
-          animation: sgFormIn 0.6s cubic-bezier(0.4,0,0.2,1) both;
-        }
-        @keyframes sgFormIn {
-          from { opacity:0; transform: translateY(20px); }
-          to   { opacity:1; transform: translateY(0); }
-        }
-
-        /* Mobile logo */
-        .sg-mobile-logo {
-          display: none; align-items: center; gap: 10px;
-          text-decoration: none; margin-bottom: 32px;
-        }
-        @media (max-width: 900px) { .sg-mobile-logo { display: flex; } }
-
-        /* Step pill */
-        .sg-step-pill {
-          display: inline-flex; align-items: center; gap: 8px;
-          font-size: 11px; font-weight: 500; letter-spacing: 0.18em;
-          text-transform: uppercase; color: #b45309;
-          margin-bottom: 10px;
-        }
-        .sg-step-pill-line { display: block; width: 22px; height: 1px; background: #d97706; opacity: 0.6; }
-
-        .sg-form-title {
-          font-family: 'Lora', serif; font-size: 26px; font-weight: 700;
-          color: #1a1a2e; line-height: 1.15; margin-bottom: 6px;
-        }
-        .sg-form-title em { font-style: italic; color: #b45309; }
-
-        .sg-form-sub {
-          font-size: 13.5px; font-weight: 300; color: #7a6a5a;
-          margin-bottom: 28px; line-height: 1.65;
-        }
-
-        /* Step progress dots */
-        .sg-dots {
-          display: flex; align-items: center; gap: 6px; margin-bottom: 28px;
-        }
-        .sg-dot {
-          height: 3px; border-radius: 100px;
-          transition: width 0.3s ease, background 0.3s ease;
-        }
-        .sg-dot--active   { width: 28px; background: #c9a84c; }
-        .sg-dot--done     { width: 16px; background: #d97706; }
-        .sg-dot--pending  { width: 16px; background: #e5ddd3; }
-
-        /* Error banner */
-        .sg-error-banner {
-          display: flex; align-items: flex-start; gap: 10px;
-          background: #fef2f2; border: 1px solid #fecaca;
-          border-radius: 8px; padding: 11px 14px;
-          margin-bottom: 18px; font-size: 13.5px; color: #b91c1c;
-          line-height: 1.5; animation: sgShake 0.35s ease;
-        }
-        @keyframes sgShake {
-          0%,100% { transform:translateX(0); }
-          25% { transform:translateX(-5px); }
-          75% { transform:translateX(5px); }
-        }
-
-        /* Fields */
-        .sg-label {
-          display: flex; align-items: center; gap: 6px;
-          font-size: 12.5px; font-weight: 500; color: #4a4a5a;
-          margin-bottom: 7px; letter-spacing: 0.02em;
-        }
-        .sg-optional {
-          font-size: 10.5px; font-weight: 400; color: #b5a090;
-          background: #f0ebe3; border-radius: 100px; padding: 1px 7px;
-        }
-        .sg-input-wrap { position: relative; }
-        .sg-icon {
-          position: absolute; left: 13px; top: 50%;
-          transform: translateY(-50%);
-          color: #b5a090; pointer-events: none;
-          display: flex; align-items: center;
-        }
-        .sg-input {
-          width: 100%; background: #fff;
-          border: 1.5px solid #e5ddd3; border-radius: 9px;
-          padding: 11px 13px 11px 40px;
-          font-family: 'DM Sans', sans-serif; font-size: 13.5px;
-          font-weight: 400; color: #1a1a2e; outline: none;
-          transition: border-color 0.2s, box-shadow 0.2s;
-          -webkit-appearance: none;
-        }
-        .sg-input::placeholder { color: #bdb3a8; }
-        .sg-input:focus { border-color: #c9a84c; box-shadow: 0 0 0 3px rgba(201,168,76,0.12); }
-        .sg-input--err { border-color: #fca5a5 !important; box-shadow: 0 0 0 3px rgba(239,68,68,0.08) !important; }
-
-        .sg-pw-toggle {
-          position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-          background: none; border: none; cursor: pointer;
-          color: #b5a090; display: flex; align-items: center; padding: 4px;
-          transition: color 0.2s;
-        }
-        .sg-pw-toggle:hover { color: #7a6a5a; }
-
-        .sg-hint { font-size: 11.5px; font-weight: 300; color: #b5a090; margin-top: 5px; line-height: 1.5; }
-        .sg-err  { font-size: 12px; color: #ef4444; margin-top: 5px; }
-
-        /* Password strength */
-        .sg-strength { margin-top: 8px; }
-        .sg-strength-bar { display: flex; gap: 4px; margin-bottom: 4px; }
-        .sg-strength-seg {
-          flex: 1; height: 3px; border-radius: 100px;
-          background: #e5ddd3;
-          transition: background 0.3s;
-        }
-        .sg-strength-label { font-size: 11px; color: #9a8a7a; }
-
-        /* Two-col grid */
-        .sg-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
-        /* Buttons */
-        .sg-btn-row { display: flex; gap: 10px; margin-top: 6px; }
-
-        .sg-btn-back {
-          padding: 12px 18px;
-          font-family: 'DM Sans', sans-serif; font-size: 13.5px;
-          font-weight: 400; color: #7a6a5a;
-          background: transparent; border: 1.5px solid #e5ddd3;
-          border-radius: 9px; cursor: pointer; white-space: nowrap;
-          transition: background 0.2s, border-color 0.2s;
-          display: flex; align-items: center; gap: 6px;
-        }
-        .sg-btn-back:hover { background: #f0ebe3; border-color: #d4c9bc; }
-
-        .sg-btn-next, .sg-btn-submit {
-          flex: 1; padding: 12px 20px;
-          font-family: 'DM Sans', sans-serif; font-size: 14px;
-          font-weight: 500; color: #fff;
-          background: #1a1a2e; border: none;
-          border-radius: 9px; cursor: pointer;
-          display: flex; align-items: center; justify-content: center; gap: 8px;
-          transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
-        }
-        .sg-btn-next:hover:not(:disabled),
-        .sg-btn-submit:hover:not(:disabled) {
-          background: #0a0f1e;
+        .gq-auth-btn-submit:hover:not(:disabled) {
+          background: #1E3A8A;
           transform: translateY(-1px);
-          box-shadow: 0 6px 20px rgba(0,0,0,0.15);
-        }
-        .sg-btn-next:disabled,
-        .sg-btn-submit:disabled { opacity: 0.55; cursor: not-allowed; }
-
-        .sg-spinner {
-          width: 15px; height: 15px;
-          border: 2px solid rgba(255,255,255,0.3);
-          border-top-color: #fff; border-radius: 50%;
-          animation: sgSpinAnim 0.7s linear infinite; flex-shrink: 0;
-        }
-        @keyframes sgSpinAnim { to { transform: rotate(360deg); } }
-
-        /* Divider */
-        .sg-divider {
-          display: flex; align-items: center; gap: 10px;
-          margin: 20px 0 14px;
-        }
-        .sg-divider-line { flex: 1; height: 1px; background: #e5ddd3; }
-        .sg-divider-text { font-size: 11.5px; color: #b5a090; white-space: nowrap; }
-
-        /* Trust chips */
-        .sg-trust { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
-        .sg-trust-chip {
-          display: flex; align-items: center; gap: 5px;
-          font-size: 11px; font-weight: 300; color: #9a8a7a;
-          background: #f0ebe3; border-radius: 100px; padding: 3px 10px;
-        }
-        .sg-trust-chip svg { color: #b45309; }
-
-        /* Login link */
-        .sg-login-link {
-          text-align: center; font-size: 13px;
-          font-weight: 300; color: #9a8a7a;
-        }
-        .sg-login-link a {
-          color: #b45309; font-weight: 500;
-          text-decoration: none; transition: color 0.2s;
-        }
-        .sg-login-link a:hover { color: #92400e; }
-
-        /* Right footer */
-        .sg-right-footer {
-          position: absolute; bottom: 20px; left: 0; right: 0;
-          text-align: center; font-size: 11px; font-weight: 300; color: #c8bfb5; z-index: 1;
-        }
-        .sg-right-footer a { color: #b5a090; text-decoration: none; }
-        .sg-right-footer a:hover { color: #7a6a5a; }
-
-        /* Slide animations for step transitions */
-        .sg-step-panel {
-          animation: sgSlideIn 0.4s cubic-bezier(0.4,0,0.2,1) both;
-        }
-        @keyframes sgSlideIn {
-          from { opacity:0; transform: translateX(16px); }
-          to   { opacity:1; transform: translateX(0); }
+          box-shadow: 0 6px 18px rgba(30, 58, 138, 0.3);
         }
 
-        /* Logo image */
-.ft-logo-img {
-  width: 10%;
-  height: 10%;
-  object-fit: contain;
-  border-radius: 8px;
-}
+        .gq-auth-btn-submit:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
+        }
 
+        .gq-auth-error {
+          background: #FEF2F2;
+          border: 1px solid #FEE2E2;
+          color: #B91C1C;
+          border-radius: 8px;
+          padding: 10px 14px;
+          font-size: 12.5px;
+          margin-bottom: 18px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
 
+        .gq-auth-footer-links {
+          margin-top: 24px;
+          padding-top: 20px;
+          border-top: 1px solid #F1F5F9;
+          text-align: center;
+          font-size: 13px;
+          color: #64748B;
+        }
 
-/* Hover effect */
-.ft-logo:hover .ft-logo-wrap {
-  transform: scale(1.05);
-  transition: 0.25s ease;
-}/* Logo image */
-.ft-logo-img {
-  width: 10%;
-  height: 10%;
-  object-fit: contain;
-  border-radius: 8px;
-}
+        .gq-auth-footer-links a {
+          color: #D97706;
+          font-weight: 700;
+          text-decoration: none;
+        }
 
-
-
-/* Hover effect */
-.ft-logo:hover .ft-logo-wrap {
-  transform: scale(1.05);
-  transition: 0.25s ease;
-}
+        .gq-auth-footer-links a:hover {
+          text-decoration: underline;
+        }
       `}</style>
-  <PageTitle title="Signup" />
-     <div className="sg-page">
-    
-            {/* ══ LEFT PANEL ══ */}
-            <div className="sg-left" style={{ display: 'flex' }}>
-              <div className="sg-orbit"><div className="sg-orbit-dot" /></div>
-              <div className="sg-orbit" />
-              <div className="sg-orbit" />
-    
-              {/* Logo */}
-                <a href="/" className="ft-logo" aria-label="GradeQuest home">     
-        <div className="ft-logo-wrap">
-          <img
-            src="/media/logo/gradequest-logo.png"
-            alt="GradeQuest logo"
-            className="ft-logo-img"
-          />
-        </div>
-      </a>
-    
-              {/* Body */}
-              <div className="sg-left-body">
-                <h1 className="sg-left-headline">
-                  Get your school<br />
-                  <em>set up in minutes.</em>
-                </h1>
-                <p className="sg-left-sub">
-                  Join 500+ Nigerian schools already running smarter
-                  with GradeQuest. No setup fee. No long contracts.
-                </p>
-    
-                {/* Progress steps */}
-                <div className="sg-steps">
-                  {[
-                    { num: "1", title: "School details", desc: "Name, address & location" },
-                    { num: "2", title: "Admin account",  desc: "Your name, phone & email" },
-                    { num: "3", title: "Set password",   desc: "Secure your account" },
-                  ].map((s, i) => {
-                    const activeStep = i + 1;
-                    const state = step > activeStep ? "done" : step === activeStep ? "active" : "pending";
-                    return (
-                      <div className="sg-step" key={s.num}>
-                        <div className={`sg-step-num sg-step-num--${state}`}>
-                          {state === "done" ? (
-                            <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                              <path d="M2 7l3.5 3.5 6.5-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          ) : s.num}
-                        </div>
-                        <div className="sg-step-info">
-                          <p className={`sg-step-title ${state === "active" ? "sg-step-title--active" : ""}`}>{s.title}</p>
-                          <p className="sg-step-desc">{s.desc}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-    
-              {/* Quote */}
-              <div className="sg-left-quote">
-                <p className="sg-quote-text">
-                  "Onboarding was seamless. Our data was migrated in one day and staff were trained the same week."
-                </p>
-                <span className="sg-quote-author">
-                  <span className="sg-quote-line" />
-                  Dr. Seun Fashola · Heritage International School, PH
-                </span>
-              </div>
-            </div>
-    
-            {/* ══ RIGHT PANEL ══ */}
-            <div className="sg-right">
-              <div className="sg-form-wrap">
-    
-                {/* Mobile logo */}
-        <a href="/" className="ft-logo" aria-label="GradeQuest home">     
-        <div className="ft-logo-wrap">
-          <img
-            src="/media/logo/gradequest-logo.png"
-            alt="GradeQuest logo"
-            className="ft-logo-img"
-          />
-        </div>
-      </a>
-    
-                {/* Step indicator dots */}
-                <div className="sg-dots">
-                  {[1, 2].map(n => (
-                    <div key={n} className={`sg-dot sg-dot--${step === n ? "active" : step > n ? "done" : "pending"}`} />
-                  ))}
-                </div>
-    
-                {/* Error banner */}
-                {errors.general && (
-                  <div className="sg-error-banner" role="alert">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
-                      <circle cx="8" cy="8" r="7" stroke="#b91c1c" strokeWidth="1.4"/>
-                      <path d="M8 5v3.5M8 10.5v.5" stroke="#b91c1c" strokeWidth="1.5" strokeLinecap="round"/>
-                    </svg>
-                    {errors.general}
-                  </div>
-                )}
 
-                <form onSubmit={handleSubmit} noValidate>
-    
-                  {/* ─── STEP 1 ─── */}
-                  {step === 1 && (
-                    <div className="sg-step-panel" key="step1">
-                      <div className="sg-step-pill">
-                        <span className="sg-step-pill-line" />
-                        Step 1 of 2
-                      </div>
-                      <h2 className="sg-form-title">
-                        Tell us about<br />
-                        <em>your school.</em>
-                      </h2>
-                      <p className="sg-form-sub">
-                        This information will be used to set up your school's profile.
-                      </p>
-    
-                      <Field
-                        id="school_name" label="School Name"
-                        error={errors.school_name}
-                        icon={<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 6.5L8 2l6 4.5V14H2V6.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><rect x="5.5" y="9" width="2" height="5" rx="0.5" fill="currentColor" opacity="0.4"/><rect x="8.5" y="9" width="2" height="5" rx="0.5" fill="currentColor" opacity="0.4"/></svg>}
-                      >
-                        <input id="school_name" type="text" className={`sg-input ${errors.school_name ? "sg-input--err" : ""}`}
-                          placeholder="e.g. Bright Future Academy"
-                          value={form.school_name} onChange={e => set("school_name", e.target.value)}
-                          autoFocus/>
-                      </Field>
-    
-                      <Field
-                        id="address" label="School Address"
-                        error={errors.address}
-                        hint="Full address — used on report cards and official documents."
-                        icon={<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 1.5C5.515 1.5 3.5 3.515 3.5 6c0 4 4.5 8.5 4.5 8.5S12.5 10 12.5 6c0-2.485-2.015-4.5-4.5-4.5z" stroke="currentColor" strokeWidth="1.3"/><circle cx="8" cy="6" r="1.5" fill="currentColor" opacity="0.5"/></svg>}
-                      >
-                        <input id="address" type="text" className={`sg-input ${errors.address ? "sg-input--err" : ""}`}
-                          placeholder="e.g. 12 Allen Avenue, Ikeja, Lagos"
-                          value={form.address} onChange={e => set("address", e.target.value)}/>
-                      </Field>
-    
-                      <div className="sg-btn-row">
-                        <button
-                          type="button"
-                          className="sg-btn-next"
-                          disabled={!step1Valid}
-                          onClick={() => setStep(2)}
-                        >
-                          Continue
-                          <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                            <path d="M1 7h12M7 1l6 6-6 6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-    
-                  {/* ─── STEP 2 ─── */}
-                  {step === 2 && (
-                    <div className="sg-step-panel" key="step2">
-                      <div className="sg-step-pill">
-                        <span className="sg-step-pill-line" />
-                        Step 2 of 2
-                      </div>
-                      <h2 className="sg-form-title">
-                        Create your<br />
-                        <em>admin account.</em>
-                      </h2>
-                      <p className="sg-form-sub">
-                        This will be the primary Super-Admin account for <strong style={{ color: "#4a4a5a" }}>{form.school_name || "your school"}</strong>.
-                      </p>
-    
-                      {/* Name row */}
-                      <div className="sg-row2">
-                        <Field
-                          id="firstname" label="First Name"
-                          error={errors.firstname}
-                          icon={<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5.5" r="2.5" stroke="currentColor" strokeWidth="1.3"/><path d="M2 14c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>}
-                        >
-                          <input id="firstname" type="text" className={`sg-input ${errors.firstname ? "sg-input--err" : ""}`}
-                            placeholder="e.g. Mausi"
-                            value={form.firstname} onChange={e => set("firstname", e.target.value)} autoFocus/>
-                        </Field>
-                        <Field
-                          id="surname" label="Surname"
-                          error={errors.surname}
-                          icon={<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5.5" r="2.5" stroke="currentColor" strokeWidth="1.3"/><path d="M2 14c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>}
-                        >
-                          <input id="surname" type="text" className={`sg-input ${errors.surname ? "sg-input--err" : ""}`}
-                            placeholder="e.g. Tokunbo"
-                            value={form.surname} onChange={e => set("surname", e.target.value)}/>
-                        </Field>
-                      </div>
-    
-                      <Field
-                        id="phone" label="Phone Number"
-                        error={errors.phone}
-                        icon={<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 1h3l1.5 3.5-1.5 1.5a9 9 0 004 4l1.5-1.5L15 10v3c0 1.1-.9 2-2 2A12 12 0 011 3c0-1.1.9-2 2-2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>}
-                      >
-                        <input id="phone" type="tel" className={`sg-input ${errors.phone ? "sg-input--err" : ""}`}
-                          placeholder="+234 800 000 0000"
-                          value={form.phone} onChange={e => set("phone", e.target.value)}/>
-                      </Field>
-    
-                      <Field
-                        id="email" label="Email Address" optional
-                        error={errors.email}
-                        hint="We'll send a verification link if you provide this."
-                        icon={<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.3"/><path d="M1 6l7 4 7-4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>}
-                      >
-                        <input id="email" type="email" className={`sg-input ${errors.email ? "sg-input--err" : ""}`}
-                          placeholder="admin@school.com"
-                          value={form.email ?? ""} onChange={e => set("email", e.target.value)}/>
-                      </Field>
-    
-                      <Field
-                        id="password" label="Password"
-                        error={errors.password}
-                        icon={<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="7" width="12" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" strokeWidth="1.2"/><circle cx="8" cy="10.5" r="1" fill="currentColor"/></svg>}
-                      >
-                        <>
-                          <input id="password" type={showPw ? "text" : "password"}
-                            className={`sg-input ${errors.password ? "sg-input--err" : ""}`}
-                            placeholder="Min. 8 characters" style={{ paddingRight: 40 }}
-                            value={form.password} onChange={e => set("password", e.target.value)}/>
-                          <button type="button" className="sg-pw-toggle" onClick={() => setShowPw(v => !v)} aria-label={showPw ? "Hide" : "Show"}>
-                            <EyeIcon crossed={showPw} />
-                          </button>
-                        </>
-                      </Field>
-    
-                      {/* Strength meter */}
-                      {form.password && (
-                        <div className="sg-strength" style={{ marginTop: -10, marginBottom: 14 }}>
-                          <div className="sg-strength-bar">
-                            {[1,2,3,4].map(n => (
-                              <div key={n} className="sg-strength-seg"
-                                style={{ background: n <= strength.score ? strength.color : "#e5ddd3" }}/>
-                            ))}
-                          </div>
-                          <span className="sg-strength-label" style={{ color: strength.color || "#9a8a7a" }}>
-                            {strength.label}
-                          </span>
-                        </div>
-                      )}
-    
-                      <Field
-                        id="password_confirmation" label="Confirm Password"
-                        error={
-                          errors.password_confirmation ||
-                          (form.password_confirmation && form.password !== form.password_confirmation
-                            ? "Passwords do not match." : undefined)
-                        }
-                        icon={<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="7" width="12" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" strokeWidth="1.2"/><path d="M6 10.5l1.5 1.5 3-3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                      >
-                        <>
-                          <input id="password_confirmation" type={showPw2 ? "text" : "password"}
-                            className={`sg-input ${(errors.password_confirmation || (form.password_confirmation && form.password !== form.password_confirmation)) ? "sg-input--err" : ""}`}
-                            placeholder="••••••••" style={{ paddingRight: 40 }}
-                            value={form.password_confirmation} onChange={e => set("password_confirmation", e.target.value)}/>
-                          <button type="button" className="sg-pw-toggle" onClick={() => setShowPw2(v => !v)} aria-label={showPw2 ? "Hide" : "Show"}>
-                            <EyeIcon crossed={showPw2} />
-                          </button>
-                        </>
-                      </Field>
-    
-                      <div className="sg-btn-row">
-                        <button type="button" className="sg-btn-back" onClick={() => setStep(1)}>
-                          <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                            <path d="M13 7H1M7 13L1 7l6-6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                          Back
-                        </button>
-                        <button type="submit" className="sg-btn-submit" disabled={!canSubmit || submitting}>
-                          {submitting ? (
-                            <><span className="sg-spinner" /> Creating account…</>
-                          ) : (
-                            <>Create Account <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M1 7h12M7 1l6 6-6 6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg></>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </form>
-    
-                <div className="sg-divider">
-                  <span className="sg-divider-line" />
-                  <span className="sg-divider-text">Trusted & secure</span>
-                  <span className="sg-divider-line" />
-                </div>
-    
-                <div className="sg-trust">
-                  {["No credit card", "Free 14-day trial", "NDPR compliant"].map(t => (
-                    <span className="sg-trust-chip" key={t}>
-                      <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                        <path d="M1.5 6l2.5 2.5 6.5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                      {t}
-                    </span>
-                  ))}
-                </div>
-    
-                <p className="sg-login-link">
-                  Already have an account?{" "}
-                  <Link to="/login">Sign in →</Link>
-                </p>
+      <PageTitle title="Register Your School | SchoolProfit" />
+
+      <div className="gq-auth-wrapper">
+        {/* ── Left Hero Panel ── */}
+        <div className="gq-auth-left">
+          <div className="gq-auth-left-bg-art" />
+
+          <Link to="/" className="gq-auth-brand-link">
+            <img
+              src="/media/logo/schoolprofit-logo.svg"
+              alt="SchoolProfit"
+              className="gq-auth-brand-logo"
+              style={{ width: "auto", height: 38 }}
+            />
+            <span className="gq-auth-brand-text">School<span style={{ color: "#059669" }}>Profit</span></span>
+          </Link>
+
+          <div className="gq-auth-left-content">
+            <div className="gq-auth-left-kicker">
+              <span>🚀</span> Start in Under 2 Minutes
+            </div>
+            <h1 className="gq-auth-left-title">
+              Scale Your School with <em>Total Financial &amp; Academic Control.</em>
+            </h1>
+
+            <ul className="gq-benefits-list">
+              <li className="gq-benefit-item">
+                <span className="gq-benefit-icon">✓</span>
+                <span><strong>Stop Fee Debts:</strong> Instant multi-bank collections, debt gatekeepers, and automated receipts.</span>
+              </li>
+              <li className="gq-benefit-item">
+                <span className="gq-benefit-icon">✓</span>
+                <span><strong>Scale Admissions:</strong> Dedicated sales partner referral engine and student lead capture.</span>
+              </li>
+              <li className="gq-benefit-item">
+                <span className="gq-benefit-icon">✓</span>
+                <span><strong>Instant Broadsheets:</strong> Automated cumulative GPAs, positions, and error-free result cards.</span>
+              </li>
+              <li className="gq-benefit-item">
+                <span className="gq-benefit-icon">✓</span>
+                <span><strong>Hybrid CBT &amp; AI:</strong> Offline computer lab examinations and instant AI lesson plans.</span>
+              </li>
+            </ul>
+          </div>
+
+          <div className="gq-auth-left-footer">
+            <span>🛡️ Free 30-Day Onboarding</span>
+            <span>● 0 Setup Fees</span>
+            <span>● Dedicated Growth Support</span>
+          </div>
+        </div>
+
+        {/* ── Right Form Panel ── */}
+        <div className="gq-auth-right">
+          <div className="gq-auth-card">
+            {/* Mobile Logo */}
+            <Link to="/" className="gq-auth-mobile-logo">
+              <img src="/media/logo/schoolprofit-icon.svg" alt="SchoolProfit" style={{ width: 32, height: 32 }} />
+              <span style={{ fontSize: 19, fontWeight: 800, color: "#0F2744" }}>School<span style={{ color: "#059669" }}>Profit</span></span>
+            </Link>
+
+            {/* Step Progress */}
+            <div className="gq-step-progress">
+              <div
+                className={`gq-step-item ${step === 1 ? "active" : ""}`}
+                onClick={() => setStep(1)}
+              >
+                <span className="gq-step-num">1</span>
+                <span>School Profile</span>
               </div>
-    
-              <div className="sg-right-footer">
-                <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · © {new Date().getFullYear()} GradeQuest
+              <span style={{ color: "#CBD5E1" }}>→</span>
+              <div
+                className={`gq-step-item ${step === 2 ? "active" : ""}`}
+                onClick={() => step1Valid && setStep(2)}
+              >
+                <span className="gq-step-num">2</span>
+                <span>Admin Account</span>
               </div>
             </div>
-    
+
+            {errors.general && (
+              <div className="gq-auth-error" role="alert">
+                <i className="bi bi-exclamation-circle-fill" />
+                <span>{errors.general}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} noValidate>
+              {/* ── STEP 1: SCHOOL IDENTITY ── */}
+              {step === 1 && (
+                <div>
+                  <h2 className="gq-form-title">Tell us about your school</h2>
+                  <p className="gq-form-subtitle">Enter your institution name and operating location in Nigeria.</p>
+
+                  <div className="gq-form-group">
+                    <label className="gq-form-label" htmlFor="school_name">
+                      Official School Name *
+                    </label>
+                    <div className="gq-input-wrap">
+                      <span className="gq-input-icon">
+                        <i className="bi bi-buildings" />
+                      </span>
+                      <input
+                        id="school_name"
+                        type="text"
+                        className="gq-auth-input"
+                        placeholder="e.g. Samjane Arise and Shine Group of Schools"
+                        value={form.school_name}
+                        onChange={(e) => set("school_name", e.target.value)}
+                        required
+                      />
+                    </div>
+                    {errors.school_name && <p className="gq-field-err">{errors.school_name}</p>}
+                  </div>
+
+                  <div className="gq-form-group">
+                    <label className="gq-form-label" htmlFor="address">
+                      School Address / State *
+                    </label>
+                    <div className="gq-input-wrap">
+                      <span className="gq-input-icon">
+                        <i className="bi bi-geo-alt" />
+                      </span>
+                      <input
+                        id="address"
+                        type="text"
+                        className="gq-auth-input"
+                        placeholder="e.g. Badagry, Lagos State"
+                        value={form.address}
+                        onChange={(e) => set("address", e.target.value)}
+                        required
+                      />
+                    </div>
+                    {errors.address && <p className="gq-field-err">{errors.address}</p>}
+                  </div>
+
+                  <button
+                    type="button"
+                    className="gq-auth-btn-submit"
+                    disabled={!step1Valid}
+                    onClick={() => setStep(2)}
+                  >
+                    Continue to Admin Setup
+                    <svg width="15" height="15" viewBox="0 0 14 14" fill="none">
+                      <path d="M1 7h12M7 1l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+
+              {/* ── STEP 2: ADMINISTRATOR ACCOUNT ── */}
+              {step === 2 && (
+                <div>
+                  <h2 className="gq-form-title">Create Admin Credentials</h2>
+                  <p className="gq-form-subtitle">These details will be your primary login as the school proprietor / principal.</p>
+
+                  <div className="row g-2 mb-3">
+                    <div className="col-6">
+                      <label className="gq-form-label" htmlFor="firstname">First Name *</label>
+                      <input
+                        id="firstname"
+                        type="text"
+                        className="gq-auth-input"
+                        style={{ paddingLeft: 14 }}
+                        placeholder="e.g. Samuel"
+                        value={form.firstname}
+                        onChange={(e) => set("firstname", e.target.value)}
+                        required
+                      />
+                      {errors.firstname && <p className="gq-field-err">{errors.firstname}</p>}
+                    </div>
+                    <div className="col-6">
+                      <label className="gq-form-label" htmlFor="surname">Surname *</label>
+                      <input
+                        id="surname"
+                        type="text"
+                        className="gq-auth-input"
+                        style={{ paddingLeft: 14 }}
+                        placeholder="e.g. Adeyemi"
+                        value={form.surname}
+                        onChange={(e) => set("surname", e.target.value)}
+                        required
+                      />
+                      {errors.surname && <p className="gq-field-err">{errors.surname}</p>}
+                    </div>
+                  </div>
+
+                  <div className="gq-form-group">
+                    <label className="gq-form-label" htmlFor="phone">Phone Number *</label>
+                    <div className="gq-input-wrap">
+                      <span className="gq-input-icon"><i className="bi bi-telephone" /></span>
+                      <input
+                        id="phone"
+                        type="tel"
+                        className="gq-auth-input"
+                        placeholder="08012345678"
+                        value={form.phone}
+                        onChange={(e) => set("phone", e.target.value)}
+                        required
+                      />
+                    </div>
+                    {errors.phone && <p className="gq-field-err">{errors.phone}</p>}
+                  </div>
+
+                  <div className="gq-form-group">
+                    <label className="gq-form-label" htmlFor="email">Email Address (Optional)</label>
+                    <div className="gq-input-wrap">
+                      <span className="gq-input-icon"><i className="bi bi-envelope" /></span>
+                      <input
+                        id="email"
+                        type="email"
+                        className="gq-auth-input"
+                        placeholder="proprietor@school.com"
+                        value={form.email || ""}
+                        onChange={(e) => set("email", e.target.value)}
+                      />
+                    </div>
+                    {errors.email && <p className="gq-field-err">{errors.email}</p>}
+                  </div>
+
+                  <div className="gq-form-group">
+                    <label className="gq-form-label" htmlFor="password">Password (Min 8 characters) *</label>
+                    <div className="gq-input-wrap">
+                      <span className="gq-input-icon"><i className="bi bi-lock" /></span>
+                      <input
+                        id="password"
+                        type={showPw ? "text" : "password"}
+                        className="gq-auth-input"
+                        placeholder="Create strong password"
+                        value={form.password}
+                        onChange={(e) => set("password", e.target.value)}
+                        style={{ paddingRight: 40 }}
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="gq-btn-eye"
+                        onClick={() => setShowPw(!showPw)}
+                      >
+                        <i className={showPw ? "bi bi-eye-slash" : "bi bi-eye"} />
+                      </button>
+                    </div>
+                    {form.password && (
+                      <div className="gq-strength-bar-wrap">
+                        <div className="gq-strength-track">
+                          <div
+                            className="gq-strength-fill"
+                            style={{
+                              width: `${(strength.score / 4) * 100}%`,
+                              backgroundColor: strength.color,
+                            }}
+                          />
+                        </div>
+                        <span className="gq-strength-label" style={{ color: strength.color }}>
+                          {strength.label}
+                        </span>
+                      </div>
+                    )}
+                    {errors.password && <p className="gq-field-err">{errors.password}</p>}
+                  </div>
+
+                  <div className="gq-form-group">
+                    <label className="gq-form-label" htmlFor="password_confirmation">Confirm Password *</label>
+                    <div className="gq-input-wrap">
+                      <span className="gq-input-icon"><i className="bi bi-lock-fill" /></span>
+                      <input
+                        id="password_confirmation"
+                        type={showPw2 ? "text" : "password"}
+                        className="gq-auth-input"
+                        placeholder="Repeat your password"
+                        value={form.password_confirmation}
+                        onChange={(e) => set("password_confirmation", e.target.value)}
+                        style={{ paddingRight: 40 }}
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="gq-btn-eye"
+                        onClick={() => setShowPw2(!showPw2)}
+                      >
+                        <i className={showPw2 ? "bi bi-eye-slash" : "bi bi-eye"} />
+                      </button>
+                    </div>
+                    {form.password_confirmation && form.password !== form.password_confirmation && (
+                      <p className="gq-field-err">Passwords do not match</p>
+                    )}
+                  </div>
+
+                  <div className="d-flex gap-2 mt-3">
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary"
+                      style={{ borderRadius: 10, padding: "0 18px", fontWeight: 700 }}
+                      onClick={() => setStep(1)}
+                    >
+                      ← Back
+                    </button>
+                    <button
+                      type="submit"
+                      className="gq-auth-btn-submit flex-grow-1"
+                      style={{ marginTop: 0 }}
+                      disabled={!canSubmit || submitting}
+                    >
+                      {submitting ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
+                          Creating School...
+                        </>
+                      ) : (
+                        <>
+                          Complete Registration
+                          <svg width="15" height="15" viewBox="0 0 14 14" fill="none">
+                            <path d="M1 7h12M7 1l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </form>
+
+            {/* Login Footer */}
+            <div className="gq-auth-footer-links">
+              Already have an active school account?{" "}
+              <Link to="/login">Sign In Here</Link>
+              <div style={{ marginTop: 6, fontSize: "12px" }}>
+                Looking to represent GradiosEdu in your state?{" "}
+                <Link to="/sales-representative/register">Join as Sales Partner</Link>
+              </div>
+            </div>
           </div>
+        </div>
+      </div>
     </>
   );
 }

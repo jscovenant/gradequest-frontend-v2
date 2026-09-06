@@ -323,28 +323,23 @@ export default function FeeStructurePage() {
     <>
       {/* Template-style inline CSS (matches your AdminDashboard aesthetic) */}
       <style>{`
+        /* ======= FeeStructurePage - Modern SaaS style ======= */
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
         .db-main {
-          background: var(--bs-body-bg, #f5f1eb);
+          background: #F8FAFC;
           min-height: 100vh;
-          font-family: "DM Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-          padding: 28px 28px 0;
+          font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+          padding: 24px 28px 0;
         }
 
         .db-hero {
-          background: #0f172a;
-          border-radius: var(--bs-border-radius-lg, 16px);
+          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
+          border-radius: 18px;
           padding: 32px 36px;
           position: relative;
           overflow: hidden;
-          margin-bottom: 20px;
-        }
-        .db-hero::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background-image: radial-gradient(circle, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
-          background-size: 24px 24px;
-          pointer-events: none;
+          margin-bottom: 24px;
+          box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
         }
         .db-hero-glow {
           position: absolute;
@@ -353,7 +348,7 @@ export default function FeeStructurePage() {
           width: 320px;
           height: 320px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(201, 168, 76, 0.1) 0%, transparent 65%);
+          background: radial-gradient(circle, rgba(217, 119, 6, 0.15) 0%, transparent 65%);
           pointer-events: none;
         }
         .db-hero-glow2 {
@@ -363,7 +358,7 @@ export default function FeeStructurePage() {
           width: 200px;
           height: 200px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(99, 102, 241, 0.07) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(37, 99, 235, 0.10) 0%, transparent 70%);
           pointer-events: none;
         }
         .db-hero-inner {
@@ -380,22 +375,22 @@ export default function FeeStructurePage() {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          font-size: 11px;
-          font-weight: 500;
-          letter-spacing: 0.12em;
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
           text-transform: uppercase;
-          color: #e8c97a;
-          background: rgba(201, 168, 76, 0.1);
-          border: 1px solid rgba(201, 168, 76, 0.2);
+          color: #FBBF24;
+          background: rgba(217, 119, 6, 0.20);
+          border: 1px solid rgba(217, 119, 6, 0.35);
           border-radius: 100px;
           padding: 4px 12px;
-          margin-bottom: 14px;
+          margin-bottom: 12px;
         }
         .db-session-dot {
           width: 6px;
           height: 6px;
           border-radius: 50%;
-          background: #22c55e;
+          background: #10B981;
           animation: dbPulse 2s ease infinite;
         }
         @keyframes dbPulse {
@@ -404,22 +399,20 @@ export default function FeeStructurePage() {
         }
 
         .db-greeting {
-          font-family: "Lora", Georgia, serif;
-          font-size: clamp(22px, 2.5vw, 32px);
-          font-weight: 700;
+          font-size: 26px;
+          font-weight: 800;
           color: #fff;
           line-height: 1.1;
           margin-bottom: 8px;
         }
-        .db-greeting em { font-style: italic; color: #e8c97a; }
+        .db-greeting em { font-style: normal; color: #FBBF24; }
 
         .db-hero-sub {
           font-size: 13.5px;
-          font-weight: 300;
-          color: #64748b;
-          line-height: 1.65;
-          max-width: 520px;
-          margin-bottom: 16px;
+          color: #CBD5E1;
+          line-height: 1.6;
+          max-width: 560px;
+          margin-bottom: 20px;
         }
 
         .db-hero-btns {
@@ -432,58 +425,52 @@ export default function FeeStructurePage() {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          padding: 10px 18px;
-          font-family: "DM Sans", sans-serif;
+          padding: 9px 18px;
           font-size: 13px;
-          font-weight: 500;
-          color: #0f172a;
-          background: #c9a84c;
+          font-weight: 700;
+          color: #FFFFFF;
+          background: #D97706;
           border: none;
-          border-radius: var(--bs-border-radius, 8px);
+          border-radius: 10px;
           cursor: pointer;
-          transition: background 0.2s, transform 0.2s;
+          transition: all 0.2s ease;
           text-decoration: none;
           white-space: nowrap;
         }
-        .db-btn-gold:hover { background: #e8c97a; transform: translateY(-1px); }
+        .db-btn-gold:hover { background: #B45309; transform: translateY(-1px); color: #FFFFFF; }
         .db-btn-gold:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 
         .db-btn-outline {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          padding: 10px 18px;
-          font-family: "DM Sans", sans-serif;
+          padding: 9px 18px;
           font-size: 13px;
-          font-weight: 400;
-          color: rgba(255, 255, 255, 0.7);
-          background: transparent;
-          border: 1px solid rgba(255, 255, 255, 0.14);
-          border-radius: var(--bs-border-radius, 8px);
+          font-weight: 600;
+          color: #FFFFFF;
+          background: rgba(255, 255, 255, 0.10);
+          border: 1px solid rgba(255, 255, 255, 0.20);
+          border-radius: 10px;
           cursor: pointer;
-          transition: background 0.2s, border-color 0.2s, color 0.2s;
+          transition: all 0.2s ease;
           white-space: nowrap;
         }
-        .db-btn-outline:hover { background: rgba(255, 255, 255, 0.06); color: #fff; border-color: rgba(255, 255, 255, 0.28); }
+        .db-btn-outline:hover { background: rgba(255, 255, 255, 0.18); color: #fff; }
         .db-btn-outline:disabled { opacity: 0.55; cursor: not-allowed; }
 
         .db-hero-stat-card {
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.09);
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.15);
           backdrop-filter: blur(8px);
-          border-radius: var(--bs-border-radius, 12px);
+          border-radius: 14px;
           padding: 20px 24px;
           min-width: 260px;
         }
         .db-hero-stat-row { display: flex; flex-direction: column; gap: 10px; }
         .db-hero-stat-item { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-        .db-hero-stat-label { font-size: 12px; font-weight: 300; color: #64748b; }
-        .db-hero-stat-val {
-          font-family: "Lora", serif;
-          font-size: 18px;
-          font-weight: 700;
-          color: #fff;
-        }
+        .db-hero-stat-label { font-size: 12px; font-weight: 400; color: #CBD5E1; }
+        .db-hero-stat-val { font-size: 18px; font-weight: 800; color: #FBBF24; }
+        
         .db-hero-stat-sep { height: 1px; background: rgba(255, 255, 255, 0.06); }
 
         .db-grid {

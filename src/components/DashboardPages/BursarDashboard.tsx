@@ -156,6 +156,16 @@ export default function BursarDashboard() {
   const [academicSession, setAcademicSession] = useState("");
   const [currentTerm, setCurrentTerm] = useState("");
   const [loading, setLoading] = useState(true);
+  const [aiCredits, setAiCredits] = useState<{
+    remaining_credits: number;
+    is_plus_active?: boolean;
+    user_allocation?: {
+      allocated_credits: number;
+      used_credits: number;
+      remaining_credits: number;
+      is_unlimited: boolean;
+    } | null;
+  } | null>(null);
 
   const [stats, setStats] = useState<FinanceStat[]>([
     { title: "Total Billed", value: naira(0), icon: "billed" },
@@ -232,6 +242,7 @@ export default function BursarDashboard() {
       fetchBankDetails(),
     ])
       .then(([sess, summary, breakdown]) => {
+        authApi.get("/admin/ai/credits").then((r) => setAiCredits(r.data?.data || null)).catch(() => undefined);
         setAcademicSession(sess.data.session || "");
         setCurrentTerm(sess.data.term || "");
 
@@ -328,50 +339,44 @@ export default function BursarDashboard() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
         :root {
-          --db-light:    var(--bs-light,     #fcf8f8);
-          --db-dark:     var(--bs-dark,      #050008);
-          --db-accent:   var(--bs-secondary, rgb(255,200,87));
-          --db-magenta:  var(--bs-primary,   rgb(211,0,176));
-          --db-success:  var(--bs-success,   rgb(34,197,94));
-          --db-danger:   var(--bs-danger,    rgb(239,68,68));
-          --db-border:   var(--bs-border-color, #ede8e0);
-          --db-radius:   var(--bs-border-radius-lg, 14px);
+          --db-light:    #F8FAFC;
+          --db-dark:     #0F2744;
+          --db-accent:   #D97706;
+          --db-magenta:  #0F2744;
+          --db-success:  #10B981;
+          --db-danger:   #EF4444;
+          --db-border:   #E2E8F0;
+          --db-radius:   16px;
 
-          --db-accent-dim:    rgba(255,200,87,0.10);
-          --db-accent-border: rgba(255,200,87,0.22);
+          --db-accent-dim:    rgba(217,119,6,0.10);
+          --db-accent-border: rgba(217,119,6,0.22);
         }
 
         .db-main {
           background: var(--db-light);
           min-height: 100vh;
-          font-family: 'DM Sans', sans-serif;
-          padding: 28px 28px 0;
+          font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+          padding: 24px 28px 0;
         }
 
         .db-hero {
-          background: var(--db-dark);
+          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
           border-radius: var(--db-radius);
           padding: 32px 36px;
           position: relative;
           overflow: hidden;
-          margin-bottom: 28px;
-        }
-        .db-hero::before {
-          content: '';
-          position: absolute; inset: 0;
-          background-image: radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px);
-          background-size: 24px 24px;
-          pointer-events: none;
+          margin-bottom: 24px;
+          box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
         }
         .db-hero-glow {
           position: absolute;
           top: -60px; right: -60px;
           width: 320px; height: 320px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(255,200,87,0.10) 0%, transparent 65%);
+          background: radial-gradient(circle, rgba(217,119,6,0.15) 0%, transparent 65%);
           pointer-events: none;
         }
         .db-hero-glow2 {
@@ -379,7 +384,7 @@ export default function BursarDashboard() {
           bottom: -40px; left: 30%;
           width: 200px; height: 200px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(211,0,176,0.06) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(37,99,235,0.10) 0%, transparent 70%);
           pointer-events: none;
         }
         .db-hero-inner {
@@ -394,16 +399,16 @@ export default function BursarDashboard() {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          font-size: 11px;
-          font-weight: 500;
-          letter-spacing: 0.12em;
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
           text-transform: uppercase;
-          color: var(--db-accent);
-          background: rgba(255,200,87,0.10);
-          border: 1px solid rgba(255,200,87,0.22);
+          color: #FBBF24;
+          background: rgba(217,119,6,0.20);
+          border: 1px solid rgba(217,119,6,0.35);
           border-radius: 100px;
           padding: 4px 12px;
-          margin-bottom: 14px;
+          margin-bottom: 12px;
         }
         .db-session-dot {
           width: 6px; height: 6px;
@@ -416,54 +421,52 @@ export default function BursarDashboard() {
           50% { opacity: .4; transform: scale(1.5); }
         }
         .db-greeting {
-          font-family: 'Playfair Display', Georgia, serif;
-          font-size: clamp(22px, 2.5vw, 32px);
-          font-weight: 900;
+          font-size: 26px;
+          font-weight: 800;
           color: #fff;
           line-height: 1.1;
           margin-bottom: 8px;
         }
-        .db-greeting em { font-style: italic; color: var(--db-magenta); }
+        .db-greeting em { font-style: normal; color: #FBBF24; }
         .db-hero-sub {
           font-size: 13.5px;
-          font-weight: 300;
-          color: rgba(255,255,255,0.38);
-          line-height: 1.65;
+          color: #CBD5E1;
+          line-height: 1.6;
           max-width: 520px;
-          margin-bottom: 24px;
+          margin-bottom: 20px;
         }
 
         .db-btn-gold, .db-btn-outline {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          padding: 10px 20px;
+          padding: 9px 18px;
           font-size: 13px;
-          border-radius: var(--db-radius);
+          font-weight: 700;
+          border-radius: 10px;
           cursor: pointer;
           white-space: nowrap;
-          transition: .2s ease;
+          transition: all .2s ease;
         }
         .db-btn-gold {
-          color: var(--db-dark);
+          color: #FFFFFF;
           background: var(--db-accent);
           border: none;
         }
-        .db-btn-gold:hover { background: #ffe0a0; transform: translateY(-1px); }
+        .db-btn-gold:hover { background: #B45309; transform: translateY(-1px); }
         .db-btn-outline {
-          color: rgba(255,255,255,0.7);
-          background: transparent;
-          border: 1px solid rgba(255,255,255,0.14);
+          color: #FFFFFF;
+          background: rgba(255,255,255,0.10);
+          border: 1px solid rgba(255,255,255,0.20);
         }
         .db-btn-outline:hover {
-          background: rgba(255,255,255,0.06);
+          background: rgba(255,255,255,0.18);
           color: #fff;
-          border-color: rgba(255,255,255,0.28);
         }
 
         .db-hero-stat-card {
-          background: rgba(255,255,255,0.05);
-          border: 1px solid rgba(255,255,255,0.09);
+          background: rgba(255,255,255,0.08);
+          border: 1px solid rgba(255,255,255,0.15);
           backdrop-filter: blur(8px);
           border-radius: var(--db-radius);
           padding: 20px 24px;
@@ -475,14 +478,13 @@ export default function BursarDashboard() {
           align-items: center;
           gap: 16px;
         }
-        .db-hero-stat-label { font-size: 12px; font-weight: 300; color: rgba(255,255,255,0.28); }
+        .db-hero-stat-label { font-size: 12px; font-weight: 400; color: #CBD5E1; }
         .db-hero-stat-val {
-          font-family: 'Playfair Display', serif;
           font-size: 18px;
-          font-weight: 700;
-          color: var(--db-accent);
+          font-weight: 800;
+          color: #FBBF24;
         }
-        .db-hero-stat-sep { height: 1px; background: rgba(255,255,255,0.06); }
+        .db-hero-stat-sep { height: 1px; background: rgba(255,255,255,0.08); }
 
         .db-stats {
           display: grid;
@@ -825,6 +827,15 @@ export default function BursarDashboard() {
                       </svg>
                       View Fee Records
                     </button>
+
+                    <button className="db-btn-outline" onClick={() => navigate("/fees/ai-collection")}>
+                      <i className="bi bi-robot me-1 text-warning" />
+                      AI Fee Assistant
+                    </button>
+                    <button className="db-btn-outline" onClick={() => navigate("/settings/ai-credits")}>
+                      <i className="bi bi-stars me-1 text-warning" />
+                      AI Credits
+                    </button>
                   </div>
                 </div>
 
@@ -845,9 +856,18 @@ export default function BursarDashboard() {
                       <span className="db-hero-stat-val">{summaryMeta.owing_students_count}</span>
                     </div>
                     <div className="db-hero-stat-sep" />
-                    <div className="db-hero-stat-item">
-                      <span className="db-hero-stat-label">Student fee accounts</span>
-                      <span className="db-hero-stat-val">{totalFinanceUsers}</span>
+                    <div
+                      className="db-hero-stat-item"
+                      style={{ cursor: "pointer" }}
+                      onClick={() => navigate("/settings/ai-credits")}
+                      title="View AI Allowance"
+                    >
+                      <span className="db-hero-stat-label">AI Allowance</span>
+                      <span className="db-hero-stat-val" style={{ color: "var(--db-accent)", fontSize: "13px" }}>
+                        {aiCredits?.is_plus_active
+                          ? (aiCredits.user_allocation?.is_unlimited ? "Unlimited" : `${aiCredits.user_allocation?.remaining_credits ?? aiCredits.remaining_credits ?? 0} credits`)
+                          : "Plus Required"}
+                      </span>
                     </div>
                   </div>
                 </div>

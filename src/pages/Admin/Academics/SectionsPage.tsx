@@ -268,35 +268,26 @@ export default function SectionsPage() {
     }
   }
 
-  /* =========================
-     TEMPLATE STYLES (inline)
-  ========================= */
   return (
     <>
       <style>{`
-        /* ======= SectionsPage - AdminDashboard template style ======= */
+        /* ======= SectionsPage - Modern SaaS style ======= */
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
         .db-main {
-          background: var(--bs-body-bg, #f5f1eb);
+          background: #F8FAFC;
           min-height: 100vh;
-          font-family: "DM Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-          padding: 28px 28px 0;
+          font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+          padding: 24px 28px 0;
         }
 
         .db-hero {
-          background: #0f172a;
-          border-radius: 16px;
+          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
+          border-radius: 18px;
           padding: 32px 36px;
           position: relative;
           overflow: hidden;
-          margin-bottom: 22px;
-        }
-        .db-hero::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background-image: radial-gradient(circle, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
-          background-size: 24px 24px;
-          pointer-events: none;
+          margin-bottom: 24px;
+          box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
         }
         .db-hero-glow {
           position: absolute;
@@ -305,7 +296,7 @@ export default function SectionsPage() {
           width: 320px;
           height: 320px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(16, 185, 129, 0.10) 0%, transparent 65%);
+          background: radial-gradient(circle, rgba(217, 119, 6, 0.15) 0%, transparent 65%);
           pointer-events: none;
         }
         .db-hero-glow2 {
@@ -315,7 +306,7 @@ export default function SectionsPage() {
           width: 220px;
           height: 220px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(99, 102, 241, 0.08) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(37, 99, 235, 0.10) 0%, transparent 70%);
           pointer-events: none;
         }
         .db-hero-inner {
@@ -332,22 +323,22 @@ export default function SectionsPage() {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          font-size: 11px;
-          font-weight: 500;
-          letter-spacing: 0.12em;
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
           text-transform: uppercase;
-          color: #86efac;
-          background: rgba(16, 185, 129, 0.10);
-          border: 1px solid rgba(16, 185, 129, 0.20);
+          color: #FBBF24;
+          background: rgba(217, 119, 6, 0.20);
+          border: 1px solid rgba(217, 119, 6, 0.35);
           border-radius: 100px;
           padding: 4px 12px;
-          margin-bottom: 14px;
+          margin-bottom: 12px;
         }
         .db-session-dot {
           width: 6px;
           height: 6px;
           border-radius: 50%;
-          background: #22c55e;
+          background: #10B981;
           animation: dbPulse 2s ease infinite;
         }
         @keyframes dbPulse {
@@ -356,103 +347,99 @@ export default function SectionsPage() {
         }
 
         .db-greeting {
-          font-family: "Lora", Georgia, serif;
-          font-size: clamp(22px, 2.5vw, 32px);
-          font-weight: 700;
+          font-size: 26px;
+          font-weight: 800;
           color: #fff;
           line-height: 1.1;
           margin-bottom: 8px;
         }
-        .db-greeting em { font-style: italic; color: #86efac; }
+        .db-greeting em { font-style: normal; color: #FBBF24; }
 
         .db-hero-sub {
           font-size: 13.5px;
-          font-weight: 300;
-          color: #64748b;
-          line-height: 1.65;
+          color: #CBD5E1;
+          line-height: 1.6;
           max-width: 720px;
-          margin-bottom: 18px;
+          margin-bottom: 20px;
         }
 
         .db-hero-btns { display:flex; gap:10px; flex-wrap:wrap; }
 
-        .db-btn-green {
+        .db-btn-green, .db-btn-gold {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          padding: 10px 18px;
+          padding: 9px 18px;
           font-size: 13px;
           font-weight: 700;
-          color: #052e1b;
-          background: #22c55e;
+          color: #FFFFFF;
+          background: #D97706;
           border: none;
           border-radius: 10px;
           cursor: pointer;
-          transition: background 0.2s, transform 0.2s;
+          transition: all 0.2s ease;
           white-space: nowrap;
         }
-        .db-btn-green:hover { background: #86efac; transform: translateY(-1px); }
-        .db-btn-green:disabled { opacity: .55; cursor:not-allowed; transform:none; }
+        .db-btn-green:hover, .db-btn-gold:hover { background: #B45309; transform: translateY(-1px); color: #FFFFFF; }
 
         .db-btn-outline {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          padding: 10px 18px;
+          padding: 9px 18px;
           font-size: 13px;
-          font-weight: 500;
-          color: rgba(255, 255, 255, 0.75);
-          background: transparent;
-          border: 1px solid rgba(255, 255, 255, 0.14);
+          font-weight: 600;
+          color: #FFFFFF;
+          background: rgba(255, 255, 255, 0.10);
+          border: 1px solid rgba(255, 255, 255, 0.20);
           border-radius: 10px;
           cursor: pointer;
-          transition: background 0.2s, border-color 0.2s, color 0.2s;
+          transition: all 0.2s ease;
           white-space: nowrap;
         }
-        .db-btn-outline:hover { background: rgba(255, 255, 255, 0.06); color: #fff; border-color: rgba(255, 255, 255, 0.28); }
-        .db-btn-outline:disabled { opacity: .55; cursor:not-allowed; }
+        .db-btn-outline:hover { background: rgba(255, 255, 255, 0.18); color: #fff; }
 
         .db-hero-stat-card {
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.09);
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.15);
           backdrop-filter: blur(8px);
-          border-radius: 12px;
+          border-radius: 14px;
           padding: 20px 24px;
           min-width: 260px;
         }
         .db-hero-stat-row { display:flex; flex-direction:column; gap:10px; }
         .db-hero-stat-item { display:flex; justify-content:space-between; align-items:center; gap:16px; }
-        .db-hero-stat-label { font-size: 12px; font-weight: 300; color: #64748b; }
-        .db-hero-stat-val { font-family: "Lora", serif; font-size: 18px; font-weight: 700; color: #fff; }
-        .db-hero-stat-sep { height: 1px; background: rgba(255, 255, 255, 0.06); }
+        .db-hero-stat-label { font-size: 12px; font-weight: 400; color: #CBD5E1; }
+        .db-hero-stat-val { font-size: 18px; font-weight: 800; color: #FBBF24; }
+        .db-hero-stat-sep { height: 1px; background: rgba(255, 255, 255, 0.08); }
 
         .db-panel {
           background: #fff;
-          border: 1px solid #ede8e0;
-          border-radius: 14px;
+          border: 1px solid #E2E8F0;
+          border-radius: 16px;
           overflow: hidden;
           margin-bottom: 24px;
+          box-shadow: 0 4px 16px rgba(15,39,68,0.03);
         }
         .db-panel-head {
           display:flex;
           align-items:center;
           justify-content: space-between;
           padding: 18px 20px 16px;
-          border-bottom: 1px solid rgba(0,0,0,0.06);
+          border-bottom: 1px solid #F1F5F9;
           gap: 12px;
           flex-wrap: wrap;
         }
         .db-panel-title {
-          font-family: "Lora", serif;
           font-size: 16px;
           font-weight: 700;
-          color: #1a1a2e;
+          color: #0F2744;
           margin: 0;
         }
         .db-panel-sub {
           font-size: 11.5px;
-          font-weight: 300;
-          color: #9a8a7a;
+          font-weight: 400;
+          color: #64748B;
           margin: 0;
         }
         .db-toolbar { display:flex; align-items:center; gap: 10px; flex-wrap: wrap; }
@@ -460,19 +447,19 @@ export default function SectionsPage() {
           display:flex;
           align-items:center;
           gap: 8px;
-          padding: 10px 12px;
-          background: #faf8f5;
-          border: 1px solid #e5ddd3;
-          border-radius: 12px;
-          min-width: 280px;
+          padding: 8px 12px;
+          background: #F8FAFC;
+          border: 1px solid #E2E8F0;
+          border-radius: 10px;
+          min-width: 260px;
         }
         .db-input input {
           border: none;
           outline: none;
           background: transparent;
           width: 100%;
-          font-size: 13.5px;
-          color: #1a1a2e;
+          font-size: 13px;
+          color: #0F2744;
         }
 
         .db-chip-btn {
@@ -481,16 +468,16 @@ export default function SectionsPage() {
           gap: 6px;
           padding: 8px 12px;
           font-size: 12.5px;
-          font-weight: 800;
-          color: #7a6a5a;
-          background: #f5f1eb;
-          border: 1px solid #e5ddd3;
+          font-weight: 700;
+          color: #0F2744;
+          background: #F8FAFC;
+          border: 1px solid #E2E8F0;
           border-radius: 10px;
           cursor: pointer;
-          transition: background .2s, color .2s, transform .2s;
+          transition: all .2s ease;
           white-space: nowrap;
         }
-        .db-chip-btn:hover:not(:disabled) { background:#ede8e0; color:#1a1a2e; transform: translateY(-1px); }
+        .db-chip-btn:hover:not(:disabled) { background:#E2E8F0; color:#0F2744; transform: translateY(-1px); }
         .db-chip-btn:disabled { opacity: .5; cursor: not-allowed; }
 
         .db-table { width: 100%; border-collapse: collapse; }
@@ -500,9 +487,9 @@ export default function SectionsPage() {
           font-weight: 600;
           letter-spacing: 0.10em;
           text-transform: uppercase;
-          color: #9a8a7a;
-          background: #faf8f5;
-          border-bottom: 1px solid rgba(0,0,0,0.06);
+          color: #64748B;
+          background: #F8FAFC;
+          border-bottom: 1px solid #E2E8F0;
           text-align: left;
           white-space: nowrap;
         }
@@ -510,12 +497,12 @@ export default function SectionsPage() {
         .db-table td {
           padding: 13px 16px;
           font-size: 13.5px;
-          color: #4a4a5a;
-          border-bottom: 1px solid rgba(0,0,0,0.06);
+          color: #334155;
+          border-bottom: 1px solid #F1F5F9;
           vertical-align: middle;
         }
         .db-table tbody tr { transition: background 0.15s; }
-        .db-table tbody tr:hover { background: #faf8f5; }
+        .db-table tbody tr:hover { background: #F8FAFC; }
         .db-table tbody tr:last-child td { border-bottom: none; }
 
         .db-actions { display:inline-flex; justify-content:flex-end; gap: 8px; flex-wrap: wrap; }

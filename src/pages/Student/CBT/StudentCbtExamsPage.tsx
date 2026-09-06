@@ -378,16 +378,74 @@ export default function StudentCbtExamsPage() {
   return (
     <>
       <style>{`
-        .scbt-main{min-height:100vh;background:#f8fafc;margin-left:280px;width:calc(100% - 280px);padding:96px 26px 32px}
-        .scbt-shell{max-width:1180px;margin:0 auto}.scbt-hero{background:linear-gradient(135deg,#171222,#3c1237);color:#fff;border-radius:18px;padding:26px}.scbt-hero h1{font-family:'Playfair Display',serif;font-weight:900;margin:4px 0 8px;font-size:clamp(28px,4vw,42px)}.scbt-hero p{margin:0;color:rgba(255,255,255,.76);line-height:1.7}
-        .scbt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:16px}.scbt-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 12px 30px rgba(15,23,42,.06);padding:18px}.scbt-title{font-size:18px;font-weight:900;color:#111827;margin:0}.scbt-sub{color:#64748b;font-size:13px;margin:6px 0 0}.scbt-meta{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.scbt-pill{display:inline-flex;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:900;background:#eef2ff;color:#3730a3}.scbt-btn{border:0;border-radius:10px;padding:10px 14px;font-weight:900;background:var(--bs-primary,#d300b0);color:#fff}.scbt-btn-soft{background:#f1f5f9;color:#0f172a}.scbt-attempt{background:#ecfeff;border:1px solid #a5f3fc;color:#155e75;border-radius:14px;padding:14px;margin-top:16px;font-weight:800;overflow:auto}
-        .scbt-paper{margin-top:16px;background:#fff;border:1px solid #e5e7eb;border-radius:18px;box-shadow:0 12px 30px rgba(15,23,42,.06);overflow:hidden;user-select:none}.scbt-paper-head{padding:20px 22px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;gap:14px;align-items:flex-start}.scbt-paper-head h2{font-size:24px;font-weight:900;margin:0;color:#111827}.scbt-paper-body{padding:20px 22px}.scbt-instruction{background:#fff7ed;border:1px solid #fed7aa;color:#7c2d12;border-radius:14px;padding:14px;margin-bottom:16px}.scbt-warning{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:14px;padding:12px 14px;margin-bottom:16px;font-weight:800}.scbt-security{display:flex;align-items:flex-start;gap:10px;background:#f8fafc;border:1px solid #dbe3ef;color:#334155;border-radius:14px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.55}.scbt-security strong{display:block;color:#0f172a}.scbt-qnav{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:8px;margin-bottom:16px}.scbt-qnav button{height:38px;border:1px solid #dbe3ef;border-radius:10px;background:#fff;font-weight:900;color:#475569}.scbt-qnav button.active{background:#111827;color:#fff}.scbt-qnav button.done{border-color:#22c55e;color:#166534}.scbt-block{border:1px solid #e5e7eb;border-radius:16px;margin-bottom:16px;overflow:hidden}.scbt-block-head{background:#f8fafc;border-bottom:1px solid #e5e7eb;padding:16px}.scbt-block-head h3{font-size:17px;font-weight:900;margin:0;color:#111827}.scbt-passage{white-space:pre-wrap;color:#334155;line-height:1.7;margin-top:10px}.scbt-question{padding:18px}.scbt-question h4{font-size:18px;font-weight:900;color:#111827;margin:12px 0 14px;line-height:1.45}.scbt-option{display:flex;gap:10px;align-items:flex-start;border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin-bottom:10px}.scbt-textarea{width:100%;min-height:110px;border:1px solid #dbe3ef;border-radius:12px;padding:12px;user-select:text}.scbt-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}.scbt-pager{display:flex;justify-content:space-between;gap:12px;align-items:center;border-top:1px solid #eef2f7;padding-top:14px;margin-top:14px}.cbt-html{color:#111827;line-height:1.6}.cbt-html p{margin:0 0 10px}.cbt-html table{width:100%;border-collapse:collapse;margin:10px 0;table-layout:fixed}.cbt-html th,.cbt-html td{border:1px solid #cbd5e1;padding:8px;vertical-align:top}.cbt-html th{background:#f1f5f9;font-weight:900}.cbt-html img{max-width:100%;height:auto;border-radius:10px;border:1px solid #e5e7eb;margin:8px 0}.scbt-option .cbt-html{flex:1}
-        @media(max-width:1199px){.scbt-main{margin-left:0;width:100%;padding:92px 16px 28px}.scbt-paper-head{flex-direction:column}}
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        .scbt-main{min-height:100vh;background:#F8FAFC;padding:calc(var(--gq-topnav-height, 66px) + 24px) 26px 32px;font-family:'Plus Jakarta Sans',system-ui,-apple-system,sans-serif;overflow-x:hidden;max-width:100vw;box-sizing:border-box;}
+        @media(max-width:767.98px){.scbt-main{padding:calc(var(--gq-topnav-height, 66px) + 12px) 12px 28px;}}
+        .scbt-shell{max-width:1180px;margin:0 auto;width:100%;box-sizing:border-box;}
+        .scbt-hero{background:linear-gradient(135deg,#0A192F 0%,#0F2744 60%,#1E3A8A 100%);color:#fff;border-radius:18px;padding:32px 36px;box-shadow:0 10px 30px -5px rgba(15,39,68,0.15);position:relative;overflow:hidden;}
+        @media(max-width:767.98px){.scbt-hero{padding:20px 16px;border-radius:14px;}}
+        .scbt-hero::after{content:"";position:absolute;top:-60px;right:-60px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(217,119,6,0.15) 0%,transparent 65%);pointer-events:none;}
+        .scbt-hero > *{position:relative;z-index:1;}
+        .scbt-hero h1{font-weight:800;margin:4px 0 8px;font-size:26px;color:#fff;}
+        @media(max-width:767.98px){.scbt-hero h1{font-size:20px;}}
+        .scbt-hero p{margin:0;color:#CBD5E1;line-height:1.6;font-size:13.5px;}
+        .scbt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:20px;}
+        @media(max-width:767.98px){.scbt-grid{grid-template-columns:1fr;gap:12px;margin-top:14px;}}
+        .scbt-card{background:#fff;border:1px solid #E2E8F0;border-radius:16px;box-shadow:0 4px 16px rgba(15,39,68,0.03);padding:20px;box-sizing:border-box;}
+        @media(max-width:767.98px){.scbt-card{padding:16px;border-radius:14px;}}
+        .scbt-title{font-size:16px;font-weight:800;color:#0F2744;margin:0;word-break:break-word;}
+        .scbt-sub{color:#64748B;font-size:12.5px;margin:6px 0 0;line-height:1.5;word-break:break-word;}
+        .scbt-meta{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0;}
+        .scbt-pill{display:inline-flex;border-radius:999px;padding:4px 10px;font-size:11.5px;font-weight:700;background:#EEF2FF;color:#3730A3;white-space:normal;word-break:break-word;}
+        .scbt-btn{border:0;border-radius:10px;padding:9px 18px;font-weight:700;font-size:13px;background:#D97706;color:#FFFFFF;cursor:pointer;transition:all .2s ease;display:inline-flex;align-items:center;justify-content:center;}
+        .scbt-btn:hover{background:#B45309;transform:translateY(-1px);color:#FFFFFF;}
+        .scbt-btn-soft{background:#F1F5F9;color:#0F2744;border:1px solid #E2E8F0;}
+        .scbt-attempt{background:#ECFEFF;border:1px solid #A5F3FC;color:#155E75;border-radius:14px;padding:14px;margin-top:16px;font-weight:800;overflow:auto;}
+        .scbt-paper{margin-top:20px;background:#fff;border:1px solid #E2E8F0;border-radius:18px;box-shadow:0 4px 20px rgba(15,39,68,0.04);overflow:hidden;user-select:none;box-sizing:border-box;width:100%;}
+        @media(max-width:767.98px){.scbt-paper{margin-top:14px;border-radius:14px;}}
+        .scbt-paper-head{padding:20px 24px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap;}
+        @media(max-width:767.98px){.scbt-paper-head{padding:14px 16px;flex-direction:column;align-items:stretch;}}
+        .scbt-paper-head h2{font-size:22px;font-weight:800;margin:0;color:#0F2744;word-break:break-word;}
+        @media(max-width:767.98px){.scbt-paper-head h2{font-size:18px;}}
+        .scbt-paper-body{padding:22px 24px;box-sizing:border-box;}
+        @media(max-width:767.98px){.scbt-paper-body{padding:14px 12px;}}
+        .scbt-instruction{background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;border-radius:14px;padding:14px 16px;margin-bottom:16px;font-size:13px;line-height:1.6;word-break:break-word;}
+        .scbt-warning{background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;border-radius:14px;padding:12px 14px;margin-bottom:16px;font-weight:700;font-size:13px;word-break:break-word;}
+        .scbt-security{display:flex;align-items:flex-start;gap:10px;background:#F8FAFC;border:1px solid #E2E8F0;color:#334155;border-radius:14px;padding:12px 14px;margin-bottom:16px;font-size:12.5px;line-height:1.55;word-break:break-word;}
+        .scbt-security strong{display:block;color:#0F2744;font-weight:700;}
+        .scbt-qnav{display:grid;grid-template-columns:repeat(auto-fill,minmax(38px,1fr));gap:6px;margin-bottom:16px;}
+        .scbt-qnav button{height:36px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-weight:700;color:#475569;cursor:pointer;font-size:12.5px;}
+        .scbt-qnav button.active{background:#0F2744;color:#fff;border-color:#0F2744;}
+        .scbt-qnav button.done{border-color:#10B981;color:#166534;background:#DCFCE7;}
+        .scbt-block{border:1px solid #E2E8F0;border-radius:16px;margin-bottom:16px;overflow:hidden;box-sizing:border-box;}
+        .scbt-block-head{background:#F8FAFC;border-bottom:1px solid #E2E8F0;padding:16px;}
+        @media(max-width:767.98px){.scbt-block-head{padding:12px;}}
+        .scbt-block-head h3{font-size:16px;font-weight:800;margin:0;color:#0F2744;word-break:break-word;}
+        .scbt-passage{white-space:pre-wrap;color:#334155;line-height:1.7;margin-top:10px;word-break:break-word;overflow-wrap:break-word;}
+        .scbt-question{padding:18px;box-sizing:border-box;}
+        @media(max-width:767.98px){.scbt-question{padding:14px 10px;}}
+        .scbt-question h4{font-size:16px;font-weight:700;color:#0F2744;margin:12px 0 14px;line-height:1.45;word-break:break-word;}
+        .scbt-option{display:flex;gap:10px;align-items:flex-start;border:1px solid #E2E8F0;border-radius:12px;padding:12px;margin-bottom:10px;cursor:pointer;word-break:break-word;overflow-wrap:break-word;box-sizing:border-box;}
+        @media(max-width:767.98px){.scbt-option{padding:10px 8px;gap:8px;}}
+        .scbt-textarea{width:100%;min-height:110px;border:1px solid #E2E8F0;border-radius:12px;padding:12px;user-select:text;outline:none;box-sizing:border-box;}
+        .scbt-textarea:focus{border-color:#D97706;}
+        .scbt-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;}
+        @media(max-width:767.98px){.scbt-actions{width:100%;}.scbt-actions .scbt-btn{flex:1;}}
+        .scbt-pager{display:flex;justify-content:space-between;gap:12px;align-items:center;border-top:1px solid #E2E8F0;padding-top:14px;margin-top:14px;flex-wrap:wrap;}
+        @media(max-width:767.98px){.scbt-pager{flex-direction:column;align-items:stretch;gap:8px;}.scbt-pager .scbt-btn{width:100%;}}
+        .cbt-html{color:#0F2744;line-height:1.6;word-break:break-word;overflow-wrap:break-word;}
+        .cbt-html p{margin:0 0 10px;}
+        .cbt-html table{width:100%;border-collapse:collapse;margin:10px 0;table-layout:fixed;display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+        .cbt-html th,.cbt-html td{border:1px solid #CBD5E1;padding:8px;vertical-align:top;word-break:break-word;}
+        .cbt-html th{background:#F1F5F9;font-weight:700;}
+        .cbt-html img{max-width:100% !important;height:auto !important;border-radius:10px;border:1px solid #E2E8F0;margin:8px 0;box-sizing:border-box;}
+        .scbt-option .cbt-html{flex:1;min-width:0;}
+        @media(max-width:1199px){.scbt-paper-head{flex-direction:column;align-items:stretch;}}
       `}</style>
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title="My CBT Exams" />
       <PageTitle title="My CBT Exams" />
       <div className="container-fluid"><div className="row"><Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-        <main className="scbt-main">{loading && <Loader message="Loading CBT exams..." />}<div className="scbt-shell">
+        <main className="col-md-9 col-lg-10 ms-auto db-main scbt-main">{loading && <Loader message="Loading CBT exams..." />}<div className="scbt-shell">
           <section className="scbt-hero"><h1>My CBT Exams</h1><p>Start only when your teacher or school tells you to begin. Passages will stay attached to their questions.</p></section>
 
           {!examPaper && (

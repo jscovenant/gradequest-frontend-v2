@@ -22,6 +22,7 @@ type AdminUser = {
   name?: string;
   email?: string;
   phone?: string | null;
+  address?: string | null;
   role?: string | null;
   status?: string | number | null;
   created_at?: string | null;
@@ -77,16 +78,13 @@ function isFreePlanName(name?: string | null) {
 function deriveTierFromSub(sub?: SubscriptionDetails | null): Tier {
   const planName = sub?.plan?.name ?? null;
 
-  // If no subscription or plan is Free => Free tier
   if (!sub || isFreePlanName(planName)) return "free";
 
-  // Premium: active vs expired by ends_at (status may be unreliable)
   const ends = sub.ends_at ? new Date(sub.ends_at) : null;
   if (ends && !Number.isNaN(ends.getTime())) {
     return ends.getTime() >= Date.now() ? "premium_active" : "premium_expired";
   }
 
-  // Premium, no ends_at => treat as active
   return "premium_active";
 }
 
@@ -136,7 +134,7 @@ function badge(status: string) {
 
 export default function AdminUserDetailsPage() {
   const { id } = useParams<{ id: string }>();
-  const { showError } = useToast();
+  const { showSuccess, showError, showToast } = useToast();
   const navigate = useNavigate();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -146,6 +144,47 @@ export default function AdminUserDetailsPage() {
   const [billing, setBilling] = useState<BillingPayload>({ subscription: null, payments: [] });
 
   const [q, setQ] = useState("");
+
+  // Edit profile state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    firstname: "",
+    surname: "",
+    email: "",
+    phone: "",
+    address: "",
+    school_name: "",
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // Password reset state
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [customPassword, setCustomPassword] = useState("");
+  const [passwordResult, setPasswordResult] = useState<string | null>(null);
+  const [resettingPassword, setResettingPassword] = useState(false);
+
+  // Status toggle state
+  const [togglingStatus, setTogglingStatus] = useState(false);
+
+  const loadAdminDetails = () => {
+    if (!id) return;
+    setLoading(true);
+    authApi
+      .get(`/admin-users/view/${id}`)
+      .then((res) => {
+        setAdmin(res.data?.admin || null);
+        setBilling(res.data?.billing || { subscription: null, payments: [] });
+      })
+      .catch((err) => {
+        console.error(err);
+        showError(err?.response?.data?.message || "Failed to load admin details.");
+      })
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadAdminDetails();
+  }, [id]);
 
   const filteredPayments = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -160,29 +199,83 @@ export default function AdminUserDetailsPage() {
     });
   }, [billing.payments, q]);
 
-  useEffect(() => {
-    if (!id) return;
-
-    setLoading(true);
-    authApi
-      .get(`/admin-users/view/${id}`)
-      .then((res) => {
-        setAdmin(res.data?.admin || null);
-        setBilling(res.data?.billing || { subscription: null, payments: [] });
-      })
-      .catch((err) => {
-        console.error(err);
-        showError(err?.response?.data?.message || "Failed to load admin details.");
-      })
-      .finally(() => setLoading(false));
-  }, [id, showError]);
-
   const sub = billing.subscription;
-
-  // ✅ tier + hero labels
   const tier = useMemo(() => deriveTierFromSub(sub), [sub]);
   const isPremium = tier !== "free";
   const isPremiumActive = tier === "premium_active";
+  const isSuspended = admin && String(admin.status) === "0";
+
+  const openEditModal = () => {
+    if (!admin) return;
+    setEditForm({
+      firstname: admin.firstname || "",
+      surname: admin.surname || "",
+      email: admin.email || "",
+      phone: admin.phone || "",
+      address: admin.address || "",
+      school_name: admin.school?.school_name || "",
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!admin) return;
+    setSavingEdit(true);
+    try {
+      const res = await authApi.put(`/admin-users/${admin.id}`, editForm);
+      showSuccess(res.data?.message || "Admin profile updated successfully.");
+      setShowEditModal(false);
+      loadAdminDetails();
+    } catch (err: any) {
+      showError(err?.response?.data?.message || "Failed to update admin profile.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleToggleStatus = async () => {
+    if (!admin) return;
+    const willSuspend = !isSuspended;
+    const msg = willSuspend
+      ? `Suspend and deactivate school admin ${fullName(admin)} (${admin.email})?\n\nAll active logins for this school will be terminated immediately.`
+      : `Reactivate and reinstate school admin ${fullName(admin)} (${admin.email})?`;
+    if (!window.confirm(msg)) return;
+
+    setTogglingStatus(true);
+    try {
+      const res = await authApi.patch(`/admin-users/${admin.id}/toggle-status`, {
+        status: willSuspend ? 0 : 1,
+      });
+      showSuccess(res.data?.message || "Admin status updated.");
+      loadAdminDetails();
+    } catch (err: any) {
+      showError(err?.response?.data?.message || "Failed to update admin status.");
+    } finally {
+      setTogglingStatus(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!admin) return;
+    setResettingPassword(true);
+    try {
+      const payload = customPassword.trim() ? { password: customPassword.trim() } : {};
+      const res = await authApi.post(`/admin-users/${admin.id}/reset-password`, payload);
+      setPasswordResult(res.data?.temporary_password);
+      showSuccess(res.data?.message || "Admin password reset successfully.");
+    } catch (err: any) {
+      showError(err?.response?.data?.message || "Failed to reset admin password.");
+    } finally {
+      setResettingPassword(false);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    showToast("Copied to clipboard!", "success");
+  };
 
   return (
     <>
@@ -200,9 +293,12 @@ export default function AdminUserDetailsPage() {
               className="mt-4 p-4 position-relative overflow-hidden sa-hero"
               style={{
                 borderRadius: 16,
+                background: isSuspended
+                  ? "linear-gradient(135deg, #450a0a 0%, #1e092b 100%)"
+                  : undefined,
               }}
             >
-              <div className="d-flex justify-content-between align-items-start flex-wrap gap-2">
+              <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
                 <div>
                   <div className="d-flex flex-wrap gap-2 align-items-center mb-2">
                     <span
@@ -216,10 +312,23 @@ export default function AdminUserDetailsPage() {
                       }}
                     >
                       <i className="bi bi-person-lines-fill me-1" />
-                      Admin Details
+                      School Admin
                     </span>
 
-                    {/* ✅ Tier chip */}
+                    {/* Account Status Badge */}
+                    <span
+                      className={`badge px-3 py-2 ${isSuspended ? "bg-danger text-white" : "bg-success text-white"}`}
+                      style={{
+                        borderRadius: 999,
+                        fontSize: "0.75rem",
+                        fontWeight: 700,
+                      }}
+                    >
+                      <i className={`bi ${isSuspended ? "bi-shield-x" : "bi-shield-check"} me-1`} />
+                      {isSuspended ? "ACCOUNT SUSPENDED" : "ACCOUNT ACTIVE"}
+                    </span>
+
+                    {/* Tier chip */}
                     <span
                       className={`badge px-3 py-2 ${tierBadge(tier)}`}
                       style={{
@@ -232,7 +341,7 @@ export default function AdminUserDetailsPage() {
                       {tierLabel(tier)}
                     </span>
 
-                    {/* ✅ Premium status chip (active vs expired) */}
+                    {/* Premium status chip */}
                     {isPremium && (
                       <span
                         className="badge px-3 py-2"
@@ -248,29 +357,16 @@ export default function AdminUserDetailsPage() {
                         {isPremiumActive ? "Premium Active" : "Premium Expired"}
                       </span>
                     )}
-
-                    <span
-                      className="badge px-3 py-2"
-                      style={{
-                        backgroundColor: "rgba(255, 255, 255, 0.2)",
-                        color: "#fff",
-                        borderRadius: 999,
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                      }}
-                    >
-                      <i className="bi bi-link-45deg me-1" />
-                      /admin-users/view/{id}
-                    </span>
                   </div>
 
                   <h2 className="fw-bold text-white mb-1">{fullName(admin)}</h2>
                   <p className="text-white mb-0" style={{ opacity: 0.9 }}>
-                    Profile, school, and billing records.
+                    {admin?.school?.school_name ? `${admin.school.school_name} — ` : ""}
+                    Profile, operations, and billing records.
                   </p>
                 </div>
 
-                <div className="d-flex gap-2">
+                <div className="d-flex gap-2 flex-wrap">
                   <button className="btn btn-light btn-sm" style={{ borderRadius: 10, fontWeight: 700 }} onClick={() => navigate(-1)}>
                     <i className="bi bi-arrow-left me-1" />
                     Back
@@ -283,16 +379,87 @@ export default function AdminUserDetailsPage() {
               </div>
             </div>
 
+            {/* SUSPENSION WARNING BANNER */}
+            {isSuspended && (
+              <div className="alert alert-danger mt-3 d-flex align-items-center justify-content-between p-3" style={{ borderRadius: 12 }}>
+                <div className="d-flex align-items-center gap-2">
+                  <i className="bi bi-exclamation-octagon-fill fs-4 text-danger" />
+                  <div>
+                    <strong>This School Admin Account is Currently Suspended</strong>
+                    <div className="small">All school staff, teachers, and student portal logins are blocked from signing in.</div>
+                  </div>
+                </div>
+                <button className="btn btn-success btn-sm fw-bold px-3" onClick={handleToggleStatus} disabled={togglingStatus}>
+                  <i className="bi bi-play-circle me-1" />
+                  Reinstate / Activate Account
+                </button>
+              </div>
+            )}
+
+            {/* SUPER ADMIN OPERATIONS TOOLBAR */}
+            <div className="card border-0 shadow-sm mt-3" style={{ borderRadius: 14, background: "#0f172a", color: "#fff" }}>
+              <div className="card-body p-3 p-md-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div>
+                  <div className="fw-bold text-white fs-6">
+                    <i className="bi bi-sliders text-warning me-2" />
+                    Super-Admin Management Operations
+                  </div>
+                  <div className="text-muted small" style={{ color: "#94a3b8" }}>
+                    Modify personal profile details, reset master credentials, or suspend account access.
+                  </div>
+                </div>
+
+                <div className="d-flex gap-2 flex-wrap">
+                  <button className="btn btn-primary btn-sm px-3" style={{ borderRadius: 8, fontWeight: 700 }} onClick={openEditModal}>
+                    <i className="bi bi-pencil-square me-1" />
+                    Edit Profile
+                  </button>
+
+                  <button
+                    className="btn btn-secondary btn-sm px-3"
+                    style={{ borderRadius: 8, fontWeight: 700 }}
+                    onClick={() => {
+                      setPasswordResult(null);
+                      setCustomPassword("");
+                      setShowPasswordModal(true);
+                    }}
+                  >
+                    <i className="bi bi-key me-1" />
+                    Reset Password
+                  </button>
+
+                  {isSuspended ? (
+                    <button className="btn btn-success btn-sm px-3" style={{ borderRadius: 8, fontWeight: 700 }} onClick={handleToggleStatus} disabled={togglingStatus}>
+                      <i className="bi bi-shield-check me-1" />
+                      {togglingStatus ? "Activating..." : "Reinstate Account"}
+                    </button>
+                  ) : (
+                    <button className="btn btn-danger btn-sm px-3" style={{ borderRadius: 8, fontWeight: 700 }} onClick={handleToggleStatus} disabled={togglingStatus}>
+                      <i className="bi bi-shield-x me-1" />
+                      {togglingStatus ? "Suspending..." : "Suspend Account"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* BODY */}
             <div className="row g-4 my-3">
               {/* Profile */}
               <div className="col-lg-6">
                 <div className="card border-0 shadow-sm h-100" style={{ borderRadius: 12 }}>
                   <div className="card-body p-3 p-md-4">
-                    <div className="fw-semibold mb-1" style={{ color: "#1e293b" }}>
-                      User Profile
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                      <div>
+                        <div className="fw-semibold" style={{ color: "#1e293b" }}>
+                          User Profile
+                        </div>
+                        <div className="text-muted small">Personal account & contact details.</div>
+                      </div>
+                      <button className="btn btn-outline-primary btn-sm" onClick={openEditModal}>
+                        <i className="bi bi-pencil me-1" /> Edit
+                      </button>
                     </div>
-                    <div className="text-muted small mb-3">Basic account details.</div>
 
                     <div className="row g-3">
                       <div className="col-md-6">
@@ -319,20 +486,26 @@ export default function AdminUserDetailsPage() {
                       <div className="col-md-6">
                         <div className="p-3 rounded-3" style={{ background: "#f8fafc" }}>
                           <div className="text-muted small">Status</div>
-                          <div className="fw-bold">{admin?.status ?? "-"}</div>
+                          <div className="fw-bold">
+                            {isSuspended ? (
+                              <span className="text-danger">● Suspended</span>
+                            ) : (
+                              <span className="text-success">● Active</span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
                       <div className="col-md-6">
                         <div className="p-3 rounded-3" style={{ background: "#f8fafc" }}>
                           <div className="text-muted small">User ID</div>
-                          <div className="fw-bold">{admin?.id ?? "-"}</div>
+                          <div className="fw-bold">#{admin?.id ?? "-"}</div>
                         </div>
                       </div>
 
                       <div className="col-md-6">
                         <div className="p-3 rounded-3" style={{ background: "#f8fafc" }}>
-                          <div className="text-muted small">Created</div>
+                          <div className="text-muted small">Registered Date</div>
                           <div className="fw-bold">{fmtDate(admin?.created_at)}</div>
                         </div>
                       </div>
@@ -377,176 +550,118 @@ export default function AdminUserDetailsPage() {
                       <div className="col-md-12">
                         <div className="p-3 rounded-3" style={{ background: "#f8fafc" }}>
                           <div className="text-muted small">Address</div>
-                          <div className="fw-bold">{admin?.school?.address || "—"}</div>
+                          <div className="fw-bold">{admin?.school?.address || admin?.address || "—"}</div>
                         </div>
                       </div>
                     </div>
+                  </div>
+                </div>
+              </div>
 
-                    {!admin?.school && (
-                      <div className="text-muted mt-3">
-                        <i className="bi bi-info-circle me-1" />
-                        No school record attached.
+              {/* Subscription */}
+              <div className="col-12">
+                <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
+                  <div className="card-body p-3 p-md-4">
+                    <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                      <div>
+                        <div className="fw-semibold" style={{ color: "#1e293b" }}>
+                          Subscription Details
+                        </div>
+                        <div className="text-muted small">Current active package and renewal info.</div>
+                      </div>
+                      <span className={`badge ${badge(sub?.status || "Free")} px-3 py-2`} style={{ borderRadius: 999 }}>
+                        {sub?.status || "Free"}
+                      </span>
+                    </div>
+
+                    <div className="row g-3">
+                      <div className="col-md-3">
+                        <div className="p-3 rounded-3" style={{ background: "#f8fafc" }}>
+                          <div className="text-muted small">Plan</div>
+                          <div className="fw-bold">{sub?.plan?.name || "Free"}</div>
+                        </div>
+                      </div>
+
+                      <div className="col-md-3">
+                        <div className="p-3 rounded-3" style={{ background: "#f8fafc" }}>
+                          <div className="text-muted small">Price</div>
+                          <div className="fw-bold">{sub?.plan?.price ? fmtNaira(sub.plan.price) : "—"}</div>
+                        </div>
+                      </div>
+
+                      <div className="col-md-3">
+                        <div className="p-3 rounded-3" style={{ background: "#f8fafc" }}>
+                          <div className="text-muted small">Starts</div>
+                          <div className="fw-bold">{fmtDate(sub?.starts_at)}</div>
+                        </div>
+                      </div>
+
+                      <div className="col-md-3">
+                        <div className="p-3 rounded-3" style={{ background: "#f8fafc" }}>
+                          <div className="text-muted small">Ends</div>
+                          <div className="fw-bold">{sub?.ends_at ? fmtDate(sub?.ends_at) : "Lifetime"}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment History */}
+              <div className="col-12">
+                <div className="card border-0 shadow-sm" style={{ borderRadius: 12 }}>
+                  <div className="card-body p-3 p-md-4">
+                    <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                      <div>
+                        <div className="fw-semibold" style={{ color: "#1e293b" }}>
+                          Billing History
+                        </div>
+                        <div className="text-muted small">All payments made by this school admin.</div>
+                      </div>
+
+                      <input
+                        type="text"
+                        className="form-control form-control-sm"
+                        style={{ maxWidth: 260, borderRadius: 8 }}
+                        placeholder="Search payments..."
+                        value={q}
+                        onChange={(e) => setQ(e.target.value)}
+                      />
+                    </div>
+
+                    {filteredPayments.length === 0 ? (
+                      <div className="text-center py-4 text-muted small">No payment records found.</div>
+                    ) : (
+                      <div className="table-responsive">
+                        <table className="table table-hover align-middle mb-0">
+                          <thead className="table-light small">
+                            <tr>
+                              <th>Reference</th>
+                              <th>Plan</th>
+                              <th>Amount</th>
+                              <th>Channel</th>
+                              <th>Status</th>
+                              <th>Date</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredPayments.map((p) => (
+                              <tr key={p.id}>
+                                <td className="font-monospace small">{p.reference}</td>
+                                <td>{p.plan?.name || "—"}</td>
+                                <td className="fw-bold">{fmtNaira(p.amount)}</td>
+                                <td className="text-uppercase small">{p.channel || "—"}</td>
+                                <td>
+                                  <span className={`badge ${badge(p.status)} px-2 py-1`}>{p.status}</span>
+                                </td>
+                                <td className="small text-muted">{fmtDate(p.created_at)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     )}
                   </div>
-                </div>
-              </div>
-            </div>
-
-            {/* BILLING SUMMARY */}
-            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
-              <div className="card-body p-3 p-md-4">
-                <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
-                  <div>
-                    <div className="fw-semibold" style={{ color: "#1e293b" }}>
-                      Billing Summary
-                    </div>
-                    <div className="text-muted small">Subscription tier (Free / Premium Active / Premium Expired).</div>
-                  </div>
-
-                  {/* ✅ Tier summary pill */}
-                  <span className={`badge ${tierBadge(tier)}`} style={{ borderRadius: 999, padding: "0.6rem 0.9rem" }}>
-                    <i className={`bi ${isPremium ? "bi-award-fill" : "bi-person-fill"} me-1`} />
-                    {tierLabel(tier)}
-                  </span>
-                </div>
-
-                <div className="row g-3 mt-1">
-                  <div className="col-md-3">
-                    <div className="p-3 rounded-3" style={{ background: "#f8fafc" }}>
-                      <div className="text-muted small">Plan</div>
-                      <div className="fw-bold">{sub?.plan?.name || (tier === "free" ? "Free" : "—")}</div>
-                    </div>
-                  </div>
-
-                  <div className="col-md-3">
-                    <div className="p-3 rounded-3" style={{ background: "#f8fafc" }}>
-                      <div className="text-muted small">Subscription Status</div>
-                      <div className="fw-bold">
-                        <span className={`badge ${badge(sub?.status || "")}`} style={{ borderRadius: 999 }}>
-                          {sub?.status || (tier === "free" ? "free" : "—")}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="col-md-3">
-                    <div className="p-3 rounded-3" style={{ background: "#f8fafc" }}>
-                      <div className="text-muted small">Auto Renew</div>
-                      <div className="fw-bold">{sub ? (sub.auto_renew ? "Enabled" : "Disabled") : "—"}</div>
-                    </div>
-                  </div>
-
-                  <div className="col-md-3">
-                    <div className="p-3 rounded-3" style={{ background: "#f8fafc" }}>
-                      <div className="text-muted small">Renewal Source</div>
-                      <div className="fw-bold">{sub?.auto_renew_source || "—"}</div>
-                    </div>
-                  </div>
-
-                  <div className="col-md-3">
-                    <div className="p-3 rounded-3" style={{ background: "#f8fafc" }}>
-                      <div className="text-muted small">Start</div>
-                      <div className="fw-bold">{fmtDate(sub?.starts_at)}</div>
-                    </div>
-                  </div>
-
-                  <div className="col-md-3">
-                    <div className="p-3 rounded-3" style={{ background: "#f8fafc" }}>
-                      <div className="text-muted small">End</div>
-                      <div className="fw-bold">{fmtDate(sub?.ends_at)}</div>
-                    </div>
-                  </div>
-
-                  <div className="col-md-3">
-                    <div className="p-3 rounded-3" style={{ background: "#f8fafc" }}>
-                      <div className="text-muted small">Amount</div>
-                      <div className="fw-bold">{sub?.plan?.price != null ? fmtNaira(Number(sub.plan.price)) : "—"}</div>
-                    </div>
-                  </div>
-
-                  <div className="col-md-3">
-                    <div className="p-3 rounded-3" style={{ background: "#f8fafc" }}>
-                      <div className="text-muted small">Duration</div>
-                      <div className="fw-bold">{sub?.plan?.duration_in_days ? `${sub.plan.duration_in_days} days` : "—"}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-3 text-muted small">
-                  <i className="bi bi-info-circle me-1" />
-                  Premium is determined by <b>plan.name</b> (not Free) and expiry is determined by <b>ends_at</b>.
-                  Expired subscriptions are still treated as <b>Premium (Expired)</b>.
-                </div>
-              </div>
-            </div>
-
-            {/* BILLING HISTORY */}
-            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
-              <div className="card-body p-3 p-md-4">
-                <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                  <div>
-                    <div className="fw-semibold" style={{ color: "#1e293b" }}>
-                      Billing Records
-                    </div>
-                    <div className="text-muted small">Payments made by this admin account.</div>
-                  </div>
-
-                  <div className="input-group" style={{ maxWidth: 360 }}>
-                    <span className="input-group-text">
-                      <i className="bi bi-search" />
-                    </span>
-                    <input className="form-control" placeholder="Search by reference, plan, status..." value={q} onChange={(e) => setQ(e.target.value)} />
-                  </div>
-                </div>
-
-                <div className="table-responsive">
-                  <table className="table table-hover align-middle mb-0">
-                    <thead style={{ background: "#eef2ff" }}>
-                      <tr>
-                        <th>Date</th>
-                        <th>Plan</th>
-                        <th>Amount</th>
-                        <th>Channel</th>
-                        <th>Reference</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredPayments.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="text-center text-muted py-4">
-                            No billing records found.
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredPayments.map((p) => (
-                          <tr key={p.id}>
-                            <td className="text-muted">{fmtDate(p.created_at || p.starts_at)}</td>
-                            <td>
-                              <div className="fw-semibold">{p.plan?.name || "—"}</div>
-                              <small className="text-muted">{p.card_type && p.last4 ? `${p.card_type} • ${p.last4}` : ""}</small>
-                            </td>
-                            <td className="fw-bold">{fmtNaira(Number(p.amount || 0))}</td>
-                            <td className="text-capitalize">{p.channel || "—"}</td>
-                            <td>
-                              <code style={{ fontSize: 12 }}>{p.reference}</code>
-                            </td>
-                            <td>
-                              <span className={`badge ${badge(p.status)}`} style={{ borderRadius: 999 }}>
-                                {p.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="mt-3 text-muted small">
-                  <i className="bi bi-info-circle me-1" />
-                  This is a read-only view for Super Admin monitoring.
                 </div>
               </div>
             </div>
@@ -557,6 +672,165 @@ export default function AdminUserDetailsPage() {
           </main>
         </div>
       </div>
+
+      {/* EDIT ADMIN PROFILE MODAL */}
+      {showEditModal && (
+        <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.6)", zIndex: 1050 }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content" style={{ borderRadius: 16, overflow: "hidden" }}>
+              <div className="modal-header bg-dark text-white p-3 border-0">
+                <h5 className="modal-title fs-6 fw-bold text-white d-flex align-items-center gap-2 m-0">
+                  <i className="bi bi-pencil-square text-warning" />
+                  Edit Admin Profile Details
+                </h5>
+                <button type="button" className="btn-close btn-close-white" onClick={() => setShowEditModal(false)} />
+              </div>
+              <form onSubmit={handleUpdateProfile}>
+                <div className="modal-body p-4">
+                  <div className="row g-3">
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold small">First Name *</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        required
+                        value={editForm.firstname}
+                        onChange={(e) => setEditForm({ ...editForm, firstname: e.target.value })}
+                      />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold small">Surname *</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        required
+                        value={editForm.surname}
+                        onChange={(e) => setEditForm({ ...editForm, surname: e.target.value })}
+                      />
+                    </div>
+                    <div className="col-12">
+                      <label className="form-label fw-bold small">Email Address *</label>
+                      <input
+                        type="email"
+                        className="form-control"
+                        required
+                        value={editForm.email}
+                        onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                      />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold small">Phone</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={editForm.phone}
+                        onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                      />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label fw-bold small">School Name</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={editForm.school_name}
+                        onChange={(e) => setEditForm({ ...editForm, school_name: e.target.value })}
+                      />
+                    </div>
+                    <div className="col-12">
+                      <label className="form-label fw-bold small">Address</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={editForm.address}
+                        onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="modal-footer bg-light p-3">
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowEditModal(false)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary btn-sm px-4 fw-bold" disabled={savingEdit}>
+                    {savingEdit ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RESET ADMIN PASSWORD MODAL */}
+      {showPasswordModal && (
+        <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.6)", zIndex: 1050 }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content" style={{ borderRadius: 16, overflow: "hidden" }}>
+              <div className="modal-header bg-dark text-white p-3 border-0">
+                <h5 className="modal-title fs-6 fw-bold text-white d-flex align-items-center gap-2 m-0">
+                  <i className="bi bi-key-fill text-warning" />
+                  Reset Admin Password
+                </h5>
+                <button type="button" className="btn-close btn-close-white" onClick={() => setShowPasswordModal(false)} />
+              </div>
+              <form onSubmit={handleResetPassword}>
+                <div className="modal-body p-4">
+                  {passwordResult ? (
+                    <div className="text-center">
+                      <i className="bi bi-check-circle-fill text-success fs-1 mb-2" />
+                      <h6>Password Reset Successful</h6>
+                      <p className="small text-muted mb-3">
+                        The password for <strong>{admin?.email}</strong> has been updated. Active sessions were logged out.
+                      </p>
+                      <div className="p-3 bg-light rounded-3 border d-flex justify-content-between align-items-center mb-3">
+                        <code className="fs-4 fw-bold text-primary">{passwordResult}</code>
+                        <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => copyToClipboard(passwordResult)}>
+                          <i className="bi bi-clipboard me-1" /> Copy
+                        </button>
+                      </div>
+                      <button type="button" className="btn btn-primary w-100" onClick={() => setShowPasswordModal(false)}>
+                        Done
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-muted small mb-3">
+                        Reset the password for <strong>{fullName(admin)}</strong> (<code>{admin?.email}</code>). Leave blank to automatically generate a secure 10-character password.
+                      </p>
+
+                      <div className="mb-3">
+                        <label className="form-label fw-bold small">Custom Password (Optional)</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Leave blank to auto-generate"
+                          value={customPassword}
+                          onChange={(e) => setCustomPassword(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="alert alert-warning py-2 px-3 small d-flex align-items-center gap-2">
+                        <i className="bi bi-exclamation-triangle-fill" />
+                        Resetting the password will immediately revoke all active sessions for this admin.
+                      </div>
+                    </>
+                  )}
+                </div>
+                {!passwordResult && (
+                  <div className="modal-footer bg-light p-3">
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowPasswordModal(false)}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn btn-primary btn-sm px-4 fw-bold" disabled={resettingPassword}>
+                      {resettingPassword ? "Resetting..." : "Confirm Password Reset"}
+                    </button>
+                  </div>
+                )}
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

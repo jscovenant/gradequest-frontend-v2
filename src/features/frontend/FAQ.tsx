@@ -1,68 +1,55 @@
 import { useState, useRef, useEffect } from "react";
-
-/**
- * FAQ.tsx — wired to your Bootstrap Sass variables
- *
- * Updated:
- * - improved spacing between question and answer
- * - cleaner answer padding/margins
- * - smoother open-state layout
- */
+import { usePlatformInfo } from "../../hooks/usePlatformInfo";
 
 type FAQ = { q: string; a: string; tag: string };
 
 const FAQS: FAQ[] = [
   {
     tag: "Security",
-    q: "Is our school's data safe on GradeQuest?",
-    a: "Absolutely. Every account uses role-based access control — meaning teachers only see their classes, admins see their school, and proprietors see everything they own. All data is encrypted at rest and in transit. We run automated daily backups, maintain a full audit trail of every action, and our infrastructure is hosted on enterprise-grade cloud servers with 99.9% uptime SLA.",
+    q: "How secure is our school's academic and financial data on GradiosEdu?",
+    a: "Bank-grade. All data is encrypted both at rest (AES-256) and in transit (SSL/TLS). Every account uses strict role-based access control — meaning teachers only access their assigned classes, bursars manage finance ledgers, and proprietors maintain overarching branch oversight. We perform automated daily backups and maintain detailed audit logs.",
   },
   {
     tag: "Results",
-    q: "How does result computation and the PIN system work?",
-    a: "Teachers upload Continuous Assessment (CA) and exam scores through their portal. GradeQuest automatically computes totals, grades, positions, and generates a broadsheet — in seconds, not days. Once an admin approves the results, scratch-card PINs are generated for parents to check their child's report card securely online. No more printing, no more calls.",
+    q: "How does automated result computation and broadsheet compilation work?",
+    a: "Teachers upload Continuous Assessment (CA) and examination scores through their authenticated portal. GradiosEdu automatically computes totals, weighted averages, class positions, and cumulative GPAs adhering to NERDC standards — generating print-ready master broadsheets and transcripts in seconds.",
   },
   {
-    tag: "AI",
-    q: "What exactly does the AI monitoring do?",
-    a: "The AI engine continuously scans for incomplete submissions — if a teacher hasn't uploaded scores for a class three days before the deadline, it sends automated reminders to both the teacher and the admin. It also flags statistical outliers: if a student who averaged 70% suddenly scores 5%, or if an entire class's scores are suspiciously uniform, the system alerts the academic team before results are published.",
+    tag: "CBT Exams",
+    q: "Can we conduct computer-based assessments in our lab without full-time internet?",
+    a: "Yes. GradiosEdu features a hybrid LAN offline testing engine. Computer laboratories can administer continuous assessments, mock exams, and timed tests on a local network. Student answers are auto-saved locally in real-time and synchronize seamlessly to academic records when connected.",
   },
   {
-    tag: "Fees",
-    q: "Can we track school fees payments per student?",
-    a: "Yes. The fees module gives you a term-by-term ledger for every student — showing what was billed, what was paid, and what's outstanding. You can set up different fee structures per class or category, record payments manually or via integration, and send automated balance reminders to parents through the parent portal. Collection reports are available at any time.",
+    tag: "Bursary",
+    q: "How does the fee management module track tuition and receipts?",
+    a: "The bursary module provides a clear, real-time ledger for every enrolled student — detailing billed amounts, payment history, and outstanding balances. You can record payments, generate electronic receipts with cryptographic verification seals, and automate statements for parents.",
+  },
+  {
+    tag: "AI Tools",
+    q: "How does the AI Assistant support teaching staff?",
+    a: "The AI Assistant helps teachers structure curriculum-compliant schemes of work, generate weekly lesson notes, and compose personalized student evaluations. It also alerts academic coordinators to incomplete score submissions before publishing deadlines.",
+  },
+  {
+    tag: "Parent Access",
+    q: "How do parents receive report cards and school updates?",
+    a: "Parents access authenticated result links, daily attendance logs, and school notices directly on their mobile phones via direct WhatsApp and SMS notifications, eliminating the friction of unread portal emails or lost physical reports.",
   },
   {
     tag: "Migration",
-    q: "We have years of student records. How difficult is migration?",
-    a: "Much easier than you'd expect. Our onboarding team provides a standard CSV template, and once you fill it with your existing student data, we import everything into the system for you — typically within one business day. Schools with three or more years of records have been fully migrated without any disruption to ongoing operations. We also offer on-site staff training as part of the Professional and Enterprise plans.",
-  },
-  {
-    tag: "Access",
-    q: "Can parents and teachers access the system too?",
-    a: "Yes — each user type has their own portal. Teachers log in to submit scores, view their class lists, and track attendance. Parents use their child's unique PIN to access report cards, see attendance summaries, and check outstanding fees. Admins control what each role can see and do. There are no shared logins and no risk of data leakage between accounts.",
-  },
-  {
-    tag: "Pricing",
-    q: "Is there a free trial? What happens to our data if we cancel?",
-    a: "Every plan starts with a 14-day free trial — no credit card required. If you decide GradeQuest isn't right for your school, you can export a full copy of all your data (students, results, fees records) in CSV format before your account closes. We don't hold your data hostage. Schools that cancel within the trial period owe nothing.",
-  },
-  {
-    tag: "Support",
-    q: "What kind of support do you offer?",
-    a: "Starter plans get email support with a 24-hour response time. Professional plans get priority support — typically under 4 hours — plus access to our onboarding call and live chat during business hours. Enterprise schools get a dedicated account manager who knows your school setup personally and is reachable directly via phone or WhatsApp.",
+    q: "We have years of existing student records in Excel. How difficult is migration?",
+    a: "Effortless. Our onboarding team provides standard Excel/CSV templates. Once uploaded, we validate and import all historical student and academic records within 24 hours with zero operational downtime.",
   },
 ];
 
 const TAG_COLORS: Record<string, { color: string; bg: string }> = {
-  Security: { color: "rgb(59,130,246)", bg: "rgba(59,130,246,0.10)" },
-  Results: { color: "rgb(34,197,94)", bg: "rgba(34,197,94,0.10)" },
-  AI: { color: "rgb(211,0,176)", bg: "rgba(211,0,176,0.09)" },
-  Fees: { color: "rgb(59,130,246)", bg: "rgba(59,130,246,0.08)" },
-  Migration: { color: "rgb(245,158,11)", bg: "rgba(245,158,11,0.10)" },
-  Access: { color: "rgb(34,197,94)", bg: "rgba(34,197,94,0.08)" },
-  Pricing: { color: "rgb(239,68,68)", bg: "rgba(239,68,68,0.09)" },
-  Support: { color: "rgb(255,200,87)", bg: "rgba(255,200,87,0.13)" },
+  Security: { color: "#1D4ED8", bg: "rgba(29, 78, 216, 0.1)" },
+  Results: { color: "#059669", bg: "rgba(5, 150, 105, 0.1)" },
+  "CBT Exams": { color: "#1D4ED8", bg: "rgba(29, 78, 216, 0.12)" },
+  Bursary: { color: "#D97706", bg: "rgba(217, 119, 6, 0.12)" },
+  "AI Tools": { color: "#DB2777", bg: "rgba(219, 39, 119, 0.12)" },
+  "Parent Access": { color: "#059669", bg: "rgba(5, 150, 105, 0.12)" },
+  Migration: { color: "#7C3AED", bg: "rgba(124, 58, 237, 0.12)" },
+  Support: { color: "#D97706", bg: "rgba(217, 119, 6, 0.12)" },
 };
 
 function AccordionItem({
@@ -144,6 +131,7 @@ function useReveal(ref: React.RefObject<HTMLElement | null>, delay = 0) {
 }
 
 export default function FAQ() {
+  const { whatsappLink } = usePlatformInfo();
   const [openIndex, setOpenIndex] = useState<number | null>(0);
   const headerRef = useRef<HTMLDivElement>(null);
   const ctaRef = useRef<HTMLDivElement>(null);
@@ -160,21 +148,21 @@ export default function FAQ() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
         :root {
-          --fq-bg:       #f7f3ed;
-          --fq-source:   var(--bs-light,     #fcf8f8);
-          --fq-dark:     var(--bs-dark,      #050008);
-          --fq-accent:   var(--bs-secondary, rgb(255,200,87));
-          --fq-magenta:  var(--bs-primary,   rgb(211,0,176));
-          --fq-muted:    #7a6a5a;
-          --fq-border:   #e8e0d5;
-          --fq-card-bg:  #ffffff;
+          --fq-bg: #F8FAFC;
+          --fq-source: #FFFFFF;
+          --fq-dark: #0F2744;
+          --fq-accent: #D97706;
+          --fq-gold-light: #F59E0B;
+          --fq-muted: #64748B;
+          --fq-border: #E2E8F0;
+          --fq-card-bg: #FFFFFF;
 
-          --fq-accent-glow:   rgba(255,200,87,0.07);
-          --fq-accent-border: rgba(255,200,87,0.22);
-          --fq-accent-ring:   rgba(255,200,87,0.10);
+          --fq-accent-glow: rgba(217, 119, 6, 0.07);
+          --fq-accent-border: rgba(217, 119, 6, 0.22);
+          --fq-accent-ring: rgba(217, 119, 6, 0.10);
         }
 
         .fq-wave {
@@ -195,35 +183,8 @@ export default function FAQ() {
           padding: 108px 0 128px;
           position: relative;
           overflow: hidden;
-          font-family: 'DM Sans', sans-serif;
-        }
-
-        .fq-section::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background-image: repeating-linear-gradient(
-            45deg,
-            rgba(211,0,176,0.012) 0px,
-            rgba(211,0,176,0.012) 1px,
-            transparent 1px,
-            transparent 14px
-          );
-          pointer-events: none;
-          z-index: 0;
-        }
-
-        .fq-section::after {
-          content: '';
-          position: absolute;
-          bottom: -80px;
-          left: -80px;
-          width: 500px;
-          height: 500px;
-          border-radius: 50%;
-          background: radial-gradient(circle, rgba(255,200,87,0.07) 0%, transparent 70%);
-          pointer-events: none;
-          z-index: 0;
+          font-family: 'Plus Jakarta Sans', sans-serif;
+          border-top: 1px solid #E2E8F0;
         }
 
         .fq-inner {
@@ -255,20 +216,23 @@ export default function FAQ() {
           display: inline-flex;
           align-items: center;
           gap: 10px;
-          font-size: 11px;
-          font-weight: 500;
-          letter-spacing: 0.2em;
+          font-size: 11.5px;
+          font-weight: 700;
+          letter-spacing: 0.16em;
           text-transform: uppercase;
-          color: var(--fq-dark);
-          opacity: 0.55;
+          color: #B45309;
+          background: #FFFFFF;
+          border: 1px solid rgba(217, 119, 6, 0.25);
+          padding: 5px 14px;
+          border-radius: 999px;
         }
 
         .fq-kicker__line {
           display: block;
-          width: 28px;
-          height: 1px;
-          background: var(--fq-accent);
-          opacity: 0.8;
+          width: 20px;
+          height: 2px;
+          background: #D97706;
+          border-radius: 99px;
         }
 
         .fq-title {
@@ -276,37 +240,40 @@ export default function FAQ() {
           font-size: clamp(30px, 3.8vw, 50px);
           font-weight: 900;
           color: var(--fq-dark);
-          line-height: 1.1;
+          line-height: 1.15;
         }
 
         .fq-title em {
           font-style: italic;
-          color: var(--fq-magenta);
+          color: #D97706;
+          background: linear-gradient(135deg, #D97706 0%, #B45309 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
         }
 
         .fq-desc {
           font-size: 15.5px;
-          font-weight: 300;
+          font-weight: 400;
           color: var(--fq-muted);
           max-width: 380px;
-          line-height: 1.8;
+          line-height: 1.7;
         }
 
         .fq-filter-pill {
-          font-size: 11.5px;
-          font-weight: 400;
-          color: #9a8a7a;
+          font-size: 12px;
+          font-weight: 600;
+          color: #475569;
           background: var(--fq-card-bg);
           border: 1px solid var(--fq-border);
           border-radius: 100px;
-          padding: 5px 14px;
+          padding: 6px 16px;
           cursor: default;
           transition: background .2s, border-color .2s, color .2s;
         }
         .fq-filter-pill:hover {
-          background: rgba(255,200,87,0.12);
-          border-color: rgba(255,200,87,0.35);
-          color: var(--fq-dark);
+          background: rgba(217, 119, 6, 0.1);
+          border-color: rgba(217, 119, 6, 0.35);
+          color: #0F2744;
         }
 
         .fq-col {
@@ -323,6 +290,11 @@ export default function FAQ() {
         }
         .fq-item--open {
           background: var(--fq-card-bg);
+          border-radius: 12px;
+          padding: 0 16px;
+          border: 1px solid #E2E8F0;
+          margin-bottom: 10px;
+          box-shadow: 0 4px 16px rgba(15, 39, 68, 0.04);
         }
 
         .fq-question {
@@ -340,23 +312,23 @@ export default function FAQ() {
         .fq-tag {
           display: inline-block;
           width: fit-content;
-          font-size: 10px;
-          font-weight: 500;
-          letter-spacing: 0.12em;
+          font-size: 10.5px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
           text-transform: uppercase;
           color: var(--c);
           background: var(--c-bg);
           border-radius: 100px;
-          padding: 2px 9px;
+          padding: 3px 10px;
           transition: opacity .2s;
         }
         .fq-item:not(.fq-item--open) .fq-tag {
-          opacity: 0.65;
+          opacity: 0.85;
         }
 
         .fq-q-text {
           font-family: 'Playfair Display', Georgia, serif;
-          font-size: 16px;
+          font-size: 16.5px;
           font-weight: 700;
           color: var(--fq-dark);
           line-height: 1.35;
@@ -365,19 +337,20 @@ export default function FAQ() {
 
         .fq-question:hover .fq-q-text,
         .fq-item--open .fq-q-text {
-          color: var(--c);
+          color: #0F2744;
         }
 
         .fq-icon {
-          width: 28px;
-          height: 28px;
+          width: 30px;
+          height: 30px;
           border-radius: 50%;
-          background: rgba(5,0,8,0.05);
+          background: #F1F5F9;
+          border: 1px solid #E2E8F0;
           display: flex;
           align-items: center;
           justify-content: center;
           margin-top: 4px;
-          color: #9a8a7a;
+          color: #64748B;
           transition: background .25s, color .25s, transform .3s;
         }
         .fq-item--open .fq-icon {
@@ -397,26 +370,20 @@ export default function FAQ() {
 
         .fq-answer {
           font-size: 14.5px;
-          font-weight: 300;
-          line-height: 1.9;
-          color: rgba(5,0,8,0.58);
+          font-weight: 400;
+          line-height: 1.8;
+          color: #475569;
           margin: 0;
-          padding: 2px 8px 28px 0;
+          padding: 2px 8px 26px 0;
           max-width: 520px;
         }
 
-        @media (min-width: 768px) {
-          .fq-answer {
-            padding-right: 12px;
-            padding-bottom: 30px;
-          }
-        }
-
         .fq-cta {
-          border-radius: 16px;
+          border-radius: 20px;
           padding: 44px 52px;
-          background: var(--fq-dark);
-          border: 1px solid var(--fq-accent-border);
+          background: #0F2744;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          box-shadow: 0 16px 40px rgba(15, 39, 68, 0.15);
           position: relative;
           overflow: hidden;
           opacity: 0;
@@ -428,80 +395,58 @@ export default function FAQ() {
           transform: translateY(0);
         }
 
-        .fq-cta-ring {
-          position: absolute;
-          border-radius: 50%;
-          border: 1px solid var(--fq-accent-ring);
-          pointer-events: none;
-        }
-        .fq-cta-ring--lg {
-          width: 300px;
-          height: 300px;
-          top: -120px;
-          right: -60px;
-        }
-        .fq-cta-ring--sm {
-          width: 180px;
-          height: 180px;
-          top: -60px;
-          right: 60px;
-        }
-
         .fq-cta-eyebrow {
           display: block;
-          font-size: 11px;
-          font-weight: 500;
+          font-size: 11.5px;
+          font-weight: 700;
           letter-spacing: 0.18em;
           text-transform: uppercase;
-          color: var(--fq-accent);
+          color: #FBBF24;
         }
 
         .fq-cta-heading {
           font-family: 'Playfair Display', serif;
-          font-size: clamp(18px, 2.4vw, 26px);
-          font-weight: 700;
-          color: #ffffff;
+          font-size: clamp(20px, 2.4vw, 28px);
+          font-weight: 800;
+          color: #FFFFFF;
           line-height: 1.3;
           max-width: 400px;
         }
-        .fq-cta-heading span {
-          color: var(--fq-accent);
-        }
 
         .btn-fq-primary {
-          background: var(--fq-accent);
-          color: var(--fq-dark);
-          border-color: var(--fq-accent);
-          font-family: 'DM Sans', sans-serif;
+          background: linear-gradient(135deg, #D97706 0%, #B45309 100%);
+          color: #FFFFFF;
+          border: none;
+          font-family: 'Plus Jakarta Sans', sans-serif;
           font-size: 14px;
-          font-weight: 500;
-          border-radius: 7px;
-          transition: background .2s, transform .2s, box-shadow .2s;
+          font-weight: 700;
+          border-radius: 10px;
+          transition: all .2s ease;
           white-space: nowrap;
+          box-shadow: 0 4px 14px rgba(217, 119, 6, 0.3);
         }
         .btn-fq-primary:hover {
-          background: #ffe0a0;
-          border-color: #ffe0a0;
-          color: var(--fq-dark);
+          background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+          color: #FFFFFF;
           transform: translateY(-2px);
-          box-shadow: 0 8px 24px rgba(255,200,87,.22);
+          box-shadow: 0 8px 24px rgba(217, 119, 6, 0.45);
         }
 
         .btn-fq-ghost {
-          background: transparent;
-          color: rgba(255,255,255,.65);
-          border: 1px solid rgba(255,255,255,.12);
-          font-family: 'DM Sans', sans-serif;
+          background: rgba(255, 255, 255, 0.08);
+          color: #FFFFFF;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          font-family: 'Plus Jakarta Sans', sans-serif;
           font-size: 14px;
-          font-weight: 400;
-          border-radius: 7px;
-          transition: background .2s, color .2s, transform .2s;
+          font-weight: 600;
+          border-radius: 10px;
+          transition: all .2s ease;
           white-space: nowrap;
         }
         .btn-fq-ghost:hover {
-          background: rgba(255,255,255,.06);
-          color: #ffffff;
-          border-color: rgba(255,255,255,.22);
+          background: rgba(255, 255, 255, 0.16);
+          color: #FFFFFF;
+          border-color: rgba(255, 255, 255, 0.4);
           transform: translateY(-2px);
         }
 
@@ -526,7 +471,7 @@ export default function FAQ() {
         <svg viewBox="0 0 1440 56" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
           <path
             d="M0,12 C360,56 720,0 1080,32 C1260,48 1380,18 1440,8 L1440,56 L0,56 Z"
-            fill="#f7f3ed"
+            fill="#F8FAFC"
           />
         </svg>
       </div>
@@ -601,24 +546,19 @@ export default function FAQ() {
             ref={ctaRef}
             className="fq-cta d-flex align-items-center justify-content-between flex-wrap gap-4 mt-5"
           >
-            <span className="fq-cta-ring fq-cta-ring--lg" aria-hidden="true" />
-            <span className="fq-cta-ring fq-cta-ring--sm" aria-hidden="true" />
-
             <div className="position-relative" style={{ zIndex: 1 }}>
               <span className="fq-cta-eyebrow mb-2">Still have questions?</span>
               <h3 className="fq-cta-heading mb-0">
-                Talk to a real person who knows
-                <br />
-                <span>Nigerian schools.</span>
+                Talk to a school operations specialist.
               </h3>
             </div>
 
             <div className="d-flex flex-wrap gap-3 position-relative" style={{ zIndex: 1 }}>
               <a
-                href="#"
+                href="/book-demo"
                 className="btn btn-fq-primary d-inline-flex align-items-center gap-2 px-4 py-3"
               >
-                Book a Free Call
+                Book a Live Demo
                 <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
                   <path
                     d="M1 7h12M7 1l6 6-6 6"
@@ -631,7 +571,9 @@ export default function FAQ() {
               </a>
 
               <a
-                href="#"
+                href={whatsappLink("Hello GradiosEdu, I have a few questions regarding the platform for our school.")}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="btn btn-fq-ghost d-inline-flex align-items-center gap-2 px-4 py-3"
               >
                 Chat on WhatsApp

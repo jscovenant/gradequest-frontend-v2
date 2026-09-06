@@ -1,39 +1,27 @@
 // src/utils/axios.ts
 import axios from "axios";
 import { getToken, logout } from "./token";
-import { isCustomPortalHost } from "./portal";
+import { getApiBaseUrl } from "./apiUrl";
 
-const rawBaseUrl = isCustomPortalHost()
-  ? window.location.origin
-  : import.meta.env.VITE_API_URL ||
-    (import.meta.env.PROD ? "https://gradequest.com.ng" : "http://localhost:8000");
-
-const normalizedBaseUrl = rawBaseUrl.replace(/\/+$/, "");
-const BASE_URL = normalizedBaseUrl.endsWith("/api")
-  ? normalizedBaseUrl
-  : `${normalizedBaseUrl}/api`;
-
-
-// const BASE_URL = import.meta.env.VITE_API_URL 
-//   ? import.meta.env.VITE_API_URL + "/api"
-//   : "http://localhost:8000/api";
-
-
-
+const BASE_URL = getApiBaseUrl();
 
 // Public instance (no auth)
 export const publicApi = axios.create({
-  baseURL: BASE_URL,
   headers: { 
     "Content-Type": "application/json",
     "Accept": "application/json", 
   },
-  // withCredentials: true, 
+});
+
+publicApi.interceptors.request.use((config) => {
+  if (!config.baseURL || config.baseURL.includes("laravel.cloud")) {
+    config.baseURL = getApiBaseUrl();
+  }
+  return config;
 });
 
 // Authenticated instance
 export const authApi = axios.create({
-  baseURL: BASE_URL,
   headers: { 
     "Content-Type": "application/json",
     "Accept": "application/json", 
@@ -41,8 +29,11 @@ export const authApi = axios.create({
   withCredentials: true, 
 });
 
-// Attach token automatically
+// Attach token automatically and ensure dynamic baseURL
 authApi.interceptors.request.use((config) => {
+  if (!config.baseURL || config.baseURL.includes("laravel.cloud")) {
+    config.baseURL = getApiBaseUrl();
+  }
   const token = getToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
   if (config.data instanceof FormData) {
@@ -56,7 +47,9 @@ authApi.interceptors.request.use((config) => {
 authApi.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) logout();
+    if (err.response?.status === 401) {
+      logout();
+    }
     return Promise.reject(err);
   }
 );

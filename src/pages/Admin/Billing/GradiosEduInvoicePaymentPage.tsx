@@ -53,7 +53,7 @@ function fmtDate(value?: string | null) {
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-export default function GradequestInvoicePaymentPage() {
+export default function GradiosEduInvoicePaymentPage() {
   const { invoiceId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -163,7 +163,7 @@ export default function GradequestInvoicePaymentPage() {
         @media(max-width:575.98px){.invoice-hero{padding:22px}.invoice-title{font-size:26px}.invoice-grid{grid-template-columns:1fr}.invoice-card-pad{padding:16px}}
       `}</style>
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title="Invoice Payment" />
-      <PageTitle title="GradeQuest Invoice Payment" />
+      <PageTitle title="GradiosEdu Invoice Payment" />
       <div className="container-fluid">
         <div className="row">
           <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
@@ -171,10 +171,10 @@ export default function GradequestInvoicePaymentPage() {
             {(loading || processing) && <Loader message={processing ? "Processing invoice payment..." : "Loading invoice..."} />}
 
             <div className="invoice-hero">
-              <div className="invoice-eyebrow">GradeQuest revenue invoice</div>
+              <div className="invoice-eyebrow">GradiosEdu revenue invoice</div>
               <h1 className="invoice-title">Settle Invoice</h1>
               <p className="invoice-sub">
-                This page is for GradeQuest term invoices and online-to-offline transition invoices. Package upgrades still happen on the normal checkout page.
+                This page is for GradiosEdu term invoices and online-to-offline transition invoices. Package upgrades still happen on the normal checkout page.
               </p>
             </div>
 
@@ -204,10 +204,10 @@ export default function GradequestInvoicePaymentPage() {
                     <div className="invoice-paybox">
                       <div className="invoice-muted">Payment amount</div>
                       <input className="invoice-input mt-2" type="number" min="100" max={balance} value={amount} onChange={(e)=>setAmount(e.target.value)} disabled={balance <= 0 || processing} />
-                      <div className="invoice-muted" style={{ marginTop: 8 }}>You can make full or partial invoice payment through Paystack.</div>
+                      <div className="invoice-muted" style={{ marginTop: 8 }}>You can make full or partial invoice payment securely online.</div>
                       <button className="invoice-btn mt-3" onClick={initializePayment} disabled={balance <= 0 || payAmount <= 0 || processing}>
-                        <i className="bi bi-credit-card" />
-                        {balance <= 0 ? "Invoice Paid" : `Pay ${fmtNaira(payAmount)}`}
+                        <i className="bi bi-shield-lock-fill" />
+                        {balance <= 0 ? "Invoice Paid" : `Make Payment — ${fmtNaira(payAmount)}`}
                       </button>
                       <button className="invoice-outline mt-2" style={{ width: "100%" }} onClick={() => navigate("/billing")}>
                         Back to Billing
