@@ -47,6 +47,10 @@ type Policy = {
   promo_claims_count?: number;
   sales_partner_term_1_commission_rate?: number;
   sales_partner_retention_commission_rate?: number;
+  basic_tier_price_per_student?: number | string;
+  standard_cbt_tier_price_per_student?: number | string;
+  annual_full_session_multiplier?: number | string;
+  annual_session_discount_percent?: number | string;
 };
 
 type School = { id: number; school_name?: string | null };
@@ -88,7 +92,11 @@ const defaultPolicy: Policy = {
   online_student_level_block_enabled: true,
   offline_grace_days: 7,
   offline_school_block_enabled: true,
-  platform_fee_per_student: 1000,
+  platform_fee_per_student: 500,
+  basic_tier_price_per_student: 300,
+  standard_cbt_tier_price_per_student: 500,
+  annual_full_session_multiplier: 3,
+  annual_session_discount_percent: 0,
   support_whatsapp: "08165748374",
   whatsapp_credit_unit_price: 10,
   legacy_plus_ai_credits: 100,
@@ -202,6 +210,12 @@ export default function BillingPolicyPage() {
         online_minimum_coverage_percent: Number(policy.online_minimum_coverage_percent || 0),
         offline_grace_days: Number(policy.offline_grace_days || 0),
         platform_fee_per_student: Number(policy.platform_fee_per_student || 0),
+        basic_tier_price_per_student: Number(policy.basic_tier_price_per_student || 300),
+        standard_cbt_tier_price_per_student: Number(policy.standard_cbt_tier_price_per_student || 500),
+        annual_full_session_multiplier: Number(policy.annual_full_session_multiplier || 3),
+        annual_session_discount_percent: Number(policy.annual_session_discount_percent || 0),
+        sales_partner_term_1_commission_rate: Number(policy.sales_partner_term_1_commission_rate ?? 30),
+        sales_partner_retention_commission_rate: Number(policy.sales_partner_retention_commission_rate ?? 12),
         whatsapp_credit_unit_price: Number(policy.whatsapp_credit_unit_price || 0),
         legacy_plus_ai_credits: Number(policy.legacy_plus_ai_credits || 0),
         ai_result_comment_credit_cost: Number(policy.ai_result_comment_credit_cost || 1),
@@ -379,8 +393,17 @@ export default function BillingPolicyPage() {
                     <Field label="Offline grace days">
                       <input className="bp-input" type="number" min={0} max={90} value={policy.offline_grace_days} onChange={(e)=>setPolicy((p)=>({...p, offline_grace_days:Number(e.target.value)}))} />
                     </Field>
-                    <Field label="Platform fee per student">
-                      <input className="bp-input" type="number" min={0} value={policy.platform_fee_per_student} onChange={(e)=>setPolicy((p)=>({...p, platform_fee_per_student:e.target.value}))} />
+                    <Field label="Basic Result Edition Fee (₦ / student / term)">
+                      <input className="bp-input" type="number" min={0} value={policy.basic_tier_price_per_student ?? 300} onChange={(e)=>setPolicy((p)=>({...p, basic_tier_price_per_student:e.target.value}))} />
+                    </Field>
+                    <Field label="Standard CBT Edition Fee (₦ / student / term)">
+                      <input className="bp-input" type="number" min={0} value={policy.standard_cbt_tier_price_per_student ?? 500} onChange={(e)=>setPolicy((p)=>({...p, standard_cbt_tier_price_per_student:e.target.value, platform_fee_per_student:e.target.value}))} />
+                    </Field>
+                    <Field label="Annual Full Session Multiplier (Terms)">
+                      <input className="bp-input" type="number" min={1} max={12} step="0.5" value={policy.annual_full_session_multiplier ?? 3} onChange={(e)=>setPolicy((p)=>({...p, annual_full_session_multiplier:Number(e.target.value)}))} />
+                    </Field>
+                    <Field label="Annual Full Session Discount (%)">
+                      <input className="bp-input" type="number" min={0} max={100} step="0.5" value={policy.annual_session_discount_percent ?? 0} onChange={(e)=>setPolicy((p)=>({...p, annual_session_discount_percent:Number(e.target.value)}))} />
                     </Field>
                     <Field label="Platform Support & Sales WhatsApp Number">
                       <input className="bp-input" type="text" placeholder="e.g. 08165748374 or +2348165748374" value={policy.support_whatsapp || ""} onChange={(e)=>setPolicy((p)=>({...p, support_whatsapp:e.target.value}))} />

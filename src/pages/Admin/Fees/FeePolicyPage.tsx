@@ -19,6 +19,11 @@ type FeeAccessPolicy = {
   bank_charge_bearer?: "parent" | "school";
   bank_charge_amount?: number;
   platform_fee_bearer?: "parent" | "school";
+  active_edition_tier?: "basic_result" | "standard_cbt" | "annual_full_session";
+  basic_tier_price?: number;
+  standard_cbt_tier_price?: number;
+  annual_full_session_price?: number;
+  platform_fee_amount?: number;
   active_payment_gateway?: "wema_alat" | "monnify" | "paystack";
   enabled: boolean;
   result_access_enabled: boolean;
@@ -96,6 +101,11 @@ export default function FeePolicyPage() {
           bank_charge_bearer: p.bank_charge_bearer === "school" ? "school" : "parent",
           bank_charge_amount: Number(p.bank_charge_amount || 200),
           platform_fee_bearer: p.platform_fee_bearer === "parent" ? "parent" : "school",
+          active_edition_tier: p.active_edition_tier || "standard_cbt",
+          basic_tier_price: Number(p.basic_tier_price || 300),
+          standard_cbt_tier_price: Number(p.standard_cbt_tier_price || 500),
+          annual_full_session_price: Number(p.annual_full_session_price || 1500),
+          platform_fee_amount: Number(p.platform_fee_amount || 500),
           active_payment_gateway: (p.active_payment_gateway as any) || "wema_alat",
         });
       }
@@ -134,6 +144,11 @@ export default function FeePolicyPage() {
           bank_charge_bearer: p.bank_charge_bearer === "school" ? "school" : "parent",
           bank_charge_amount: Number(p.bank_charge_amount || 200),
           platform_fee_bearer: p.platform_fee_bearer === "parent" ? "parent" : "school",
+          active_edition_tier: p.active_edition_tier || "standard_cbt",
+          basic_tier_price: Number(p.basic_tier_price || 300),
+          standard_cbt_tier_price: Number(p.standard_cbt_tier_price || 500),
+          annual_full_session_price: Number(p.annual_full_session_price || 1500),
+          platform_fee_amount: Number(p.platform_fee_amount || 500),
           active_payment_gateway: (p.active_payment_gateway as any) || "wema_alat",
         });
       }
@@ -823,10 +838,42 @@ export default function FeePolicyPage() {
                           <i className="bi bi-bank2" />
                         </div>
                         <div>
-                          <h2 className="fp-card-title">Bank Processing Charge & Platform Fee Allocation</h2>
+                          <h2 className="fp-card-title">School Edition Tier, Bank Charge & Platform Fee Policy</h2>
                           <p className="fp-card-desc">
-                            Control who pays bank processing charges and the SchoolProfit electronic platform access fee (Parent vs. School).
+                            Select your school's active platform edition and control who pays bank charges and the SchoolProfit portal fee (Parent vs. School).
                           </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* School Active Edition / Tier Selector */}
+                    <div className="mb-4">
+                      <label className="fp-form-label">
+                        <i className="bi bi-stars me-1 text-warning" /> Select Active School Edition / Tier
+                      </label>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
+                        <div
+                          className={`fp-preset-card ${policy.active_edition_tier === "basic_result" ? "active" : ""}`}
+                          style={{ padding: "16px", cursor: "pointer" }}
+                          onClick={() => setPolicy((p) => ({ ...p, active_edition_tier: "basic_result" }))}
+                        >
+                          <span className="fp-preset-pill" style={{ background: "#E0F2FE", color: "#0369A1" }}>₦{(policy.basic_tier_price ?? 300).toLocaleString()} / Student / Term</span>
+                          <div className="fp-preset-title" style={{ fontSize: 15 }}>Basic Result Edition</div>
+                          <div className="fp-preset-desc" style={{ fontSize: 12 }}>
+                            Result entry, terminal broadsheets, report card downloads, student ID cards, and bursar payment records.
+                          </div>
+                        </div>
+
+                        <div
+                          className={`fp-preset-card ${policy.active_edition_tier !== "basic_result" ? "active" : ""}`}
+                          style={{ padding: "16px", cursor: "pointer" }}
+                          onClick={() => setPolicy((p) => ({ ...p, active_edition_tier: "standard_cbt" }))}
+                        >
+                          <span className="fp-preset-pill" style={{ background: "#DCFCE7", color: "#15803D" }}>₦{(policy.standard_cbt_tier_price ?? 500).toLocaleString()} / Student / Term (Complete)</span>
+                          <div className="fp-preset-title" style={{ fontSize: 15 }}>Full CBT & AI Edition</div>
+                          <div className="fp-preset-desc" style={{ fontSize: 12 }}>
+                            Everything in Basic + Online/Offline CBT Exam Room, AI Lesson Planning, AI Auto-Comments, and WhatsApp Broadcasts.
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -887,7 +934,7 @@ export default function FeePolicyPage() {
                       {/* SchoolProfit Platform Fee Bearer */}
                       <div className="col-12 col-md-6">
                         <label className="fp-form-label">
-                          <i className="bi bi-cpu me-1 text-primary" /> SchoolProfit Platform Fee Bearer (₦500 / term)
+                          <i className="bi bi-cpu me-1 text-primary" /> SchoolProfit Platform Fee Bearer (₦{(policy.active_edition_tier === "basic_result" ? (policy.basic_tier_price ?? 300) : (policy.standard_cbt_tier_price ?? 500)).toLocaleString()} / term)
                         </label>
                         <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
                           <button
@@ -899,7 +946,7 @@ export default function FeePolicyPage() {
                             <span className="fp-preset-pill">Standard</span>
                             <div className="fp-preset-title" style={{ fontSize: 13 }}>School Pays (Deducted)</div>
                             <div className="fp-preset-desc" style={{ fontSize: 11.5 }}>
-                              ₦500 is deducted from tuition settlement. Parents pay zero extra.
+                              ₦{(policy.active_edition_tier === "basic_result" ? (policy.basic_tier_price ?? 300) : (policy.standard_cbt_tier_price ?? 500)).toLocaleString()} is deducted from tuition settlement. Parents pay zero extra.
                             </div>
                           </button>
 
@@ -912,7 +959,7 @@ export default function FeePolicyPage() {
                             <span className="fp-preset-pill" style={{ background: "#DBEAFE", color: "#1D4ED8" }}>Surcharge</span>
                             <div className="fp-preset-title" style={{ fontSize: 13 }}>Parent Pays (Added)</div>
                             <div className="fp-preset-desc" style={{ fontSize: 11.5 }}>
-                              ₦500 is added to parent checkout as electronic portal access fee.
+                              ₦{(policy.active_edition_tier === "basic_result" ? (policy.basic_tier_price ?? 300) : (policy.standard_cbt_tier_price ?? 500)).toLocaleString()} is added to parent checkout as electronic portal access fee.
                             </div>
                           </button>
                         </div>
@@ -925,37 +972,38 @@ export default function FeePolicyPage() {
                     </div>
 
                     {/* Live Fee Settlement Simulator */}
-                    <div className="fp-sim-box" style={{ marginTop: 22 }}>
-                      <div className="fp-sim-head">
-                        <i className="bi bi-calculator-fill" /> Live Settlement Simulation (Example on ₦30,000 School Fee)
-                      </div>
-                      <div className="fp-sim-steps">
-                        <div className="fp-sim-step">
-                          <div className="fp-sim-step-title">School Fee (Tuition)</div>
-                          <div className="fp-sim-step-val" style={{ color: "#0F172A" }}>₦30,000</div>
-                        </div>
-                        <div className="fp-sim-step">
-                          <div className="fp-sim-step-title">Parent Checkout Total</div>
-                          <div className="fp-sim-step-val" style={{ color: "#047857" }}>
-                            ₦{(
-                              30000 +
-                              (policy.bank_charge_bearer === "parent" ? (policy.bank_charge_amount || 200) : 0) +
-                              (policy.platform_fee_bearer === "parent" ? 500 : 0)
-                            ).toLocaleString()}
+                    {(() => {
+                      const tierFee = policy.active_edition_tier === "basic_result" ? (policy.basic_tier_price ?? 300) : (policy.standard_cbt_tier_price ?? 500);
+                      const bankFee = policy.bank_charge_bearer === "parent" ? (policy.bank_charge_amount || 200) : 0;
+                      const parentPlatformFee = policy.platform_fee_bearer === "parent" ? tierFee : 0;
+                      const schoolDeduction = (policy.bank_charge_bearer === "school" ? (policy.bank_charge_amount || 200) : 0) + (policy.platform_fee_bearer === "school" ? tierFee : 0);
+
+                      return (
+                        <div className="fp-sim-box" style={{ marginTop: 22 }}>
+                          <div className="fp-sim-head">
+                            <i className="bi bi-calculator-fill" /> Live Settlement Simulation (Example on ₦30,000 School Fee — {policy.active_edition_tier === "basic_result" ? "Basic Edition" : "Full CBT Edition"})
+                          </div>
+                          <div className="fp-sim-steps">
+                            <div className="fp-sim-step">
+                              <div className="fp-sim-step-title">School Fee (Tuition)</div>
+                              <div className="fp-sim-step-val" style={{ color: "#0F172A" }}>₦30,000</div>
+                            </div>
+                            <div className="fp-sim-step">
+                              <div className="fp-sim-step-title">Parent Checkout Total</div>
+                              <div className="fp-sim-step-val" style={{ color: "#047857" }}>
+                                ₦{(30000 + bankFee + parentPlatformFee).toLocaleString()}
+                              </div>
+                            </div>
+                            <div className="fp-sim-step">
+                              <div className="fp-sim-step-title">School Net Bank Payout</div>
+                              <div className="fp-sim-step-val" style={{ color: "#2563EB" }}>
+                                ₦{(30000 - schoolDeduction).toLocaleString()}
+                              </div>
+                            </div>
                           </div>
                         </div>
-                        <div className="fp-sim-step">
-                          <div className="fp-sim-step-title">School Net Bank Payout</div>
-                          <div className="fp-sim-step-val" style={{ color: "#2563EB" }}>
-                            ₦{(
-                              30000 -
-                              (policy.bank_charge_bearer === "school" ? (policy.bank_charge_amount || 200) : 0) -
-                              (policy.platform_fee_bearer === "school" ? 500 : 0)
-                            ).toLocaleString()}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Bottom Save Bar */}
