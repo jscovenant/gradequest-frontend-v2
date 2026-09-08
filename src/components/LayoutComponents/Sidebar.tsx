@@ -359,9 +359,11 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       label: "Subscribers & Billing",
       icon: "cash",
       collapseId: "billingMenu",
-      children: [{ label: "Platform Staff", href: "/superadmin/platform-staff", superAdminPermission: "staff" },
+      children: [
+        { label: "Platform Staff", href: "/superadmin/platform-staff", superAdminPermission: "staff" },
         { label: "Subscribers", href: "/superadmin/subscribers", superAdminPermission: "billing" },
-        { label: "Billing Policy", href: "/superadmin/billing-policy", superAdminPermission: "billing" },
+        { label: "Billing & Tier Policy", href: "/superadmin/billing-policy", superAdminPermission: "billing" },
+        { label: "Enterprise Contracts", href: "/subplan", superAdminPermission: "billing" },
         { label: "Twilio WhatsApp", href: "/superadmin/twilio-whatsapp", superAdminPermission: "support" },
         { label: "Bookings", href: "/demo-bookers", superAdminPermission: "sales" }
       ],
@@ -380,13 +382,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
         { label: "Newsletter Subscribers", href: "/superadmin/newsletter-subscribers", superAdminPermission: "marketing" },
         { label: "Broadcast", href: "/superadmin/send-message", superAdminPermission: "marketing" },
       ],
-      roles: ["Super-Admin", "Platform-Staff"],
-    },
-    {
-      label: "SubPlans",
-      icon: "card-list",
-      collapseId: "subPlansMenu",
-      children: [{ label: "Subscription-Plans", href: "/subplan", superAdminPermission: "billing" }],
       roles: ["Super-Admin", "Platform-Staff"],
     },
     {

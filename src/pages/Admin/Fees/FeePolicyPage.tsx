@@ -182,7 +182,7 @@ export default function FeePolicyPage() {
 
   return (
     <>
-      <PageTitle title="Fee Policy & Installments | GradiosEdu" />
+      <PageTitle title="Fee Policy & Installments | SchoolProfit" />
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap');
@@ -912,23 +912,24 @@ export default function FeePolicyPage() {
                           </button>
                         </div>
 
-                        <label className="fp-form-label">Bank Processing Charge Amount (₦)</label>
+                        <label className="fp-form-label d-flex justify-content-between align-items-center">
+                          <span>Bank Processing Charge</span>
+                          <span className="badge bg-light text-dark border">Universal Platform Standard</span>
+                        </label>
                         <div className="input-group">
-                          <span className="input-group-text">₦</span>
+                          <span className="input-group-text bg-light text-muted fw-bold">₦</span>
                           <input
-                            type="number"
-                            className="form-control"
-                            min={0}
-                            value={policy.bank_charge_amount ?? 200}
-                            onChange={(e) =>
-                              setPolicy((p) => ({
-                                ...p,
-                                bank_charge_amount: Math.max(0, Number(e.target.value || 0)),
-                              }))
-                            }
+                            type="text"
+                            className="form-control bg-light text-muted fw-bold"
+                            value={(policy.bank_charge_amount ?? 200).toLocaleString() + ".00 / transaction"}
+                            disabled
+                            readOnly
                           />
                         </div>
-                        <div className="fp-help">Interbank NIP transfer & virtual account processing fee (Default: ₦200).</div>
+                        <div className="fp-help">
+                          <i className="bi bi-shield-lock-fill text-warning me-1" />
+                          Set universally by SchoolProfit Gateway Policy for Wema Bank / AlatPay & Monnify virtual account settlements.
+                        </div>
                       </div>
 
                       {/* SchoolProfit Platform Fee Bearer */}

@@ -559,6 +559,22 @@ export default function SubscriptionPlansPage() {
               </div>
             </div>
 
+            {/* NOTICE BANNER */}
+            <div className="alert alert-warning border-0 shadow-sm mt-3 d-flex flex-wrap align-items-center justify-content-between gap-3 p-3" style={{ borderRadius: 12 }}>
+              <div className="d-flex align-items-center gap-3">
+                <i className="bi bi-info-circle-fill text-warning fs-4" />
+                <div>
+                  <div className="fw-bold text-dark">Primary Model: SchoolProfit Per-Student Edition Tiers</div>
+                  <div className="text-muted small">
+                    Regular schools operate on dynamic per-student tiers (Basic Result ₦300 vs Full CBT & AI ₦500). Manage tier rates in <strong>Billing & Tier Policy</strong>. Use this section only for custom enterprise contracts or legacy grandfathered packages.
+                  </div>
+                </div>
+              </div>
+              <a href="/superadmin/billing-policy" className="btn btn-warning btn-sm fw-bold text-nowrap" style={{ borderRadius: 8 }}>
+                <i className="bi bi-sliders me-1" /> View Tier Policy
+              </a>
+            </div>
+
             {/* FILTERS */}
             <div className="card border-0 shadow-sm my-4" style={{ borderRadius: 12 }}>
               <div className="card-body p-3 p-md-4">

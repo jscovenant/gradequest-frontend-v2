@@ -51,6 +51,9 @@ type Policy = {
   standard_cbt_tier_price_per_student?: number | string;
   annual_full_session_multiplier?: number | string;
   annual_session_discount_percent?: number | string;
+  default_bank_charge_amount?: number | string;
+  promo_target_tier?: string;
+  promo_discount_percent?: number | string;
 };
 
 type School = { id: number; school_name?: string | null };
@@ -97,6 +100,7 @@ const defaultPolicy: Policy = {
   standard_cbt_tier_price_per_student: 500,
   annual_full_session_multiplier: 3,
   annual_session_discount_percent: 0,
+  default_bank_charge_amount: 200,
   support_whatsapp: "08165748374",
   whatsapp_credit_unit_price: 10,
   legacy_plus_ai_credits: 100,
@@ -112,9 +116,11 @@ const defaultPolicy: Policy = {
   temporary_access_min_days: 3,
   temporary_access_max_days: 7,
   promo_enabled: false,
-  promo_title: "Buy 1 Year, Get +1 Year Free Promo",
-  promo_description: "Subscribe to GradiosEdu Plus for 1 year with at least 100 students and get an additional year 100% free.",
-  promo_target_plan: "GradiosEdu Plus",
+  promo_title: "SchoolProfit 2-for-1 Launch Offer",
+  promo_description: "Subscribe or clear for 1 full academic session with at least 100 students and receive the next full academic session 100% free with ₦0 platform fee.",
+  promo_target_plan: "SchoolProfit Plus",
+  promo_target_tier: "all",
+  promo_discount_percent: 100,
   promo_min_students: 100,
   promo_bonus_days: 365,
   promo_starts_at: "",
@@ -364,10 +370,10 @@ export default function BillingPolicyPage() {
             {(loading || saving) && <Loader message={saving ? "Saving billing policy..." : "Loading billing policy..."} />}
 
             <section className="bp-hero">
-              <div className="bp-kicker">GradiosEdu revenue protection</div>
-              <h1 className="bp-title">Billing Enforcement Policy</h1>
+              <div className="bp-kicker">SchoolProfit Revenue & Platform Policy</div>
+              <h1 className="bp-title">Platform Billing & Tier Policy</h1>
               <p className="bp-sub">
-                Configure online collection grace, student-level protection, whole-school thresholds, offline invoice blocking, platform fee charges, and short temporary access grants.
+                Configure per-student edition tier prices, standard bank processing charge, sales partner commissions, launch promo waivers, and temporary access grants.
               </p>
             </section>
 
@@ -376,8 +382,8 @@ export default function BillingPolicyPage() {
                 <div className="bp-card-pad">
                   <div className="bp-card-head">
                     <div>
-                      <div className="bp-card-title">Dynamic enforcement settings</div>
-                      <div className="bp-muted">These values are loaded by the backend before CRUD and academic actions are allowed.</div>
+                      <div className="bp-card-title">Dynamic enforcement & pricing settings</div>
+                      <div className="bp-muted">These values are loaded by the backend for student checkout, offline invoicing, and clearance gates.</div>
                     </div>
                     <span className="bp-pill">{activeAccess} active grants</span>
                     {suspiciousPeriods.length > 0 && <span className="bp-pill" style={{ background: "rgba(239,68,68,.12)", color: "#dc2626" }}>{suspiciousPeriods.length} flagged</span>}
@@ -404,6 +410,9 @@ export default function BillingPolicyPage() {
                     </Field>
                     <Field label="Annual Full Session Discount (%)">
                       <input className="bp-input" type="number" min={0} max={100} step="0.5" value={policy.annual_session_discount_percent ?? 0} onChange={(e)=>setPolicy((p)=>({...p, annual_session_discount_percent:Number(e.target.value)}))} />
+                    </Field>
+                    <Field label="Platform Bank Processing Charge (₦ / transaction)">
+                      <input className="bp-input" type="number" min={0} value={policy.default_bank_charge_amount ?? 200} onChange={(e)=>setPolicy((p)=>({...p, default_bank_charge_amount:e.target.value}))} />
                     </Field>
                     <Field label="Platform Support & Sales WhatsApp Number">
                       <input className="bp-input" type="text" placeholder="e.g. 08165748374 or +2348165748374" value={policy.support_whatsapp || ""} onChange={(e)=>setPolicy((p)=>({...p, support_whatsapp:e.target.value}))} />
@@ -493,7 +502,7 @@ export default function BillingPolicyPage() {
                       <div className="bp-card-title" style={{ fontSize: 14, color: "#92400e" }}>
                         <i className="bi bi-stars me-2" /> Promotions & Launch Offers Engine
                       </div>
-                      <div className="bp-muted">Automatically grant bonus subscription duration (e.g. +1 Year Free) to qualifying schools.</div>
+                      <div className="bp-muted">Automatically grant platform fee waivers (e.g. ₦0 / +1 Year Free) or session discounts to qualifying schools.</div>
                     </div>
                     <input type="checkbox" checked={asBool(policy.promo_enabled)} onChange={(e)=>setPolicy((p)=>({...p, promo_enabled:e.target.checked}))} />
                   </div>
@@ -511,10 +520,17 @@ export default function BillingPolicyPage() {
 
                       <div className="bp-form-grid">
                         <Field label="Promo title">
-                          <input className="bp-input" type="text" value={policy.promo_title || ""} onChange={(e)=>setPolicy((p)=>({...p, promo_title:e.target.value}))} placeholder="e.g. Buy 1 Year, Get +1 Year Free Promo" />
+                          <input className="bp-input" type="text" value={policy.promo_title || ""} onChange={(e)=>setPolicy((p)=>({...p, promo_title:e.target.value}))} placeholder="e.g. SchoolProfit 2-for-1 Launch Offer" />
                         </Field>
-                        <Field label="Target plan name">
-                          <input className="bp-input" type="text" value={policy.promo_target_plan || ""} onChange={(e)=>setPolicy((p)=>({...p, promo_target_plan:e.target.value}))} placeholder="e.g. GradiosEdu Plus" />
+                        <Field label="Target edition tier">
+                          <select className="bp-select" value={policy.promo_target_tier || "all"} onChange={(e)=>setPolicy((p)=>({...p, promo_target_tier:e.target.value}))}>
+                            <option value="all">All Edition Tiers</option>
+                            <option value="basic_result">Basic Result Edition (₦300)</option>
+                            <option value="standard_cbt">Standard CBT & AI Edition (₦500)</option>
+                          </select>
+                        </Field>
+                        <Field label="Platform Fee Discount (%)">
+                          <input className="bp-input" type="number" min={0} max={100} value={policy.promo_discount_percent ?? 100} onChange={(e)=>setPolicy((p)=>({...p, promo_discount_percent:Number(e.target.value)}))} placeholder="100 for 100% Free Platform Fee Waiver" />
                         </Field>
                         <Field label="Minimum active students required">
                           <input className="bp-input" type="number" min={0} value={policy.promo_min_students ?? 100} onChange={(e)=>setPolicy((p)=>({...p, promo_min_students:Number(e.target.value)}))} />
@@ -545,7 +561,7 @@ export default function BillingPolicyPage() {
 
                       <div className="mt-3">
                         <Field label="Promo description & conditions">
-                          <textarea className="bp-textarea" value={policy.promo_description || ""} onChange={(e)=>setPolicy((p)=>({...p, promo_description:e.target.value}))} placeholder="Subscribe for 1 full year with at least 100 students and receive an additional 1 year 100% free with ₦0 platform fee on school fees." />
+                          <textarea className="bp-textarea" value={policy.promo_description || ""} onChange={(e)=>setPolicy((p)=>({...p, promo_description:e.target.value}))} placeholder="Subscribe or clear for 1 full academic session with at least 100 students and receive the next full academic session 100% free with ₦0 platform fee." />
                         </Field>
                       </div>
                     </div>
