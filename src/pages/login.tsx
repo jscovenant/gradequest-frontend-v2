@@ -675,7 +675,7 @@ export default function Login() {
             {/* Register Footer */}
             <div className="gq-auth-footer-links">
               New school proprietor or principal?{" "}
-              <Link to="/register">Create School Account</Link>
+              <Link to="/book-demo">Request School Demo &amp; Setup</Link>
               <div style={{ marginTop: 6, fontSize: "12px" }}>
                 Interested in earning commissions?{" "}
                 <Link to="/sales-representative/register">Join Sales Partner Program</Link>

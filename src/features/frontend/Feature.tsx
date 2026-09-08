@@ -431,15 +431,21 @@ export default function Feature() {
               </p>
             </div>
             <div className="d-flex flex-wrap gap-3">
-              <Link to="/register" className="gq-btn-cta-main" style={{ padding: "13px 26px" }}>
-                Get Started
+              <Link to="/book-demo" className="gq-btn-cta-main" style={{ padding: "13px 26px" }}>
+                Book a Live Demo / Request Setup
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                   <path d="M1 7h12M7 1l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </Link>
-              <Link to="/book-demo" className="gq-btn-cta-secondary" style={{ padding: "13px 22px" }}>
-                Book a Live Demo
-              </Link>
+              <a
+                href="https://wa.me/2348165748374?text=Hello%20SchoolProfit%2C%20I%20want%20to%20request%20a%20demo%20for%20my%20school"
+                target="_blank"
+                rel="noreferrer"
+                className="gq-btn-cta-secondary"
+                style={{ padding: "13px 22px" }}
+              >
+                Chat on WhatsApp
+              </a>
             </div>
           </div>
         </div>

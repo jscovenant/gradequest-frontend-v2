@@ -674,11 +674,11 @@ export default function Navbar() {
             </svg>
           </Link>
           <Link
-            to="/register"
+            to="/book-demo"
             className="gq-drawer-btn gq-drawer-btn--secondary"
             onClick={() => setMenuOpen(false)}
           >
-            Get Started
+            Book a Free Demo
           </Link>
           <a
             href={whatsappLink("Hello GradiosEdu, I want to learn more about your school software")}

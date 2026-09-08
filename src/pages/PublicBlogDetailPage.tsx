@@ -404,12 +404,18 @@ export default function PublicBlogDetailPage() {
                     Join hundreds of leading schools already using SchoolProfit for computerized report cards, instant fee collection, and offline CBT exams.
                   </p>
                   <div className="d-flex justify-content-center gap-3 flex-wrap">
-                    <Link to="/register" className="btn btn-warning fw-bold px-4 py-2.5 text-dark" style={{ borderRadius: "10px" }}>
-                      Get Started Free →
+                    <Link to="/book-demo" className="btn btn-warning fw-bold px-4 py-2.5 text-dark" style={{ borderRadius: "10px" }}>
+                      Book a Free Demo →
                     </Link>
-                    <Link to="/book-demo" className="btn btn-outline-light fw-bold px-4 py-2.5" style={{ borderRadius: "10px" }}>
-                      Book a Live Demo
-                    </Link>
+                    <a
+                      href="https://wa.me/2348165748374?text=Hello%20SchoolProfit%2C%20I%20want%20to%20learn%20more%20about%20your%20software"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn btn-outline-light fw-bold px-4 py-2.5"
+                      style={{ borderRadius: "10px" }}
+                    >
+                      Chat on WhatsApp
+                    </a>
                   </div>
                 </div>
               </article>

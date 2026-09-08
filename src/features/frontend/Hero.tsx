@@ -683,8 +683,8 @@ export default function Hero() {
               </div>
 
               <div className="gq-hero-actions">
-                <Link to="/register" className="gq-btn-cta-main" style={{ background: "linear-gradient(135deg, #059669 0%, #047857 100%)" }}>
-                  Start Growing Your School Free
+                <Link to="/book-demo" className="gq-btn-cta-main" style={{ background: "linear-gradient(135deg, #059669 0%, #047857 100%)" }}>
+                  Book a Live Demo / Request Setup
                   <svg width="15" height="15" viewBox="0 0 14 14" fill="none">
                     <path
                       d="M1 7h12M7 1l6 6-6 6"

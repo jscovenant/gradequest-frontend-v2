@@ -484,8 +484,8 @@ export default function WhySchoolProfit() {
             </div>
 
             <div className="text-center mt-4 pt-2">
-              <Link to="/register" className="gq-btn-cta-main" style={{ display: "inline-flex", background: "linear-gradient(135deg, #059669 0%, #047857 100%)" }}>
-                Start Growing Your School with SchoolProfit
+              <Link to="/book-demo" className="gq-btn-cta-main" style={{ display: "inline-flex", background: "linear-gradient(135deg, #059669 0%, #047857 100%)" }}>
+                Book a Live Demo with SchoolProfit
                 <svg width="15" height="15" viewBox="0 0 14 14" fill="none" style={{ marginLeft: 8 }}>
                   <path d="M1 7h12M7 1l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>

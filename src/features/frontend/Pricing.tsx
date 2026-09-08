@@ -443,8 +443,8 @@ export default function Pricing() {
                 </li>
               </ul>
 
-              <Link to="/register" className="pr-btn-primary pr-btn-outline">
-                Start Free School Account <i className="bi bi-arrow-right" />
+              <Link to="/book-demo" className="pr-btn-primary pr-btn-outline">
+                Book a Free Demo <i className="bi bi-arrow-right" />
               </Link>
             </article>
 
@@ -492,8 +492,8 @@ export default function Pricing() {
                 </li>
               </ul>
 
-              <Link to="/register" className="pr-btn-primary pr-btn-gold">
-                Get Started with GradiosEdu <i className="bi bi-lightning-charge-fill" />
+              <Link to="/book-demo" className="pr-btn-primary pr-btn-gold">
+                Book a Live Demo with SchoolProfit <i className="bi bi-lightning-charge-fill" />
               </Link>
             </article>
 
@@ -535,8 +535,8 @@ export default function Pricing() {
                 </li>
               </ul>
 
-              <Link to="/register" className="pr-btn-primary pr-btn-outline">
-                Explore Add-Ons <i className="bi bi-arrow-right" />
+              <Link to="/book-demo" className="pr-btn-primary pr-btn-outline">
+                Book a Demo to Explore Add-Ons <i className="bi bi-arrow-right" />
               </Link>
             </article>
           </div>
