@@ -362,8 +362,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       children: [
         { label: "Platform Staff", href: "/superadmin/platform-staff", superAdminPermission: "staff" },
         { label: "Subscribers", href: "/superadmin/subscribers", superAdminPermission: "billing" },
-        { label: "Billing & Tier Policy", href: "/superadmin/billing-policy", superAdminPermission: "billing" },
-        { label: "Enterprise Contracts", href: "/subplan", superAdminPermission: "billing" },
+        { label: "Billing Policy & Bank Charges", href: "/superadmin/billing-policy", superAdminPermission: "billing" },
         { label: "Twilio WhatsApp", href: "/superadmin/twilio-whatsapp", superAdminPermission: "support" },
         { label: "Bookings", href: "/demo-bookers", superAdminPermission: "sales" }
       ],

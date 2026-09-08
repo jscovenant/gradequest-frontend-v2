@@ -212,14 +212,15 @@ export default function BillingPolicyPage() {
     try {
       const payload = {
         ...policy,
+        default_bank_charge_amount: Number(policy.default_bank_charge_amount ?? 200),
+        basic_tier_price_per_student: Number(policy.basic_tier_price_per_student || 300),
+        standard_cbt_tier_price_per_student: Number(policy.standard_cbt_tier_price_per_student || 500),
+        platform_fee_per_student: Number(policy.standard_cbt_tier_price_per_student || 500),
+        annual_full_session_multiplier: Number(policy.annual_full_session_multiplier || 3),
+        annual_session_discount_percent: Number(policy.annual_session_discount_percent || 0),
         online_grace_days: Number(policy.online_grace_days || 0),
         online_minimum_coverage_percent: Number(policy.online_minimum_coverage_percent || 0),
         offline_grace_days: Number(policy.offline_grace_days || 0),
-        platform_fee_per_student: Number(policy.platform_fee_per_student || 0),
-        basic_tier_price_per_student: Number(policy.basic_tier_price_per_student || 300),
-        standard_cbt_tier_price_per_student: Number(policy.standard_cbt_tier_price_per_student || 500),
-        annual_full_session_multiplier: Number(policy.annual_full_session_multiplier || 3),
-        annual_session_discount_percent: Number(policy.annual_session_discount_percent || 0),
         sales_partner_term_1_commission_rate: Number(policy.sales_partner_term_1_commission_rate ?? 30),
         sales_partner_retention_commission_rate: Number(policy.sales_partner_retention_commission_rate ?? 12),
         whatsapp_credit_unit_price: Number(policy.whatsapp_credit_unit_price || 0),
@@ -235,10 +236,20 @@ export default function BillingPolicyPage() {
         per_student_billing_starts_at: policy.per_student_billing_starts_at || null,
         temporary_access_min_days: Number(policy.temporary_access_min_days || 1),
         temporary_access_max_days: Number(policy.temporary_access_max_days || 1),
+        promo_enabled: asBool(policy.promo_enabled),
+        promo_title: policy.promo_title || "",
+        promo_description: policy.promo_description || "",
+        promo_target_tier: policy.promo_target_tier || "all",
+        promo_discount_percent: Number(policy.promo_discount_percent ?? 100),
+        promo_min_students: Number(policy.promo_min_students ?? 100),
+        promo_bonus_days: Number(policy.promo_bonus_days ?? 365),
+        promo_starts_at: policy.promo_starts_at || null,
+        promo_ends_at: policy.promo_ends_at || null,
+        promo_max_claims: policy.promo_max_claims ? Number(policy.promo_max_claims) : null,
       };
       const res = await authApi.put("/superadmin/billing-policy", payload);
       setPolicy({ ...defaultPolicy, ...(res.data.policy || {}) });
-      showSuccess?.("Billing policy updated.");
+      showSuccess?.("Billing policy updated successfully.");
     } catch (err: any) {
       showError?.(err?.response?.data?.message || "Unable to update billing policy.");
     } finally {
@@ -378,201 +389,310 @@ export default function BillingPolicyPage() {
             </section>
 
             <div className="bp-grid">
-              <section className="bp-card">
-                <div className="bp-card-pad">
-                  <div className="bp-card-head">
-                    <div>
-                      <div className="bp-card-title">Dynamic enforcement & pricing settings</div>
-                      <div className="bp-muted">These values are loaded by the backend for student checkout, offline invoicing, and clearance gates.</div>
-                    </div>
-                    <span className="bp-pill">{activeAccess} active grants</span>
-                    {suspiciousPeriods.length > 0 && <span className="bp-pill" style={{ background: "rgba(239,68,68,.12)", color: "#dc2626" }}>{suspiciousPeriods.length} flagged</span>}
-                  </div>
-
-                  <div className="bp-form-grid">
-                    <Field label="Online grace days">
-                      <input className="bp-input" type="number" min={0} max={90} value={policy.online_grace_days} onChange={(e)=>setPolicy((p)=>({...p, online_grace_days:Number(e.target.value)}))} />
-                    </Field>
-                    <Field label="Online minimum coverage (%)">
-                      <input className="bp-input" type="number" min={0} max={100} value={policy.online_minimum_coverage_percent} onChange={(e)=>setPolicy((p)=>({...p, online_minimum_coverage_percent:Number(e.target.value)}))} />
-                    </Field>
-                    <Field label="Offline grace days">
-                      <input className="bp-input" type="number" min={0} max={90} value={policy.offline_grace_days} onChange={(e)=>setPolicy((p)=>({...p, offline_grace_days:Number(e.target.value)}))} />
-                    </Field>
-                    <Field label="Basic Result Edition Fee (₦ / student / term)">
-                      <input className="bp-input" type="number" min={0} value={policy.basic_tier_price_per_student ?? 300} onChange={(e)=>setPolicy((p)=>({...p, basic_tier_price_per_student:e.target.value}))} />
-                    </Field>
-                    <Field label="Standard CBT Edition Fee (₦ / student / term)">
-                      <input className="bp-input" type="number" min={0} value={policy.standard_cbt_tier_price_per_student ?? 500} onChange={(e)=>setPolicy((p)=>({...p, standard_cbt_tier_price_per_student:e.target.value, platform_fee_per_student:e.target.value}))} />
-                    </Field>
-                    <Field label="Annual Full Session Multiplier (Terms)">
-                      <input className="bp-input" type="number" min={1} max={12} step="0.5" value={policy.annual_full_session_multiplier ?? 3} onChange={(e)=>setPolicy((p)=>({...p, annual_full_session_multiplier:Number(e.target.value)}))} />
-                    </Field>
-                    <Field label="Annual Full Session Discount (%)">
-                      <input className="bp-input" type="number" min={0} max={100} step="0.5" value={policy.annual_session_discount_percent ?? 0} onChange={(e)=>setPolicy((p)=>({...p, annual_session_discount_percent:Number(e.target.value)}))} />
-                    </Field>
-                    <Field label="Platform Bank Processing Charge (₦ / transaction)">
-                      <input className="bp-input" type="number" min={0} value={policy.default_bank_charge_amount ?? 200} onChange={(e)=>setPolicy((p)=>({...p, default_bank_charge_amount:e.target.value}))} />
-                    </Field>
-                    <Field label="Platform Support & Sales WhatsApp Number">
-                      <input className="bp-input" type="text" placeholder="e.g. 08165748374 or +2348165748374" value={policy.support_whatsapp || ""} onChange={(e)=>setPolicy((p)=>({...p, support_whatsapp:e.target.value}))} />
-                    </Field>
-                    <Field label="WhatsApp price per credit (NGN)">
-                      <input className="bp-input" type="number" min={0.01} step="0.01" value={policy.whatsapp_credit_unit_price} onChange={(e)=>setPolicy((p)=>({...p, whatsapp_credit_unit_price:e.target.value}))} />
-                    </Field>
-                    <Field label="AI credits allocated on Plus upgrade">
-                      <input className="bp-input" type="number" min={0} value={policy.legacy_plus_ai_credits} onChange={(e)=>setPolicy((p)=>({...p, legacy_plus_ai_credits:Number(e.target.value)}))} />
-                    </Field>
-                    <Field label="AI result comment cost (credits)">
-                      <input className="bp-input" type="number" min={1} value={policy.ai_result_comment_credit_cost} onChange={(e)=>setPolicy((p)=>({...p, ai_result_comment_credit_cost:Number(e.target.value)}))} />
-                    </Field>
-                    <Field label="AI CBT question cost (credits)">
-                      <input className="bp-input" type="number" min={1} value={policy.ai_cbt_question_credit_cost} onChange={(e)=>setPolicy((p)=>({...p, ai_cbt_question_credit_cost:Number(e.target.value)}))} />
-                    </Field>
-                    <Field label="AI lesson plan cost (credits)">
-                      <input className="bp-input" type="number" min={1} value={policy.ai_lesson_plan_credit_cost} onChange={(e)=>setPolicy((p)=>({...p, ai_lesson_plan_credit_cost:Number(e.target.value)}))} />
-                    </Field>
-                    <Field label="AI scheme of work cost (credits)">
-                      <input className="bp-input" type="number" min={1} value={policy.ai_scheme_work_credit_cost} onChange={(e)=>setPolicy((p)=>({...p, ai_scheme_work_credit_cost:Number(e.target.value)}))} />
-                    </Field>
-                    <Field label="AI lesson note cost (credits)">
-                      <input className="bp-input" type="number" min={1} value={policy.ai_lesson_note_credit_cost} onChange={(e)=>setPolicy((p)=>({...p, ai_lesson_note_credit_cost:Number(e.target.value)}))} />
-                    </Field>
-                    <Field label="AI fee collection cost (credits)">
-                      <input className="bp-input" type="number" min={1} value={policy.ai_fee_collection_credit_cost} onChange={(e)=>setPolicy((p)=>({...p, ai_fee_collection_credit_cost:Number(e.target.value)}))} />
-                    </Field>
-                    <Field label="AI credit price (NGN)">
-                      <input className="bp-input" type="number" min={0.01} step="0.01" value={policy.ai_credit_unit_price} onChange={(e)=>setPolicy((p)=>({...p, ai_credit_unit_price:e.target.value}))} />
-                    </Field>
-                    <Field label="Per-student billing starts">
-                      <input
-                        className="bp-input"
-                        type="datetime-local"
-                        value={(policy.per_student_billing_starts_at || "").slice(0, 16)}
-                        onChange={(e)=>setPolicy((p)=>({...p, per_student_billing_starts_at:e.target.value}))}
-                      />
-                    </Field>
-                    <Field label="Temporary access min days">
-                      <input className="bp-input" type="number" min={1} max={30} value={policy.temporary_access_min_days} onChange={(e)=>setPolicy((p)=>({...p, temporary_access_min_days:Number(e.target.value)}))} />
-                    </Field>
-                    <Field label="Temporary access max days">
-                      <input className="bp-input" type="number" min={1} max={90} value={policy.temporary_access_max_days} onChange={(e)=>setPolicy((p)=>({...p, temporary_access_max_days:Number(e.target.value)}))} />
-                    </Field>
-                    <Field label="Sales Partner Default Term 1 Commission (%)">
-                      <input className="bp-input" type="number" min={0} max={100} step="0.5" value={policy.sales_partner_term_1_commission_rate ?? 30} onChange={(e)=>setPolicy((p)=>({...p, sales_partner_term_1_commission_rate:Number(e.target.value)}))} />
-                    </Field>
-                    <Field label="Sales Partner Default Retention Commission (%)">
-                      <input className="bp-input" type="number" min={0} max={100} step="0.5" value={policy.sales_partner_retention_commission_rate ?? 12} onChange={(e)=>setPolicy((p)=>({...p, sales_partner_retention_commission_rate:Number(e.target.value)}))} />
-                    </Field>
-                  </div>
-
-                  <div className="bp-form-grid" style={{ marginTop: 14 }}>
-                    <div className="bp-switch">
+              <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                {/* 1. Core Pricing & Universal Bank Charge Card */}
+                <section className="bp-card" style={{ border: "2px solid rgba(211, 0, 176, 0.2)", boxShadow: "0 10px 30px rgba(211, 0, 176, 0.06)" }}>
+                  <div className="bp-card-pad">
+                    <div className="bp-card-head">
                       <div>
-                        <div className="bp-card-title" style={{ fontSize: 13 }}>Online student-level blocking</div>
-                        <div className="bp-muted">Protect results and promotion per uncovered student.</div>
+                        <div className="bp-card-title" style={{ fontSize: 16, color: "#4c0519", display: "flex", alignItems: "center", gap: 8 }}>
+                          <i className="bi bi-credit-card-2-front-fill" style={{ color: "#d300b0" }} />
+                          1. Universal Bank Processing Charge & Edition Tiers
+                        </div>
+                        <div className="bp-muted">
+                          These platform rates apply universally across all schools. School Admins cannot modify or bypass these values.
+                        </div>
                       </div>
-                      <input type="checkbox" checked={asBool(policy.online_student_level_block_enabled)} onChange={(e)=>setPolicy((p)=>({...p, online_student_level_block_enabled:e.target.checked}))} />
+                      <span className="bp-pill" style={{ background: "rgba(211, 0, 176, 0.12)", color: "#9d174d", fontWeight: 800 }}>
+                        <i className="bi bi-shield-lock-fill me-1" /> Super-Admin Controlled
+                      </span>
                     </div>
-                    <div className="bp-switch">
-                      <div>
-                        <div className="bp-card-title" style={{ fontSize: 13 }}>Online whole-school threshold</div>
-                        <div className="bp-muted">Block CRUD only below coverage after grace.</div>
-                      </div>
-                      <input type="checkbox" checked={asBool(policy.online_whole_school_block_enabled)} onChange={(e)=>setPolicy((p)=>({...p, online_whole_school_block_enabled:e.target.checked}))} />
-                    </div>
-                    <div className="bp-switch">
-                      <div>
-                        <div className="bp-card-title" style={{ fontSize: 13 }}>Offline invoice school block</div>
-                        <div className="bp-muted">Offline schools are responsible for direct invoice settlement.</div>
-                      </div>
-                      <input type="checkbox" checked={asBool(policy.offline_school_block_enabled)} onChange={(e)=>setPolicy((p)=>({...p, offline_school_block_enabled:e.target.checked}))} />
-                    </div>
-                    <div className="bp-switch">
-                      <div>
-                        <div className="bp-card-title" style={{ fontSize: 13 }}>Honor old active subscriptions</div>
-                        <div className="bp-muted">Schools paid before the cutover keep access until their subscription expires.</div>
-                      </div>
-                      <input type="checkbox" checked={asBool(policy.legacy_subscription_honor_enabled)} onChange={(e)=>setPolicy((p)=>({...p, legacy_subscription_honor_enabled:e.target.checked}))} />
-                    </div>
-                  </div>
 
-                  <div className="bp-switch mt-4" style={{ background: "rgba(255, 200, 87, 0.12)", border: "1px solid rgba(255, 200, 87, 0.4)" }}>
-                    <div>
-                      <div className="bp-card-title" style={{ fontSize: 14, color: "#92400e" }}>
-                        <i className="bi bi-stars me-2" /> Promotions & Launch Offers Engine
-                      </div>
-                      <div className="bp-muted">Automatically grant platform fee waivers (e.g. ₦0 / +1 Year Free) or session discounts to qualifying schools.</div>
-                    </div>
-                    <input type="checkbox" checked={asBool(policy.promo_enabled)} onChange={(e)=>setPolicy((p)=>({...p, promo_enabled:e.target.checked}))} />
-                  </div>
-
-                  {asBool(policy.promo_enabled) && (
-                    <div className="p-3 mt-3 rounded-3" style={{ background: "#fffdfa", border: "1px solid rgba(245, 158, 11, 0.25)" }}>
-                      <div className="d-flex justify-content-between align-items-center mb-3">
-                        <span className="bp-pill" style={{ background: "rgba(245, 158, 11, 0.2)", color: "#b45309" }}>
-                          Active Promotion Rules
-                        </span>
-                        <span className="text-muted small fw-bold">
-                          {policy.promo_claims_count || 0} / {policy.promo_max_claims || "∞"} Claims Redeemed
+                    {/* Prominent Bank Charge Banner */}
+                    <div style={{ background: "linear-gradient(135deg, #fdf4ff 0%, #fae8ff 100%)", border: "1.5px solid #f0abfc", borderRadius: 12, padding: "16px 18px", marginBottom: 16 }}>
+                      <div className="d-flex justify-content-between align-items-center mb-2">
+                        <label style={{ fontSize: 13.5, fontWeight: 900, color: "#701a75", display: "flex", alignItems: "center", gap: 6 }}>
+                          <i className="bi bi-bank2" />
+                          Platform Bank Processing Charge (₦ / student transaction)
+                        </label>
+                        <span className="badge" style={{ background: "#701a75", color: "#fff", padding: "4px 10px", borderRadius: 999, fontSize: 11 }}>
+                          Universal Standard
                         </span>
                       </div>
-
-                      <div className="bp-form-grid">
-                        <Field label="Promo title">
-                          <input className="bp-input" type="text" value={policy.promo_title || ""} onChange={(e)=>setPolicy((p)=>({...p, promo_title:e.target.value}))} placeholder="e.g. SchoolProfit 2-for-1 Launch Offer" />
-                        </Field>
-                        <Field label="Target edition tier">
-                          <select className="bp-select" value={policy.promo_target_tier || "all"} onChange={(e)=>setPolicy((p)=>({...p, promo_target_tier:e.target.value}))}>
-                            <option value="all">All Edition Tiers</option>
-                            <option value="basic_result">Basic Result Edition (₦300)</option>
-                            <option value="standard_cbt">Standard CBT & AI Edition (₦500)</option>
-                          </select>
-                        </Field>
-                        <Field label="Platform Fee Discount (%)">
-                          <input className="bp-input" type="number" min={0} max={100} value={policy.promo_discount_percent ?? 100} onChange={(e)=>setPolicy((p)=>({...p, promo_discount_percent:Number(e.target.value)}))} placeholder="100 for 100% Free Platform Fee Waiver" />
-                        </Field>
-                        <Field label="Minimum active students required">
-                          <input className="bp-input" type="number" min={0} value={policy.promo_min_students ?? 100} onChange={(e)=>setPolicy((p)=>({...p, promo_min_students:Number(e.target.value)}))} />
-                        </Field>
-                        <Field label="Bonus duration granted (Days)">
-                          <input className="bp-input" type="number" min={1} value={policy.promo_bonus_days ?? 365} onChange={(e)=>setPolicy((p)=>({...p, promo_bonus_days:Number(e.target.value)}))} />
-                        </Field>
-                        <Field label="Promo start date">
+                      <p style={{ fontSize: 12, color: "#86198f", margin: "0 0 10px 0", lineHeight: 1.5 }}>
+                        This charge is automatically added to both <strong>Online checkout</strong> and <strong>Offline school invoices</strong> per student (e.g., ₦200 gateway cost). School admins cannot alter this amount in their dashboard.
+                      </p>
+                      <div style={{ maxWidth: 280 }}>
+                        <div className="input-group">
+                          <span className="input-group-text" style={{ background: "#f5d0fe", borderColor: "#f0abfc", fontWeight: 900, color: "#701a75" }}>₦</span>
                           <input
-                            className="bp-input"
-                            type="datetime-local"
-                            value={(policy.promo_starts_at || "").slice(0, 16)}
-                            onChange={(e)=>setPolicy((p)=>({...p, promo_starts_at:e.target.value}))}
+                            className="form-control fw-bold"
+                            style={{ borderColor: "#f0abfc", fontSize: 16, color: "#4a044e" }}
+                            type="number"
+                            min={0}
+                            step="10"
+                            value={policy.default_bank_charge_amount ?? 200}
+                            onChange={(e) => setPolicy((p) => ({ ...p, default_bank_charge_amount: e.target.value }))}
                           />
-                        </Field>
-                        <Field label="Promo ending date (Strict deadline)">
-                          <input
-                            className="bp-input"
-                            type="datetime-local"
-                            value={(policy.promo_ends_at || "").slice(0, 16)}
-                            onChange={(e)=>setPolicy((p)=>({...p, promo_ends_at:e.target.value}))}
-                          />
-                        </Field>
-                        <Field label="Max allowed redemption claims (optional)">
-                          <input className="bp-input" type="number" min={1} value={policy.promo_max_claims || ""} onChange={(e)=>setPolicy((p)=>({...p, promo_max_claims:e.target.value ? Number(e.target.value) : null}))} placeholder="e.g. 50" />
-                        </Field>
-                      </div>
-
-                      <div className="mt-3">
-                        <Field label="Promo description & conditions">
-                          <textarea className="bp-textarea" value={policy.promo_description || ""} onChange={(e)=>setPolicy((p)=>({...p, promo_description:e.target.value}))} placeholder="Subscribe or clear for 1 full academic session with at least 100 students and receive the next full academic session 100% free with ₦0 platform fee." />
-                        </Field>
+                          <span className="input-group-text" style={{ background: "#f5d0fe", borderColor: "#f0abfc", fontSize: 12, color: "#701a75" }}>/ txn</span>
+                        </div>
                       </div>
                     </div>
-                  )}
 
-                  <button className="bp-btn mt-3" onClick={updatePolicy} disabled={saving}>
+                    {/* Per-Student Edition Tiers */}
+                    <div className="bp-form-grid">
+                      <Field label="Basic Result Edition Fee (₦ / student / term)">
+                        <input
+                          className="bp-input"
+                          type="number"
+                          min={0}
+                          value={policy.basic_tier_price_per_student ?? 300}
+                          onChange={(e) => setPolicy((p) => ({ ...p, basic_tier_price_per_student: e.target.value }))}
+                        />
+                      </Field>
+                      <Field label="Standard CBT & AI Edition Fee (₦ / student / term)">
+                        <input
+                          className="bp-input"
+                          type="number"
+                          min={0}
+                          value={policy.standard_cbt_tier_price_per_student ?? 500}
+                          onChange={(e) => setPolicy((p) => ({ ...p, standard_cbt_tier_price_per_student: e.target.value, platform_fee_per_student: e.target.value }))}
+                        />
+                      </Field>
+                      <Field label="Annual Full Session Multiplier (Terms)">
+                        <input
+                          className="bp-input"
+                          type="number"
+                          min={1}
+                          max={12}
+                          step="0.5"
+                          value={policy.annual_full_session_multiplier ?? 3}
+                          onChange={(e) => setPolicy((p) => ({ ...p, annual_full_session_multiplier: Number(e.target.value) }))}
+                        />
+                      </Field>
+                      <Field label="Annual Full Session Discount (%)">
+                        <input
+                          className="bp-input"
+                          type="number"
+                          min={0}
+                          max={100}
+                          step="0.5"
+                          value={policy.annual_session_discount_percent ?? 0}
+                          onChange={(e) => setPolicy((p) => ({ ...p, annual_session_discount_percent: Number(e.target.value) }))}
+                        />
+                      </Field>
+                      <Field label="Per-student billing system cutover starts">
+                        <input
+                          className="bp-input"
+                          type="datetime-local"
+                          value={(policy.per_student_billing_starts_at || "").slice(0, 16)}
+                          onChange={(e) => setPolicy((p) => ({ ...p, per_student_billing_starts_at: e.target.value }))}
+                        />
+                      </Field>
+                    </div>
+                  </div>
+                </section>
+
+                {/* 2. Promotions & Launch Offers Engine */}
+                <section className="bp-card" style={{ border: "1.5px solid rgba(245, 158, 11, 0.3)" }}>
+                  <div className="bp-card-pad">
+                    <div className="bp-switch" style={{ background: "rgba(255, 200, 87, 0.12)", border: "1px solid rgba(255, 200, 87, 0.4)" }}>
+                      <div>
+                        <div className="bp-card-title" style={{ fontSize: 14, color: "#92400e", display: "flex", alignItems: "center", gap: 6 }}>
+                          <i className="bi bi-stars" /> 2. Promotions & Launch Offers Engine (+1 Year Free / Waivers)
+                        </div>
+                        <div className="bp-muted">Automatically grant platform fee waivers (e.g. ₦0 / +1 Year Free) or session discounts to qualifying schools.</div>
+                      </div>
+                      <input type="checkbox" checked={asBool(policy.promo_enabled)} onChange={(e) => setPolicy((p) => ({ ...p, promo_enabled: e.target.checked }))} />
+                    </div>
+
+                    {asBool(policy.promo_enabled) && (
+                      <div className="p-3 mt-3 rounded-3" style={{ background: "#fffdfa", border: "1px solid rgba(245, 158, 11, 0.25)" }}>
+                        <div className="d-flex justify-content-between align-items-center mb-3">
+                          <span className="bp-pill" style={{ background: "rgba(245, 158, 11, 0.2)", color: "#b45309" }}>
+                            Active Promotion Rules
+                          </span>
+                          <span className="text-muted small fw-bold">
+                            {policy.promo_claims_count || 0} / {policy.promo_max_claims || "∞"} Claims Redeemed
+                          </span>
+                        </div>
+
+                        <div className="bp-form-grid">
+                          <Field label="Promo title">
+                            <input className="bp-input" type="text" value={policy.promo_title || ""} onChange={(e) => setPolicy((p) => ({ ...p, promo_title: e.target.value }))} placeholder="e.g. SchoolProfit 2-for-1 Launch Offer" />
+                          </Field>
+                          <Field label="Target edition tier">
+                            <select className="bp-select" value={policy.promo_target_tier || "all"} onChange={(e) => setPolicy((p) => ({ ...p, promo_target_tier: e.target.value }))}>
+                              <option value="all">All Edition Tiers</option>
+                              <option value="basic_result">Basic Result Edition (₦300)</option>
+                              <option value="standard_cbt">Standard CBT & AI Edition (₦500)</option>
+                            </select>
+                          </Field>
+                          <Field label="Platform Fee Discount (%)">
+                            <input className="bp-input" type="number" min={0} max={100} value={policy.promo_discount_percent ?? 100} onChange={(e) => setPolicy((p) => ({ ...p, promo_discount_percent: Number(e.target.value) }))} placeholder="100 for 100% Free Platform Fee Waiver" />
+                          </Field>
+                          <Field label="Minimum active students required">
+                            <input className="bp-input" type="number" min={0} value={policy.promo_min_students ?? 100} onChange={(e) => setPolicy((p) => ({ ...p, promo_min_students: Number(e.target.value) }))} />
+                          </Field>
+                          <Field label="Bonus duration granted (Days)">
+                            <input className="bp-input" type="number" min={1} value={policy.promo_bonus_days ?? 365} onChange={(e) => setPolicy((p) => ({ ...p, promo_bonus_days: Number(e.target.value) }))} />
+                          </Field>
+                          <Field label="Promo start date">
+                            <input
+                              className="bp-input"
+                              type="datetime-local"
+                              value={(policy.promo_starts_at || "").slice(0, 16)}
+                              onChange={(e) => setPolicy((p) => ({ ...p, promo_starts_at: e.target.value }))}
+                            />
+                          </Field>
+                          <Field label="Promo ending date (Strict deadline)">
+                            <input
+                              className="bp-input"
+                              type="datetime-local"
+                              value={(policy.promo_ends_at || "").slice(0, 16)}
+                              onChange={(e) => setPolicy((p) => ({ ...p, promo_ends_at: e.target.value }))}
+                            />
+                          </Field>
+                          <Field label="Max allowed redemption claims (optional)">
+                            <input className="bp-input" type="number" min={1} value={policy.promo_max_claims || ""} onChange={(e) => setPolicy((p) => ({ ...p, promo_max_claims: e.target.value ? Number(e.target.value) : null }))} placeholder="e.g. 50" />
+                          </Field>
+                        </div>
+
+                        <div className="mt-3">
+                          <Field label="Promo description & conditions">
+                            <textarea className="bp-textarea" value={policy.promo_description || ""} onChange={(e) => setPolicy((p) => ({ ...p, promo_description: e.target.value }))} placeholder="Subscribe or clear for 1 full academic session with at least 100 students and receive the next full academic session 100% free with ₦0 platform fee." />
+                          </Field>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                {/* 3. Clearance & Enforcement Rules */}
+                <section className="bp-card">
+                  <div className="bp-card-pad">
+                    <div className="bp-card-head">
+                      <div>
+                        <div className="bp-card-title" style={{ fontSize: 15 }}>
+                          <i className="bi bi-shield-check me-2 text-primary" />
+                          3. Payment Clearance & Dynamic Enforcement Rules
+                        </div>
+                        <div className="bp-muted">Configure grace periods, minimum threshold coverage, and feature protection gates.</div>
+                      </div>
+                    </div>
+
+                    <div className="bp-form-grid">
+                      <Field label="Online grace days">
+                        <input className="bp-input" type="number" min={0} max={90} value={policy.online_grace_days} onChange={(e) => setPolicy((p) => ({ ...p, online_grace_days: Number(e.target.value) }))} />
+                      </Field>
+                      <Field label="Online minimum coverage (%)">
+                        <input className="bp-input" type="number" min={0} max={100} value={policy.online_minimum_coverage_percent} onChange={(e) => setPolicy((p) => ({ ...p, online_minimum_coverage_percent: Number(e.target.value) }))} />
+                      </Field>
+                      <Field label="Offline grace days">
+                        <input className="bp-input" type="number" min={0} max={90} value={policy.offline_grace_days} onChange={(e) => setPolicy((p) => ({ ...p, offline_grace_days: Number(e.target.value) }))} />
+                      </Field>
+                      <Field label="Temporary access min days">
+                        <input className="bp-input" type="number" min={1} max={30} value={policy.temporary_access_min_days} onChange={(e) => setPolicy((p) => ({ ...p, temporary_access_min_days: Number(e.target.value) }))} />
+                      </Field>
+                      <Field label="Temporary access max days">
+                        <input className="bp-input" type="number" min={1} max={90} value={policy.temporary_access_max_days} onChange={(e) => setPolicy((p) => ({ ...p, temporary_access_max_days: Number(e.target.value) }))} />
+                      </Field>
+                    </div>
+
+                    <div className="bp-form-grid" style={{ marginTop: 14 }}>
+                      <div className="bp-switch">
+                        <div>
+                          <div className="bp-card-title" style={{ fontSize: 13 }}>Online student-level blocking</div>
+                          <div className="bp-muted">Protect results and promotion per uncovered student.</div>
+                        </div>
+                        <input type="checkbox" checked={asBool(policy.online_student_level_block_enabled)} onChange={(e) => setPolicy((p) => ({ ...p, online_student_level_block_enabled: e.target.checked }))} />
+                      </div>
+                      <div className="bp-switch">
+                        <div>
+                          <div className="bp-card-title" style={{ fontSize: 13 }}>Online whole-school threshold</div>
+                          <div className="bp-muted">Block CRUD only below coverage after grace.</div>
+                        </div>
+                        <input type="checkbox" checked={asBool(policy.online_whole_school_block_enabled)} onChange={(e) => setPolicy((p) => ({ ...p, online_whole_school_block_enabled: e.target.checked }))} />
+                      </div>
+                      <div className="bp-switch">
+                        <div>
+                          <div className="bp-card-title" style={{ fontSize: 13 }}>Offline invoice school block</div>
+                          <div className="bp-muted">Offline schools are responsible for direct invoice settlement.</div>
+                        </div>
+                        <input type="checkbox" checked={asBool(policy.offline_school_block_enabled)} onChange={(e) => setPolicy((p) => ({ ...p, offline_school_block_enabled: e.target.checked }))} />
+                      </div>
+                      <div className="bp-switch">
+                        <div>
+                          <div className="bp-card-title" style={{ fontSize: 13 }}>Honor old active subscriptions</div>
+                          <div className="bp-muted">Schools paid before the cutover keep access until their subscription expires.</div>
+                        </div>
+                        <input type="checkbox" checked={asBool(policy.legacy_subscription_honor_enabled)} onChange={(e) => setPolicy((p) => ({ ...p, legacy_subscription_honor_enabled: e.target.checked }))} />
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* 4. Sales Commissions & Addon Credits */}
+                <section className="bp-card">
+                  <div className="bp-card-pad">
+                    <div className="bp-card-head">
+                      <div>
+                        <div className="bp-card-title" style={{ fontSize: 15 }}>
+                          <i className="bi bi-person-badge me-2 text-primary" />
+                          4. Sales Partner Commissions & Addon Credits (WhatsApp & AI)
+                        </div>
+                        <div className="bp-muted">Configure affiliate sales partner reward rates, WhatsApp SMS rates, and AI credit unit costs.</div>
+                      </div>
+                    </div>
+
+                    <div className="bp-form-grid">
+                      <Field label="Sales Partner Default Term 1 Commission (%)">
+                        <input className="bp-input" type="number" min={0} max={100} step="0.5" value={policy.sales_partner_term_1_commission_rate ?? 30} onChange={(e) => setPolicy((p) => ({ ...p, sales_partner_term_1_commission_rate: Number(e.target.value) }))} />
+                      </Field>
+                      <Field label="Sales Partner Default Retention Commission (%)">
+                        <input className="bp-input" type="number" min={0} max={100} step="0.5" value={policy.sales_partner_retention_commission_rate ?? 12} onChange={(e) => setPolicy((p) => ({ ...p, sales_partner_retention_commission_rate: Number(e.target.value) }))} />
+                      </Field>
+                      <Field label="Platform Support & Sales WhatsApp Number">
+                        <input className="bp-input" type="text" placeholder="e.g. 08165748374 or +2348165748374" value={policy.support_whatsapp || ""} onChange={(e) => setPolicy((p) => ({ ...p, support_whatsapp: e.target.value }))} />
+                      </Field>
+                      <Field label="WhatsApp price per credit (NGN)">
+                        <input className="bp-input" type="number" min={0.01} step="0.01" value={policy.whatsapp_credit_unit_price} onChange={(e) => setPolicy((p) => ({ ...p, whatsapp_credit_unit_price: e.target.value }))} />
+                      </Field>
+                      <Field label="AI credit price (NGN)">
+                        <input className="bp-input" type="number" min={0.01} step="0.01" value={policy.ai_credit_price} onChange={(e) => setPolicy((p) => ({ ...p, ai_credit_price: e.target.value }))} />
+                      </Field>
+                      <Field label="AI credits allocated on Plus upgrade">
+                        <input className="bp-input" type="number" min={0} value={policy.legacy_plus_ai_credits} onChange={(e) => setPolicy((p) => ({ ...p, legacy_plus_ai_credits: Number(e.target.value) }))} />
+                      </Field>
+                      <Field label="AI result comment cost (credits)">
+                        <input className="bp-input" type="number" min={1} value={policy.ai_result_comment_credit_cost} onChange={(e) => setPolicy((p) => ({ ...p, ai_result_comment_credit_cost: Number(e.target.value) }))} />
+                      </Field>
+                      <Field label="AI CBT question cost (credits)">
+                        <input className="bp-input" type="number" min={1} value={policy.ai_cbt_question_credit_cost} onChange={(e) => setPolicy((p) => ({ ...p, ai_cbt_question_credit_cost: Number(e.target.value) }))} />
+                      </Field>
+                      <Field label="AI lesson plan cost (credits)">
+                        <input className="bp-input" type="number" min={1} value={policy.ai_lesson_plan_credit_cost} onChange={(e) => setPolicy((p) => ({ ...p, ai_lesson_plan_credit_cost: Number(e.target.value) }))} />
+                      </Field>
+                      <Field label="AI scheme of work cost (credits)">
+                        <input className="bp-input" type="number" min={1} value={policy.ai_scheme_work_credit_cost} onChange={(e) => setPolicy((p) => ({ ...p, ai_scheme_work_credit_cost: Number(e.target.value) }))} />
+                      </Field>
+                      <Field label="AI lesson note cost (credits)">
+                        <input className="bp-input" type="number" min={1} value={policy.ai_lesson_note_credit_cost} onChange={(e) => setPolicy((p) => ({ ...p, ai_lesson_note_credit_cost: Number(e.target.value) }))} />
+                      </Field>
+                      <Field label="AI fee collection cost (credits)">
+                        <input className="bp-input" type="number" min={1} value={policy.ai_fee_collection_credit_cost} onChange={(e) => setPolicy((p) => ({ ...p, ai_fee_collection_credit_cost: Number(e.target.value) }))} />
+                      </Field>
+                    </div>
+                  </div>
+                </section>
+
+                <div style={{ display: "flex", gap: 12 }}>
+                  <button className="bp-btn" style={{ padding: "14px 28px", fontSize: 15 }} onClick={updatePolicy} disabled={saving}>
                     <i className="bi bi-check2-circle" />
-                    Save Policy
+                    Save Platform Billing Policy
                   </button>
                 </div>
-              </section>
+              </div>
 
               <aside className="bp-card">
                 <div className="bp-card-pad">
