@@ -105,9 +105,13 @@ export default function PublicCbtAccessPage() {
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const [securityViolations, setSecurityViolations] = useState(0);
   const [securityWarning, setSecurityWarning] = useState("");
+  const [syncStatus, setSyncStatus] = useState<"synced" | "syncing" | "offline_saved">("synced");
+  const [unsyncedQuestionIds, setUnsyncedQuestionIds] = useState<number[]>([]);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const eventThrottleRef = useRef<Record<string, number>>({});
   const saveTimersRef = useRef<Record<number, number>>({});
   const forcedSubmitRef = useRef(false);
+  const syncLockRef = useRef(false);
   const questionRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   const flatQuestions = useMemo(() => (examPaper?.question_blocks || []).flatMap((block) => block.questions || []), [examPaper]);
@@ -121,6 +125,120 @@ export default function PublicCbtAccessPage() {
     const answer = answers[question.id];
     return Boolean((answer?.selected_option_ids || []).length || answer?.answer_text?.trim());
   }).length;
+
+  const storageKey = useMemo(() => (attempt?.token ? `cbt_public_attempt_${attempt.token}_answers` : null), [attempt?.token]);
+  const unsyncedStorageKey = useMemo(() => (attempt?.token ? `cbt_public_attempt_${attempt.token}_unsynced` : null), [attempt?.token]);
+
+  // Sync state with localStorage
+  const persistLocalAnswers = useCallback((newAnswers: Record<number, AnswerDraft>) => {
+    if (!storageKey) return;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(newAnswers));
+    } catch {
+      // Ignore storage errors if quota exceeded
+    }
+  }, [storageKey]);
+
+  const persistUnsyncedIds = useCallback((ids: number[]) => {
+    if (!unsyncedStorageKey) return;
+    try {
+      localStorage.setItem(unsyncedStorageKey, JSON.stringify(ids));
+    } catch {
+      // Ignore
+    }
+    setUnsyncedQuestionIds(ids);
+  }, [unsyncedStorageKey]);
+
+  // Periodic heartbeat sync for any pending offline answers
+  const flushUnsyncedAnswers = useCallback(async () => {
+    if (!attempt?.token || syncLockRef.current || !navigator.onLine) return;
+
+    let queuedIds: number[] = [];
+    if (unsyncedStorageKey) {
+      try {
+        queuedIds = JSON.parse(localStorage.getItem(unsyncedStorageKey) || "[]");
+      } catch {
+        queuedIds = [];
+      }
+    }
+
+    if (queuedIds.length === 0) {
+      setSyncStatus("synced");
+      return;
+    }
+
+    syncLockRef.current = true;
+    setSyncStatus("syncing");
+
+    try {
+      let currentLocal: Record<number, AnswerDraft> = {};
+      if (storageKey) {
+        try {
+          currentLocal = JSON.parse(localStorage.getItem(storageKey) || "{}");
+        } catch {
+          currentLocal = {};
+        }
+      }
+
+      const remainingIds = [...queuedIds];
+
+      for (const qId of queuedIds) {
+        const answer = currentLocal[qId];
+        if (answer) {
+          try {
+            await publicApi.post(`/public/cbt/attempts/${attempt.token}/answers`, {
+              question_id: qId,
+              selected_option_ids: answer.selected_option_ids || [],
+              answer_text: answer.answer_text || null,
+            });
+            const idx = remainingIds.indexOf(qId);
+            if (idx > -1) remainingIds.splice(idx, 1);
+          } catch {
+            // Keep in queue if still failing
+            break;
+          }
+        } else {
+          const idx = remainingIds.indexOf(qId);
+          if (idx > -1) remainingIds.splice(idx, 1);
+        }
+      }
+
+      persistUnsyncedIds(remainingIds);
+      setSyncStatus(remainingIds.length === 0 ? "synced" : "offline_saved");
+    } finally {
+      syncLockRef.current = false;
+    }
+  }, [attempt?.token, persistUnsyncedIds, storageKey, unsyncedStorageKey]);
+
+  // Online / Offline listener
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      void flushUnsyncedAnswers();
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      setSyncStatus("offline_saved");
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [flushUnsyncedAnswers]);
+
+  useEffect(() => {
+    if (!attempt?.token) return;
+    const interval = window.setInterval(() => {
+      if (navigator.onLine) {
+        void flushUnsyncedAnswers();
+      }
+    }, 15000);
+    return () => window.clearInterval(interval);
+  }, [attempt?.token, flushUnsyncedAnswers]);
 
   async function lookup(e: FormEvent) {
     e.preventDefault();
@@ -159,7 +277,8 @@ export default function PublicCbtAccessPage() {
         exam_id: exam.id,
         access_code: exam.access_code_required ? form.access_code : null,
       });
-      setAttempt(res.data?.attempt || null);
+      const newAttempt = res.data?.attempt || null;
+      setAttempt(newAttempt);
       setExamPaper(res.data?.exam || null);
       setAnswers({});
       setActiveQuestionIndex(0);
@@ -168,6 +287,20 @@ export default function PublicCbtAccessPage() {
       forcedSubmitRef.current = false;
       setRemainingSeconds(res.data?.attempt?.expires_at ? Math.max(0, Math.floor((new Date(res.data.attempt.expires_at).getTime() - Date.now()) / 1000)) : null);
       setConfirmingSubmit(false);
+
+      // Restore existing local draft if student reconnected/reloaded
+      if (newAttempt?.token) {
+        const localAnswersStr = localStorage.getItem(`cbt_public_attempt_${newAttempt.token}_answers`);
+        if (localAnswersStr) {
+          try {
+            const restored = JSON.parse(localAnswersStr);
+            setAnswers(restored);
+          } catch {
+            // Keep empty
+          }
+        }
+      }
+
       try {
         await document.documentElement.requestFullscreen?.();
       } catch {
@@ -230,19 +363,71 @@ export default function PublicCbtAccessPage() {
       delete saveTimersRef.current[question.id];
     }
     setSavingQuestionId(question.id);
+
+    // If offline, save locally without error toast and record to queue
+    if (!navigator.onLine) {
+      setSyncStatus("offline_saved");
+      let queued: number[] = [];
+      if (unsyncedStorageKey) {
+        try {
+          queued = JSON.parse(localStorage.getItem(unsyncedStorageKey) || "[]");
+        } catch {
+          queued = [];
+        }
+      }
+      if (!queued.includes(question.id)) {
+        queued.push(question.id);
+        persistUnsyncedIds(queued);
+      }
+      setSavingQuestionId((current) => (current === question.id ? null : current));
+      return;
+    }
+
+    setSyncStatus("syncing");
+
     try {
       await publicApi.post(`/public/cbt/attempts/${attempt.token}/answers`, {
         question_id: question.id,
         selected_option_ids: answer.selected_option_ids || [],
         answer_text: answer.answer_text || null,
       });
+
+      // Remove from unsynced queue if present
+      let queued: number[] = [];
+      if (unsyncedStorageKey) {
+        try {
+          queued = JSON.parse(localStorage.getItem(unsyncedStorageKey) || "[]");
+        } catch {
+          queued = [];
+        }
+      }
+      const updatedQueued = queued.filter((id) => id !== question.id);
+      persistUnsyncedIds(updatedQueued);
+
+      if (updatedQueued.length === 0) {
+        setSyncStatus("synced");
+      }
+
       if (!silent) showSuccess("Answer saved.");
-    } catch (e: any) {
-      showError(e?.response?.data?.message || "Unable to save answer.");
+    } catch {
+      // Save locally and queue for background retry
+      setSyncStatus("offline_saved");
+      let queued: number[] = [];
+      if (unsyncedStorageKey) {
+        try {
+          queued = JSON.parse(localStorage.getItem(unsyncedStorageKey) || "[]");
+        } catch {
+          queued = [];
+        }
+      }
+      if (!queued.includes(question.id)) {
+        queued.push(question.id);
+        persistUnsyncedIds(queued);
+      }
     } finally {
       setSavingQuestionId((current) => (current === question.id ? null : current));
     }
-  }, [attempt?.token, showError, showSuccess]);
+  }, [attempt?.token, persistUnsyncedIds, showSuccess, unsyncedStorageKey]);
 
   function queueAnswerSave(question: Question, answer: AnswerDraft, delay = 350) {
     if (saveTimersRef.current[question.id]) {
@@ -263,21 +448,33 @@ export default function PublicCbtAccessPage() {
         : [optionId];
 
       const nextAnswer = { ...prev[question.id], selected_option_ids: next };
+      const updatedAll = { ...prev, [question.id]: nextAnswer };
+      persistLocalAnswers(updatedAll);
       void saveAnswerPayload(question, nextAnswer);
-      return { ...prev, [question.id]: nextAnswer };
+      return updatedAll;
     });
   }
 
   function writeAnswer(question: Question, value: string) {
     setAnswers((prev) => {
       const nextAnswer = { ...prev[question.id], answer_text: value };
+      const updatedAll = { ...prev, [question.id]: nextAnswer };
+      persistLocalAnswers(updatedAll);
       queueAnswerSave(question, nextAnswer, 800);
-      return { ...prev, [question.id]: nextAnswer };
+      return updatedAll;
     });
   }
 
   async function saveAnswer(question: Question) {
     await saveAnswerPayload(question, answers[question.id] || {}, false);
+  }
+
+  function buildAnswersBundle() {
+    return Object.entries(answers).map(([qId, draft]) => ({
+      question_id: Number(qId),
+      selected_option_ids: draft.selected_option_ids || [],
+      answer_text: draft.answer_text || null,
+    }));
   }
 
   async function submitExam() {
@@ -287,7 +484,14 @@ export default function PublicCbtAccessPage() {
       if (activeQuestion) {
         await saveAnswerPayload(activeQuestion, answers[activeQuestion.id] || {});
       }
-      await publicApi.post(`/public/cbt/attempts/${attempt.token}/submit`);
+      const answersBundle = buildAnswersBundle();
+      await publicApi.post(`/public/cbt/attempts/${attempt.token}/submit`, {
+        answers_bundle: answersBundle,
+      });
+
+      if (storageKey) localStorage.removeItem(storageKey);
+      if (unsyncedStorageKey) localStorage.removeItem(unsyncedStorageKey);
+
       showSuccess("CBT exam submitted.");
       setAttempt(null);
       setExamPaper(null);
@@ -541,6 +745,16 @@ export default function PublicCbtAccessPage() {
                   </div>
                 </div>
                 <div className="pcbt-actions">
+                  <span
+                    className="pcbt-pill"
+                    style={{
+                      background: syncStatus === "offline_saved" || !isOnline ? "#FEF3C7" : syncStatus === "syncing" ? "#E0F2FE" : "#DCFCE7",
+                      color: syncStatus === "offline_saved" || !isOnline ? "#92400E" : syncStatus === "syncing" ? "#0369A1" : "#166534",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {syncStatus === "syncing" ? "🔄 Syncing answers..." : (!isOnline || syncStatus === "offline_saved") ? `🟡 Saved locally (${unsyncedQuestionIds.length || 1} pending sync)` : "🟢 All answers synced"}
+                  </span>
                   <div className={`pcbt-timer ${(remainingSeconds ?? 9999) <= 300 ? "danger" : ""}`}>
                     <span>Time left</span>
                     <strong>{remainingSeconds === null ? "--:--" : formatTime(remainingSeconds)}</strong>
