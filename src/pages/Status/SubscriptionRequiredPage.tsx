@@ -139,7 +139,7 @@ export default function SubscriptionRequiredPage() {
         </div>
         <h1 className="gq-status-title">Upgrade Package Required</h1>
         <p className="gq-status-desc">
-          This feature is exclusive to the <strong>GradiosEdu Plus</strong> suite or your active subscription period has expired. Upgrade or renew to unlock full access.
+          This feature is exclusive to the <strong>SchoolProfit Plus</strong> suite or your active subscription period has expired. Upgrade or renew to unlock full access.
         </p>
 
         <div className="gq-status-actions">

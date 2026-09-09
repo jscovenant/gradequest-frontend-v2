@@ -343,7 +343,7 @@ export default function SchoolOperatorsPage() {
       `}</style>
 
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-      <PageTitle title="School Operators & Delegated Managers | GradiosEdu" />
+      <PageTitle title="School Operators & Delegated Managers | SchoolProfit" />
 
       <div className="container-fluid">
         <div className="row">

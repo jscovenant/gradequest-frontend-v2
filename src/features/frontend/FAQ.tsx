@@ -6,18 +6,18 @@ type FAQ = { q: string; a: string; tag: string };
 const FAQS: FAQ[] = [
   {
     tag: "Security",
-    q: "How secure is our school's academic and financial data on GradiosEdu?",
+    q: "How secure is our school's academic and financial data on SchoolProfit?",
     a: "Bank-grade. All data is encrypted both at rest (AES-256) and in transit (SSL/TLS). Every account uses strict role-based access control — meaning teachers only access their assigned classes, bursars manage finance ledgers, and proprietors maintain overarching branch oversight. We perform automated daily backups and maintain detailed audit logs.",
   },
   {
     tag: "Results",
     q: "How does automated result computation and broadsheet compilation work?",
-    a: "Teachers upload Continuous Assessment (CA) and examination scores through their authenticated portal. GradiosEdu automatically computes totals, weighted averages, class positions, and cumulative GPAs adhering to NERDC standards — generating print-ready master broadsheets and transcripts in seconds.",
+    a: "Teachers upload Continuous Assessment (CA) and examination scores through their authenticated portal. SchoolProfit automatically computes totals, weighted averages, class positions, and cumulative GPAs adhering to NERDC standards — generating print-ready master broadsheets and transcripts in seconds.",
   },
   {
     tag: "CBT Exams",
     q: "Can we conduct computer-based assessments in our lab without full-time internet?",
-    a: "Yes. GradiosEdu features a hybrid LAN offline testing engine. Computer laboratories can administer continuous assessments, mock exams, and timed tests on a local network. Student answers are auto-saved locally in real-time and synchronize seamlessly to academic records when connected.",
+    a: "Yes. SchoolProfit features a hybrid LAN offline testing engine. Computer laboratories can administer continuous assessments, mock exams, and timed tests on a local network. Student answers are auto-saved locally in real-time and synchronize seamlessly to academic records when connected.",
   },
   {
     tag: "Bursary",
@@ -571,7 +571,7 @@ export default function FAQ() {
               </a>
 
               <a
-                href={whatsappLink("Hello GradiosEdu, I have a few questions regarding the platform for our school.")}
+                href={whatsappLink("Hello SchoolProfit, I have a few questions regarding the platform for our school.")}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn btn-fq-ghost d-inline-flex align-items-center gap-2 px-4 py-3"

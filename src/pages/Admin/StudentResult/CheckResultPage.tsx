@@ -662,7 +662,7 @@ export default function CheckResultPage() {
 
   return (
     <main className="gq-cr-page">
-      <PageTitle title="Student Result Checker | GradiosEdu" />
+      <PageTitle title="Student Result Checker | SchoolProfit" />
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Cinzel:wght@600;700;800&display=swap');
@@ -1028,7 +1028,7 @@ export default function CheckResultPage() {
           <Link to="/" className="gq-cr-brand">
             <div className="gq-cr-logo-badge">GQ</div>
             <div>
-              <div className="gq-cr-brand-title">GradiosEdu Portal</div>
+              <div className="gq-cr-brand-title">SchoolProfit Portal</div>
               <div className="gq-cr-brand-sub">Academic Records & Result Verification</div>
             </div>
           </Link>

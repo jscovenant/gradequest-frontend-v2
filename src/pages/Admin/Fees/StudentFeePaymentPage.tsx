@@ -40,13 +40,34 @@ type StudentFee = {
   session?: SessionRel | null;
 };
 
+type FullPaymentDiscount = {
+  enabled: boolean;
+  discount_type: "percentage" | "fixed";
+  discount_value: number;
+  discount_amount: number;
+  original_balance: number;
+  discounted_payable_amount: number;
+  formatted_discount: string;
+  message: string;
+};
+
+type InstallmentPreset = {
+  label: string;
+  percent: number;
+  amount: number;
+  original_amount?: number;
+  discount_amount?: number;
+  discount_applied?: boolean;
+};
+
 type InstallmentPlan = {
   enabled: boolean;
   installment_type: string;
   min_initial_percent: number;
   min_initial_amount: number;
   min_payable_now: number;
-  presets: Array<{ label: string; percent: number; amount: number }>;
+  presets: InstallmentPreset[];
+  full_payment_discount?: FullPaymentDiscount | null;
   message: string;
 };
 
@@ -54,6 +75,7 @@ type StudentFeeDetailsResponse = {
   student: StudentInfo;
   fees: StudentFee[];
   installment_plan?: InstallmentPlan;
+  full_payment_discount?: FullPaymentDiscount | null;
 };
 
 type PayFeeResponse = {
@@ -124,6 +146,7 @@ export default function StudentFeePaymentPage() {
   const [student, setStudent] = useState<StudentInfo | null>(null);
   const [fees, setFees] = useState<StudentFee[]>([]);
   const [installmentPlan, setInstallmentPlan] = useState<InstallmentPlan | null>(null);
+  const [fullDiscount, setFullDiscount] = useState<FullPaymentDiscount | null>(null);
 
   // UI state
   const [filter, setFilter] = useState("");
@@ -132,9 +155,11 @@ export default function StudentFeePaymentPage() {
 
   // pay modal
   const [showPay, setShowPay] = useState(false);
+  const [selectedFee, setSelectedFee] = useState<StudentFee | null>(null);
   const [payFeeId, setPayFeeId] = useState<number | null>(null);
   const [payMethod, setPayMethod] = useState<string>("");
   const [payAmount, setPayAmount] = useState<string>("");
+  const [applyFullDiscount, setApplyFullDiscount] = useState(false);
 
   useEffect(() => {
     const t = window.setTimeout(() => setLoadingPage(false), 120);
@@ -190,12 +215,14 @@ export default function StudentFeePaymentPage() {
       setStudent(res.data?.student ?? null);
       setFees(Array.isArray(res.data?.fees) ? res.data.fees : []);
       setInstallmentPlan(res.data?.installment_plan ?? null);
+      setFullDiscount(res.data?.full_payment_discount ?? res.data?.installment_plan?.full_payment_discount ?? null);
       showSuccess("Student fee details loaded.");
     } catch (e: any) {
       console.error(e);
       setStudent(null);
       setFees([]);
       setInstallmentPlan(null);
+      setFullDiscount(null);
       showError(getErrorMessage(e));
     } finally {
       setLoadingDetails(false);
@@ -207,8 +234,10 @@ export default function StudentFeePaymentPage() {
   ========================= */
   function openPayModal(f: StudentFee) {
     if (!f?.id) return;
+    setSelectedFee(f);
     setPayFeeId(f.id);
     setPayMethod("");
+    setApplyFullDiscount(false);
     setPayAmount(String(Math.max(0, Number(f.balance ?? 0))));
     setShowPay(true);
   }
@@ -227,6 +256,7 @@ export default function StudentFeePaymentPage() {
         student_fee_id: payFeeId,
         amount: amountNum,
         payment_method: method,
+        apply_full_discount: applyFullDiscount,
       });
 
       showSuccess(res.data?.message ?? "Payment successful.");
@@ -804,6 +834,63 @@ export default function StudentFeePaymentPage() {
                   </div>
                 )}
 
+                {fullDiscount?.enabled && (
+                  <div
+                    style={{
+                      background: "linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)",
+                      border: "1px solid #6EE7B7",
+                      borderRadius: 14,
+                      padding: "14px 18px",
+                      marginBottom: 18,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 14,
+                      flexWrap: "wrap",
+                      boxShadow: "0 2px 8px rgba(5, 150, 105, 0.06)",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 10,
+                          background: "#059669",
+                          color: "#FFFFFF",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 18,
+                        }}
+                      >
+                        <i className="bi bi-tag-fill" />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 14, color: "#065F46" }}>
+                          Full-Payment Early Incentive Active ({fullDiscount.formatted_discount} Discount)
+                        </div>
+                        <div style={{ fontSize: 12.5, color: "#047857" }}>
+                          {fullDiscount.message || `Full upfront settlements save ${fullDiscount.formatted_discount} (${naira(fullDiscount.discount_amount)}).`}
+                        </div>
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        background: "#047857",
+                        color: "#FFFFFF",
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        padding: "5px 12px",
+                        borderRadius: 999,
+                        letterSpacing: "0.03em",
+                      }}
+                    >
+                      <i className="bi bi-patch-check-fill me-1" /> Discount Active
+                    </span>
+                  </div>
+                )}
+
                 {/* Fees Table */}
                 <div className="db-panel">
                   <div className="db-panel-head">
@@ -1112,6 +1199,71 @@ export default function StudentFeePaymentPage() {
                         </div>
                       </div>
 
+                      {/* Full-Payment Incentive Switch */}
+                      {fullDiscount?.enabled && selectedFee && (
+                        <div
+                          className="col-12"
+                          style={{
+                            background: applyFullDiscount ? "#F0FDF4" : "#F8FAFC",
+                            border: `1.5px solid ${applyFullDiscount ? "#86EFAC" : "#E2E8F0"}`,
+                            borderRadius: 12,
+                            padding: "14px 16px",
+                            transition: "all 0.15s ease",
+                          }}
+                        >
+                          <div className="d-flex align-items-center justify-content-between mb-0">
+                            <label
+                              className="form-check-label fw-bold small text-dark d-flex align-items-center gap-2 mb-0"
+                              htmlFor="applyDiscountSwitch"
+                              style={{ cursor: "pointer" }}
+                            >
+                              <i className="bi bi-tag-fill text-success fs-6" />
+                              <div>
+                                <div>Apply Full-Payment Early Settlement Discount</div>
+                                <div className="text-muted fw-normal" style={{ fontSize: 11.5 }}>
+                                  {fullDiscount.formatted_discount} discount on full fee settlement
+                                </div>
+                              </div>
+                            </label>
+                            <div className="form-check form-switch m-0">
+                              <input
+                                className="form-check-input"
+                                type="checkbox"
+                                role="switch"
+                                id="applyDiscountSwitch"
+                                style={{ width: "2.4em", height: "1.2em", cursor: "pointer" }}
+                                checked={applyFullDiscount}
+                                disabled={busyKey !== null}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setApplyFullDiscount(checked);
+                                  const feeBal = Number(selectedFee.balance || 0);
+                                  const feeTotal = Number(selectedFee.total_amount || 0);
+                                  if (checked) {
+                                    const disc =
+                                      fullDiscount.discount_type === "percentage"
+                                        ? (fullDiscount.discount_value / 100) * (feeTotal > 0 ? feeTotal : feeBal)
+                                        : fullDiscount.discount_value;
+                                    const finalDisc = Math.min(disc, feeBal);
+                                    setPayAmount(String(Math.max(0, Math.round((feeBal - finalDisc) * 100) / 100)));
+                                  } else {
+                                    setPayAmount(String(feeBal));
+                                  }
+                                }}
+                              />
+                            </div>
+                          </div>
+                          {applyFullDiscount && (
+                            <div className="mt-2 pt-2 border-top small text-success fw-semibold d-flex justify-content-between align-items-center">
+                              <span>Settles Fee in Full at Discount:</span>
+                              <span className="badge bg-success text-white">
+                                Pay {naira(Number(payAmount))} (Waives {naira(Math.max(0, Number(selectedFee.balance || 0) - Number(payAmount)))})
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       <div className="col-12">
                         <div className="d-flex justify-content-between align-items-center mb-1">
                           <label className="form-label fw-semibold small mb-0">Amount (₦) *</label>
@@ -1132,18 +1284,38 @@ export default function StudentFeePaymentPage() {
                         {/* Quick Presets */}
                         {installmentPlan?.presets && installmentPlan.presets.length > 0 && (
                           <div className="d-flex gap-2 mb-2 flex-wrap">
-                            {installmentPlan.presets.map((preset, pIdx) => (
-                              <button
-                                key={pIdx}
-                                type="button"
-                                className={`btn btn-sm ${payAmount === String(preset.amount) ? "btn-primary" : "btn-outline-primary"}`}
-                                style={{ borderRadius: 8, fontSize: 12, fontWeight: 600 }}
-                                onClick={() => setPayAmount(String(preset.amount))}
-                                disabled={busyKey !== null}
-                              >
-                                {preset.label} ({naira(preset.amount)})
-                              </button>
-                            ))}
+                            {installmentPlan.presets.map((preset, pIdx) => {
+                              const isSelected = payAmount === String(preset.amount);
+                              const isDiscountPreset = Boolean(preset.discount_applied);
+                              return (
+                                <button
+                                  key={pIdx}
+                                  type="button"
+                                  className={`btn btn-sm ${
+                                    isSelected
+                                      ? isDiscountPreset
+                                        ? "btn-success"
+                                        : "btn-primary"
+                                      : isDiscountPreset
+                                      ? "btn-outline-success"
+                                      : "btn-outline-primary"
+                                  }`}
+                                  style={{ borderRadius: 8, fontSize: 12, fontWeight: 600 }}
+                                  onClick={() => {
+                                    setPayAmount(String(preset.amount));
+                                    if (preset.discount_applied) {
+                                      setApplyFullDiscount(true);
+                                    } else {
+                                      setApplyFullDiscount(false);
+                                    }
+                                  }}
+                                  disabled={busyKey !== null}
+                                >
+                                  {isDiscountPreset && <i className="bi bi-patch-check-fill me-1" />}
+                                  {preset.label} ({naira(preset.amount)})
+                                </button>
+                              );
+                            })}
                           </div>
                         )}
 
@@ -1155,7 +1327,11 @@ export default function StudentFeePaymentPage() {
                           onChange={(e) => setPayAmount(e.target.value)}
                           disabled={busyKey !== null}
                         />
-                        <div className="form-text">Backend will reject if amount exceeds the remaining balance.</div>
+                        <div className="form-text">
+                          {applyFullDiscount
+                            ? "Full payment discount applied: Settles fee in full upon payment."
+                            : "Backend will reject if amount exceeds the remaining balance."}
+                        </div>
                       </div>
 
                       <div className="col-12">

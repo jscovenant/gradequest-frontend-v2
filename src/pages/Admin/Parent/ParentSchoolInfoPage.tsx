@@ -224,7 +224,7 @@ export default function ParentSchoolInfoPage() {
       `}</style>
 
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-      <PageTitle title="School Information & Calendar - GradiosEdu" />
+      <PageTitle title="School Information & Calendar - SchoolProfit" />
 
       <div className="container-fluid">
         <div className="row">

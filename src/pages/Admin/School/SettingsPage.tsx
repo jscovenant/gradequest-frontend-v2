@@ -501,7 +501,7 @@ const removeDomain = async () => {
                   </div>
 
                   <h1 className="db-greeting">
-                    Configure <em>GradiosEdu</em>
+                    Configure <em>SchoolProfit</em>
                   </h1>
 
                   <p className="db-hero-sub">
@@ -647,7 +647,7 @@ const removeDomain = async () => {
                             className="form-control"
                             value={school.schoolName}
                             onChange={(e) => setSchool((p) => ({ ...p, schoolName: e.target.value }))}
-                            placeholder="e.g. GradiosEdu Academy"
+                            placeholder="e.g. SchoolProfit Academy"
                             required
                             disabled={loading || saving}
                           />
@@ -864,7 +864,7 @@ const removeDomain = async () => {
                     >
                       <i className="bi bi-shield-check" />
                       <span>
-                        <strong>{domainRecord.domain}</strong> is active. Users can now open the GradiosEdu portal through this domain.
+                        <strong>{domainRecord.domain}</strong> is active. Users can now open the SchoolProfit portal through this domain.
                       </span>
                     </div>
                   )}

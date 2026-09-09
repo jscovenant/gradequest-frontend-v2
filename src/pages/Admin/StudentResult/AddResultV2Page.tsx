@@ -1510,7 +1510,7 @@ export default function AddResultV2Page() {
                                 className="btn btn-outline-primary btn-sm"
                                 onClick={generateAiComments}
                                 disabled={!student || !batchId || aiCommenting || saving || (aiCredits && aiCredits.is_plus_active === false)}
-                                title={aiCredits && aiCredits.is_plus_active === false ? "Requires GradiosEdu Plus" : "1 credit per generation"}
+                                title={aiCredits && aiCredits.is_plus_active === false ? "Requires SchoolProfit Plus" : "1 credit per generation"}
                               >
                                 {aiCommenting ? (
                                   <>

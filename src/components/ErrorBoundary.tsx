@@ -20,7 +20,7 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("GradiosEdu Uncaught Runtime Error:", error, errorInfo);
+    console.error("SchoolProfit Uncaught Runtime Error:", error, errorInfo);
   }
 
   public render() {

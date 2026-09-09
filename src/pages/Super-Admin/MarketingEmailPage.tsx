@@ -77,7 +77,7 @@ export default function MarketingEmailPage() {
   // form
   const [subject, setSubject] = useState("");
   const [content, setContent] = useState(
-    "Hello {firstname},\n\nWe have a quick update for you...\n\nRegards,\nGradiosEdu Team"
+    "Hello {firstname},\n\nWe have a quick update for you...\n\nRegards,\nSchoolProfit Team"
   );
 
   // optional: paste emails

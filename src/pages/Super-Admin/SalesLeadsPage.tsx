@@ -1,4 +1,4 @@
-﻿import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import TopNav from "../../components/LayoutComponents/TopNav";
 import Sidebar from "../../components/LayoutComponents/Sidebar";
@@ -236,7 +236,7 @@ export default function SalesLeadsManagementPage() {
             <div>
               <span className="sales-eyebrow"><i className="bi bi-kanban" /> Lead conversion desk</span>
               <h1>Review sales leads and open school accounts</h1>
-              <p>Track leads from sales representatives, move them through the pipeline, and convert qualified schools into real GradiosEdu admin accounts.</p>
+              <p>Track leads from sales representatives, move them through the pipeline, and convert qualified schools into real SchoolProfit admin accounts.</p>
             </div>
             <div className="sales-hero-actions">
               <button className="sales-btn sales-btn-light" type="button" onClick={loadLeads}>

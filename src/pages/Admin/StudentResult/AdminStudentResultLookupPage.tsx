@@ -170,7 +170,7 @@ export default function AdminStudentResultLookupPage() {
   const [student, setStudent] = useState<Student | null>(null);
   const [studentPhotoBase64, setStudentPhotoBase64] = useState<string | null>(null);
   const [schoolInfo, setSchoolInfo] = useState<SchoolInfo>({
-    name: "GradiosEdu Academic Partner School",
+    name: "SchoolProfit Academic Partner School",
     address: "Academic Campus",
     phone: "",
     primary_color: "#0d47a1",
@@ -671,7 +671,7 @@ export default function AdminStudentResultLookupPage() {
 
   return (
     <div className="admin-result-editor-layout">
-      <PageTitle title="Student Result Lookup & Editor | GradiosEdu" />
+      <PageTitle title="Student Result Lookup & Editor | SchoolProfit" />
 
       <style>{`
         .db-main {

@@ -321,7 +321,7 @@ export default function ReceiptUploadPage() {
       `}</style>
 
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-      <PageTitle title="Upload Payment Receipt - GradiosEdu" />
+      <PageTitle title="Upload Payment Receipt - SchoolProfit" />
 
       <div className="container-fluid">
         <div className="row">

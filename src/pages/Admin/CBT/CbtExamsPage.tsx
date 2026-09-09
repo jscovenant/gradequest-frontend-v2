@@ -820,7 +820,7 @@ export default function CbtExamsPage() {
   async function generateAiQuestions() {
     if (!selectedExamId) return showError("Select an exam first.");
     if (aiCreditSummary && aiCreditSummary.is_plus_active === false) {
-      return showError("AI question generation is available on the GradiosEdu Plus package.");
+      return showError("AI question generation is available on the SchoolProfit Plus package.");
     }
     const selectedLessonNoteIds = Array.isArray(aiForm.lesson_note_ids) ? aiForm.lesson_note_ids : [];
     if (!aiFile && selectedLessonNoteIds.length === 0 && !aiForm.topics.trim() && !aiForm.source_text.trim()) return showError("Select one or more saved lesson notes, upload a note, or enter topics first.");
@@ -828,23 +828,24 @@ export default function CbtExamsPage() {
     setAiGenerating(true);
     setAiDraft(null);
     try {
-      const payload = new FormData();
-      if (aiFile) payload.append("source_file", aiFile);
-      selectedLessonNoteIds.forEach((id) => payload.append("lesson_note_ids[]", id));
-      payload.append("topics", aiForm.topics);
-      payload.append("source_text", aiForm.source_text);
-      payload.append("question_count", String(aiForm.question_count));
-      payload.append("difficulty", aiForm.difficulty);
-      payload.append("marks_per_question", String(aiForm.marks_per_question));
-      aiForm.formats.forEach((format) => payload.append("formats[]", format));
+      const form = new FormData();
+      if (aiFile) form.append("source_file", aiFile);
+      selectedLessonNoteIds.forEach((id) => form.append("lesson_note_ids[]", String(id)));
+      form.append("topics", aiForm.topics);
+      form.append("source_text", aiForm.source_text);
+      form.append("count", String(aiForm.count));
+      form.append("difficulty", aiForm.difficulty);
+      form.append("style", aiForm.style);
+      form.append("custom_instruction", aiForm.custom_instruction);
 
-      const res = await authApi.post("/cbt/exams/" + selectedExamId + "/questions/ai-generate", payload, {
+      const res = await authApi.post(`/admin/cbt/exams/${selectedExamId}/ai/generate-questions`, form, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      setAiDraft(res.data?.draft || null);
-      showSuccess(res.data?.message || "AI draft generated.");
-    } catch (e: any) {
-      showError(safeAiError(e?.response?.data?.message, "Unable to generate AI questions."));
+      setAiDraft(res.data?.data || null);
+      showSuccess("AI draft questions generated. Review and import below.");
+      authApi.get("/admin/ai/credits").then((r) => setAiCreditSummary(r.data?.data || null)).catch(() => undefined);
+    } catch (err: any) {
+      showError(err?.response?.data?.message || err?.message || "Failed to generate questions with AI.");
     } finally {
       setAiGenerating(false);
     }
@@ -937,11 +938,11 @@ export default function CbtExamsPage() {
       const base = getApiBaseUrl().replace(/\/+$/, "");
       const directUrl = `${base}/public/cbt/offline/installer/download?token=${encodeURIComponent(token)}`;
 
-      showSuccess("Downloading GradiosEdu Offline CBT Setup (106 MB)... Check your browser's download bar.");
+      showSuccess("Downloading SchoolProfit Offline CBT Setup (106 MB)... Check your browser's download bar.");
 
       const a = document.createElement("a");
       a.href = directUrl;
-      a.download = "GradiosEduOfflineCBTSetup.exe";
+      a.download = "SchoolProfitOfflineCBTSetup.exe";
       a.target = "_blank";
       document.body.appendChild(a);
       a.click();
@@ -2233,7 +2234,7 @@ export default function CbtExamsPage() {
                 <div className="cbt-manual-card">
                   <h3>Offline CBT</h3>
                   <ol>
-                    <li>Install the GradiosEdu Offline CBT app on the server computer.</li>
+                    <li>Install the SchoolProfit Offline CBT app on the server computer.</li>
                     <li>Create and publish an exam with Offline/LAN or Online and Offline mode.</li>
                     <li>Open Offline Package and click Download Offline Package close to exam time.</li>
                     <li>Upload the downloaded JSON package inside the offline app on the server computer.</li>
@@ -2297,7 +2298,7 @@ export default function CbtExamsPage() {
               {aiCreditSummary && aiCreditSummary.is_plus_active === false && (
                 <div className="alert alert-warning py-2 px-3 mb-3 small" style={{ borderRadius: "10px" }}>
                   <i className="bi bi-exclamation-triangle-fill me-1" />
-                  <strong>GradiosEdu Plus Required:</strong> AI Question generation requires an active GradiosEdu Plus subscription.
+                  <strong>SchoolProfit Plus Required:</strong> AI Question generation requires an active SchoolProfit Plus subscription.
                 </div>
               )}
               <div className="cbt-import-box">

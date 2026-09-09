@@ -333,7 +333,7 @@ export default function WhatsAppSettingsPage() {
                     Send via <em>WhatsApp</em>
                   </h1>
                   <p className="db-hero-sub">
-                    Send result sheets, fee reminders and custom broadcasts to parents directly on WhatsApp — powered by GradiosEdu. No setup required on your end.
+                    Send result sheets, fee reminders and custom broadcasts to parents directly on WhatsApp — powered by SchoolProfit. No setup required on your end.
                   </p>
                   <div className="db-hero-btns">
                     <span className="db-pill" style={{
@@ -410,7 +410,7 @@ export default function WhatsAppSettingsPage() {
                   <div className="db-panel-head">
                     <div>
                       <p className="db-panel-title">WhatsApp notifications</p>
-                      <p className="db-panel-sub">Messages are sent from GradiosEdu's WhatsApp number on your behalf.</p>
+                      <p className="db-panel-sub">Messages are sent from SchoolProfit's WhatsApp number on your behalf.</p>
                     </div>
                     <StatusBadge enabled={settings.whatsapp_enabled} />
                   </div>
@@ -418,7 +418,7 @@ export default function WhatsAppSettingsPage() {
                   <div style={{ padding: 16 }}>
                     <div className="wa-callout wa-callout-info mb-3">
                       <i className="bi bi-info-circle me-1" />
-                      <strong>No setup required.</strong> GradiosEdu handles all WhatsApp delivery via a shared number. Your school name is always included in every message so parents know who sent it.
+                      <strong>No setup required.</strong> SchoolProfit handles all WhatsApp delivery via a shared number. Your school name is always included in every message so parents know who sent it.
                     </div>
 
                     <div className="db-kv">
@@ -462,7 +462,7 @@ export default function WhatsAppSettingsPage() {
 
                     <div className="db-muted mt-2" style={{ fontSize: 12.5 }}>
                       <i className="bi bi-whatsapp me-1" style={{ color: "#25d366" }} />
-                      Messages appear from GradiosEdu's number with your school name in the body.
+                      Messages appear from SchoolProfit's number with your school name in the body.
                     </div>
                   </div>
                 </div>

@@ -437,7 +437,7 @@ export default function AiCreditsPage() {
                 <div>
                   <div className="ai-credit-kicker db-session-badge">
                     <i className="bi bi-stars" />
-                    <span>GradiosEdu Plus AI</span>
+                    <span>SchoolProfit Plus AI</span>
                   </div>
                   <h1 className="db-greeting">AI Credit Management & Staff Quotas</h1>
                   <p className="db-hero-sub">
@@ -459,15 +459,15 @@ export default function AiCreditsPage() {
                 </button>
               </section>
 
-              {/* GradiosEdu Plus Check Warning */}
+              {/* SchoolProfit Plus Check Warning */}
               {summary && summary.is_plus_active === false && (
                 <div className="alert alert-warning d-flex align-items-center gap-3 p-3 mb-2" style={{ borderRadius: "14px" }}>
                   <i className="bi bi-exclamation-triangle-fill fs-3 text-warning" />
                   <div>
-                    <h4 className="fs-6 fw-bold mb-1">GradiosEdu Plus Package Required</h4>
+                    <h4 className="fs-6 fw-bold mb-1">SchoolProfit Plus Package Required</h4>
                     <p className="mb-0 text-muted" style={{ fontSize: "13px" }}>
-                      AI Features and credit allowances are exclusively enabled for schools on the <strong>GradiosEdu Plus</strong> plan.
-                      {!isAdmin && " Please contact your school administrator to upgrade to GradiosEdu Plus."}
+                      AI Features and credit allowances are exclusively enabled for schools on the <strong>SchoolProfit Plus</strong> plan.
+                      {!isAdmin && " Please contact your school administrator to upgrade to SchoolProfit Plus."}
                     </p>
                   </div>
                 </div>
@@ -564,7 +564,7 @@ export default function AiCreditsPage() {
                       <div className="mt-4">
                         <div className="ai-credit-row">
                           <span className="ai-credit-label">Current Package</span>
-                          <span className="ai-credit-value">{summary?.current_package || "GradiosEdu Plus"}</span>
+                          <span className="ai-credit-value">{summary?.current_package || "SchoolProfit Plus"}</span>
                         </div>
                         <div className="ai-credit-row">
                           <span className="ai-credit-label">AI Access Valid Until</span>
@@ -573,9 +573,15 @@ export default function AiCreditsPage() {
                         {isAdmin && (
                           <div className="ai-credit-row">
                             <span className="ai-credit-label">Extra AI Credit Price</span>
-                            <span className="ai-credit-value">{fmtMoney(summary?.ai_credit_unit_price)}</span>
+                            <span className="ai-credit-value">{fmtMoney(summary?.ai_credit_unit_price ?? 50)} / credit</span>
                           </div>
                         )}
+                        <div className="ai-credit-row">
+                          <span className="ai-credit-label">AI Status</span>
+                          <span className="ai-credit-value" style={{ color: "#15803d" }}>
+                            {summary?.is_plus_active === false ? "Paused (Plus Required)" : "Active"}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Buy Extra Credits - Only for Administrators */}
@@ -639,7 +645,7 @@ export default function AiCreditsPage() {
                     <div className="ai-credit-pad">
                       <div className="ai-credit-head">
                         <div>
-                          <h2 className="ai-credit-card-title">GradiosEdu Standard Rates</h2>
+                          <h2 className="ai-credit-card-title">SchoolProfit Standard Rates</h2>
                           <p className="ai-credit-muted">Fixed credit costs per AI feature.</p>
                         </div>
                       </div>

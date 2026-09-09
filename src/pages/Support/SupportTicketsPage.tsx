@@ -520,7 +520,7 @@ export default function SupportTicketsPage() {
       <TopNav
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
-        title={platform ? "Support Desk" : "GradiosEdu Support"}
+        title={platform ? "Support Desk" : "SchoolProfit Support"}
       />
 
       <div className="container-fluid">
@@ -543,7 +543,7 @@ export default function SupportTicketsPage() {
                   <p className="db-hero-sub">
                     {platform
                       ? "Manage incoming support tickets, triage technical questions, and reply to school administrators."
-                      : "Submit technical inquiries, report discrepancies, and chat directly with GradiosEdu support engineers."}
+                      : "Submit technical inquiries, report discrepancies, and chat directly with SchoolProfit support engineers."}
                   </p>
                   {!platform && (
                     <div className="mt-3">

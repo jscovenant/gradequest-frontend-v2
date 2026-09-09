@@ -252,7 +252,7 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
           <h5 className="gq-topnav__title">
             {title ?? "Dashboard"}
           </h5>
-          <div className="gq-topnav__subtitle">GradiosEdu workspace</div>
+          <div className="gq-topnav__subtitle">SchoolProfit workspace</div>
         </div>
       </div>
 

@@ -60,7 +60,7 @@ const SettingsPage = lazy(() => import("./pages/Admin/School/SettingsPage"));
 const PromoteStudentsPage = lazy(() => import("./pages/Admin/students/PromoteStudentsPage"));
 const BillingPage = lazy(() => import("./pages/Admin/Billing/BillingPage"));
 const CheckoutPage = lazy(() => import("./pages/Admin/Billing/CheckoutPage"));
-const GradiosEduInvoicePaymentPage = lazy(() => import("./pages/Admin/Billing/GradiosEduInvoicePaymentPage"));
+const SchoolProfitInvoicePaymentPage = lazy(() => import("./pages/Admin/Billing/SchoolProfitInvoicePaymentPage"));
 const WalletPage = lazy(() => import("./pages/Admin/Wallet/WalletPage"));
 const AdminUserDetailsPage = lazy(() => import("./pages/Super-Admin/AdminUserDetailsPage"));
 const SubscribersManagementPage = lazy(() => import("./pages/Super-Admin/SubscribersManagementPage"));
@@ -1057,7 +1057,7 @@ function App() {
             element={
               <RequireAuth roles={["Admin"]}>
                 <OnboardingGuard>
-                  <GradiosEduInvoicePaymentPage />
+                  <SchoolProfitInvoicePaymentPage />
                 </OnboardingGuard>
               </RequireAuth>
             }

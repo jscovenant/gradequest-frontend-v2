@@ -340,7 +340,7 @@ export default function ForgotPasswordPage() {
                 <path d="M10 10l7-4M10 10v8M10 10L3 6" stroke="#0f172a" strokeWidth="1.4" strokeLinecap="round"/>
               </svg>
             </div>
-            <span className="fp-logo-name">Gradios<span>Edu</span></span>
+            <span className="fp-logo-name">School<span>Profit</span></span>
           </div>
 
           <div className="fp-form-header">

@@ -864,7 +864,7 @@ export default function AiLessonPlanPage() {
               <div>
                 <div className="lp-kicker db-session-badge">
                   <i className="bi bi-stars" />
-                  <span>GradiosEdu AI Academic tools</span>
+                  <span>SchoolProfit AI Academic tools</span>
                 </div>
                 <h1 className="lp-title db-greeting">AI Teaching Workspace</h1>
                 <p className="lp-sub db-hero-sub">Generate and manage comprehensive schemes of work, lesson plans, and classroom lesson notes tailored to your curriculum.</p>
@@ -874,9 +874,9 @@ export default function AiLessonPlanPage() {
               <div className="alert alert-warning py-3 px-4 mb-3 d-flex align-items-center gap-3" style={{ borderRadius: "14px" }}>
                 <i className="bi bi-exclamation-triangle-fill fs-4 text-warning" />
                 <div>
-                  <h4 className="fs-6 fw-bold mb-1">GradiosEdu Plus Package Required</h4>
+                  <h4 className="fs-6 fw-bold mb-1">SchoolProfit Plus Package Required</h4>
                   <p className="mb-0 text-muted" style={{ fontSize: "13px" }}>
-                    AI Scheme of Work, Lesson Plan, and Lesson Note generators require an active <strong>GradiosEdu Plus</strong> subscription. Please contact your school administrator to activate the Plus package.
+                    AI Scheme of Work, Lesson Plan, and Lesson Note generators require an active <strong>SchoolProfit Plus</strong> subscription. Please contact your school administrator to activate the Plus package.
                   </p>
                 </div>
               </div>

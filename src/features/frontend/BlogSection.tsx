@@ -42,7 +42,7 @@ const DEFAULT_FEATURED_ARTICLES: BlogItem[] = [
     slug: "digital-report-cards-scratch-pins-schools",
     category: "Academic Operations",
     excerpt:
-      "Eliminate manual transcript errors and provide parents 24/7 online portal access with customizable, tamper-proof GradiosEdu result templates.",
+      "Eliminate manual transcript errors and provide parents 24/7 online portal access with customizable, tamper-proof SchoolProfit result templates.",
     created_at: new Date(Date.now() - 12 * 86400000).toISOString(),
     thumbnail_url: "/images/blog/blog-digital-report-cards.jpg",
   },
@@ -277,7 +277,7 @@ export default function BlogSection() {
               From Our Blog: <span>Modern School Leadership</span>
             </h2>
             <p className="gq-blog-sub">
-              Actionable insights, fee collection strategies, computerized examination techniques, and administrative best practices from the GradiosEdu team.
+              Actionable insights, fee collection strategies, computerized examination techniques, and administrative best practices from the SchoolProfit team.
             </p>
           </div>
 

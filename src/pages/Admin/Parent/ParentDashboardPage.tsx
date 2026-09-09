@@ -714,7 +714,7 @@ export default function ParentDashboardPage() {
           <main className="col-md-9 col-lg-10 ms-auto gq-app-main parent-db-main d-flex flex-column min-vh-100">
             {loading && <Loader message="Loading parent dashboard..." />}
 
-            {/* ── Signature GradiosEdu Jumbotron ── */}
+            {/* ── Signature SchoolProfit Jumbotron ── */}
             <div className="parent-hero">
               <div className="parent-hero-glow" />
               <div className="parent-hero-glow2" />

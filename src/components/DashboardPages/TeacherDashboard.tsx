@@ -916,7 +916,7 @@ export default function TeacherDashboard() {
           <main className="col-md-9 col-lg-10 ms-auto gq-app-main teacher-db-main d-flex flex-column min-vh-100">
             {loading && <Loader message="Loading dashboard..." />}
 
-            {/* ── Signature GradiosEdu Hero ── */}
+            {/* ── Signature SchoolProfit Hero ── */}
             <div className="teacher-db-hero">
               <div className="teacher-db-hero-glow" />
               <div className="teacher-db-hero-glow2" />

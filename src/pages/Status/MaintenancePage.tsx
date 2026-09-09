@@ -172,7 +172,7 @@ export default function MaintenancePage() {
         </div>
 
         <div className="gq-status-footer">
-          Thank you for your patience &bull; GradiosEdu Operations Team
+          Thank you for your patience &bull; SchoolProfit Operations Team
         </div>
       </div>
     </main>

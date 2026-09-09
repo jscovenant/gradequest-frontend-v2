@@ -95,7 +95,7 @@ export default function Footer() {
     },
     {
       label: "WhatsApp",
-      href: whatsappLink("Hello GradiosEdu, I want to connect with your team."),
+      href: whatsappLink("Hello SchoolProfit, I want to connect with your team."),
       icon: (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path

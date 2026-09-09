@@ -31,13 +31,34 @@ type FeeItem = {
   status: string;
 };
 
+type FullPaymentDiscount = {
+  enabled: boolean;
+  discount_type: "percentage" | "fixed";
+  discount_value: number;
+  discount_amount: number;
+  original_balance: number;
+  discounted_payable_amount: number;
+  formatted_discount: string;
+  message: string;
+};
+
+type InstallmentPreset = {
+  label: string;
+  percent: number;
+  amount: number;
+  original_amount?: number;
+  discount_amount?: number;
+  discount_applied?: boolean;
+};
+
 type InstallmentPlan = {
   enabled: boolean;
   installment_type: string;
   min_initial_percent: number;
   min_initial_amount: number;
   min_payable_now: number;
-  presets: Array<{ label: string; percent: number; amount: number }>;
+  presets: InstallmentPreset[];
+  full_payment_discount?: FullPaymentDiscount | null;
   message: string;
 };
 
@@ -68,6 +89,7 @@ type StudentLookupResponse = {
     outstanding_items: number;
   };
   installment_plan?: InstallmentPlan;
+  full_payment_discount?: FullPaymentDiscount | null;
   charge_policy?: ChargePolicy;
   fees: FeeItem[];
 };
@@ -120,6 +142,9 @@ export default function PublicFeePaymentPage() {
   const balance = Number(studentData?.summary?.balance || 0);
   const numAmount = Number(amount || 0);
 
+  const fullDiscount = studentData?.installment_plan?.full_payment_discount || studentData?.full_payment_discount;
+  const isDiscountApplied = !!(fullDiscount?.enabled && fullDiscount.discount_amount > 0 && Math.abs(numAmount - fullDiscount.discounted_payable_amount) < 0.01);
+
   const chargePolicy = studentData?.charge_policy;
   const isParentBankBearer = chargePolicy?.bank_charge_bearer === "parent";
   const isParentPlatformBearer = chargePolicy?.platform_fee_bearer === "parent";
@@ -127,7 +152,8 @@ export default function PublicFeePaymentPage() {
   const platformFeeAmount = isParentPlatformBearer && numAmount > 0 ? Number(chargePolicy?.platform_fee_amount ?? 500) : 0;
   const totalPayableWithSurcharges = numAmount + bankChargeAmount + platformFeeAmount;
 
-  const canPay = !!school && !!studentData && numAmount >= 100 && numAmount <= (balance > 0 ? balance : Infinity) && !paying;
+  const maxPayable = isDiscountApplied && fullDiscount ? fullDiscount.discounted_payable_amount : (balance > 0 ? balance : Infinity);
+  const canPay = !!school && !!studentData && numAmount >= 100 && (numAmount <= maxPayable || numAmount <= balance) && !paying;
 
   // Handle Payment Verification on Return
   useEffect(() => {
@@ -205,7 +231,12 @@ export default function PublicFeePaymentPage() {
           setStudentData(res.data);
           if (res.data?.school) setSchool(res.data.school);
           if (!amount && Number(res.data?.summary?.balance || 0) > 0) {
-            setAmount(String(res.data.summary.balance));
+            const disc = res.data?.installment_plan?.full_payment_discount || res.data?.full_payment_discount;
+            if (disc?.enabled && disc.discount_amount > 0 && disc.discounted_payable_amount > 0) {
+              setAmount(String(disc.discounted_payable_amount));
+            } else {
+              setAmount(String(res.data.summary.balance));
+            }
           }
         })
         .catch((err) => {
@@ -1280,6 +1311,52 @@ export default function PublicFeePaymentPage() {
                         )}
                       </div>
 
+                      {/* Full-Payment Incentive Announcement */}
+                      {fullDiscount?.enabled && fullDiscount.discount_amount > 0 && (
+                        <div
+                          style={{
+                            background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
+                            border: '1.5px solid #6EE7B7',
+                            borderRadius: 12,
+                            padding: '12px 14px',
+                            marginTop: 10,
+                            marginBottom: 10,
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: 12,
+                            boxShadow: '0 2px 8px rgba(5, 150, 105, 0.08)'
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 34,
+                              height: 34,
+                              borderRadius: 10,
+                              background: '#059669',
+                              color: '#FFFFFF',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 16,
+                              flexShrink: 0
+                            }}
+                          >
+                            <i className="bi bi-tag-fill" />
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: 13, color: '#065F46', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              <span>🎉 Full-Payment Early Incentive Active!</span>
+                              <span style={{ background: '#047857', color: '#FFFFFF', fontSize: 10.5, fontWeight: 800, padding: '2px 8px', borderRadius: 999 }}>
+                                Save {fullDiscount.formatted_discount} ({money(fullDiscount.discount_amount)})
+                              </span>
+                            </div>
+                            <div style={{ fontSize: 12, color: '#047857', marginTop: 3, lineHeight: 1.45 }}>
+                              {fullDiscount.message || `Pay in full upfront for only ${money(fullDiscount.discounted_payable_amount)} instead of ${money(fullDiscount.original_balance)} to clear your term fees.`}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {studentData?.installment_plan?.enabled && (
                         <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 10, padding: '10px 12px', marginTop: 8, marginBottom: 8, fontSize: 12, color: '#1E40AF', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                           <i className="bi bi-info-circle-fill text-primary" style={{ fontSize: 15, marginTop: 1, flexShrink: 0 }} />
@@ -1304,14 +1381,32 @@ export default function PublicFeePaymentPage() {
                           {studentData?.installment_plan?.presets && studentData.installment_plan.presets.length > 0 ? (
                             studentData.installment_plan.presets.map((preset, pIdx) => {
                               const isSelected = amount === String(preset.amount);
+                              const isDiscountPreset = Boolean(preset.discount_applied);
                               return (
                                 <button
                                   key={pIdx}
                                   type="button"
                                   className="gq-preset-btn"
-                                  style={isSelected ? { background: '#0F2744', color: '#FFFFFF', borderColor: '#0F2744' } : undefined}
+                                  style={
+                                    isSelected
+                                      ? {
+                                          background: isDiscountPreset ? '#047857' : '#0F2744',
+                                          color: '#FFFFFF',
+                                          borderColor: isDiscountPreset ? '#047857' : '#0F2744',
+                                          boxShadow: isDiscountPreset ? '0 2px 8px rgba(4, 120, 87, 0.3)' : undefined,
+                                        }
+                                      : isDiscountPreset
+                                      ? {
+                                          background: '#ECFDF5',
+                                          color: '#065F46',
+                                          borderColor: '#6EE7B7',
+                                          fontWeight: 800,
+                                        }
+                                      : undefined
+                                  }
                                   onClick={() => setAmount(String(preset.amount))}
                                 >
+                                  {isDiscountPreset && <i className="bi bi-patch-check-fill me-1 text-success" />}
                                   {preset.label} ({money(preset.amount)})
                                 </button>
                               );
@@ -1379,6 +1474,20 @@ export default function PublicFeePaymentPage() {
                         <div style={{ fontSize: 11.5, fontWeight: 800, textTransform: 'uppercase', color: '#64748B', marginBottom: 8, letterSpacing: '0.04em' }}>
                           Payment Summary & Settlement Breakdown
                         </div>
+                        {isDiscountApplied && fullDiscount && (
+                          <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#64748B', marginBottom: 4 }}>
+                              <span>Original Term Balance:</span>
+                              <span style={{ textDecoration: 'line-through' }}>{money(fullDiscount.original_balance)}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#047857', marginBottom: 4, fontWeight: 700 }}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <i className="bi bi-tag-fill" /> Full-Payment Early Discount ({fullDiscount.formatted_discount}):
+                              </span>
+                              <span>-{money(fullDiscount.discount_amount)}</span>
+                            </div>
+                          </>
+                        )}
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#334155', marginBottom: 4 }}>
                           <span>Base Tuition Amount:</span>
                           <span style={{ fontWeight: 700 }}>{money(numAmount)}</span>
@@ -1404,8 +1513,10 @@ export default function PublicFeePaymentPage() {
                           <span>Total Amount Payable:</span>
                           <span style={{ color: '#047857' }}>{money(totalPayableWithSurcharges)}</span>
                         </div>
-                        <div style={{ fontSize: 11.5, color: '#64748B', marginTop: 6, lineHeight: 1.4 }}>
-                          {isParentBankBearer
+                        <div style={{ fontSize: 11.5, color: isDiscountApplied ? '#065F46' : '#64748B', marginTop: 6, lineHeight: 1.4, fontWeight: isDiscountApplied ? 700 : 400 }}>
+                          {isDiscountApplied && fullDiscount
+                            ? `🎉 Verified Early Full-Payment: Your payment of ${money(numAmount)} will fully clear and settle the ${money(fullDiscount.original_balance)} student fee balance.`
+                            : isParentBankBearer
                             ? "✓ Verified direct settlement. School receives 100% of your tuition payment."
                             : "✓ Zero additional bank surcharge. School covers gateway processing fees."}
                         </div>

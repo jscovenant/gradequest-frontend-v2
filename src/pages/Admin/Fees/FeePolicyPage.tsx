@@ -35,6 +35,10 @@ type FeeAccessPolicy = {
   installment_enabled: boolean;
   installment_type: InstallmentType;
   min_initial_installment_percent: number;
+  full_payment_discount_enabled?: boolean;
+  full_payment_discount_type?: "percentage" | "fixed";
+  full_payment_discount_value?: number;
+  full_payment_discount_message?: string;
   message: string;
   cbt_message: string;
   installment_message: string;
@@ -69,6 +73,10 @@ export default function FeePolicyPage() {
     installment_enabled: true,
     installment_type: "two_installments_70_30",
     min_initial_installment_percent: 70,
+    full_payment_discount_enabled: false,
+    full_payment_discount_type: "percentage",
+    full_payment_discount_value: 0,
+    full_payment_discount_message: "🎉 Pay your full fee upfront and enjoy an instant :discount discount!",
     message: "Result access is currently unavailable because the required school fee payment has not been completed.",
     cbt_message: "Access denied. Complete the required school fee payment before starting this exam.",
     installment_message: "This school requires a minimum initial payment of :percent% (:amount) for the term.",
@@ -95,6 +103,10 @@ export default function FeePolicyPage() {
           installment_enabled: Boolean(p.installment_enabled),
           installment_type: p.installment_type || "two_installments_70_30",
           min_initial_installment_percent: clampInt(p.min_initial_installment_percent, 1, 100, 70),
+          full_payment_discount_enabled: Boolean(p.full_payment_discount_enabled),
+          full_payment_discount_type: p.full_payment_discount_type === "fixed" ? "fixed" : "percentage",
+          full_payment_discount_value: Number(p.full_payment_discount_value || 0),
+          full_payment_discount_message: p.full_payment_discount_message || "🎉 Pay your full fee upfront and enjoy an instant :discount discount!",
           message: p.message || "Result access is currently unavailable because the required school fee payment has not been completed.",
           cbt_message: p.cbt_message || "Access denied. Complete the required school fee payment before starting this exam.",
           installment_message: p.installment_message || "This school requires a minimum initial payment of :percent% (:amount) for the term.",
@@ -138,6 +150,10 @@ export default function FeePolicyPage() {
           installment_enabled: Boolean(p.installment_enabled),
           installment_type: p.installment_type || "two_installments_70_30",
           min_initial_installment_percent: clampInt(p.min_initial_installment_percent, 1, 100, 70),
+          full_payment_discount_enabled: Boolean(p.full_payment_discount_enabled),
+          full_payment_discount_type: p.full_payment_discount_type === "fixed" ? "fixed" : "percentage",
+          full_payment_discount_value: Number(p.full_payment_discount_value || 0),
+          full_payment_discount_message: p.full_payment_discount_message || "🎉 Pay your full fee upfront and enjoy an instant :discount discount!",
           message: p.message || "Result access is currently unavailable because the required school fee payment has not been completed.",
           cbt_message: p.cbt_message || "Access denied. Complete the required school fee payment before starting this exam.",
           installment_message: p.installment_message || "This school requires a minimum initial payment of :percent% (:amount) for the term.",
@@ -666,6 +682,149 @@ export default function FeePolicyPage() {
                       <div style={{ padding: "16px 20px", background: "#F1F5F9", borderRadius: 12, fontSize: 13.5, color: "#475569" }}>
                         <i className="bi bi-info-circle me-2" />
                         Installment control is currently <strong>disabled</strong>. Parents can enter and pay any random partial amount.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── CARD: Full-Payment Early Incentive / Discount ── */}
+                  <div className="fp-card">
+                    <div className="fp-card-header">
+                      <div style={{ display: "flex", gap: 14 }}>
+                        <div className="fp-card-ico" style={{ background: "#ECFDF5", color: "#059669" }}>
+                          <i className="bi bi-tag-fill" />
+                        </div>
+                        <div>
+                          <h2 className="fp-card-title">Full-Payment Early Incentive / Discount</h2>
+                          <p className="fp-card-desc">
+                            Reward parents who settle their full tuition/fees upfront with an automatic percentage or flat cash discount.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="form-check form-switch m-0">
+                        <input
+                          className="form-check-input"
+                          type="checkbox"
+                          role="switch"
+                          style={{ width: 44, height: 22, cursor: "pointer" }}
+                          checked={policy.full_payment_discount_enabled}
+                          onChange={(e) => setPolicy((p) => ({ ...p, full_payment_discount_enabled: e.target.checked }))}
+                        />
+                      </div>
+                    </div>
+
+                    {policy.full_payment_discount_enabled ? (
+                      <div>
+                        <div className="row g-3">
+                          <div className="col-12 col-md-6">
+                            <label className="fp-form-label">Discount Calculation Mode</label>
+                            <select
+                              className="fp-select"
+                              value={policy.full_payment_discount_type || "percentage"}
+                              onChange={(e) =>
+                                setPolicy((p) => ({
+                                  ...p,
+                                  full_payment_discount_type: e.target.value === "fixed" ? "fixed" : "percentage",
+                                }))
+                              }
+                            >
+                              <option value="percentage">Percentage Discount (%)</option>
+                              <option value="fixed">Fixed Amount Discount (₦)</option>
+                            </select>
+                            <div className="fp-help">Choose whether to deduct a percentage of tuition or a flat cash amount.</div>
+                          </div>
+
+                          <div className="col-12 col-md-6">
+                            <label className="fp-form-label">
+                              Discount Value {policy.full_payment_discount_type === "percentage" ? "(Percentage %)" : "(Naira ₦)"}
+                            </label>
+                            <div className="input-group">
+                              <input
+                                type="number"
+                                className="form-control"
+                                min={0}
+                                max={policy.full_payment_discount_type === "percentage" ? 100 : 1000000}
+                                value={policy.full_payment_discount_value ?? 0}
+                                onChange={(e) =>
+                                  setPolicy((p) => ({
+                                    ...p,
+                                    full_payment_discount_value: Math.max(0, parseFloat(e.target.value) || 0),
+                                  }))
+                                }
+                              />
+                              <span className="input-group-text">
+                                {policy.full_payment_discount_type === "percentage" ? "%" : "₦"}
+                              </span>
+                            </div>
+                            <div className="fp-help">
+                              {policy.full_payment_discount_type === "percentage"
+                                ? "e.g., enter 5 for a 5% discount on full fee payments."
+                                : "e.g., enter 2000 for a ₦2,000 flat discount."}
+                            </div>
+                          </div>
+
+                          <div className="col-12">
+                            <label className="fp-form-label">Promotional Note / Message Shown to Parents</label>
+                            <textarea
+                              className="fp-textarea"
+                              rows={2}
+                              value={policy.full_payment_discount_message || ""}
+                              onChange={(e) => setPolicy((p) => ({ ...p, full_payment_discount_message: e.target.value }))}
+                              placeholder="🎉 Pay your full fee upfront and enjoy an instant :discount discount!"
+                            />
+                            <div className="fp-help">
+                              Use <code>:discount</code>, <code>:amount</code>, or <code>:percent</code> as automatic placeholders in the message.
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Interactive Live Calculation Preview */}
+                        <div
+                          style={{
+                            marginTop: 18,
+                            background: "linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)",
+                            border: "1px solid #86EFAC",
+                            borderRadius: 14,
+                            padding: "16px 20px",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, color: "#166534", fontWeight: 700, fontSize: 13.5 }}>
+                            <i className="bi bi-calculator-fill" /> Live Calculation Demonstration (Sample ₦100,000 Fee)
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 12, fontSize: 13, color: "#14532D" }}>
+                            <div>
+                              <span className="text-muted d-block">Original Total Fee</span>
+                              <strong>₦100,000</strong>
+                            </div>
+                            <div>
+                              <span className="text-muted d-block">Discount Deducted</span>
+                              <strong style={{ color: "#059669" }}>
+                                -{policy.full_payment_discount_type === "percentage"
+                                  ? `₦${((100000 * (policy.full_payment_discount_value || 0)) / 100).toLocaleString()} (${policy.full_payment_discount_value || 0}%)`
+                                  : `₦${Number(policy.full_payment_discount_value || 0).toLocaleString()}`}
+                              </strong>
+                            </div>
+                            <div>
+                              <span className="text-muted d-block">Amount Paid by Parent</span>
+                              <strong style={{ color: "#1E3A8A", fontSize: 14 }}>
+                                ₦{Math.max(0, 100000 - (policy.full_payment_discount_type === "percentage"
+                                  ? (100000 * (policy.full_payment_discount_value || 0)) / 100
+                                  : Number(policy.full_payment_discount_value || 0))).toLocaleString()}
+                              </strong>
+                            </div>
+                            <div>
+                              <span className="text-muted d-block">Student Ledger Status</span>
+                              <span className="badge bg-success" style={{ padding: "6px 10px", fontSize: 12 }}>
+                                ₦0 Balance (Fully Cleared)
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ padding: "16px 20px", background: "#F1F5F9", borderRadius: 12, fontSize: 13.5, color: "#475569" }}>
+                        <i className="bi bi-info-circle me-2" />
+                        Full payment early incentive is currently <strong>disabled</strong>. No automatic discount is applied when parents pay in full.
                       </div>
                     )}
                   </div>

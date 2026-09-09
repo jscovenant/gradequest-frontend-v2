@@ -339,7 +339,7 @@ export default function ParentResultsPage() {
       `}</style>
 
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-      <PageTitle title="Academic Results & Broadsheet - GradiosEdu" />
+      <PageTitle title="Academic Results & Broadsheet - SchoolProfit" />
 
       <div className="container-fluid">
         <div className="row">

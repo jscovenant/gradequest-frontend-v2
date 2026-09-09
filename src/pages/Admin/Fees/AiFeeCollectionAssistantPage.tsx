@@ -322,7 +322,7 @@ export default function AiFeeCollectionAssistantPage() {
           {loading && <Loader message="Analyzing outstanding fees..." />}
           <section className="fee-ai-hero">
             <div className="fee-ai-hero-glow" />
-            <div className="fee-ai-kicker">GradiosEdu AI finance tools</div>
+            <div className="fee-ai-kicker">SchoolProfit AI finance tools</div>
             <h1 className="fee-ai-title">AI Fee Collection Assistant</h1>
             <p className="fee-ai-sub">Identify parents with the highest outstanding balances, summarize debts by class, term, parent, or student, and generate polite reminder drafts.</p>
           </section>
@@ -349,7 +349,7 @@ export default function AiFeeCollectionAssistantPage() {
               {credits && credits.is_plus_active === false && (
                 <div className="alert alert-warning py-2 px-3 mt-3 mb-0" style={{ fontSize: "12px", borderRadius: "10px" }}>
                   <i className="bi bi-exclamation-triangle me-1" />
-                  <strong>GradiosEdu Plus Required:</strong> AI Fee Assistant requires an active GradiosEdu Plus subscription.
+                  <strong>SchoolProfit Plus Required:</strong> AI Fee Assistant requires an active SchoolProfit Plus subscription.
                 </div>
               )}
               <button className="fee-ai-btn" disabled={loading || (credits && credits.is_plus_active === false)} onClick={analyze}>

@@ -1,4 +1,4 @@
-﻿import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import TopNav from "../../components/LayoutComponents/TopNav";
 import Sidebar from "../../components/LayoutComponents/Sidebar";
 import Footer from "../../components/LayoutComponents/Footer";
@@ -127,7 +127,7 @@ export default function SalesPayoutSettingsPage() {
   return <><TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title="Payout Settings" />
     <div className="container-fluid"><div className="row"><Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       <main className="col-md-9 col-lg-10 ms-auto db-main sales-work-main">{loading && <Loader message="Loading payout settings..." />}<div className="sales-work-shell">
-        <section className="sales-work-hero"><div><div className="sales-work-eyebrow"><i className="bi bi-bank" /> Payout account</div><h1>My Payout Settings</h1><p>Add and verify the bank account where GradiosEdu will send your approved sales commissions.</p></div><div className="sales-work-actions"><button className="sales-work-btn sales-work-btn-light" onClick={load}><i className="bi bi-arrow-repeat" /> Refresh</button></div></section>
+        <section className="sales-work-hero"><div><div className="sales-work-eyebrow"><i className="bi bi-bank" /> Payout account</div><h1>My Payout Settings</h1><p>Add and verify the bank account where SchoolProfit will send your approved sales commissions.</p></div><div className="sales-work-actions"><button className="sales-work-btn sales-work-btn-light" onClick={load}><i className="bi bi-arrow-repeat" /> Refresh</button></div></section>
 
         {rep && <section className="sales-work-grid"><article className="sales-work-card"><span className="sales-work-icon"><i className="bi bi-hourglass-split" /></span><div><p>Pending</p><h3>{currency.format(rep.pending_commission)}</h3><small>Awaiting approval</small></div></article><article className="sales-work-card"><span className="sales-work-icon"><i className="bi bi-check-circle" /></span><div><p>Approved</p><h3>{currency.format(rep.approved_commission)}</h3><small>Ready for payout</small></div></article><article className="sales-work-card"><span className="sales-work-icon"><i className="bi bi-wallet2" /></span><div><p>Paid</p><h3>{currency.format(rep.paid_commission)}</h3><small>Received payout</small></div></article><article className="sales-work-card"><span className="sales-work-icon"><i className="bi bi-shield-check" /></span><div><p>Bank Status</p><h3>{rep.paystack_recipient_code ? "Verified" : "Not Set"}</h3><small>{rep.payout_verified_at ? fmtDate(rep.payout_verified_at) : "Add bank details"}</small></div></article></section>}
 

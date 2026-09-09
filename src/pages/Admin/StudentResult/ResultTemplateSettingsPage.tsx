@@ -259,8 +259,8 @@ function normalizeCustomLayout(raw: any): CustomReportLayout {
 export default function ResultTemplateSettingsPage() {
   const { showSuccess, showError } = useToast();
   const adminUser = getUser();
-  const schoolLogo = resolveMediaUrl(adminUser?.school?.logo, "/media/logo/gradiosedu-logo.png?v=3");
-  const schoolName = adminUser?.school?.name || "GradiosEdu International School";
+  const schoolLogo = resolveMediaUrl(adminUser?.school?.logo, "/media/logo/schoolprofit-logo.svg");
+  const schoolName = adminUser?.school?.name || "SchoolProfit International School";
   const studentAvatar = resolveMediaUrl("2411221407avatar-2.png", "/media/profile.jpg");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);

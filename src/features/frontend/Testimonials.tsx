@@ -17,7 +17,7 @@ type Testimonial = {
 const TESTIMONIALS: Testimonial[] = [
   {
     quote:
-      "Before GradiosEdu, computing results for 600 students took our staff nearly two weeks. Now it's done in a single afternoon — and the master broadsheet is ready before we even leave the office.",
+      "Before SchoolProfit, computing results for 600 students took our staff nearly two weeks. Now it's done in a single afternoon — and the master broadsheet is ready before we even leave the office.",
     name: "Mrs. Janet Avoseh",
     role: "Head of Administration",
     school: "Samjane Arise & Shine Schools",
@@ -59,7 +59,7 @@ const TESTIMONIALS: Testimonial[] = [
   },
   {
     quote:
-      "Tracking fee payments used to be a nightmare of paper bank tellers and reconciliations. GradiosEdu gave us a clear digital ledger and instant receipts — term one collections improved significantly.",
+      "Tracking fee payments used to be a nightmare of paper bank tellers and reconciliations. SchoolProfit gave us a clear digital ledger and instant receipts — term one collections improved significantly.",
     name: "Dr. Leonard John",
     role: "Proprietor & Director",
     school: "Dr. Raphael Arinze Memorial College",
@@ -87,7 +87,7 @@ const TESTIMONIALS: Testimonial[] = [
   },
   {
     quote:
-      "I was impressed by how smooth the onboarding was. The GradiosEdu team migrated our multi-year student records in one day and trained our teachers personally. Zero classroom disruption.",
+      "I was impressed by how smooth the onboarding was. The SchoolProfit team migrated our multi-year student records in one day and trained our teachers personally. Zero classroom disruption.",
     name: "Alh. Kabir Banuso",
     role: "Director of Education",
     school: "Borgu School of Excellence",
@@ -453,7 +453,7 @@ export default function Testimonials() {
                 <em>distinguished school leaders.</em>
               </h2>
               <p className="tm-desc mb-0">
-                Authentic experiences from school proprietors, principals, and exam officers operating GradiosEdu Worldwide.
+                Authentic experiences from school proprietors, principals, and exam officers operating SchoolProfit Worldwide.
               </p>
             </div>
 

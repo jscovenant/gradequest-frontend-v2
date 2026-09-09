@@ -177,14 +177,14 @@ function revenueModelLabel(model?: string | null) {
 
 function revenueModelHelp(model?: string | null) {
   if (model === "online_transaction_fee") {
-    return "Core access is supported by GradiosEdu charges collected automatically from parent fee payments.";
+    return "Core access is supported by SchoolProfit charges collected automatically from parent fee payments.";
   }
 
   if (model === "offline_term_invoice") {
-    return "GradiosEdu bills the school directly based on active students for the current term.";
+    return "SchoolProfit bills the school directly based on active students for the current term.";
   }
 
-  return "Set up online payments or offline billing to activate the GradiosEdu revenue model.";
+  return "Set up online payments or offline billing to activate the SchoolProfit revenue model.";
 }
 
 export default function BillingPage() {
@@ -402,10 +402,10 @@ export default function BillingPage() {
     try {
       await authApi.post("/school/billing/offline-invoice/generate", {});
       await loadBillingData(false);
-      showSuccess?.("GradiosEdu invoice generated.");
+      showSuccess?.("SchoolProfit invoice generated.");
     } catch (err: any) {
       console.error(err);
-      showError?.(err?.response?.data?.message || "Unable to generate GradiosEdu invoice.");
+      showError?.(err?.response?.data?.message || "Unable to generate SchoolProfit invoice.");
     } finally {
       setLoading(false);
     }
@@ -434,7 +434,7 @@ export default function BillingPage() {
       showError?.(
         err?.response?.data?.message ||
           (paymentMode === "online"
-            ? "Unable to switch to online model. Make sure online bank payment is enabled and outstanding GradiosEdu revenue is settled."
+            ? "Unable to switch to online model. Make sure online bank payment is enabled and outstanding SchoolProfit revenue is settled."
             : "Unable to switch to offline model.")
       );
 
@@ -725,7 +725,7 @@ export default function BillingPage() {
                   </h1>
 
                   <p className="db-hero-sub">
-                    Manage student fee clearances, track your GradiosEdu wallet balance, and review fee payment history.
+                    Manage student fee clearances, track your SchoolProfit wallet balance, and review fee payment history.
                   </p>
 
                   <div className="db-hero-btns">
@@ -860,7 +860,7 @@ export default function BillingPage() {
                           <div className="db-strong" style={{ fontSize: 15 }}>Clear Whole School (Current Term)</div>
                         </div>
                         <p className="db-muted" style={{ fontSize: 12.5, margin: "6px 0 12px 0" }}>
-                          Clear all <strong>{clearanceSummary?.pending_count || 0} unpaid student(s)</strong> for the active term at once from your GradiosEdu wallet.
+                          Clear all <strong>{clearanceSummary?.pending_count || 0} unpaid student(s)</strong> for the active term at once from your SchoolProfit wallet.
                         </p>
                         <div className="db-strong" style={{ fontSize: 14, color: "#2563eb", marginBottom: 12 }}>
                           Total: {fmtNaira(Number(clearanceSummary?.term_clearance_fee || 0))} ({fmtNaira(Number(clearanceSummary?.fee_per_student || 500))}/student)
@@ -942,14 +942,14 @@ export default function BillingPage() {
             <div className="db-panel">
               <div className="db-panel-head">
                 <div>
-                  <p className="db-panel-title">GradiosEdu per-student invoice</p>
+                  <p className="db-panel-title">SchoolProfit per-student invoice</p>
                   <p className="db-panel-sub">
                     Current term invoice is calculated from active students and package price per student.
                   </p>
                 </div>
 
                 <span className="db-pill" style={{ background: "rgba(15,23,42,0.08)", color: "#0f172a" }}>
-                  Enforcement managed by GradiosEdu
+                  Enforcement managed by SchoolProfit
                 </span>
               </div>
 
@@ -985,7 +985,7 @@ export default function BillingPage() {
                     </div>
                     <div>
                       <div className="db-muted" style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 0, fontWeight: 800 }}>
-                        GradiosEdu revenue model
+                        SchoolProfit revenue model
                       </div>
                       <div className="db-strong" style={{ fontSize: 20, marginTop: 2 }}>
                         {revenueModelLabel(schoolBilling?.revenue_model)}
@@ -1413,7 +1413,7 @@ export default function BillingPage() {
                         <div>
                           <div className="db-strong">Students at risk</div>
                           <div className="db-muted" style={{ fontSize: 12 }}>
-                            Teachers will be protected from entering resources when GradiosEdu revenue is not covered.
+                            Teachers will be protected from entering resources when SchoolProfit revenue is not covered.
                           </div>
                         </div>
                         <span className="db-pill" style={{ background: "rgba(245,158,11,0.14)", color: "#b45309" }}>

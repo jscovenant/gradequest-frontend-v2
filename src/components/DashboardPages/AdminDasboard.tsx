@@ -312,7 +312,7 @@ export default function AdminDashboard() {
   const [totalUsers, setTotalUsers] = useState(0);
   const [academicSession, setAcademicSession] = useState("");
   const [currentTerm, setCurrentTerm] = useState("");
-  const [currentPackage, setCurrentPackage] = useState("GradiosEdu Core");
+  const [currentPackage, setCurrentPackage] = useState("SchoolProfit Core");
   const [stats, setStats] = useState<StatCard[]>([
     { title: "Total Students", value: 0, icon: "students" },
     { title: "Teachers", value: 0, icon: "teachers" },

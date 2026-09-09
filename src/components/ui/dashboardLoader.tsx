@@ -3,7 +3,7 @@ interface LoaderProps {
   eyebrow?: string;
 }
 
-export default function Loader({ message = "Loading…", eyebrow = "GradiosEdu" }: LoaderProps) {
+export default function Loader({ message = "Loading…", eyebrow = "SchoolProfit" }: LoaderProps) {
   return (
     <div className="gq-loader-backdrop" role="status" aria-live="polite" aria-label={message}>
       <style>{`
@@ -131,8 +131,8 @@ export default function Loader({ message = "Loading…", eyebrow = "GradiosEdu" 
         <div className="gq-loader-icon-wrap">
           <div className="gq-loader-spinner-ring" />
           <img
-            src="/media/logo/gradiosedu-logo.png?v=3"
-            alt="GradiosEdu"
+            src="/media/logo/schoolprofit-logo.svg"
+            alt="SchoolProfit"
             className="gq-loader-logo"
             onError={(e) => {
               (e.target as HTMLElement).style.display = "none";

@@ -317,6 +317,34 @@ export default function Pricing() {
           color: #0F2744;
         }
 
+        /* ── Add-On & Session Banner ── */
+        .pr-session-banner {
+          margin-top: 36px;
+          background: linear-gradient(135deg, #0F2744 0%, #1E3A8A 100%);
+          border-radius: 20px;
+          padding: 28px 34px;
+          color: #FFFFFF;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 24px;
+          flex-wrap: wrap;
+          box-shadow: 0 10px 30px rgba(15, 39, 68, 0.12);
+        }
+
+        .pr-addon-box {
+          margin-top: 24px;
+          background: #FFFFFF;
+          border: 1.5px dashed #D97706;
+          border-radius: 20px;
+          padding: 24px 30px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+          flex-wrap: wrap;
+        }
+
         /* ── Comparison Banner ── */
         .pr-compare-box {
           margin-top: 48px;
@@ -374,13 +402,13 @@ export default function Pricing() {
         <div className="container-xl pr-shell">
           {/* Header */}
           <header className="text-center">
-            <span className="pr-kicker">100% Free Core • Pay-As-You-Go</span>
+            <span className="pr-kicker">100% Free Core OS • Pay When Tuition is Cleared</span>
             <h2 className="pr-title">
-              The Software is <em>100% Free.</em><br />
-              Pay Only {feeText} When Tuition is Cleared.
+              Complete School Management is <em>100% Free.</em><br />
+              Transparent Pay-As-You-Go Fee Clearance.
             </h2>
             <p className="pr-subtitle">
-              Say goodbye to expensive yearly subscriptions and student lockouts. GradiosEdu gives your school complete management tools for free, earning only a small {feeText} platform fee when school fees are settled.
+              Say goodbye to expensive yearly software licenses and mid-term student lockouts. SchoolProfit provides full day-to-day administrative tools completely free, earning only a tiny platform fee when school tuition is cleared.
             </p>
 
             <div className="pr-badges-row">
@@ -404,10 +432,10 @@ export default function Pricing() {
             {/* Card 1: 100% Free Core OS */}
             <article className="pr-card-main">
               <div className="pr-card-head">
-                <div className="pr-plan-label">Complete School OS</div>
-                <h3 className="pr-plan-name">GradiosEdu Free Core</h3>
+                <div className="pr-plan-label">Core School Operating System</div>
+                <h3 className="pr-plan-name">SchoolProfit Free Core</h3>
                 <p className="pr-plan-desc">
-                  Everything your school needs for day-to-day administration with zero subscription charges forever.
+                  Everything your school needs for everyday management with zero subscription charges forever.
                 </p>
               </div>
 
@@ -423,11 +451,11 @@ export default function Pricing() {
                 </li>
                 <li>
                   <span className="pr-icon-check"><i className="bi bi-check" /></span>
-                  <span>Continuous Assessment & Broadsheet Engine</span>
+                  <span>Continuous Assessment & Broadsheet Compilation</span>
                 </li>
                 <li>
                   <span className="pr-icon-check"><i className="bi bi-check" /></span>
-                  <span>Digital School Fee Ledger & Bank Integration</span>
+                  <span>Digital School Fee Ledger & Bank Account Integration</span>
                 </li>
                 <li>
                   <span className="pr-icon-check"><i className="bi bi-check" /></span>
@@ -439,7 +467,7 @@ export default function Pricing() {
                 </li>
                 <li>
                   <span className="pr-icon-check"><i className="bi bi-check" /></span>
-                  <span>Dedicated Bursar & Parent Portals</span>
+                  <span>Dedicated Bursar, Teacher & Parent Portals</span>
                 </li>
               </ul>
 
@@ -448,47 +476,94 @@ export default function Pricing() {
               </Link>
             </article>
 
-            {/* Card 2: Per-Student Fee Clearance (Featured) */}
-            <article className="pr-card-main pr-card-featured">
-              <div className="pr-pop-tag">MOST POPULAR • PAY WHEN YOU EARN</div>
-
+            {/* Card 2: Basic Result Management Tier */}
+            <article className="pr-card-main">
               <div className="pr-card-head">
-                <div className="pr-plan-label">Pay-As-You-Go Clearance</div>
-                <h3 className="pr-plan-name">Student Fee Clearance</h3>
+                <div className="pr-plan-label">Result Management Edition</div>
+                <h3 className="pr-plan-name">Basic Result Tier</h3>
                 <p className="pr-plan-desc">
-                  Pay only when students settle school fees. Unlocks digital report cards, online CBT, and promotion.
+                  Pay only when students settle tuition. Unlocks digital report cards, CA broadsheets, and parent access.
                 </p>
               </div>
 
               <div className="pr-price-box">
-                <div className="pr-price-val">{feeText}</div>
+                <div className="pr-price-val">₦300</div>
                 <div className="pr-price-sub">per active student / term</div>
               </div>
 
               <ul className="pr-feature-list">
                 <li>
                   <span className="pr-icon-check"><i className="bi bi-check" /></span>
-                  <span><strong>Automated Online Split:</strong> Fee split seamlessly via Paystack</span>
+                  <span><strong>Everything in Free Core OS</strong></span>
                 </li>
                 <li>
                   <span className="pr-icon-check"><i className="bi bi-check" /></span>
-                  <span><strong>1-Click Wallet Bulk Clearance:</strong> Clear single student, class, or whole school</span>
+                  <span><strong>Official Digital Report Cards:</strong> Publish termly report sheets</span>
                 </li>
                 <li>
                   <span className="pr-icon-check"><i className="bi bi-check" /></span>
-                  <span><strong>₦0 Result Checking:</strong> Parents access report cards free (no scratch cards)</span>
+                  <span><strong>₦0 Scratch Card Fees:</strong> Parents view & download results free</span>
                 </li>
                 <li>
                   <span className="pr-icon-check"><i className="bi bi-check" /></span>
-                  <span><strong>Anti-Tamper QR Verification:</strong> Scannable security codes on all results</span>
+                  <span><strong>Anti-Tamper QR Verification:</strong> Scannable validation on all results</span>
                 </li>
                 <li>
                   <span className="pr-icon-check"><i className="bi bi-check" /></span>
-                  <span><strong>Online CBT Exams:</strong> Full cloud examination & instant grading</span>
+                  <span><strong>Student Promotion Engine:</strong> Automated carry-over & class advancement</span>
                 </li>
                 <li>
                   <span className="pr-icon-check"><i className="bi bi-check" /></span>
-                  <span><strong>Full Session Option:</strong> Pay 3 terms upfront for zero stress</span>
+                  <span><strong>Flexible Clearance:</strong> Automated Paystack split or 1-click wallet clearance</span>
+                </li>
+              </ul>
+
+              <Link to="/book-demo" className="pr-btn-primary pr-btn-outline">
+                Explore Basic Tier <i className="bi bi-arrow-right" />
+              </Link>
+            </article>
+
+            {/* Card 3: Standard CBT & Cloud Examination Tier (Featured) */}
+            <article className="pr-card-main pr-card-featured">
+              <div className="pr-pop-tag">MOST POPULAR • ALL-INCLUSIVE</div>
+
+              <div className="pr-card-head">
+                <div className="pr-plan-label">Cloud CBT & All-Inclusive Edition</div>
+                <h3 className="pr-plan-name">Standard CBT Tier</h3>
+                <p className="pr-plan-desc">
+                  The complete power package. Combines full digital results with multi-school cloud CBT examination.
+                </p>
+              </div>
+
+              <div className="pr-price-box">
+                <div className="pr-price-val">₦500</div>
+                <div className="pr-price-sub">per active student / term</div>
+              </div>
+
+              <ul className="pr-feature-list">
+                <li>
+                  <span className="pr-icon-check"><i className="bi bi-check" /></span>
+                  <span><strong>Everything in Basic Result Tier (₦300)</strong></span>
+                </li>
+                <li>
+                  <span className="pr-icon-check"><i className="bi bi-check" /></span>
+                  <span><strong>Online Cloud CBT Portal:</strong> 3,000+ simultaneous student concurrency</span>
+                </li>
+                <li>
+                  <span className="pr-icon-check"><i className="bi bi-check" /></span>
+                  <span><strong>Instant Auto-Grading:</strong> Direct computation into term broadsheets</span>
+                </li>
+                <li>
+                  <span className="pr-icon-check"><i className="bi bi-check" /></span>
+                  <span><strong>Anti-Cheating Security:</strong> Fullscreen lockdown & tab-switch logging</span>
+                </li>
+                <li>
+                  <span className="pr-icon-check"><i className="bi bi-check" /></span>
+                  <span><strong>Comprehension & Math Engines:</strong> Passages, formulas & scientific calculator</span>
+                </li>
+                <li>
+                  <span className="pr-icon-check"><i className="bi bi-check" /></span>
+                  <span><strong>Offline-First Resilience:</strong> Never lose answers even during network flickers</span>
                 </li>
               </ul>
 
@@ -496,55 +571,48 @@ export default function Pricing() {
                 Book a Live Demo with SchoolProfit <i className="bi bi-lightning-charge-fill" />
               </Link>
             </article>
-
-            {/* Card 3: Optional On-Demand Add-Ons */}
-            <article className="pr-card-main">
-              <div className="pr-card-head">
-                <div className="pr-plan-label">On-Demand Add-Ons</div>
-                <h3 className="pr-plan-name">AI & Communication</h3>
-                <p className="pr-plan-desc">
-                  Supercharge your school with cutting-edge AI lesson planners and automated WhatsApp dispatch.
-                </p>
-              </div>
-
-              <div className="pr-price-box">
-                <div className="pr-price-val">Pay-As-You-Go</div>
-                <div className="pr-price-sub">Top up wallet only when you need credits</div>
-              </div>
-
-              <ul className="pr-feature-list">
-                <li>
-                  <span className="pr-icon-check"><i className="bi bi-check" /></span>
-                  <span><strong>WhatsApp Parent Dispatch:</strong> Send receipts, attendance & results to parent WhatsApp</span>
-                </li>
-                <li>
-                  <span className="pr-icon-check"><i className="bi bi-check" /></span>
-                  <span><strong>AI Lesson Note Generator:</strong> Instant curriculum-aligned lesson plans for teachers</span>
-                </li>
-                <li>
-                  <span className="pr-icon-check"><i className="bi bi-check" /></span>
-                  <span><strong>AI Exam Question Builder:</strong> Generate WAEC/NERDC-standard questions in seconds</span>
-                </li>
-                <li>
-                  <span className="pr-icon-check"><i className="bi bi-check" /></span>
-                  <span><strong>Zero Expiry:</strong> Wallet credits roll over indefinitely</span>
-                </li>
-                <li>
-                  <span className="pr-icon-check"><i className="bi bi-check" /></span>
-                  <span><strong>Bursar AI Assistant:</strong> Automated overdue fee reminders and collections</span>
-                </li>
-              </ul>
-
-              <Link to="/book-demo" className="pr-btn-primary pr-btn-outline">
-                Book a Demo to Explore Add-Ons <i className="bi bi-arrow-right" />
-              </Link>
-            </article>
           </div>
 
-          {/* Comparison Table: Traditional Software vs GradiosEdu */}
+          {/* Full Session Clearance Banner */}
+          <div className="pr-session-banner">
+            <div>
+              <div style={{ fontSize: "12px", textTransform: "uppercase", letterSpacing: ".14em", color: "#FDE68A", fontWeight: 900 }}>
+                FULL SESSION BUNDLE
+              </div>
+              <h3 style={{ fontSize: "22px", fontWeight: 900, margin: "6px 0", color: "#FFFFFF" }}>
+                Pay 3 Terms Upfront for the Entire Academic Year
+              </h3>
+              <p style={{ margin: 0, fontSize: "14px", color: "rgba(255,255,255,0.85)", maxWidth: "700px", lineHeight: 1.6 }}>
+                Proprietors can clear their entire student body for all 3 terms upfront in a single click with zero termly renewal stress.
+              </p>
+            </div>
+            <Link to="/book-demo" className="pr-btn-primary pr-btn-gold" style={{ width: "auto", padding: "12px 26px", whiteSpace: "nowrap" }}>
+              Inquire Full Session <i className="bi bi-arrow-right" />
+            </Link>
+          </div>
+
+          {/* On-Demand AI & WhatsApp Add-ons Strip */}
+          <div className="pr-addon-box">
+            <div>
+              <div style={{ fontSize: "12px", textTransform: "uppercase", letterSpacing: ".14em", color: "#D97706", fontWeight: 900 }}>
+                OPTIONAL ON-DEMAND ADD-ONS
+              </div>
+              <h4 style={{ fontSize: "18px", fontWeight: 900, margin: "4px 0", color: "#0F2744" }}>
+                AI Curriculum Tools & WhatsApp Parent Dispatch
+              </h4>
+              <p style={{ margin: 0, fontSize: "13.5px", color: "#64748B", maxWidth: "720px", lineHeight: 1.55 }}>
+                Top up your wallet only when you need credits: Instant WhatsApp fee receipts, attendance alerts, report cards, AI lesson note generation, and WAEC-standard CBT question creators.
+              </p>
+            </div>
+            <Link to="/book-demo" className="pr-btn-primary pr-btn-outline" style={{ width: "auto", padding: "11px 22px", whiteSpace: "nowrap" }}>
+              Explore Add-Ons <i className="bi bi-stars" />
+            </Link>
+          </div>
+
+          {/* Comparison Table: Traditional Software vs SchoolProfit */}
           <div className="pr-compare-box">
             <h3 style={{ fontFamily: "Playfair Display, Georgia, serif", fontSize: "22px", fontWeight: 900, color: "#0F2744", textAlign: "center", marginBottom: "20px" }}>
-              Why School Proprietors Choose GradiosEdu Over Traditional Portals
+              Why School Proprietors Choose SchoolProfit Over Traditional Portals
             </h3>
 
             <div className="pr-compare-grid">
@@ -563,13 +631,13 @@ export default function Pricing() {
 
               <div className="pr-compare-col pr-compare-gq">
                 <div style={{ fontWeight: 800, color: "#15803D", fontSize: "15px", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
-                  <i className="bi bi-check-circle-fill" /> GradiosEdu Intelligent Cloud
+                  <i className="bi bi-check-circle-fill" /> SchoolProfit Intelligent Cloud
                 </div>
                 <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "10px", fontSize: "13px", color: "#14532D" }}>
                   <li>✅ <strong>₦0 setup fees & ₦0 yearly subscriptions forever.</strong></li>
                   <li>✅ Complete core school management is 100% free with unlimited access.</li>
                   <li>✅ <strong>₦0 scratch card fee for parents</strong> — Instant digital report cards.</li>
-                  <li>✅ Pay only <strong>{feeText}</strong> when school fees are settled.</li>
+                  <li>✅ Choose <strong>Basic (₦300)</strong> or <strong>Standard CBT (₦500)</strong> only when tuition is settled.</li>
                   <li>✅ Instant automated Paystack split direct to your school bank account.</li>
                 </ul>
               </div>
@@ -588,7 +656,7 @@ export default function Pricing() {
             </div>
 
             <a
-              href={whatsappLink("Hello GradiosEdu Team! I am a school proprietor/principal and I would like to onboard my school on the Free Core model.")}
+              href={whatsappLink("Hello SchoolProfit Team! I am a school proprietor/principal and I would like to onboard my school on the Free Core model.")}
               target="_blank"
               rel="noopener noreferrer"
               className="pr-btn-primary pr-btn-gold"

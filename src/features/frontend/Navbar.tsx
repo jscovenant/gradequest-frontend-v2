@@ -544,8 +544,8 @@ export default function Navbar() {
               rel="noopener noreferrer"
               className="gq-btn-ghost"
               style={{ padding: "8px 12px", color: "#1877F2" }}
-              aria-label="GradiosEdu Facebook Page"
-              title="Follow GradiosEdu on Facebook"
+              aria-label="SchoolProfit Facebook Page"
+              title="Follow SchoolProfit on Facebook"
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3V2z" />
@@ -681,7 +681,7 @@ export default function Navbar() {
             Book a Free Demo
           </Link>
           <a
-            href={whatsappLink("Hello GradiosEdu, I want to learn more about your school software")}
+            href={whatsappLink("Hello SchoolProfit, I want to learn more about your school software")}
             target="_blank"
             rel="noopener noreferrer"
             className="gq-drawer-whatsapp"

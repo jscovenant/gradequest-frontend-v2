@@ -305,7 +305,7 @@ export default function Schools() {
           </h2>
 
           <p className="gq-schools-subtitle">
-            Progressive private and international institutions operating their academic broadsheets, fees collection, and CBT assessments on GradiosEdu.
+            Progressive private and international institutions operating their academic broadsheets, fees collection, and CBT assessments on SchoolProfit.
           </p>
 
           <div className="gq-schools-meta-bar">

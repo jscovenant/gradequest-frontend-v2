@@ -252,7 +252,7 @@ export default function ParentCommunicationPage() {
       `}</style>
 
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-      <PageTitle title="Communication & Broadcasts - GradiosEdu" />
+      <PageTitle title="Communication & Broadcasts - SchoolProfit" />
 
       <div className="container-fluid">
         <div className="row">

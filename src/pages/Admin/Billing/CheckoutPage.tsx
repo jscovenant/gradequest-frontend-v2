@@ -982,7 +982,7 @@ export default function CheckoutPage() {
                           >
                             <div className="db-strong">No plans available</div>
                             <div className="db-muted" style={{ fontSize: 12.5, marginTop: 4 }}>
-                              There are currently no active subscription plans. Please check again later or contact GradiosEdu Support.
+                              There are currently no active subscription plans. Please check again later or contact SchoolProfit Support.
                             </div>
                           </div>
                         </div>

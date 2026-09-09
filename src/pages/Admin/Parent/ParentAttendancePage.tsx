@@ -384,16 +384,16 @@ export default function ParentAttendancePage() {
       `}</style>
 
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-      <PageTitle title="Child Attendance - GradiosEdu" />
+      <PageTitle title="Child Attendance - SchoolProfit" />
 
       <div className="container-fluid">
         <div className="row">
           <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-          <main className="col-md-9 col-lg-10 ms-auto gq-app-main p-att-main d-flex flex-column min-vh-100">
+          <main className="col-md-9 col-lg-10 ms-auto gq-app-main parent-db-main d-flex flex-column min-vh-100">
             {loading && <Loader message="Loading attendance records..." />}
 
-            {/* ── Signature GradiosEdu Hero ── */}
+            {/* ── Signature SchoolProfit Hero ── */}
             <div className="p-att-hero">
               <div className="p-att-hero-glow" />
               <div className="p-att-hero-inner">

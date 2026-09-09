@@ -53,7 +53,7 @@ function fmtDate(value?: string | null) {
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-export default function GradiosEduInvoicePaymentPage() {
+export default function SchoolProfitInvoicePaymentPage() {
   const { invoiceId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -163,7 +163,7 @@ export default function GradiosEduInvoicePaymentPage() {
         @media(max-width:575.98px){.invoice-hero{padding:22px}.invoice-title{font-size:26px}.invoice-grid{grid-template-columns:1fr}.invoice-card-pad{padding:16px}}
       `}</style>
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title="Invoice Payment" />
-      <PageTitle title="GradiosEdu Invoice Payment" />
+      <PageTitle title="SchoolProfit Invoice Payment" />
       <div className="container-fluid">
         <div className="row">
           <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
@@ -171,10 +171,10 @@ export default function GradiosEduInvoicePaymentPage() {
             {(loading || processing) && <Loader message={processing ? "Processing invoice payment..." : "Loading invoice..."} />}
 
             <div className="invoice-hero">
-              <div className="invoice-eyebrow">GradiosEdu revenue invoice</div>
+              <div className="invoice-eyebrow">SchoolProfit revenue invoice</div>
               <h1 className="invoice-title">Settle Invoice</h1>
               <p className="invoice-sub">
-                This page is for GradiosEdu term invoices and online-to-offline transition invoices. Package upgrades still happen on the normal checkout page.
+                This page is for SchoolProfit term invoices and online-to-offline transition invoices. Package upgrades still happen on the normal checkout page.
               </p>
             </div>
 

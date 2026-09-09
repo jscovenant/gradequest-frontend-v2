@@ -580,7 +580,7 @@ export default function ResetPasswordPage() {
                 <path d="M10 10l7-4M10 10v8M10 10L3 6" stroke="#0f172a" strokeWidth="1.4" strokeLinecap="round"/>
               </svg>
             </div>
-            <span className="rp-logo-name">Gradios<span>Edu</span></span>
+            <span className="rp-logo-name">School<span>Profit</span></span>
           </div>
 
           {step === "otp" && (
