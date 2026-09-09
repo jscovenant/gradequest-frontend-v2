@@ -26,13 +26,26 @@ export type PlatformInfo = {
   support_email: string;
   platform_fee_per_student: number;
   formatted_platform_fee: string;
+  basic_tier_price_per_student?: number;
+  formatted_basic_tier_price?: string;
+  standard_cbt_tier_price_per_student?: number;
+  formatted_standard_cbt_tier_price?: string;
+  annual_full_session_multiplier?: number;
+  annual_session_discount_percent?: number;
+  default_bank_charge_amount?: number;
+  whatsapp_credit_unit_price?: number;
+  ai_credit_unit_price?: number;
   sales_partner_term_1_commission: number;
   sales_partner_retention_commission: number;
   promo?: {
     title: string;
     description: string;
+    target_tier?: string;
+    discount_percent?: number;
     bonus_days: number;
     min_students: number;
+    starts_at?: string | null;
+    ends_at?: string | null;
   } | null;
 };
 
@@ -40,8 +53,17 @@ const DEFAULT_PLATFORM_INFO: PlatformInfo = {
   support_whatsapp: "2348165748374",
   support_whatsapp_raw: "08165748374",
   support_email: "support@schoolprofit.ng",
-  platform_fee_per_student: 1000,
-  formatted_platform_fee: "₦1,000",
+  platform_fee_per_student: 500,
+  formatted_platform_fee: "₦500",
+  basic_tier_price_per_student: 300,
+  formatted_basic_tier_price: "₦300",
+  standard_cbt_tier_price_per_student: 500,
+  formatted_standard_cbt_tier_price: "₦500",
+  annual_full_session_multiplier: 3,
+  annual_session_discount_percent: 0,
+  default_bank_charge_amount: 200,
+  whatsapp_credit_unit_price: 10,
+  ai_credit_unit_price: 25,
   sales_partner_term_1_commission: 30,
   sales_partner_retention_commission: 12,
   promo: null,
@@ -97,6 +119,9 @@ export function usePlatformInfo() {
 
   const whatsappLink = (message?: string) => getWhatsAppUrl(platform.support_whatsapp, message);
 
+  const basicPriceFormatted = platform.formatted_basic_tier_price || "₦300";
+  const standardCbtPriceFormatted = platform.formatted_standard_cbt_tier_price || "₦500";
+
   return {
     plans,
     platform,
@@ -104,6 +129,12 @@ export function usePlatformInfo() {
     error,
     whatsappLink,
     whatsappNumber: platform.support_whatsapp,
-    formattedPlatformFee: platform.formatted_platform_fee || "₦1,000",
+    formattedPlatformFee: platform.formatted_platform_fee || standardCbtPriceFormatted || "₦500",
+    formattedBasicPrice: basicPriceFormatted,
+    formattedStandardCbtPrice: standardCbtPriceFormatted,
+    basicTierPrice: Number(platform.basic_tier_price_per_student || 300),
+    standardCbtTierPrice: Number(platform.standard_cbt_tier_price_per_student || 500),
+    annualSessionMultiplier: Number(platform.annual_full_session_multiplier || 3),
+    annualSessionDiscountPercent: Number(platform.annual_session_discount_percent || 0),
   };
 }

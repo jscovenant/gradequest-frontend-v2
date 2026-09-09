@@ -3,8 +3,18 @@ import { Link } from "react-router-dom";
 import { usePlatformInfo } from "../../hooks/usePlatformInfo";
 
 export default function Pricing() {
-  const { platform, whatsappLink, formattedPlatformFee } = usePlatformInfo();
-  const feeText = formattedPlatformFee || "₦500";
+  const {
+    platform,
+    whatsappLink,
+    formattedBasicPrice,
+    formattedStandardCbtPrice,
+    annualSessionMultiplier,
+    annualSessionDiscountPercent,
+  } = usePlatformInfo();
+
+  const basicPriceText = formattedBasicPrice || "₦300";
+  const standardCbtPriceText = formattedStandardCbtPrice || "₦500";
+  const promo = platform.promo;
 
   return (
     <>
@@ -487,7 +497,7 @@ export default function Pricing() {
               </div>
 
               <div className="pr-price-box">
-                <div className="pr-price-val">₦300</div>
+                <div className="pr-price-val">{basicPriceText}</div>
                 <div className="pr-price-sub">per active student / term</div>
               </div>
 
@@ -514,7 +524,7 @@ export default function Pricing() {
                 </li>
                 <li>
                   <span className="pr-icon-check"><i className="bi bi-check" /></span>
-                  <span><strong>Flexible Clearance:</strong> Automated Paystack split or 1-click wallet clearance</span>
+                  <span><strong>Flexible Clearance:</strong> Direct Wema Transfer, Paystack split, or 1-click wallet clearance</span>
                 </li>
               </ul>
 
@@ -536,14 +546,14 @@ export default function Pricing() {
               </div>
 
               <div className="pr-price-box">
-                <div className="pr-price-val">₦500</div>
+                <div className="pr-price-val">{standardCbtPriceText}</div>
                 <div className="pr-price-sub">per active student / term</div>
               </div>
 
               <ul className="pr-feature-list">
                 <li>
                   <span className="pr-icon-check"><i className="bi bi-check" /></span>
-                  <span><strong>Everything in Basic Result Tier (₦300)</strong></span>
+                  <span><strong>Everything in Basic Result Tier ({basicPriceText})</strong></span>
                 </li>
                 <li>
                   <span className="pr-icon-check"><i className="bi bi-check" /></span>
@@ -580,16 +590,36 @@ export default function Pricing() {
                 FULL SESSION BUNDLE
               </div>
               <h3 style={{ fontSize: "22px", fontWeight: 900, margin: "6px 0", color: "#FFFFFF" }}>
-                Pay 3 Terms Upfront for the Entire Academic Year
+                Pay {annualSessionMultiplier || 3} Terms Upfront for the Entire Academic Year {annualSessionDiscountPercent > 0 ? `(${annualSessionDiscountPercent}% Off)` : ""}
               </h3>
               <p style={{ margin: 0, fontSize: "14px", color: "rgba(255,255,255,0.85)", maxWidth: "700px", lineHeight: 1.6 }}>
-                Proprietors can clear their entire student body for all 3 terms upfront in a single click with zero termly renewal stress.
+                Proprietors can clear their entire student body for all {annualSessionMultiplier || 3} terms upfront in a single click with zero termly renewal stress.
               </p>
             </div>
             <Link to="/book-demo" className="pr-btn-primary pr-btn-gold" style={{ width: "auto", padding: "12px 26px", whiteSpace: "nowrap" }}>
               Inquire Full Session <i className="bi bi-arrow-right" />
             </Link>
           </div>
+
+          {/* Promo Offer Banner if Active */}
+          {promo && (
+            <div className="pr-session-banner" style={{ background: "linear-gradient(135deg, #B45309 0%, #D97706 100%)", marginTop: "24px" }}>
+              <div>
+                <div style={{ fontSize: "12px", textTransform: "uppercase", letterSpacing: ".14em", color: "#FEF3C7", fontWeight: 900 }}>
+                  <i className="bi bi-stars me-1" /> SPECIAL LAUNCH OFFER
+                </div>
+                <h3 style={{ fontSize: "22px", fontWeight: 900, margin: "6px 0", color: "#FFFFFF" }}>
+                  {promo.title || "SchoolProfit Launch Incentive"}
+                </h3>
+                <p style={{ margin: 0, fontSize: "14px", color: "rgba(255,255,255,0.92)", maxWidth: "700px", lineHeight: 1.6 }}>
+                  {promo.description || `Sign up with at least ${promo.min_students || 100} students and receive ${promo.bonus_days || 365} days of platform fee waiver.`}
+                </p>
+              </div>
+              <Link to="/book-demo" className="pr-btn-primary" style={{ background: "#0F2744", color: "#FFFFFF", width: "auto", padding: "12px 26px", whiteSpace: "nowrap" }}>
+                Claim Launch Offer <i className="bi bi-gift-fill" />
+              </Link>
+            </div>
+          )}
 
           {/* On-Demand AI & WhatsApp Add-ons Strip */}
           <div className="pr-addon-box">
@@ -637,8 +667,8 @@ export default function Pricing() {
                   <li>✅ <strong>₦0 setup fees & ₦0 yearly subscriptions forever.</strong></li>
                   <li>✅ Complete core school management is 100% free with unlimited access.</li>
                   <li>✅ <strong>₦0 scratch card fee for parents</strong> — Instant digital report cards.</li>
-                  <li>✅ Choose <strong>Basic (₦300)</strong> or <strong>Standard CBT (₦500)</strong> only when tuition is settled.</li>
-                  <li>✅ Instant automated Paystack split direct to your school bank account.</li>
+                  <li>✅ Choose <strong>Basic ({basicPriceText})</strong> or <strong>Standard CBT ({standardCbtPriceText})</strong> only when tuition is settled.</li>
+                  <li>✅ Instant automated Wema Bank transfer or Paystack split direct to your school account.</li>
                 </ul>
               </div>
             </div>
