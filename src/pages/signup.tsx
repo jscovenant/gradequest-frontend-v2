@@ -578,10 +578,10 @@ export default function Signup() {
 
           <Link to="/" className="gq-auth-brand-link">
             <img
-              src="/media/logo/schoolprofit-logo.svg"
+              src="/media/logo/schoolprofit-logo.png"
               alt="SchoolProfit"
               className="gq-auth-brand-logo"
-              style={{ width: "auto", height: 38 }}
+              style={{ width: "auto", height: 38, objectFit: "contain", borderRadius: 6 }}
             />
             <span className="gq-auth-brand-text">School<span style={{ color: "#059669" }}>Profit</span></span>
           </Link>
@@ -601,22 +601,22 @@ export default function Signup() {
               </li>
               <li className="gq-benefit-item">
                 <span className="gq-benefit-icon">✓</span>
-                <span><strong>Scale Admissions:</strong> Dedicated sales partner referral engine and student lead capture.</span>
+                <span><strong>Scale Admissions:</strong> Transparent parent portal, instant SMS/WhatsApp billing alerts.</span>
               </li>
               <li className="gq-benefit-item">
                 <span className="gq-benefit-icon">✓</span>
-                <span><strong>Instant Broadsheets:</strong> Automated cumulative GPAs, positions, and error-free result cards.</span>
+                <span><strong>Master Academic Broadsheets:</strong> 1-click terminal collation, verified QR transcripts, offline CBT.</span>
               </li>
               <li className="gq-benefit-item">
                 <span className="gq-benefit-icon">✓</span>
-                <span><strong>Hybrid CBT &amp; AI:</strong> Offline computer lab examinations and instant AI lesson plans.</span>
+                <span><strong>Empower Staff:</strong> AI lesson planning and automated biometric attendance logging.</span>
               </li>
             </ul>
           </div>
 
           <div className="gq-auth-left-footer">
-            <span>🛡️ Free 30-Day Onboarding</span>
-            <span>● 0 Setup Fees</span>
+            <span>🛡️ 256-Bit SSL Encrypted</span>
+            <span>● 99.9% Uptime</span>
             <span>● Dedicated Growth Support</span>
           </div>
         </div>
@@ -626,7 +626,7 @@ export default function Signup() {
           <div className="gq-auth-card">
             {/* Mobile Logo */}
             <Link to="/" className="gq-auth-mobile-logo">
-              <img src="/media/logo/schoolprofit-icon.svg" alt="SchoolProfit" style={{ width: 32, height: 32 }} />
+              <img src="/media/logo/schoolprofit-logo.png" alt="SchoolProfit" style={{ width: "auto", height: 32, objectFit: "contain", borderRadius: 6 }} />
               <span style={{ fontSize: 19, fontWeight: 800, color: "#0F2744" }}>School<span style={{ color: "#059669" }}>Profit</span></span>
             </Link>
 

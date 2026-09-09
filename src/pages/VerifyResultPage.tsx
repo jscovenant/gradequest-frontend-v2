@@ -824,7 +824,7 @@ export default function VerifyResultPage() {
           <div className="vc-nav-inner">
             <Link to="/" className="vc-logo-brand">
               <div className="vc-logo-badge" style={{ background: "transparent" }}>
-                <img src="/media/logo/schoolprofit-icon.svg" alt="SchoolProfit" style={{ width: 32, height: 32 }} />
+                <img src="/media/logo/schoolprofit-logo.png" alt="SchoolProfit" style={{ width: "auto", height: 32, objectFit: "contain", borderRadius: 4 }} />
               </div>
               <div className="vc-brand-text">
                 <span className="vc-brand-title">School<span style={{ color: "#10B981" }}>Profit</span></span>

@@ -512,16 +512,14 @@ export default function ResetPasswordPage() {
           <div className="rp-glow2" aria-hidden="true" />
 
           <div className="rp-logo">
-      <a href="/" className="ft-logo" aria-label="SchoolProfit home">     
-        <div className="ft-logo-wrap" style={{ background: "transparent", border: "none" }}>
-          <img
-            src="/media/logo/schoolprofit-icon.svg"
-            alt="SchoolProfit logo"
-            className="ft-logo-img"
-            style={{ width: "32px", height: "32px" }}
-          />
-        </div>
-      </a>
+            <a href="/" className="ft-logo" aria-label="SchoolProfit home" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 10 }}>     
+              <img
+                src="/media/logo/schoolprofit-logo.png"
+                alt="SchoolProfit logo"
+                style={{ width: "auto", height: "36px", objectFit: "contain", borderRadius: 6 }}
+              />
+              <span style={{ fontSize: 20, fontWeight: 800, color: "#FFFFFF" }}>School<span style={{ color: "#10B981" }}>Profit</span></span>
+            </a>
           </div>
 
           <div className="rp-left-body">
@@ -574,13 +572,8 @@ export default function ResetPasswordPage() {
 
         <div className="rp-right">
           <div className="rp-mobile-logo">
-            <div className="rp-logo-mark">
-              <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-                <path d="M10 2L17 6v8l-7 4-7-4V6l7-4z" stroke="#0f172a" strokeWidth="1.6" strokeLinejoin="round"/>
-                <path d="M10 10l7-4M10 10v8M10 10L3 6" stroke="#0f172a" strokeWidth="1.4" strokeLinecap="round"/>
-              </svg>
-            </div>
-            <span className="rp-logo-name">School<span>Profit</span></span>
+            <img src="/media/logo/schoolprofit-logo.png" alt="SchoolProfit" style={{ width: "auto", height: 32, objectFit: "contain", borderRadius: 6 }} />
+            <span className="rp-logo-name">School<span style={{ color: "#10B981" }}>Profit</span></span>
           </div>
 
           {step === "otp" && (

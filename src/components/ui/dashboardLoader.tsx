@@ -131,7 +131,7 @@ export default function Loader({ message = "Loading…", eyebrow = "SchoolProfit
         <div className="gq-loader-icon-wrap">
           <div className="gq-loader-spinner-ring" />
           <img
-            src="/media/logo/schoolprofit-logo.svg"
+            src="/media/logo/schoolprofit-logo.png"
             alt="SchoolProfit"
             className="gq-loader-logo"
             onError={(e) => {

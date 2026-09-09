@@ -487,10 +487,10 @@ export default function Login() {
 
           <Link to="/" className="gq-auth-brand-link">
             <img
-              src="/media/logo/schoolprofit-logo.svg"
+              src="/media/logo/schoolprofit-logo.png"
               alt="SchoolProfit"
               className="gq-auth-brand-logo"
-              style={{ width: "auto", height: 38 }}
+              style={{ width: "auto", height: 38, objectFit: "contain", borderRadius: 6 }}
             />
             <span className="gq-auth-brand-text">School<span style={{ color: "#059669" }}>Profit</span></span>
           </Link>
@@ -536,7 +536,7 @@ export default function Login() {
           <div className="gq-auth-card">
             {/* Mobile Logo */}
             <Link to="/" className="gq-auth-mobile-logo">
-              <img src="/media/logo/schoolprofit-icon.svg" alt="SchoolProfit" style={{ width: 32, height: 32 }} />
+              <img src="/media/logo/schoolprofit-logo.png" alt="SchoolProfit" style={{ width: "auto", height: 32, objectFit: "contain", borderRadius: 6 }} />
               <span style={{ fontSize: 19, fontWeight: 800, color: "#0F2744" }}>School<span style={{ color: "#059669" }}>Profit</span></span>
             </Link>
 

@@ -101,7 +101,7 @@ const NotificationsPage = lazy(() => import("./pages/Notification/NotificationsP
 const InvoiceNotificationsPage = lazy(() => import("./pages/Invoices/InvoiceNotificationsPage"));
 const InvoiceNotificationDetailsPage = lazy(() => import("./pages/Invoices/InvoiceNotificationDetailsPage"));
 const PaymentInstructionsPage = lazy(() => import("./pages/Invoices/PaymentInstructionsPage"));
-const BookDemo = lazy(() => import("./pages/Bookdemo "));
+const BookDemo = lazy(() => import("./pages/Bookdemo"));
 const DemoBookingsPage = lazy(() => import("./pages/Super-Admin/DemoBookingsPage"));
 const BursarsPage = lazy(() => import("./pages/Admin/Bursar/BursarsPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/Forgotpasswordpage"));

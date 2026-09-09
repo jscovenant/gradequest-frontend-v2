@@ -680,16 +680,13 @@ export default function OnboardingPage() {
           <div className="ob-sidebar-inner">
 
             {/* Logo */}
-            <a href="/" className="ob-logo">
-              <span className="ob-logo-mark">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <polygon points="12,2 22,19 2,19" stroke="#0a0f1e" strokeWidth="2"
-                    strokeLinejoin="round" fill="none"/>
-                  <path d="M12 8v5M12 15.5v.5" stroke="#0a0f1e" strokeWidth="2.2" strokeLinecap="round"/>
-                </svg>
-              </span>
-              <span className="ob-logo-name">GradiosEdu</span>
-              <span className="ob-logo-pill">AI</span>
+            <a href="/" className="ob-logo" style={{ textDecoration: "none" }}>
+              <img
+                src="/media/logo/schoolprofit-logo.png"
+                alt="SchoolProfit"
+                style={{ width: "auto", height: 36, objectFit: "contain", borderRadius: 6 }}
+              />
+              <span className="ob-logo-name">School<span style={{ color: "#10B981" }}>Profit</span></span>
             </a>
 
             {/* Headline */}
@@ -778,14 +775,9 @@ export default function OnboardingPage() {
         <main className="ob-main">
 
           {/* Mobile logo */}
-          <a href="/" className="ob-mobile-logo">
-            <span className="ob-logo-mark" style={{ width:32, height:32, borderRadius:8 }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <polygon points="12,2 22,19 2,19" stroke="#0a0f1e" strokeWidth="2" strokeLinejoin="round" fill="none"/>
-                <path d="M12 8v5M12 15.5v.5" stroke="#0a0f1e" strokeWidth="2.2" strokeLinecap="round"/>
-              </svg>
-            </span>
-            <span style={{ fontFamily:"'Lora',serif", fontSize:17, fontWeight:700, color:"#1a1a2e" }}>GradiosEdu</span>
+          <a href="/" className="ob-mobile-logo" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <img src="/media/logo/schoolprofit-logo.png" alt="SchoolProfit" style={{ width: "auto", height: 28, objectFit: "contain", borderRadius: 4 }} />
+            <span style={{ fontSize: 17, fontWeight: 800, color: "#0F2744" }}>School<span style={{ color: "#10B981" }}>Profit</span></span>
           </a>
 
           {/* Header */}

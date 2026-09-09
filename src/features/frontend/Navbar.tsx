@@ -504,10 +504,10 @@ export default function Navbar() {
           <Link to="/" className="gq-logo-link" aria-label="SchoolProfit Homepage">
             <div className="gq-logo-badge" style={{ background: "transparent", border: "none", boxShadow: "none" }}>
               <img
-                src="/media/logo/schoolprofit-logo.svg"
+                src="/media/logo/schoolprofit-logo.png"
                 alt="SchoolProfit Logo"
                 className="gq-logo-img"
-                style={{ width: "auto", height: "38px", objectFit: "contain" }}
+                style={{ width: "auto", height: "38px", objectFit: "contain", borderRadius: "6px" }}
                 onError={(e) => {
                   const target = e.currentTarget;
                   target.style.display = "none";
@@ -602,8 +602,11 @@ export default function Navbar() {
         aria-label="Mobile Navigation Menu"
       >
         <div className="gq-drawer-header">
-          <div className="gq-brand-name" style={{ fontSize: 18 }}>
-            School<span style={{ color: "#059669" }}>Profit</span>
+          <div className="d-flex align-items-center gap-2">
+            <img src="/media/logo/schoolprofit-logo.png" alt="SchoolProfit" style={{ width: "auto", height: "30px", objectFit: "contain", borderRadius: "4px" }} />
+            <div className="gq-brand-name" style={{ fontSize: 18 }}>
+              School<span style={{ color: "#059669" }}>Profit</span>
+            </div>
           </div>
           <button
             className="gq-drawer-close"

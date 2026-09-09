@@ -481,7 +481,7 @@ export default function Footer() {
                 <div className="d-flex flex-column h-100">
                   <a href="/" className="ft-logo mb-4" aria-label="SchoolProfit home">
                     <div className="ft-logo-wrap" style={{ background: "transparent", border: "none" }}>
-                      <img src="/media/logo/schoolprofit-logo.svg" alt="SchoolProfit logo" className="ft-logo-img" style={{ width: "auto", height: "36px" }} />
+                      <img src="/media/logo/schoolprofit-logo.png" alt="SchoolProfit logo" className="ft-logo-img" style={{ width: "auto", height: "38px", objectFit: "contain", borderRadius: "6px" }} />
                     </div>
                     <span className="ft-logo-text">School<span style={{ color: "#10B981" }}>Profit</span></span>
                   </a>

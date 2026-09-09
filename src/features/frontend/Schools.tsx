@@ -1,7 +1,14 @@
 import { useState, useEffect, useMemo } from "react";
 import { api } from "../../utils/api";
 
-type School = { name: string; tag: string; location: string };
+type School = {
+  id?: number;
+  name: string;
+  tag: string;
+  location: string;
+  logo_url?: string | null;
+  logo?: string | null;
+};
 
 const FALLBACK_REAL_SCHOOLS: School[] = [
   { name: "DIKOR Comprehensive College", tag: "Comprehensive College", location: "Badagry, Lagos" },
@@ -39,12 +46,26 @@ const PALETTE = [
 ];
 
 function SchoolPill({ school, index }: { school: School; index: number }) {
+  const [imgError, setImgError] = useState(false);
   const color = PALETTE[index % PALETTE.length];
+  const logoSrc = (!imgError && (school.logo_url || school.logo)) ? (school.logo_url || school.logo) : null;
+
   return (
     <div className="gq-school-pill">
-      <span className="gq-sp-mono" style={{ background: color.bg, color: color.fg, border: `1px solid ${color.border}` }}>
-        {initials(school.name)}
-      </span>
+      {logoSrc ? (
+        <div className="gq-sp-logo-wrap">
+          <img
+            src={logoSrc}
+            alt={school.name}
+            className="gq-sp-logo-img"
+            onError={() => setImgError(true)}
+          />
+        </div>
+      ) : (
+        <span className="gq-sp-mono" style={{ background: color.bg, color: color.fg, border: `1px solid ${color.border}` }}>
+          {initials(school.name)}
+        </span>
+      )}
       <div className="gq-sp-content">
         <span className="gq-sp-name">{school.name}</span>
         <span className="gq-sp-tag">{school.tag}</span>
@@ -261,6 +282,27 @@ export default function Schools() {
           font-size: 13px;
           font-weight: 800;
           flex-shrink: 0;
+        }
+
+        .gq-sp-logo-wrap {
+          width: 36px;
+          height: 36px;
+          border-radius: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #F8FAFC;
+          border: 1px solid #E2E8F0;
+          overflow: hidden;
+          flex-shrink: 0;
+          padding: 2px;
+        }
+
+        .gq-sp-logo-img {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+          border-radius: 8px;
         }
 
         .gq-sp-content {
