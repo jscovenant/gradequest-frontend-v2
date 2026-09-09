@@ -74,9 +74,11 @@ export default function SchoolProfitInvoicePaymentPage() {
   const [generatingVirtual, setGeneratingVirtual] = useState(false);
   const [payload, setPayload] = useState<PaymentPayload | null>(null);
   const [amount, setAmount] = useState("");
-  const [activeTab, setActiveTab] = useState<"wema_transfer" | "card">("wema_transfer");
+  const [activeTab, setActiveTab] = useState<"wema_transfer" | "wallet" | "card">("wema_transfer");
   const [virtualAccount, setVirtualAccount] = useState<VirtualAccountData | null>(null);
   const [copied, setCopied] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [payingWithWallet, setPayingWithWallet] = useState(false);
 
   const invoice = payload?.invoice || null;
   const balance = Number(invoice?.balance || 0);
@@ -88,8 +90,12 @@ export default function SchoolProfitInvoicePaymentPage() {
   const load = async () => {
     if (!invoiceId) return;
     try {
-      const res = await authApi.get<PaymentPayload>(`/school/billing/invoices/${invoiceId}/payment`);
+      const [res, clearanceRes] = await Promise.all([
+        authApi.get<PaymentPayload>(`/school/billing/invoices/${invoiceId}/payment`),
+        authApi.get(`/school/clearance/summary`).catch(() => ({ data: { wallet_balance: 0 } })),
+      ]);
       setPayload(res.data);
+      setWalletBalance(Number(clearanceRes.data?.wallet_balance || 0));
       setAmount(String(Number(res.data.invoice?.balance || 0)));
       if (Number(res.data.invoice?.balance || 0) <= 0) {
         setVirtualAccount(null);
@@ -186,6 +192,34 @@ export default function SchoolProfitInvoicePaymentPage() {
     } catch (err: any) {
       showError?.(err?.response?.data?.message || "Unable to initialize card payment.");
       setProcessing(false);
+    }
+  };
+
+  const handlePayWithWallet = async () => {
+    if (!invoice || payAmount <= 0) {
+      showError?.("Enter a valid amount to pay.");
+      return;
+    }
+
+    if (walletBalance < payAmount) {
+      showError?.(`Insufficient wallet balance. Total due is ${fmtNaira(payAmount)}, but your balance is ${fmtNaira(walletBalance)}.`);
+      return;
+    }
+
+    const ok = window.confirm(`Debit ${fmtNaira(payAmount)} from your SchoolProfit wallet to pay Invoice #${invoice.invoice_no}?`);
+    if (!ok) return;
+
+    setPayingWithWallet(true);
+    try {
+      const res = await authApi.post(`/school/billing/invoices/${invoice.id}/payment/wallet`, {
+        amount: payAmount,
+      });
+      showSuccess?.(res.data?.message || "Invoice settled successfully from school wallet!");
+      await load();
+    } catch (err: any) {
+      showError?.(err?.response?.data?.message || "Failed to settle invoice from wallet.");
+    } finally {
+      setPayingWithWallet(false);
     }
   };
 
@@ -343,7 +377,15 @@ export default function SchoolProfitInvoicePaymentPage() {
                             onClick={() => setActiveTab("wema_transfer")}
                           >
                             <i className="bi bi-bank" />
-                            Wema Bank Transfer
+                            Wema Transfer
+                          </button>
+                          <button
+                            type="button"
+                            className={`invoice-tab-btn ${activeTab === "wallet" ? "active" : ""}`}
+                            onClick={() => setActiveTab("wallet")}
+                          >
+                            <i className="bi bi-wallet2" />
+                            School Wallet
                           </button>
                           <button
                             type="button"
@@ -351,7 +393,7 @@ export default function SchoolProfitInvoicePaymentPage() {
                             onClick={() => setActiveTab("card")}
                           >
                             <i className="bi bi-credit-card" />
-                            Debit Card / USSD
+                            Card / USSD
                           </button>
                         </div>
 
@@ -421,7 +463,71 @@ export default function SchoolProfitInvoicePaymentPage() {
                           </div>
                         )}
 
-                        {/* TAB 2: PAYSTACK CARD CHECKOUT */}
+                        {/* TAB 2: SCHOOL WALLET SETTLEMENT */}
+                        {activeTab === "wallet" && (
+                          <div style={{ background: "#FFFDF8", border: "1.5px solid #FDE68A", borderRadius: 16, padding: 20 }}>
+                            <div className="d-flex justify-content-between align-items-center mb-3">
+                              <span className="badge" style={{ background: walletBalance >= payAmount ? "#15803D" : "#B45309", color: "#FFFFFF", padding: "5px 10px", borderRadius: 999, fontSize: 11, fontWeight: 800 }}>
+                                <i className={`bi ${walletBalance >= payAmount ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill"} me-1`} />
+                                {walletBalance >= payAmount ? "SUFFICIENT WALLET BALANCE" : "LOW WALLET BALANCE"}
+                              </span>
+                              <span className="invoice-muted" style={{ fontSize: 11 }}>1-Click Debit</span>
+                            </div>
+
+                            <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 12, padding: 14, marginBottom: 14 }}>
+                              <div className="d-flex justify-content-between align-items-center mb-1">
+                                <span className="invoice-muted">School Wallet Balance</span>
+                                <strong style={{ fontSize: 18, color: walletBalance >= payAmount ? "#15803D" : "#B45309" }}>{fmtNaira(walletBalance)}</strong>
+                              </div>
+                              <div className="d-flex justify-content-between align-items-center">
+                                <span className="invoice-muted">Invoice Amount Due</span>
+                                <strong style={{ fontSize: 16, color: "#0F2744" }}>{fmtNaira(payAmount)}</strong>
+                              </div>
+                              {walletBalance < payAmount && (
+                                <div className="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+                                  <span className="text-danger" style={{ fontSize: 12, fontWeight: 700 }}>Shortfall / Deficit</span>
+                                  <strong className="text-danger" style={{ fontSize: 14 }}>{fmtNaira(payAmount - walletBalance)}</strong>
+                                </div>
+                              )}
+                            </div>
+
+                            {walletBalance >= payAmount ? (
+                              <button
+                                type="button"
+                                className="invoice-btn"
+                                onClick={handlePayWithWallet}
+                                disabled={payingWithWallet || balance <= 0 || payAmount <= 0}
+                              >
+                                {payingWithWallet ? (
+                                  <><span className="spinner-border spinner-border-sm me-2" /> Debiting Wallet…</>
+                                ) : (
+                                  <><i className="bi bi-wallet2 me-1" /> Debit Wallet & Settle ({fmtNaira(payAmount)})</>
+                                )}
+                              </button>
+                            ) : (
+                              <div className="d-flex flex-column gap-2">
+                                <button
+                                  type="button"
+                                  className="btn btn-warning w-100 fw-bold py-2"
+                                  style={{ borderRadius: 12, fontSize: 13 }}
+                                  onClick={() => navigate("/wallet")}
+                                >
+                                  <i className="bi bi-plus-circle me-1" /> Top Up School Wallet ({fmtNaira(payAmount - walletBalance)} needed)
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-outline-dark w-100 fw-bold py-2"
+                                  style={{ borderRadius: 12, fontSize: 12.5 }}
+                                  onClick={() => setActiveTab("wema_transfer")}
+                                >
+                                  <i className="bi bi-bank me-1" /> Pay via Direct Wema Bank Transfer Instead
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* TAB 3: PAYSTACK CARD CHECKOUT */}
                         {activeTab === "card" && (
                           <div className="invoice-paybox" style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 16, padding: 20 }}>
                             <div className="invoice-muted">Payment amount</div>

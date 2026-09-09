@@ -279,7 +279,45 @@ export default function BillingPage() {
     }
   };
 
-  const handleClearTerm = async () => {
+  const [clearanceModal, setClearanceModal] = useState<{
+    isOpen: boolean;
+    type: "term" | "session";
+    title: string;
+    subtitle: string;
+    sessionId?: number | null;
+    termId?: number | null;
+    studentCount: number;
+    feePerStudent: number;
+    totalFee: number;
+    walletBalance: number;
+    invoiceId?: number | null;
+    invoiceNo?: string | null;
+    virtualAccount?: {
+      bank_name: string;
+      account_number: string;
+      account_name: string;
+      reference: string;
+      amount: number;
+    } | null;
+    loadingOnline: boolean;
+    activeTab: "wema_transfer" | "wallet" | "card";
+  }>({
+    isOpen: false,
+    type: "term",
+    title: "",
+    subtitle: "",
+    studentCount: 0,
+    feePerStudent: 500,
+    totalFee: 0,
+    walletBalance: 0,
+    loadingOnline: false,
+    activeTab: "wema_transfer",
+  });
+
+  const [modalCopied, setModalCopied] = useState(false);
+  const [modalProcessingWallet, setModalProcessingWallet] = useState(false);
+
+  const openTermClearanceModal = async () => {
     if (!clearanceSummary?.session_id || !clearanceSummary?.term_id) {
       showError?.("Current academic period is not active.");
       return;
@@ -290,29 +328,49 @@ export default function BillingPage() {
       showSuccess?.("All active students are already cleared for the current term.");
       return;
     }
-    if ((clearanceSummary.wallet_balance || 0) < fee) {
-      showError?.(`Insufficient wallet balance. Total fee is ${fmtNaira(fee)}, but wallet balance is ${fmtNaira(clearanceSummary.wallet_balance)}. Please top up your wallet first.`);
-      return;
-    }
-    const ok = window.confirm(`Debit ${fmtNaira(fee)} from school wallet to clear all ${count} unpaid student(s) for the current term?`);
-    if (!ok) return;
 
-    setClearingTerm(true);
+    const defaultTab = (clearanceSummary.wallet_balance || 0) >= fee ? "wallet" : "wema_transfer";
+
+    setClearanceModal({
+      isOpen: true,
+      type: "term",
+      title: "Clear Whole School — Current Term",
+      subtitle: `Clear all ${count} unpaid student(s) for the current active term.`,
+      sessionId: clearanceSummary.session_id,
+      termId: clearanceSummary.term_id,
+      studentCount: count,
+      feePerStudent: Number(clearanceSummary.fee_per_student || 500),
+      totalFee: fee,
+      walletBalance: Number(clearanceSummary.wallet_balance || 0),
+      loadingOnline: true,
+      activeTab: defaultTab,
+      virtualAccount: null,
+      invoiceId: null,
+      invoiceNo: null,
+    });
+
     try {
-      const res = await authApi.post("/school/clearance/clear-school-term", {
+      const res = await authApi.post("/school/clearance/initiate-online", {
+        type: "term",
         session_id: clearanceSummary.session_id,
         term_id: clearanceSummary.term_id,
       });
-      showSuccess?.(res.data.message || "Whole-school term clearance completed successfully!");
-      await loadBillingData();
+      if (res.data?.success) {
+        setClearanceModal((prev) => ({
+          ...prev,
+          invoiceId: res.data.invoice?.id,
+          invoiceNo: res.data.invoice?.invoice_no,
+          virtualAccount: res.data.virtual_account,
+          loadingOnline: false,
+        }));
+      }
     } catch (err: any) {
-      showError?.(err?.response?.data?.message || "Failed to clear students from wallet.");
-    } finally {
-      setClearingTerm(false);
+      console.warn("Failed to auto-initiate online clearance:", err);
+      setClearanceModal((prev) => ({ ...prev, loadingOnline: false }));
     }
   };
 
-  const handleClearSession = async () => {
+  const openSessionClearanceModal = async () => {
     if (!clearanceSummary?.session_id) {
       showError?.("Current academic session is not active.");
       return;
@@ -320,26 +378,118 @@ export default function BillingPage() {
     const totalFee = Number(clearanceSummary.session_clearance_fee || 0);
     const totalStudents = Number(clearanceSummary.total_students || 0);
     const termsCount = Number(clearanceSummary.terms_count || 3);
-    if ((clearanceSummary.wallet_balance || 0) < totalFee) {
-      showError?.(`Insufficient wallet balance. Session clearance requires ${fmtNaira(totalFee)}, but wallet balance is ${fmtNaira(clearanceSummary.wallet_balance)}. Please top up your wallet first.`);
+    if (totalStudents === 0) {
+      showError?.("No active students found in this school.");
       return;
     }
-    const ok = window.confirm(`Debit ${fmtNaira(totalFee)} from school wallet to clear all ${totalStudents} active students across ALL ${termsCount} terms in this academic session?`);
-    if (!ok) return;
 
-    setClearingSession(true);
+    const defaultTab = (clearanceSummary.wallet_balance || 0) >= totalFee ? "wallet" : "wema_transfer";
+
+    setClearanceModal({
+      isOpen: true,
+      type: "session",
+      title: "Clear Full Academic Session — 3 Terms Upfront",
+      subtitle: `Clear all ${totalStudents} active students across all ${termsCount} terms for the entire academic session.`,
+      sessionId: clearanceSummary.session_id,
+      termId: null,
+      studentCount: totalStudents * termsCount,
+      feePerStudent: Number(clearanceSummary.fee_per_student || 500),
+      totalFee: totalFee,
+      walletBalance: Number(clearanceSummary.wallet_balance || 0),
+      loadingOnline: true,
+      activeTab: defaultTab,
+      virtualAccount: null,
+      invoiceId: null,
+      invoiceNo: null,
+    });
+
     try {
-      const res = await authApi.post("/school/clearance/clear-school-session", {
+      const res = await authApi.post("/school/clearance/initiate-online", {
+        type: "session",
         session_id: clearanceSummary.session_id,
       });
-      showSuccess?.(res.data.message || "Full academic session clearance completed successfully!");
-      await loadBillingData();
+      if (res.data?.success) {
+        setClearanceModal((prev) => ({
+          ...prev,
+          invoiceId: res.data.invoice?.id,
+          invoiceNo: res.data.invoice?.invoice_no,
+          virtualAccount: res.data.virtual_account,
+          loadingOnline: false,
+        }));
+      }
     } catch (err: any) {
-      showError?.(err?.response?.data?.message || "Failed to clear session from wallet.");
-    } finally {
-      setClearingSession(false);
+      console.warn("Failed to auto-initiate session online clearance:", err);
+      setClearanceModal((prev) => ({ ...prev, loadingOnline: false }));
     }
   };
+
+  const handleModalWalletClearance = async () => {
+    if (!clearanceModal.sessionId) {
+      showError?.("Academic session not specified.");
+      return;
+    }
+
+    if (clearanceModal.walletBalance < clearanceModal.totalFee) {
+      showError?.(`Insufficient wallet balance. Total fee is ${fmtNaira(clearanceModal.totalFee)}, but your balance is ${fmtNaira(clearanceModal.walletBalance)}.`);
+      return;
+    }
+
+    const ok = window.confirm(`Debit ${fmtNaira(clearanceModal.totalFee)} from school wallet to ${clearanceModal.type === "session" ? "clear entire academic session" : "clear whole school for active term"}?`);
+    if (!ok) return;
+
+    setModalProcessingWallet(true);
+    try {
+      let res;
+      if (clearanceModal.type === "session") {
+        res = await authApi.post("/school/clearance/clear-school-session", {
+          session_id: clearanceModal.sessionId,
+        });
+      } else {
+        res = await authApi.post("/school/clearance/clear-school-term", {
+          session_id: clearanceModal.sessionId,
+          term_id: clearanceModal.termId,
+        });
+      }
+      showSuccess?.(res.data?.message || "Clearance completed successfully!");
+      setClearanceModal((prev) => ({ ...prev, isOpen: false }));
+      await loadBillingData();
+    } catch (err: any) {
+      showError?.(err?.response?.data?.message || "Clearance from wallet failed.");
+    } finally {
+      setModalProcessingWallet(false);
+    }
+  };
+
+  const copyModalAccount = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setModalCopied(true);
+      showSuccess?.("Account number copied!");
+      setTimeout(() => setModalCopied(false), 2500);
+    } catch {
+      showError?.("Could not copy automatically. Please copy manually.");
+    }
+  };
+
+  useEffect(() => {
+    if (!clearanceModal.isOpen || !clearanceModal.invoiceId) return;
+
+    const poll = setInterval(async () => {
+      try {
+        const res = await authApi.get(`/school/billing/invoices/${clearanceModal.invoiceId}/payment`);
+        if (Number(res.data?.invoice?.balance || 0) <= 0 || res.data?.invoice?.status === "paid") {
+          showSuccess?.("Direct bank transfer payment confirmed! Student clearance updated.");
+          setClearanceModal((prev) => ({ ...prev, isOpen: false }));
+          await loadBillingData();
+          clearInterval(poll);
+        }
+      } catch {
+        // silent
+      }
+    }, 12000);
+
+    return () => clearInterval(poll);
+  }, [clearanceModal.isOpen, clearanceModal.invoiceId, showSuccess]);
 
   useEffect(() => {
     loadBillingData();
@@ -860,7 +1010,7 @@ export default function BillingPage() {
                           <div className="db-strong" style={{ fontSize: 15 }}>Clear Whole School (Current Term)</div>
                         </div>
                         <p className="db-muted" style={{ fontSize: 12.5, margin: "6px 0 12px 0" }}>
-                          Clear all <strong>{clearanceSummary?.pending_count || 0} unpaid student(s)</strong> for the active term at once from your SchoolProfit wallet.
+                          Clear all <strong>{clearanceSummary?.pending_count || 0} unpaid student(s)</strong> for the active term via <strong>School Wallet</strong> or direct <strong>Wema Bank Transfer</strong>.
                         </p>
                         <div className="db-strong" style={{ fontSize: 14, color: "#2563eb", marginBottom: 12 }}>
                           Total: {fmtNaira(Number(clearanceSummary?.term_clearance_fee || 0))} ({fmtNaira(Number(clearanceSummary?.fee_per_student || 500))}/student)
@@ -870,14 +1020,10 @@ export default function BillingPage() {
                       <button
                         className="db-btn-gold"
                         style={{ width: "100%", justifyContent: "center", padding: "10px 14px", fontSize: 13 }}
-                        onClick={handleClearTerm}
-                        disabled={clearingTerm || (clearanceSummary?.pending_count || 0) === 0}
+                        onClick={openTermClearanceModal}
+                        disabled={(clearanceSummary?.pending_count || 0) === 0}
                       >
-                        {clearingTerm ? (
-                          <><span className="spinner-border spinner-border-sm me-2" /> Clearing Students…</>
-                        ) : (
-                          <><i className="bi bi-check2-all me-1" /> Clear Whole School ({fmtNaira(Number(clearanceSummary?.term_clearance_fee || 0))})</>
-                        )}
+                        <i className="bi bi-check2-all me-1" /> Clear Whole School ({fmtNaira(Number(clearanceSummary?.term_clearance_fee || 0))})
                       </button>
                     </div>
                   </div>
@@ -901,7 +1047,7 @@ export default function BillingPage() {
                           <div className="db-strong" style={{ fontSize: 15 }}>Clear Full Session (All Terms Upfront)</div>
                         </div>
                         <p className="db-muted" style={{ fontSize: 12.5, margin: "6px 0 12px 0" }}>
-                          Clear all <strong>{clearanceSummary?.total_students || 0} active students</strong> across all {clearanceSummary?.terms_count || 3} terms for the entire academic session.
+                          Clear all <strong>{clearanceSummary?.total_students || 0} active students</strong> across all {clearanceSummary?.terms_count || 3} terms upfront via <strong>School Wallet</strong> or direct <strong>Wema Bank Transfer</strong>.
                         </p>
                         <div className="db-strong" style={{ fontSize: 14, color: "#16a34a", marginBottom: 12 }}>
                           Total Upfront: {fmtNaira(Number(clearanceSummary?.session_clearance_fee || 0))}
@@ -911,14 +1057,10 @@ export default function BillingPage() {
                       <button
                         className="db-btn-outline"
                         style={{ width: "100%", justifyContent: "center", padding: "10px 14px", fontSize: 13, borderColor: "#16a34a", color: "#16a34a" }}
-                        onClick={handleClearSession}
-                        disabled={clearingSession || (clearanceSummary?.total_students || 0) === 0}
+                        onClick={openSessionClearanceModal}
+                        disabled={(clearanceSummary?.total_students || 0) === 0}
                       >
-                        {clearingSession ? (
-                          <><span className="spinner-border spinner-border-sm me-2" /> Clearing Session…</>
-                        ) : (
-                          <><i className="bi bi-award-fill me-1" /> Clear Entire Academic Session</>
-                        )}
+                        <i className="bi bi-award-fill me-1" /> Clear Full Academic Session ({fmtNaira(Number(clearanceSummary?.session_clearance_fee || 0))})
                       </button>
                     </div>
                   </div>
@@ -1632,6 +1774,431 @@ export default function BillingPage() {
           </main>
         </div>
       </div>
+
+      {/* ===== CLEARANCE PAYMENT MODAL ===== */}
+      {clearanceModal.isOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+            background: "rgba(10, 25, 47, 0.75)",
+            backdropFilter: "blur(6px)",
+          }}
+          onClick={() => setClearanceModal((prev) => ({ ...prev, isOpen: false }))}
+        >
+          <div
+            style={{
+              background: "#FFFFFF",
+              borderRadius: 20,
+              maxWidth: 560,
+              width: "100%",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.35)",
+              border: "1px solid rgba(255,255,255,0.2)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                padding: "22px 24px",
+                background: "linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%)",
+                color: "#FFFFFF",
+                borderRadius: "20px 20px 0 0",
+                position: "relative",
+              }}
+            >
+              <div className="d-flex justify-content-between align-items-start">
+                <div>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                      fontWeight: 800,
+                      color: "#FBBF24",
+                    }}
+                  >
+                    Fee Clearance & Settlement
+                  </span>
+                  <h3 style={{ fontSize: 20, fontWeight: 900, margin: "4px 0 0", color: "#FFFFFF" }}>
+                    {clearanceModal.title}
+                  </h3>
+                  <p style={{ fontSize: 13, color: "#CBD5E1", margin: "4px 0 0", lineHeight: 1.4 }}>
+                    {clearanceModal.subtitle}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  style={{
+                    background: "rgba(255,255,255,0.15)",
+                    border: "none",
+                    color: "#FFFFFF",
+                    width: 32,
+                    height: 32,
+                    borderRadius: "50%",
+                    display: "grid",
+                    placeItems: "center",
+                    cursor: "pointer",
+                    fontSize: 15,
+                  }}
+                  onClick={() => setClearanceModal((prev) => ({ ...prev, isOpen: false }))}
+                >
+                  <i className="bi bi-x-lg" />
+                </button>
+              </div>
+
+              {/* Scope Summary Badge */}
+              <div
+                style={{
+                  marginTop: 16,
+                  background: "rgba(255, 255, 255, 0.1)",
+                  borderRadius: 12,
+                  padding: "10px 14px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: 8,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase" }}>
+                    Scope Calculation
+                  </div>
+                  <div style={{ fontSize: 13.5, fontWeight: 800 }}>
+                    {clearanceModal.studentCount.toLocaleString()} student{clearanceModal.studentCount !== 1 ? "s" : ""} × {fmtNaira(clearanceModal.feePerStudent)}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase" }}>
+                    Total Payable
+                  </div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: "#FBBF24" }}>
+                    {fmtNaira(clearanceModal.totalFee)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: "20px 24px" }}>
+              {/* Tab Selector */}
+              <div
+                style={{
+                  display: "flex",
+                  background: "#F1F5F9",
+                  borderRadius: 12,
+                  padding: 4,
+                  gap: 4,
+                  marginBottom: 18,
+                }}
+              >
+                <button
+                  type="button"
+                  style={{
+                    flex: 1,
+                    border: "none",
+                    background: clearanceModal.activeTab === "wema_transfer" ? "#FFFFFF" : "transparent",
+                    color: clearanceModal.activeTab === "wema_transfer" ? "#0F2744" : "#64748B",
+                    fontWeight: 800,
+                    fontSize: 12.5,
+                    padding: "9px 12px",
+                    borderRadius: 9,
+                    boxShadow: clearanceModal.activeTab === "wema_transfer" ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    transition: "all .15s",
+                  }}
+                  onClick={() => setClearanceModal((prev) => ({ ...prev, activeTab: "wema_transfer" }))}
+                >
+                  <i className="bi bi-bank" />
+                  Wema Transfer
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    flex: 1,
+                    border: "none",
+                    background: clearanceModal.activeTab === "wallet" ? "#FFFFFF" : "transparent",
+                    color: clearanceModal.activeTab === "wallet" ? "#0F2744" : "#64748B",
+                    fontWeight: 800,
+                    fontSize: 12.5,
+                    padding: "9px 12px",
+                    borderRadius: 9,
+                    boxShadow: clearanceModal.activeTab === "wallet" ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    transition: "all .15s",
+                  }}
+                  onClick={() => setClearanceModal((prev) => ({ ...prev, activeTab: "wallet" }))}
+                >
+                  <i className="bi bi-wallet2" />
+                  School Wallet
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    flex: 1,
+                    border: "none",
+                    background: clearanceModal.activeTab === "card" ? "#FFFFFF" : "transparent",
+                    color: clearanceModal.activeTab === "card" ? "#0F2744" : "#64748B",
+                    fontWeight: 800,
+                    fontSize: 12.5,
+                    padding: "9px 12px",
+                    borderRadius: 9,
+                    boxShadow: clearanceModal.activeTab === "card" ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    transition: "all .15s",
+                  }}
+                  onClick={() => setClearanceModal((prev) => ({ ...prev, activeTab: "card" }))}
+                >
+                  <i className="bi bi-credit-card" />
+                  Card / USSD
+                </button>
+              </div>
+
+              {/* TAB 1: DIRECT WEMA TRANSFER */}
+              {clearanceModal.activeTab === "wema_transfer" && (
+                <div
+                  style={{
+                    background: "linear-gradient(135deg, #FFFDF8 0%, #FEF3C7 100%)",
+                    border: "1.5px solid #FDE68A",
+                    borderRadius: 16,
+                    padding: 18,
+                  }}
+                >
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span
+                      style={{
+                        background: "#92400E",
+                        color: "#FFFFFF",
+                        padding: "4px 8px",
+                        borderRadius: 999,
+                        fontSize: 10.5,
+                        fontWeight: 800,
+                      }}
+                    >
+                      <i className="bi bi-lightning-charge-fill me-1" /> INSTANT WEBHOOK CLEARANCE
+                    </span>
+                    <span style={{ fontSize: 11, color: "#78350F", fontWeight: 700 }}>NIP Transfer</span>
+                  </div>
+
+                  <p style={{ fontSize: 13, color: "#78350F", margin: "10px 0 0", lineHeight: 1.4 }}>
+                    Transfer exactly <strong>{fmtNaira(clearanceModal.totalFee)}</strong> to this dedicated Wema Bank account:
+                  </p>
+
+                  {clearanceModal.loadingOnline && !clearanceModal.virtualAccount ? (
+                    <div className="text-center py-4">
+                      <span className="spinner-border text-warning" />
+                      <div className="db-muted mt-2" style={{ fontSize: 12 }}>Generating dedicated virtual account…</div>
+                    </div>
+                  ) : (
+                    <>
+                      <div
+                        style={{
+                          fontFamily: "monospace",
+                          fontSize: 26,
+                          fontWeight: 900,
+                          letterSpacing: 2,
+                          color: "#0F2744",
+                          background: "#FFFFFF",
+                          border: "1.5px dashed #D97706",
+                          padding: "10px 14px",
+                          borderRadius: 12,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          margin: "12px 0",
+                        }}
+                      >
+                        <span>{clearanceModal.virtualAccount?.account_number || "Generating..."}</span>
+                        {clearanceModal.virtualAccount?.account_number && (
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-dark"
+                            style={{ borderRadius: 8, fontSize: 12, fontWeight: 700 }}
+                            onClick={() => copyModalAccount(clearanceModal.virtualAccount?.account_number || "")}
+                          >
+                            <i className={`bi ${modalCopied ? "bi-check2" : "bi-clipboard"}`} /> {modalCopied ? "Copied" : "Copy"}
+                          </button>
+                        )}
+                      </div>
+
+                      <div style={{ fontSize: 12.5, display: "flex", flexDirection: "column", gap: 6 }}>
+                        <div className="d-flex justify-content-between">
+                          <span className="text-muted">Bank Name:</span>
+                          <strong style={{ color: "#0F2744" }}>{clearanceModal.virtualAccount?.bank_name || "Wema Bank"}</strong>
+                        </div>
+                        <div className="d-flex justify-content-between">
+                          <span className="text-muted">Account Name:</span>
+                          <strong style={{ color: "#0F2744", textAlign: "right" }}>{clearanceModal.virtualAccount?.account_name || "SchoolProfit Clearance"}</strong>
+                        </div>
+                        <div className="d-flex justify-content-between">
+                          <span className="text-muted">Payable Amount:</span>
+                          <strong style={{ color: "#B45309" }}>{fmtNaira(clearanceModal.totalFee)}</strong>
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          background: "#FFFFFF",
+                          border: "1px solid #E2E8F0",
+                          borderRadius: 10,
+                          padding: "8px 12px",
+                          marginTop: 12,
+                          fontSize: 11.5,
+                          color: "#475569",
+                          textAlign: "center",
+                        }}
+                      >
+                        <i className="bi bi-arrow-repeat spin me-1 text-warning" />
+                        Listening for incoming transfer. Clearance is applied automatically upon settlement.
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 2: SCHOOL WALLET */}
+              {clearanceModal.activeTab === "wallet" && (
+                <div style={{ background: "#FFFDF8", border: "1.5px solid #FDE68A", borderRadius: 16, padding: 18 }}>
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <span
+                      style={{
+                        background: clearanceModal.walletBalance >= clearanceModal.totalFee ? "#15803D" : "#B45309",
+                        color: "#FFFFFF",
+                        padding: "4px 8px",
+                        borderRadius: 999,
+                        fontSize: 11,
+                        fontWeight: 800,
+                      }}
+                    >
+                      <i className={`bi ${clearanceModal.walletBalance >= clearanceModal.totalFee ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill"} me-1`} />
+                      {clearanceModal.walletBalance >= clearanceModal.totalFee ? "SUFFICIENT WALLET BALANCE" : "INSUFFICIENT WALLET BALANCE"}
+                    </span>
+                    <span style={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>Instant Clearance</span>
+                  </div>
+
+                  <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 12, padding: 14, marginBottom: 14 }}>
+                    <div className="d-flex justify-content-between align-items-center mb-1">
+                      <span style={{ fontSize: 13, color: "#64748B" }}>School Wallet Balance</span>
+                      <strong style={{ fontSize: 18, color: clearanceModal.walletBalance >= clearanceModal.totalFee ? "#15803D" : "#B45309" }}>
+                        {fmtNaira(clearanceModal.walletBalance)}
+                      </strong>
+                    </div>
+                    <div className="d-flex justify-content-between align-items-center">
+                      <span style={{ fontSize: 13, color: "#64748B" }}>Clearance Fee Required</span>
+                      <strong style={{ fontSize: 16, color: "#0F2744" }}>{fmtNaira(clearanceModal.totalFee)}</strong>
+                    </div>
+                    {clearanceModal.walletBalance < clearanceModal.totalFee && (
+                      <div className="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+                        <span className="text-danger" style={{ fontSize: 12, fontWeight: 700 }}>Shortfall</span>
+                        <strong className="text-danger" style={{ fontSize: 14 }}>
+                          {fmtNaira(clearanceModal.totalFee - clearanceModal.walletBalance)}
+                        </strong>
+                      </div>
+                    )}
+                  </div>
+
+                  {clearanceModal.walletBalance >= clearanceModal.totalFee ? (
+                    <button
+                      type="button"
+                      className="db-btn-gold"
+                      style={{ width: "100%", justifyContent: "center", padding: "12px", fontSize: 13.5 }}
+                      onClick={handleModalWalletClearance}
+                      disabled={modalProcessingWallet}
+                    >
+                      {modalProcessingWallet ? (
+                        <><span className="spinner-border spinner-border-sm me-2" /> Debiting Wallet…</>
+                      ) : (
+                        <><i className="bi bi-wallet2 me-1" /> Debit Wallet & Complete Clearance ({fmtNaira(clearanceModal.totalFee)})</>
+                      )}
+                    </button>
+                  ) : (
+                    <div className="d-flex flex-column gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-warning w-100 fw-bold py-2"
+                        style={{ borderRadius: 12, fontSize: 13 }}
+                        onClick={() => navigate("/wallet")}
+                      >
+                        <i className="bi bi-plus-circle me-1" /> Top Up School Wallet ({fmtNaira(clearanceModal.totalFee - clearanceModal.walletBalance)} deficit)
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline-dark w-100 fw-bold py-2"
+                        style={{ borderRadius: 12, fontSize: 12.5 }}
+                        onClick={() => setClearanceModal((prev) => ({ ...prev, activeTab: "wema_transfer" }))}
+                      >
+                        <i className="bi bi-bank me-1" /> Pay via Direct Wema Bank Transfer Instead
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 3: CARD / PAYSTACK */}
+              {clearanceModal.activeTab === "card" && (
+                <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 16, padding: 18 }}>
+                  <div style={{ fontSize: 13, color: "#64748B", marginBottom: 12 }}>
+                    Pay securely with Mastercard, Visa, Verve card, or Bank USSD via Paystack.
+                  </div>
+                  <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 12, padding: 12, marginBottom: 14 }}>
+                    <div className="d-flex justify-content-between align-items-center">
+                      <span style={{ fontSize: 13, color: "#64748B" }}>Total Payable</span>
+                      <strong style={{ fontSize: 17, color: "#0F2744" }}>{fmtNaira(clearanceModal.totalFee)}</strong>
+                    </div>
+                  </div>
+                  {clearanceModal.invoiceId ? (
+                    <button
+                      type="button"
+                      className="db-btn-gold"
+                      style={{ width: "100%", justifyContent: "center", padding: "12px", fontSize: 13.5 }}
+                      onClick={() => navigate(`/billing/invoice-payment/${clearanceModal.invoiceId}`)}
+                    >
+                      <i className="bi bi-credit-card me-1" /> Proceed to Card Payment ({fmtNaira(clearanceModal.totalFee)})
+                    </button>
+                  ) : (
+                    <div className="text-center py-3">
+                      <span className="spinner-border spinner-border-sm text-warning me-2" />
+                      <span style={{ fontSize: 13 }}>Initializing payment checkout…</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ padding: "12px 24px 20px", display: "flex", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                className="db-refresh-btn"
+                style={{ fontSize: 12.5 }}
+                onClick={() => setClearanceModal((prev) => ({ ...prev, isOpen: false }))}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
