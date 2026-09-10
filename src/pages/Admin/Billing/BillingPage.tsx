@@ -300,7 +300,7 @@ export default function BillingPage() {
       amount: number;
     } | null;
     loadingOnline: boolean;
-    activeTab: "wema_transfer" | "wallet" | "card";
+    activeTab: "wema_transfer" | "wallet";
   }>({
     isOpen: false,
     type: "term",
@@ -1948,30 +1948,6 @@ export default function BillingPage() {
                   <i className="bi bi-wallet2" />
                   School Wallet
                 </button>
-                <button
-                  type="button"
-                  style={{
-                    flex: 1,
-                    border: "none",
-                    background: clearanceModal.activeTab === "card" ? "#FFFFFF" : "transparent",
-                    color: clearanceModal.activeTab === "card" ? "#0F2744" : "#64748B",
-                    fontWeight: 800,
-                    fontSize: 12.5,
-                    padding: "9px 12px",
-                    borderRadius: 9,
-                    boxShadow: clearanceModal.activeTab === "card" ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 6,
-                    transition: "all .15s",
-                  }}
-                  onClick={() => setClearanceModal((prev) => ({ ...prev, activeTab: "card" }))}
-                >
-                  <i className="bi bi-credit-card" />
-                  Card / USSD
-                </button>
               </div>
 
               {/* TAB 1: DIRECT WEMA TRANSFER */}
@@ -2149,36 +2125,6 @@ export default function BillingPage() {
                       >
                         <i className="bi bi-bank me-1" /> Pay via Direct Wema Bank Transfer Instead
                       </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* TAB 3: CARD / PAYSTACK */}
-              {clearanceModal.activeTab === "card" && (
-                <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 16, padding: 18 }}>
-                  <div style={{ fontSize: 13, color: "#64748B", marginBottom: 12 }}>
-                    Pay securely with Mastercard, Visa, Verve card, or Bank USSD via Paystack.
-                  </div>
-                  <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 12, padding: 12, marginBottom: 14 }}>
-                    <div className="d-flex justify-content-between align-items-center">
-                      <span style={{ fontSize: 13, color: "#64748B" }}>Total Payable</span>
-                      <strong style={{ fontSize: 17, color: "#0F2744" }}>{fmtNaira(clearanceModal.totalFee)}</strong>
-                    </div>
-                  </div>
-                  {clearanceModal.invoiceId ? (
-                    <button
-                      type="button"
-                      className="db-btn-gold"
-                      style={{ width: "100%", justifyContent: "center", padding: "12px", fontSize: 13.5 }}
-                      onClick={() => navigate(`/billing/invoice-payment/${clearanceModal.invoiceId}`)}
-                    >
-                      <i className="bi bi-credit-card me-1" /> Proceed to Card Payment ({fmtNaira(clearanceModal.totalFee)})
-                    </button>
-                  ) : (
-                    <div className="text-center py-3">
-                      <span className="spinner-border spinner-border-sm text-warning me-2" />
-                      <span style={{ fontSize: 13 }}>Initializing payment checkout…</span>
                     </div>
                   )}
                 </div>

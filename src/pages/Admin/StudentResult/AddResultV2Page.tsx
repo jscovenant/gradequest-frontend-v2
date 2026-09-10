@@ -218,8 +218,8 @@ export default function AddResultV2Page() {
     },
   });
 
-  // Sidebar: completed
   const [completedStudents, setCompletedStudents] = useState<CompletedStudent[]>([]);
+  const [autoAttendance, setAutoAttendance] = useState<{ present: number; absent: number; total_open: number; available: boolean } | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [computing, setComputing] = useState(false);
@@ -512,11 +512,34 @@ export default function AddResultV2Page() {
 
         setScores(init);
 
+        if (data.attendance?.available) {
+          setAutoAttendance(data.attendance);
+        } else {
+          setAutoAttendance(null);
+        }
+
         if (data.existing?.summary) {
+          const exMeta = data.existing.summary.meta ?? {};
           setSummary((p) => ({
             ...p,
             ...data.existing.summary,
-            meta: { ...p.meta, ...(data.existing.summary.meta ?? {}) },
+            meta: {
+              ...p.meta,
+              ...exMeta,
+              no_present: exMeta.no_present ?? (data.attendance?.available ? String(data.attendance.present) : p.meta.no_present),
+              no_absent: exMeta.no_absent ?? (data.attendance?.available ? String(data.attendance.absent) : p.meta.no_absent),
+              school_open: exMeta.school_open ?? (data.attendance?.available ? String(data.attendance.total_open) : p.meta.school_open),
+            },
+          }));
+        } else if (data.attendance?.available) {
+          setSummary((p) => ({
+            ...p,
+            meta: {
+              ...p.meta,
+              no_present: String(data.attendance.present),
+              no_absent: String(data.attendance.absent),
+              school_open: String(data.attendance.total_open),
+            },
           }));
         }
 
@@ -579,6 +602,21 @@ export default function AddResultV2Page() {
         init[s.name] = { subject_id: s.id, ca: {}, exam: undefined, total: undefined, grade: "", remark: "" };
       }
       setScores(init);
+
+      if (data.attendance?.available) {
+        setAutoAttendance(data.attendance);
+        setSummary((p) => ({
+          ...p,
+          meta: {
+            ...p.meta,
+            no_present: p.meta.no_present || String(data.attendance.present),
+            no_absent: p.meta.no_absent || String(data.attendance.absent),
+            school_open: p.meta.school_open || String(data.attendance.total_open),
+          },
+        }));
+      } else {
+        setAutoAttendance(null);
+      }
 
       setStep(2);
       showSuccess("Student loaded successfully.");
@@ -1601,6 +1639,30 @@ export default function AddResultV2Page() {
                                 onChange={(e) => setSummary((p) => ({ ...p, meta: { ...p.meta, resumption_date: e.target.value } }))}
                               />
                             </div>
+
+                            {autoAttendance && autoAttendance.available && (
+                              <div className="col-12">
+                                <div
+                                  style={{
+                                    background: "rgba(16, 185, 129, 0.08)",
+                                    border: "1px solid rgba(16, 185, 129, 0.25)",
+                                    borderRadius: 10,
+                                    padding: "8px 14px",
+                                    fontSize: "12.5px",
+                                    color: "#065F46",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    marginBottom: 6,
+                                  }}
+                                >
+                                  <i className="bi bi-calendar-check-fill" style={{ color: "#10B981" }} />
+                                  <span>
+                                    Attendance auto-computed from class records: <strong>{autoAttendance.present}</strong> Present, <strong>{autoAttendance.absent}</strong> Absent (<strong>{autoAttendance.total_open}</strong> Total Days). You may adjust if needed.
+                                  </span>
+                                </div>
+                              </div>
+                            )}
 
                             <div className="col-md-4">
                               <label className="form-label">Times Open</label>

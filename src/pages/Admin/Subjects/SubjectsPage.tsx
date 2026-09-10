@@ -121,7 +121,13 @@ export default function SubjectsPage() {
       setLoadingDepartments(true);
       // common in your project: "/student-department"
       const res = await authApi.get<Department[]>("/student-department");
-      setDepartments(Array.isArray(res.data) ? res.data : []);
+      const list = Array.isArray(res.data) ? res.data : [];
+      // Deduplicate: unify database general records with the built-in General department option
+      const filtered = list.filter((d) => {
+        const n = (d.name || "").trim().toLowerCase();
+        return n !== "general" && n !== "general department";
+      });
+      setDepartments(filtered);
     } catch (err: any) {
       showError(getErrorMessage(err));
     } finally {
@@ -201,7 +207,7 @@ export default function SubjectsPage() {
      DERIVED
   ========================= */
   const selectedDepartment = useMemo(
-    () => departmentId === GENERAL_DEPARTMENT_ID ? { id: 0, name: "General Department" } : departments.find((d) => String(d.id) === String(departmentId)),
+    () => departmentId === GENERAL_DEPARTMENT_ID ? { id: 0, name: "General Department (Core / All Classes)" } : departments.find((d) => String(d.id) === String(departmentId)),
     [departments, departmentId]
   );
 
@@ -1206,7 +1212,7 @@ export default function SubjectsPage() {
                     title="Select department"
                   >
                     <option value="">Select Department</option>
-                    <option value={GENERAL_DEPARTMENT_ID}>General Department</option>
+                    <option value={GENERAL_DEPARTMENT_ID}>General (All Classes / Core)</option>
                     {departments.map((d) => (
                       <option key={d.id} value={d.id}>
                         {d.name}

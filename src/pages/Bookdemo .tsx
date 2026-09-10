@@ -1,4 +1,4 @@
-﻿import { useState, useRef } from "react";
+import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { publicApi } from "../utils/axios";
 import Navbar from "../features/frontend/Navbar";
@@ -43,9 +43,9 @@ const SCHOOL_TYPES = [
 
 const STUDENT_COUNTS = [
   "Under 100 students",
-  "100 â€“ 300 students",
-  "300 â€“ 700 students",
-  "700 â€“ 1,500 students",
+  "100 - 300 students",
+  "300 - 700 students",
+  "700 - 1,500 students",
   "1,500+ students",
 ];
 
@@ -67,22 +67,22 @@ const STEPS = [
 
 const HIGHLIGHTS = [
   {
-    icon: "ðŸ’³",
+    iconType: "wallet",
     title: "Zero Fee Debt Recovery",
     desc: "Automated installment tracking, debt gatekeepers, and instant multi-bank settlement to prevent revenue leakages.",
   },
   {
-    icon: "ðŸ“Š",
+    iconType: "chart",
     title: "1-Click Master Broadsheets",
     desc: "Compile entire school terminal positions, GPAs, and tamper-proof QR verified report cards in under 3 minutes.",
   },
   {
-    icon: "ðŸ’»",
+    iconType: "laptop",
     title: "Offline Computer Lab CBT",
     desc: "Conduct massive terminal exams with hundreds of students concurrently without internet or power interruption risks.",
   },
   {
-    icon: "ðŸ¤–",
+    iconType: "sparkles",
     title: "AI Lesson Note Generator",
     desc: "Empower teachers to generate Nigerian NERDC-compliant lesson plans and schemes of work in seconds.",
   },
@@ -218,7 +218,7 @@ export default function BookDemo() {
 
   return (
     <>
-      <PageTitle title="Book a Free Live Demo | SchoolProfit â€” School Growth & Profit OS" />
+      <PageTitle title="Book a Free Live Demo | SchoolProfit — School Growth & Profit OS" />
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,800;1,600&display=swap');
@@ -768,7 +768,7 @@ export default function BookDemo() {
         <section className="gq-demo-hero">
           <div className="container-xl">
             <div className="gq-demo-kicker">
-              <span>ðŸŽ¯</span> Schedule Your Interactive Walkthrough
+              Schedule Your Interactive Walkthrough
             </div>
 
             <h1 className="gq-demo-hero-title">
@@ -781,19 +781,19 @@ export default function BookDemo() {
 
             <div className="gq-demo-trust-row">
               <div className="gq-demo-trust-badge">
-                <span>ðŸ«</span>
+                <i className="bi bi-building-check" style={{ color: "#FBBF24" }} />
                 <span><strong>500+</strong> Partner Schools</span>
               </div>
               <div className="gq-demo-trust-badge">
-                <span>â­</span>
+                <i className="bi bi-star-fill" style={{ color: "#FBBF24" }} />
                 <span><strong>4.9/5</strong> Satisfaction Rating</span>
               </div>
               <div className="gq-demo-trust-badge">
-                <span>â±ï¸</span>
+                <i className="bi bi-clock-history" style={{ color: "#FBBF24" }} />
                 <span><strong>30 Mins</strong> Guided Session</span>
               </div>
               <div className="gq-demo-trust-badge">
-                <span>ðŸŽ</span>
+                <i className="bi bi-shield-check" style={{ color: "#FBBF24" }} />
                 <span><strong>100% Free</strong> No Commitment</span>
               </div>
             </div>
@@ -813,7 +813,12 @@ export default function BookDemo() {
 
                 {HIGHLIGHTS.map((h, i) => (
                   <div className="gq-demo-feature-item" key={i}>
-                    <div className="gq-demo-feature-icon">{h.icon}</div>
+                    <div className="gq-demo-feature-icon">
+                      {h.iconType === "wallet" && <i className="bi bi-wallet2" style={{ color: "#D97706", fontSize: 18 }} />}
+                      {h.iconType === "chart" && <i className="bi bi-bar-chart-line-fill" style={{ color: "#D97706", fontSize: 18 }} />}
+                      {h.iconType === "laptop" && <i className="bi bi-laptop" style={{ color: "#D97706", fontSize: 18 }} />}
+                      {h.iconType === "sparkles" && <i className="bi bi-stars" style={{ color: "#D97706", fontSize: 18 }} />}
+                    </div>
                     <div>
                       <div className="gq-demo-feature-title">{h.title}</div>
                       <p className="gq-demo-feature-text">{h.desc}</p>
@@ -832,7 +837,8 @@ export default function BookDemo() {
                     rel="noopener noreferrer"
                     className="gq-demo-whatsapp-btn"
                   >
-                    <span>ðŸ’¬ Chat Now</span>
+                    <i className="bi bi-whatsapp me-1" />
+                    <span>Chat Now</span>
                   </a>
                 </div>
               </div>
@@ -841,8 +847,8 @@ export default function BookDemo() {
               <div className="gq-demo-form-card">
                 {done ? (
                   <div className="gq-demo-success-box">
-                    <div className="gq-demo-success-icon">âœ“</div>
-                    <h2 className="gq-demo-success-title">Demo Successfully Booked! ðŸŽ‰</h2>
+                    <div className="gq-demo-success-icon"><i className="bi bi-check-lg" /></div>
+                    <h2 className="gq-demo-success-title">Demo Successfully Booked!</h2>
                     <p className="gq-demo-success-sub">
                       Thank you, <strong>{form.firstName}</strong>. We've reserved your 30-minute demonstration slot. A growth specialist will reach out on WhatsApp and Email to confirm the meeting link.
                     </p>
@@ -898,7 +904,7 @@ export default function BookDemo() {
                             }`}
                           >
                             <div className="gq-demo-step-circle">
-                              {isCompleted ? "âœ“" : `0${s.n}`}
+                              {isCompleted ? <i className="bi bi-check-lg" /> : `0${s.n}`}
                             </div>
                             <span className="gq-demo-step-name">{s.label}</span>
                           </div>
@@ -922,7 +928,7 @@ export default function BookDemo() {
                           gap: 8,
                         }}
                       >
-                        <span>âš ï¸</span> {serverError}
+                        <i className="bi bi-exclamation-circle-fill me-1" /> {serverError}
                       </div>
                     )}
 
@@ -1148,13 +1154,13 @@ export default function BookDemo() {
                     <div className="gq-demo-actions">
                       {step > 1 && (
                         <button type="button" className="gq-demo-btn-back" onClick={back}>
-                          â† Back
+                          <i className="bi bi-arrow-left me-1" /> Back
                         </button>
                       )}
 
                       {step < 3 ? (
                         <button type="button" className="gq-demo-btn-next" onClick={next}>
-                          Continue to Step {step + 1} â†’
+                          Continue to Step {step + 1} <i className="bi bi-arrow-right ms-1" />
                         </button>
                       ) : (
                         <button
@@ -1163,7 +1169,7 @@ export default function BookDemo() {
                           onClick={submit}
                           disabled={submitting}
                         >
-                          {submitting ? "Booking Your Demo..." : "Confirm & Schedule Demo âœ“"}
+                          {submitting ? "Booking Your Demo..." : "Confirm & Schedule Demo"}
                         </button>
                       )}
                     </div>

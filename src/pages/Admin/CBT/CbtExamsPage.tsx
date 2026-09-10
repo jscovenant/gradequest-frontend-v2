@@ -357,7 +357,6 @@ export default function CbtExamsPage() {
     return preferGeneralSubjects(subjects.filter((subject) => {
       const subjectDepartment = Number(subject.department_id || 0);
       if (selectedDepartment && subjectDepartment > 0 && subjectDepartment !== selectedDepartment) return false;
-      if (!selectedDepartment && subjectDepartment > 0) return false;
       if (selectedSection && subject.section_id && Number(subject.section_id) !== selectedSection) return false;
       if (selectedClass && subject.class_id && Number(subject.class_id) !== selectedClass) return false;
       return true;
@@ -392,16 +391,37 @@ export default function CbtExamsPage() {
         )
       );
       const subjectMap = new Map<number, Subject>();
-      subjectResponses.forEach((response, index) => {
+      subjectResponses.forEach((response) => {
         readList<Subject>(response.data).forEach((subject) => {
           subjectMap.set(subject.id, { ...subject, department_id: subject.department_id ?? null });
         });
       });
+
+      const user = getUser();
+      const isTeacher = String(user?.role || "").toLowerCase() === "teacher";
+
+      let finalSubjects: Subject[] = [];
+      if (isTeacher) {
+        try {
+          const tsRes = await authApi.get("/teacher-subjects");
+          const assignments = readList<any>(tsRes.data);
+          const teacherSubjects = assignments
+            .filter((a: any) => Number(a.teacher_id) === Number(user?.id))
+            .map((a: any) => a.subject)
+            .filter(Boolean);
+          finalSubjects = preferGeneralSubjects(teacherSubjects);
+        } catch {
+          finalSubjects = preferGeneralSubjects(Array.from(subjectMap.values()));
+        }
+      } else {
+        finalSubjects = preferGeneralSubjects(Array.from(subjectMap.values()));
+      }
+
       setExams(Array.isArray(examRes.data?.exams?.data) ? examRes.data.exams.data : []);
       setClasses(Array.isArray(classRes.data) ? classRes.data : []);
       setSections(readList<SchoolSection>(sectionRes.data));
       setDepartments(departmentList);
-      setSubjects(preferGeneralSubjects(Array.from(subjectMap.values())));
+      setSubjects(finalSubjects);
       authApi.get("/admin/ai/credits").then((r) => setAiCreditSummary(r.data?.data || null)).catch(() => undefined);
     } catch (e: any) {
       showError(e?.response?.data?.message || "Unable to load CBT exams.");

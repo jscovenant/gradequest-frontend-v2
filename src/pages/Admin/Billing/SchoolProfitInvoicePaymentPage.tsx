@@ -74,7 +74,7 @@ export default function SchoolProfitInvoicePaymentPage() {
   const [generatingVirtual, setGeneratingVirtual] = useState(false);
   const [payload, setPayload] = useState<PaymentPayload | null>(null);
   const [amount, setAmount] = useState("");
-  const [activeTab, setActiveTab] = useState<"wema_transfer" | "wallet" | "card">("wema_transfer");
+  const [activeTab, setActiveTab] = useState<"wema_transfer" | "wallet">("wema_transfer");
   const [virtualAccount, setVirtualAccount] = useState<VirtualAccountData | null>(null);
   const [copied, setCopied] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number>(0);
@@ -175,25 +175,6 @@ export default function SchoolProfitInvoicePaymentPage() {
   }, [searchParams, invoiceId]);
 
   const payAmount = useMemo(() => Math.min(Number(amount || 0), balance), [amount, balance]);
-
-  const initializeCardPayment = async () => {
-    if (!invoice || payAmount <= 0) {
-      showError?.("Enter a valid amount to pay.");
-      return;
-    }
-
-    setProcessing(true);
-    try {
-      const res = await authApi.post(`/school/billing/invoices/${invoice.id}/payment/initialize`, {
-        amount: payAmount,
-      });
-
-      window.location.href = res.data.authorization_url;
-    } catch (err: any) {
-      showError?.(err?.response?.data?.message || "Unable to initialize card payment.");
-      setProcessing(false);
-    }
-  };
 
   const handlePayWithWallet = async () => {
     if (!invoice || payAmount <= 0) {
@@ -387,14 +368,6 @@ export default function SchoolProfitInvoicePaymentPage() {
                             <i className="bi bi-wallet2" />
                             School Wallet
                           </button>
-                          <button
-                            type="button"
-                            className={`invoice-tab-btn ${activeTab === "card" ? "active" : ""}`}
-                            onClick={() => setActiveTab("card")}
-                          >
-                            <i className="bi bi-credit-card" />
-                            Card / USSD
-                          </button>
                         </div>
 
                         {/* TAB 1: WEMA BANK DIRECT TRANSFER */}
@@ -527,32 +500,7 @@ export default function SchoolProfitInvoicePaymentPage() {
                           </div>
                         )}
 
-                        {/* TAB 3: PAYSTACK CARD CHECKOUT */}
-                        {activeTab === "card" && (
-                          <div className="invoice-paybox" style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 16, padding: 20 }}>
-                            <div className="invoice-muted">Payment amount</div>
-                            <input
-                              className="invoice-input mt-2"
-                              type="number"
-                              min="100"
-                              max={balance}
-                              value={amount}
-                              onChange={(e) => setAmount(e.target.value)}
-                              disabled={balance <= 0 || processing}
-                            />
-                            <div className="invoice-muted" style={{ marginTop: 8 }}>
-                              Pay with Mastercard, Visa, Verve, or USSD via Paystack.
-                            </div>
-                            <button
-                              className="invoice-btn mt-3"
-                              onClick={initializeCardPayment}
-                              disabled={balance <= 0 || payAmount <= 0 || processing}
-                            >
-                              <i className="bi bi-shield-lock-fill" />
-                              Pay Online — {fmtNaira(payAmount)}
-                            </button>
-                          </div>
-                        )}
+
 
                         <button
                           className="invoice-outline mt-3"
