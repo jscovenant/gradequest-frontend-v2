@@ -137,9 +137,71 @@ export default function StudentMyFeesPage() {
         .sf-btn{border:0;border-radius:10px;padding:10px 15px;font-size:13px;font-weight:750;display:inline-flex;align-items:center;gap:8px;text-decoration:none;cursor:pointer}.sf-btn-gold{background:var(--gq-secondary,#ffc857);color:var(--gq-dark,#050008)}.sf-btn-soft{background:var(--gq-surface-soft,#fbf7f8);color:#5f5147;border:1px solid rgba(5,0,8,.08)}
         .sf-table-wrap{overflow:auto;border:1px solid rgba(5,0,8,.07);border-radius:12px}.sf-table{width:100%;border-collapse:separate;border-spacing:0;min-width:760px}.sf-table th{background:var(--gq-surface-soft,#fbf7f8);color:#74675e;font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:13px 14px;border-bottom:1px solid rgba(5,0,8,.07);white-space:nowrap}.sf-table td{padding:14px;border-bottom:1px solid rgba(5,0,8,.06);font-size:13px;color:var(--gq-dark,#050008);vertical-align:middle}.sf-table tr:last-child td{border-bottom:0}.sf-fee-name{font-weight:850}.sf-muted{color:#8a7d72}.sf-balance-due{color:#b91c1c;font-weight:850}.sf-badge{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-size:11.5px;font-weight:850}.sf-badge.paid{background:rgba(34,197,94,.1);color:#15803d}.sf-badge.partial{background:rgba(245,158,11,.14);color:#92400e}.sf-badge.pending{background:#f1f5f9;color:#64748b}
         .sf-empty,.sf-error{border-radius:12px;padding:18px;font-size:13px}.sf-empty{border:1px dashed rgba(5,0,8,.14);background:var(--gq-surface-soft,#fbf7f8);color:#7a6a5a;text-align:center}.sf-error{background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.18);color:#b91c1c;margin-bottom:16px}
-        .sf-pager{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}.sf-page-group{display:flex;gap:6px}.sf-page-btn{width:36px;height:36px;border-radius:9px;border:1px solid rgba(5,0,8,.1);background:#fff;color:#5f5147}.sf-page-btn.active{background:var(--gq-primary,#d300b0);border-color:var(--gq-primary,#d300b0);color:#fff}.sf-page-btn:disabled{opacity:.45;cursor:not-allowed}
+        .sf-pager{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}.sf-page-group{display:flex;gap:6px}.sf-page-btn{width:36px;height:36px;border-radius:999px;border:1px solid rgba(5,0,8,.1);background:#fff;color:#5f5147}.sf-page-btn.active{background:var(--gq-primary,#d300b0);border-color:var(--gq-primary,#d300b0);color:#fff}.sf-page-btn:disabled{opacity:.45;cursor:not-allowed}
+
+        /* Mobile Fee Card in Student portal */
+        .sf-mobile-card {
+          background: #ffffff;
+          border: 1px solid rgba(5, 0, 8, 0.08);
+          border-radius: 12px;
+          padding: 14px 16px;
+          margin-bottom: 12px;
+          box-shadow: 0 4px 14px rgba(5, 0, 8, 0.03);
+        }
+        .sf-mobile-card:last-child { margin-bottom: 0; }
+        .sf-mc-head {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 10px;
+          margin-bottom: 10px;
+        }
+        .sf-mc-title {
+          font-weight: 850;
+          font-size: 15px;
+          color: var(--gq-dark, #050008);
+        }
+        .sf-mc-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 8px;
+          background: var(--gq-surface-soft, #fbf7f8);
+          border-radius: 10px;
+          padding: 10px 12px;
+          margin-bottom: 8px;
+        }
+        .sf-mc-stat {
+          display: flex;
+          flex-direction: column;
+        }
+        .sf-mc-lbl {
+          font-size: 10.5px;
+          color: #8a7d72;
+          text-transform: uppercase;
+          font-weight: 600;
+        }
+        .sf-mc-val {
+          font-size: 13.5px;
+          font-weight: 800;
+          color: var(--gq-dark, #050008);
+        }
+        .sf-mc-val.balance {
+          color: #b91c1c;
+        }
+        .sf-mc-val.paid {
+          color: #15803d;
+        }
+
         @media(max-width:1199.98px){.sf-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sf-hero-inner{grid-template-columns:1fr}}
-        @media(max-width:575.98px){.sf-hero{padding:20px}.sf-grid{grid-template-columns:1fr}.sf-panel{display:none}.sf-card-head{align-items:flex-start;flex-direction:column}.sf-btn{justify-content:center;width:100%}}
+        @media(max-width:575.98px){
+          .sf-hero{padding:18px 16px; margin-bottom:14px}
+          .sf-grid{grid-template-columns:1fr; gap:10px}
+          .sf-panel{display:block; margin-top:14px; padding:14px}
+          .sf-panel-balance{font-size:22px}
+          .sf-card-head{align-items:flex-start;flex-direction:column}
+          .sf-btn{justify-content:center;width:100%}
+          .sf-mc-grid{grid-template-columns:1fr 1fr;}
+        }
       `}</style>
 
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
@@ -203,7 +265,8 @@ export default function StudentMyFeesPage() {
                 </button>
               </div>
 
-              <div className="sf-table-wrap">
+              {/* Desktop Table View */}
+              <div className="sf-table-wrap d-none d-md-block">
                 <table className="sf-table">
                   <thead>
                     <tr>
@@ -250,6 +313,57 @@ export default function StudentMyFeesPage() {
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Mobile Cards View */}
+              <div className="d-block d-md-none">
+                {!fees?.data?.length ? (
+                  <div className="sf-empty">
+                    <i className="bi bi-receipt fs-2 d-block mb-2" />
+                    <strong>No fee records found</strong>
+                    <div>Your fee records will appear here once the school creates them.</div>
+                  </div>
+                ) : (
+                  fees.data.map((row, index) => {
+                    const feeType = row.feeType?.name || row.fee_type?.name || "Fee";
+                    const rowBalance = Number(row.balance || 0);
+                    const paid = Number(row.amount_paid || 0);
+                    const badgeClass = rowBalance <= 0 ? "paid" : paid > 0 ? "partial" : "pending";
+                    const label = rowBalance <= 0 ? "Paid" : paid > 0 ? "Part payment" : row.status || "Pending";
+
+                    return (
+                      <div className="sf-mobile-card" key={row.id}>
+                        <div className="sf-mc-head">
+                          <div>
+                            <div className="sf-mc-title">{feeType}</div>
+                            <div className="sf-muted small">Record #{(fees.from ?? 1) + index}</div>
+                          </div>
+                          <span className={`sf-badge ${badgeClass}`}>{label}</span>
+                        </div>
+
+                        <div className="sf-mc-grid">
+                          <div className="sf-mc-stat">
+                            <span className="sf-mc-lbl">Total</span>
+                            <span className="sf-mc-val">{formatMoney(row.total_amount)}</span>
+                          </div>
+                          <div className="sf-mc-stat">
+                            <span className="sf-mc-lbl">Paid</span>
+                            <span className="sf-mc-val paid">{formatMoney(row.amount_paid)}</span>
+                          </div>
+                          <div className="sf-mc-stat">
+                            <span className="sf-mc-lbl">Balance</span>
+                            <span className={`sf-mc-val ${rowBalance > 0 ? "balance" : "paid"}`}>{formatMoney(row.balance)}</span>
+                          </div>
+                        </div>
+
+                        <div className="d-flex justify-content-between align-items-center sf-muted small pt-2 border-top">
+                          <span>Updated:</span>
+                          <span>{formatDate(row.updated_at || row.created_at)}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
 
               {fees && fees.last_page > 1 && (

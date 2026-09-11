@@ -438,13 +438,13 @@ export default function StudentFeePaymentPage() {
           border: 1px solid rgba(255, 255, 255, 0.15);
           backdrop-filter: blur(8px);
           border-radius: 14px;
-          padding: 20px 24px;
-          min-width: 320px;
+          padding: 16px 20px;
+          min-width: 300px;
         }
-        .db-hero-stat-row { display: flex; flex-direction: column; gap: 10px; }
+        .db-hero-stat-row { display: flex; flex-direction: column; gap: 8px; }
         .db-hero-stat-item { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
         .db-hero-stat-label { font-size: 12px; font-weight: 400; color: #CBD5E1; }
-        .db-hero-stat-val { font-size: 18px; font-weight: 800; color: #FBBF24; }
+        .db-hero-stat-val { font-size: 17px; font-weight: 800; color: #FBBF24; }
         .db-hero-stat-sep { height: 1px; background: rgba(255, 255, 255, 0.08); }
 
         .db-panel {
@@ -459,12 +459,12 @@ export default function StudentFeePaymentPage() {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 18px 20px;
+          padding: 16px 18px;
           border-bottom: 1px solid rgba(0, 0, 0, 0.06);
           gap: 12px;
           flex-wrap: wrap;
         }
-        .db-panel-title-group { display: flex; align-items: center; gap: 12px; min-width: 240px; }
+        .db-panel-title-group { display: flex; align-items: center; gap: 12px; min-width: 220px; }
         .db-panel-icon {
           width: 36px;
           height: 36px;
@@ -559,7 +559,7 @@ export default function StudentFeePaymentPage() {
           gap: 6px;
           padding: 7px 14px;
           font-size: 12px;
-          font-weight: 400;
+          font-weight: 500;
           color: #7a6a5a;
           background: #f5f1eb;
           border: 1px solid #e5ddd3;
@@ -571,12 +571,182 @@ export default function StudentFeePaymentPage() {
         .db-refresh-btn:hover { background: #ede8e0; }
         .db-refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        .db-grid2 { display: grid; grid-template-columns: 1fr 420px; gap: 18px; margin-bottom: 22px; }
+        /* Mobile Fee Card styles */
+        .db-mobile-fee-card {
+          background: #ffffff;
+          border: 1px solid #E2E8F0;
+          border-radius: 12px;
+          padding: 14px 16px;
+          margin-bottom: 12px;
+          box-shadow: 0 2px 8px rgba(15, 39, 68, 0.04);
+          transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .db-mobile-fee-card:last-child {
+          margin-bottom: 0;
+        }
+        .db-mobile-fee-card:hover {
+          border-color: #CBD5E1;
+          box-shadow: 0 4px 12px rgba(15, 39, 68, 0.08);
+        }
+        .db-mfc-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 10px;
+          margin-bottom: 10px;
+        }
+        .db-mfc-title {
+          font-weight: 700;
+          font-size: 15px;
+          color: #0F2744;
+          line-height: 1.3;
+        }
+        .db-mfc-sub {
+          font-size: 11.5px;
+          color: #94A3B8;
+          margin-top: 2px;
+        }
+        .db-mfc-badges {
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+          margin-bottom: 12px;
+        }
+        .db-mfc-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 8px;
+          background: #F8FAFC;
+          border: 1px solid #F1F5F9;
+          border-radius: 10px;
+          padding: 10px 12px;
+          margin-bottom: 12px;
+        }
+        .db-mfc-stat {
+          display: flex;
+          flex-direction: column;
+        }
+        .db-mfc-stat-lbl {
+          font-size: 10.5px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: #64748B;
+          margin-bottom: 2px;
+        }
+        .db-mfc-stat-val {
+          font-size: 13.5px;
+          font-weight: 700;
+          color: #0F2744;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .db-mfc-stat-val.balance {
+          color: #B45309;
+        }
+        .db-mfc-stat-val.paid-val {
+          color: #059669;
+        }
+        .db-mfc-actions {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+
+        /* Mobile Student Snapshot Header */
+        .db-mobile-snapshot {
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
+          border-radius: 14px;
+          padding: 16px;
+          margin-bottom: 18px;
+          box-shadow: 0 4px 14px rgba(15, 39, 68, 0.05);
+        }
+        .db-mobile-snapshot-head {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 12px;
+          flex-wrap: wrap;
+        }
+        .db-mobile-snapshot-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 8px;
+          background: #F8FAFC;
+          border: 1px solid #E2E8F0;
+          border-radius: 10px;
+          padding: 10px 12px;
+        }
+
+        /* Modal Overlay & Responsive Container */
+        .db-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.65);
+          backdrop-filter: blur(6px);
+          z-index: 1100;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 12px;
+          overflow-y: auto;
+        }
+        .db-modal-container {
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
+          border-radius: 16px;
+          width: 100%;
+          max-width: 650px;
+          max-height: 90vh;
+          display: flex;
+          flex-direction: column;
+          box-shadow: 0 25px 60px rgba(0, 0, 0, 0.3);
+          overflow: hidden;
+        }
+        .db-modal-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 16px 20px;
+          border-bottom: 1px solid #E2E8F0;
+          flex-shrink: 0;
+          gap: 12px;
+        }
+        .db-modal-body {
+          padding: 18px 20px;
+          overflow-y: auto;
+          flex: 1 1 auto;
+          -webkit-overflow-scrolling: touch;
+        }
+        .db-modal-footer {
+          padding: 14px 20px;
+          border-top: 1px solid #E2E8F0;
+          background: #F8FAFC;
+          display: flex;
+          justify-content: flex-end;
+          gap: 10px;
+          flex-wrap: wrap;
+          flex-shrink: 0;
+        }
+
+        .db-grid2 { display: grid; grid-template-columns: 1fr 380px; gap: 18px; margin-bottom: 22px; }
         @media (max-width: 991.98px) {
           .db-grid2 { grid-template-columns: 1fr; }
-          .db-main { padding: 18px 14px 0; }
-          .db-hero { padding: 24px 20px; }
-          .db-hero-stat-card { min-width: 0; width: 100%; }
+          .db-main { padding: 14px 10px 0; }
+          .db-hero { padding: 20px 16px; margin-bottom: 16px; }
+          .db-hero-stat-card { min-width: 0; width: 100%; margin-top: 14px; }
+          .db-greeting { font-size: 22px; }
+          .db-hero-sub { font-size: 12.5px; }
+        }
+        @media (max-width: 575.98px) {
+          .db-mfc-grid { grid-template-columns: 1fr 1fr; }
+          .db-mobile-snapshot-grid { grid-template-columns: 1fr; gap: 6px; }
+          .db-modal-header { padding: 14px 16px; }
+          .db-modal-body { padding: 14px 16px; }
+          .db-modal-footer { padding: 12px 16px; }
         }
         @keyframes dbSpin { to { transform: rotate(360deg); } }
       `}</style>
@@ -949,7 +1119,40 @@ export default function StudentFeePaymentPage() {
                   </div>
                 )}
 
-                {/* Fees Table */}
+                {/* Mobile Student Snapshot Header (Visible on mobile/tablet <lg) */}
+                {student && (
+                  <div className="db-mobile-snapshot d-block d-lg-none">
+                    <div className="db-mobile-snapshot-head">
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 16, color: "#0F2744" }}>{student.name}</div>
+                        <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>
+                          Reg No: <b style={{ color: "#0F2744" }}>{student.reg_no}</b>
+                        </div>
+                      </div>
+                      <div className="d-flex gap-1 flex-wrap">
+                        <span className="db-pill">{student.section}</span>
+                        <span className="db-pill db-pill--violet">{student.class}</span>
+                      </div>
+                    </div>
+
+                    <div className="db-mobile-snapshot-grid">
+                      <div className="db-mfc-stat">
+                        <span className="db-mfc-stat-lbl">Total Fees</span>
+                        <span className="db-mfc-stat-val">{naira(stats.totalAmount)}</span>
+                      </div>
+                      <div className="db-mfc-stat">
+                        <span className="db-mfc-stat-lbl">Total Paid</span>
+                        <span className="db-mfc-stat-val paid-val">{naira(stats.paidAmount)}</span>
+                      </div>
+                      <div className="db-mfc-stat">
+                        <span className="db-mfc-stat-lbl">Outstanding</span>
+                        <span className="db-mfc-stat-val balance">{naira(stats.outstanding)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Fees Table & Mobile Cards */}
                 <div className="db-panel">
                   <div className="db-panel-head">
                     <div className="db-panel-title-group">
@@ -961,7 +1164,9 @@ export default function StudentFeePaymentPage() {
                       </div>
                       <div>
                         <p className="db-panel-title">Assigned Fees</p>
-                        <p className="db-panel-sub">Pay selected fee items (backend may enforce receipt approval)</p>
+                        <p className="db-panel-sub">
+                          {student ? `${filteredFees.length} fee item${filteredFees.length === 1 ? "" : "s"} listed` : "Pay selected fee items"}
+                        </p>
                       </div>
                     </div>
 
@@ -980,7 +1185,8 @@ export default function StudentFeePaymentPage() {
                     </button>
                   </div>
 
-                  <div style={{ overflowX: "auto" }}>
+                  {/* Desktop Table View */}
+                  <div className="d-none d-md-block" style={{ overflowX: "auto" }}>
                     <table className="db-table">
                       <thead>
                         <tr>
@@ -999,8 +1205,8 @@ export default function StudentFeePaymentPage() {
                       <tbody>
                         {!student ? (
                           <tr>
-                            <td colSpan={9} style={{ padding: 18, textAlign: "center", color: "#9a8a7a" }}>
-                              Enter Reg No and click <b>Fetch</b> to load assigned fees.
+                            <td colSpan={9} style={{ padding: 24, textAlign: "center", color: "#9a8a7a" }}>
+                              Enter Reg No and click <b>Fetch Fees</b> to load assigned fees.
                             </td>
                           </tr>
                         ) : loadingDetails ? (
@@ -1013,7 +1219,7 @@ export default function StudentFeePaymentPage() {
                           </tr>
                         ) : filteredFees.length === 0 ? (
                           <tr>
-                            <td colSpan={9} style={{ padding: 18, textAlign: "center", color: "#9a8a7a" }}>
+                            <td colSpan={9} style={{ padding: 24, textAlign: "center", color: "#9a8a7a" }}>
                               No fees found. Try adjusting filters (Session/Term) or the search keyword.
                             </td>
                           </tr>
@@ -1050,14 +1256,14 @@ export default function StudentFeePaymentPage() {
                                     className="db-refresh-btn"
                                     onClick={() => openPayModal(f)}
                                     disabled={busyKey !== null || fullyPaid}
-                                      title={fullyPaid ? "Already fully paid" : "Pay fee"}
+                                    title={fullyPaid ? "Already fully paid" : "Pay fee"}
                                     style={{
                                       background: fullyPaid ? "#f5f1eb" : "rgba(201,168,76,0.16)",
                                       borderColor: fullyPaid ? "#e5ddd3" : "rgba(201,168,76,0.26)",
                                       color: fullyPaid ? "#7a6a5a" : "#1a1a2e",
                                     }}
                                   >
-                                      {actionBusy ? (
+                                    {actionBusy ? (
                                       <>
                                         <span className="spinner-border spinner-border-sm" style={{ width: 14, height: 14 }} />
                                         Paying…
@@ -1096,11 +1302,126 @@ export default function StudentFeePaymentPage() {
                       </tbody>
                     </table>
                   </div>
+
+                  {/* Mobile Cards View */}
+                  <div className="d-block d-md-none" style={{ padding: "14px" }}>
+                    {!student ? (
+                      <div
+                        style={{
+                          padding: "24px 14px",
+                          textAlign: "center",
+                          color: "#9a8a7a",
+                          background: "#FAF8F5",
+                          borderRadius: 12,
+                          border: "1px dashed #E2E8F0",
+                        }}
+                      >
+                        <i className="bi bi-search fs-3 d-block mb-2 text-muted" />
+                        <div>Enter Reg No above and tap <b>Fetch Fees</b> to view assigned fees.</div>
+                      </div>
+                    ) : loadingDetails ? (
+                      <div style={{ padding: 10 }}>
+                        <div className="db-skeleton" style={{ width: "70%", height: 18, marginBottom: 12 }} />
+                        <div className="db-skeleton" style={{ width: "100%", height: 70, marginBottom: 12 }} />
+                        <div className="db-skeleton" style={{ width: "100%", height: 70 }} />
+                      </div>
+                    ) : filteredFees.length === 0 ? (
+                      <div style={{ padding: "24px 14px", textAlign: "center", color: "#9a8a7a", background: "#FAF8F5", borderRadius: 12 }}>
+                        <i className="bi bi-inbox fs-3 d-block mb-2 text-muted" />
+                        <div>No fees found. Try adjusting filters or search keyword.</div>
+                      </div>
+                    ) : (
+                      filteredFees.map((f, idx) => {
+                        const st = paymentStatus(f);
+                        const fullyPaid = st.tone === "paid";
+                        const actionBusy = payFeeId === f.id && isBusy(`fee:pay:${f.id}`);
+                        const statusPill =
+                          st.tone === "paid"
+                            ? "db-pill db-pill--green"
+                            : st.tone === "partial"
+                            ? "db-pill db-pill--gold"
+                            : "db-pill db-pill--red";
+
+                        return (
+                          <div className="db-mobile-fee-card" key={f.id}>
+                            <div className="db-mfc-header">
+                              <div>
+                                <div className="db-mfc-title">{f.feeType?.name ?? `Fee Type #${f.fee_type_id}`}</div>
+                                <div className="db-mfc-sub">ID: #{f.id} • Item {idx + 1} of {filteredFees.length}</div>
+                              </div>
+                              <span className={statusPill}>{st.label}</span>
+                            </div>
+
+                            <div className="db-mfc-badges">
+                              <span className="db-pill db-pill--violet">
+                                <i className="bi bi-calendar3 me-1" />
+                                {f.term?.name ?? `Term #${f.term_id}`}
+                              </span>
+                              <span className="db-pill">
+                                <i className="bi bi-mortarboard me-1" />
+                                {f.session?.name ?? `Session #${f.session_id}`}
+                              </span>
+                            </div>
+
+                            <div className="db-mfc-grid">
+                              <div className="db-mfc-stat">
+                                <span className="db-mfc-stat-lbl">Total</span>
+                                <span className="db-mfc-stat-val">{naira(f.total_amount)}</span>
+                              </div>
+                              <div className="db-mfc-stat">
+                                <span className="db-mfc-stat-lbl">Paid</span>
+                                <span className="db-mfc-stat-val paid-val">{naira(f.amount_paid)}</span>
+                              </div>
+                              <div className="db-mfc-stat">
+                                <span className="db-mfc-stat-lbl">Balance</span>
+                                <span className={`db-mfc-stat-val ${fullyPaid ? "paid-val" : "balance"}`}>
+                                  {naira(f.balance)}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="db-mfc-actions">
+                              <button
+                                className="db-btn-gold w-100"
+                                style={{
+                                  height: 40,
+                                  justifyContent: "center",
+                                  fontSize: 13,
+                                  background: fullyPaid ? "#F1F5F9" : "#D97706",
+                                  color: fullyPaid ? "#94A3B8" : "#FFFFFF",
+                                  border: fullyPaid ? "1px solid #CBD5E1" : "none",
+                                }}
+                                onClick={() => openPayModal(f)}
+                                disabled={busyKey !== null || fullyPaid}
+                              >
+                                {actionBusy ? (
+                                  <>
+                                    <span className="spinner-border spinner-border-sm me-1" />
+                                    Processing…
+                                  </>
+                                ) : fullyPaid ? (
+                                  <>
+                                    <i className="bi bi-check-circle-fill me-1 text-success" />
+                                    Fully Settled
+                                  </>
+                                ) : (
+                                  <>
+                                    <i className="bi bi-credit-card-2-front-fill me-1" />
+                                    Pay Fee ({naira(f.balance)})
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* RIGHT: student snapshot */}
-              <div className="db-panel" style={{ height: "fit-content", position: "sticky", top: 16 }}>
+              {/* RIGHT: student snapshot (Desktop only: sticky sidebar) */}
+              <div className="db-panel d-none d-lg-block" style={{ height: "fit-content", position: "sticky", top: 16 }}>
                 <div className="db-panel-head">
                   <div className="db-panel-title-group">
                     <div className="db-panel-icon" style={{ "--pi": "#d1fae5", "--pc": "#065f46" } as any}>
@@ -1121,7 +1442,7 @@ export default function StudentFeePaymentPage() {
                 </div>
 
                 <div style={{ padding: 18 }}>
-                        {!student ? (
+                  {!student ? (
                     <div style={{ color: "#9a8a7a" }}>
                       No student loaded yet. Use the search to load fee details.
                     </div>
@@ -1182,21 +1503,14 @@ export default function StudentFeePaymentPage() {
             ========================= */}
             {showPay && payFeeId && (
               <div
-                className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
-                style={{
-                  background: "rgba(15, 23, 42, 0.55)",
-                  backdropFilter: "blur(6px)",
-                  zIndex: 1100,
-                  padding: 12,
-                }}
-                  onClick={() => (busyKey ? null : setShowPay(false))}
+                className="db-modal-overlay"
+                onClick={() => (busyKey ? null : setShowPay(false))}
               >
                 <div
-                  className="db-panel"
-                  style={{ width: "100%", maxWidth: 720, borderRadius: 16, boxShadow: "0 30px 80px rgba(0,0,0,0.35)" }}
+                  className="db-modal-container"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="db-panel-head" style={{ borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
+                  <div className="db-modal-header">
                     <div className="db-panel-title-group">
                       <div className="db-panel-icon" style={{ "--pi": "#ede9fe", "--pc": "#7c3aed" } as any}>
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -1212,22 +1526,22 @@ export default function StudentFeePaymentPage() {
                       </div>
                       <div>
                         <p className="db-panel-title">Pay Fee</p>
-                        <p className="db-panel-sub">Payment may require an approved receipt (backend enforced)</p>
+                        <p className="db-panel-sub">
+                          {selectedFee ? `${selectedFee.feeType?.name ?? "Fee"} (Bal: ${naira(selectedFee.balance)})` : "Payment may require an approved receipt"}
+                        </p>
                       </div>
                     </div>
 
                     <button
-                      className="db-refresh-btn"
+                      className="btn-close"
                       onClick={() => setShowPay(false)}
                       disabled={busyKey !== null}
-                      style={{ background: "transparent" }}
                       title="Close"
-                    >
-                      Close
-                    </button>
+                      aria-label="Close"
+                    />
                   </div>
 
-                  <div style={{ padding: 18 }}>
+                  <div className="db-modal-body">
                     <div className="row g-3">
                       <div className="col-12">
                         <label className="form-label fw-semibold small mb-1">Payment Method *</label>
@@ -1393,44 +1707,42 @@ export default function StudentFeePaymentPage() {
                       </div>
 
                       <div className="col-12">
-                        <div className="alert alert-warning mb-0">
+                        <div className="alert alert-warning mb-0" style={{ fontSize: 12.5 }}>
+                          <i className="bi bi-exclamation-triangle-fill me-1 text-warning" />
                           <b>If payment fails</b>, confirm the student has uploaded a receipt and it is <b>approved</b>.
                         </div>
                       </div>
                     </div>
+                  </div>
 
-                    <div className="d-flex flex-wrap gap-2 justify-content-end mt-4">
-                      <button
-                        className="btn btn-outline-secondary"
-                        onClick={() => setShowPay(false)}
-                        disabled={busyKey !== null}
-                        style={{ borderRadius: 10 }}
-                      >
-                        Cancel
-                      </button>
+                  <div className="db-modal-footer">
+                    <button
+                      className="btn btn-outline-secondary"
+                      onClick={() => setShowPay(false)}
+                      disabled={busyKey !== null}
+                      style={{ borderRadius: 10, fontSize: 13, fontWeight: 600, minHeight: 38 }}
+                    >
+                      Cancel
+                    </button>
 
-                      <button
-                        className="btn"
-                        onClick={submitPayment}
-                        disabled={busyKey !== null}
-                        style={{
-                          borderRadius: 10,
-                          fontWeight: 700,
-                          background: "#c9a84c",
-                          border: "1px solid rgba(201,168,76,0.35)",
-                          color: "#0f172a",
-                        }}
-                      >
-                        {isBusy(`fee:pay:${payFeeId}`) ? (
-                          <>
-                            <span className="spinner-border spinner-border-sm me-2" />
-                            Processing...
-                          </>
-                        ) : (
-                          "Confirm Payment"
-                        )}
-                      </button>
-                    </div>
+                    <button
+                      className="db-btn-gold"
+                      onClick={submitPayment}
+                      disabled={busyKey !== null}
+                      style={{ borderRadius: 10, minHeight: 38, padding: "8px 24px" }}
+                    >
+                      {isBusy(`fee:pay:${payFeeId}`) ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-2" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <i className="bi bi-check2-circle me-1" />
+                          Confirm Payment
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>
