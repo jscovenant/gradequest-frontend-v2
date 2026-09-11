@@ -363,9 +363,13 @@ export default function BillingPage() {
           virtualAccount: res.data.virtual_account,
           loadingOnline: false,
         }));
+      } else {
+        showError?.(res.data?.message || "Could not initiate term clearance.");
+        setClearanceModal((prev) => ({ ...prev, loadingOnline: false }));
       }
     } catch (err: any) {
       console.warn("Failed to auto-initiate online clearance:", err);
+      showError?.(err?.response?.data?.message || "Failed to generate virtual account for term clearance.");
       setClearanceModal((prev) => ({ ...prev, loadingOnline: false }));
     }
   };
@@ -416,9 +420,13 @@ export default function BillingPage() {
           virtualAccount: res.data.virtual_account,
           loadingOnline: false,
         }));
+      } else {
+        showError?.(res.data?.message || "Could not initiate session clearance.");
+        setClearanceModal((prev) => ({ ...prev, loadingOnline: false }));
       }
     } catch (err: any) {
       console.warn("Failed to auto-initiate session online clearance:", err);
+      showError?.(err?.response?.data?.message || "Failed to generate virtual account for session clearance.");
       setClearanceModal((prev) => ({ ...prev, loadingOnline: false }));
     }
   };
@@ -1980,12 +1988,12 @@ export default function BillingPage() {
                     Transfer exactly <strong>{fmtNaira(clearanceModal.totalFee)}</strong> to this dedicated Wema Bank account:
                   </p>
 
-                  {clearanceModal.loadingOnline && !clearanceModal.virtualAccount ? (
+                  {clearanceModal.loadingOnline ? (
                     <div className="text-center py-4">
                       <span className="spinner-border text-warning" />
                       <div className="db-muted mt-2" style={{ fontSize: 12 }}>Generating dedicated virtual account…</div>
                     </div>
-                  ) : (
+                  ) : clearanceModal.virtualAccount?.account_number ? (
                     <>
                       <div
                         style={{
@@ -2004,27 +2012,25 @@ export default function BillingPage() {
                           margin: "12px 0",
                         }}
                       >
-                        <span>{clearanceModal.virtualAccount?.account_number || "Generating..."}</span>
-                        {clearanceModal.virtualAccount?.account_number && (
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-dark"
-                            style={{ borderRadius: 8, fontSize: 12, fontWeight: 700 }}
-                            onClick={() => copyModalAccount(clearanceModal.virtualAccount?.account_number || "")}
-                          >
-                            <i className={`bi ${modalCopied ? "bi-check2" : "bi-clipboard"}`} /> {modalCopied ? "Copied" : "Copy"}
-                          </button>
-                        )}
+                        <span>{clearanceModal.virtualAccount.account_number}</span>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-dark"
+                          style={{ borderRadius: 8, fontSize: 12, fontWeight: 700 }}
+                          onClick={() => copyModalAccount(clearanceModal.virtualAccount?.account_number || "")}
+                        >
+                          <i className={`bi ${modalCopied ? "bi-check2" : "bi-clipboard"}`} /> {modalCopied ? "Copied" : "Copy"}
+                        </button>
                       </div>
 
                       <div style={{ fontSize: 12.5, display: "flex", flexDirection: "column", gap: 6 }}>
                         <div className="d-flex justify-content-between">
                           <span className="text-muted">Bank Name:</span>
-                          <strong style={{ color: "#0F2744" }}>{clearanceModal.virtualAccount?.bank_name || "Wema Bank"}</strong>
+                          <strong style={{ color: "#0F2744" }}>{clearanceModal.virtualAccount.bank_name || "Wema Bank"}</strong>
                         </div>
                         <div className="d-flex justify-content-between">
                           <span className="text-muted">Account Name:</span>
-                          <strong style={{ color: "#0F2744", textAlign: "right" }}>{clearanceModal.virtualAccount?.account_name || "SchoolProfit Clearance"}</strong>
+                          <strong style={{ color: "#0F2744", textAlign: "right" }}>{clearanceModal.virtualAccount.account_name || "SchoolProfit Clearance"}</strong>
                         </div>
                         <div className="d-flex justify-content-between">
                           <span className="text-muted">Payable Amount:</span>
@@ -2048,6 +2054,21 @@ export default function BillingPage() {
                         Listening for incoming transfer. Clearance is applied automatically upon settlement.
                       </div>
                     </>
+                  ) : (
+                    <div className="text-center py-4">
+                      <div className="text-danger small mb-3">
+                        <i className="bi bi-exclamation-triangle-fill me-1" />
+                        Unable to retrieve virtual account number.
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-dark fw-bold"
+                        style={{ borderRadius: 9, fontSize: 12 }}
+                        onClick={clearanceModal.type === "session" ? openSessionClearanceModal : openTermClearanceModal}
+                      >
+                        <i className="bi bi-arrow-clockwise me-1" /> Retry Virtual Account Generation
+                      </button>
+                    </div>
                   )}
                 </div>
               )}

@@ -600,7 +600,7 @@ export default function StudentFeePaymentPage() {
                 <div>
                   <div className="db-session-badge">
                     <span className="db-session-dot" />
-                    Fees • Payments
+                    Fees • Offline Payment
                   </div>
 
                   <h1 className="db-greeting">
@@ -608,41 +608,49 @@ export default function StudentFeePaymentPage() {
                   </h1>
 
                   <p className="db-hero-sub">
-                    Look up a student’s assigned fees by <b>Reg No</b>, optionally filter by <b>Session</b> and <b>Term</b>,
-                    then process payments. Payments can be restricted by your backend (e.g., receipt approval rules).
+                    Look up a student’s assigned fees by <b>Registration Number</b> to record offline fee collections, bank transfers, POS payments, and apply full-settlement discounts.
                   </p>
 
-                  <div className="db-hero-btns">
-                    <button className="db-btn-gold" onClick={fetchStudentFees} disabled={!canSearch} title={!regNo.trim() ? "Enter Reg No" : ""}>
-                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                        <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
-                        <path d="M11 11l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                      </svg>
-                      {loadingDetails ? "Fetching..." : "Fetch Fees"}
-                    </button>
-
-                    <button
-                      className="db-btn-outline"
-                      onClick={() => {
-                        setStudent(null);
-                        setFees([]);
-                        setFilter("");
+                  <div className="d-flex align-items-center gap-2 flex-wrap">
+                    <span
+                      style={{
+                        background: "rgba(255, 255, 255, 0.12)",
+                        color: "#F8FAFC",
+                        border: "1px solid rgba(255, 255, 255, 0.20)",
+                        borderRadius: 999,
+                        padding: "5px 12px",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
                       }}
-                      disabled={busyKey !== null || loadingDetails}
                     >
-                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                        <path d="M3 3l10 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                        <path d="M13 3L3 13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                      </svg>
-                      Clear Results
-                    </button>
+                      <i className="bi bi-wallet2 text-warning" /> Direct Offline Collections
+                    </span>
+                    <span
+                      style={{
+                        background: "rgba(255, 255, 255, 0.12)",
+                        color: "#F8FAFC",
+                        border: "1px solid rgba(255, 255, 255, 0.20)",
+                        borderRadius: 999,
+                        padding: "5px 12px",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <i className="bi bi-patch-check-fill text-success" /> Receipt & Installment Reconciled
+                    </span>
                   </div>
                 </div>
 
                 <div className="db-hero-stat-card d-none d-md-block">
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                     <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.14em", textTransform: "uppercase", color: "#c9a84c" }}>
-                      Quick glance
+                      Fee Summary Glance
                     </span>
                     <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
                       <path d="M2 10V6M5 10V4M8 10V7M11 10V3" stroke="#64748b" strokeWidth="1.5" strokeLinecap="round" />
@@ -651,17 +659,17 @@ export default function StudentFeePaymentPage() {
 
                   <div className="db-hero-stat-row">
                     <div className="db-hero-stat-item">
-                      <span className="db-hero-stat-label">Fees loaded</span>
+                      <span className="db-hero-stat-label">Fees Loaded</span>
                       <span className="db-hero-stat-val">{stats.total}</span>
                     </div>
                     <div className="db-hero-stat-sep" />
                     <div className="db-hero-stat-item">
-                      <span className="db-hero-stat-label">Fully paid</span>
+                      <span className="db-hero-stat-label">Fully Settled</span>
                       <span className="db-hero-stat-val">{stats.paid}</span>
                     </div>
                     <div className="db-hero-stat-sep" />
                     <div className="db-hero-stat-item">
-                      <span className="db-hero-stat-label">Outstanding</span>
+                      <span className="db-hero-stat-label">Total Outstanding</span>
                       <span className="db-hero-stat-val">{naira(stats.outstanding)}</span>
                     </div>
                   </div>
@@ -684,47 +692,65 @@ export default function StudentFeePaymentPage() {
                         </svg>
                       </div>
                       <div>
-                        <p className="db-panel-title">Search Student</p>
-                        <p className="db-panel-sub">Reg No + optional Session/Term filters</p>
+                        <p className="db-panel-title">Lookup Student Fees</p>
+                        <p className="db-panel-sub">Enter Registration Number to query assigned fee structures</p>
                       </div>
                     </div>
 
-                    <button className="db-refresh-btn" onClick={fetchStudentFees} disabled={!canSearch}>
-                      <svg
-                        width="13"
-                        height="13"
-                        viewBox="0 0 14 14"
-                        fill="none"
-                        style={{ animation: loadingDetails ? "dbSpin 0.8s linear infinite" : "none" }}
+                    {student && (
+                      <button
+                        className="btn btn-sm btn-outline-secondary"
+                        style={{ borderRadius: 8, fontSize: 12, fontWeight: 600 }}
+                        onClick={() => {
+                          setStudent(null);
+                          setFees([]);
+                          setFilter("");
+                          setRegNo("");
+                        }}
+                        disabled={busyKey !== null || loadingDetails}
                       >
-                        <path d="M12 7A5 5 0 112 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                        <path d="M12 3v4h-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                      </svg>
-                      {loadingDetails ? "Fetching..." : "Fetch Fees"}
-                    </button>
+                        <i className="bi bi-x-circle me-1" /> Clear Student
+                      </button>
+                    )}
                   </div>
 
-                  <div style={{ padding: 18 }}>
-                    <div className="row g-3">
-                      <div className="col-12 col-lg-4">
-                        <label className="form-label fw-semibold small mb-1">Registration Number</label>
-                        <input
-                          className="form-control"
-                          placeholder="Reg No (e.g. GQ/2026/012)"
-                          value={regNo}
-                          onChange={(e) => setRegNo(e.target.value)}
-                          disabled={busyKey !== null || loadingDetails}
-                        />
+                  <div style={{ padding: 20 }}>
+                    <div className="row g-3 align-items-end">
+                      <div className="col-12 col-md-4 col-lg-4">
+                        <label className="form-label fw-bold small mb-1" style={{ color: "#0F2744" }}>
+                          Student Reg Number <span className="text-danger">*</span>
+                        </label>
+                        <div className="input-group">
+                          <span className="input-group-text bg-white" style={{ borderColor: "#CBD5E1", borderRight: "none" }}>
+                            <i className="bi bi-person-badge text-muted" />
+                          </span>
+                          <input
+                            className="form-control"
+                            style={{ borderColor: "#CBD5E1", borderLeft: "none", fontWeight: 700, color: "#0F2744" }}
+                            placeholder="e.g. GQ/2026/012"
+                            value={regNo}
+                            onChange={(e) => setRegNo(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && canSearch) {
+                                fetchStudentFees();
+                              }
+                            }}
+                            disabled={busyKey !== null || loadingDetails}
+                          />
+                        </div>
                       </div>
 
-                      <div className="col-12 col-lg-4">
-                        <label className="form-label fw-semibold small mb-1">Session (optional)</label>
+                      <div className="col-12 col-md-3 col-lg-3">
+                        <label className="form-label fw-bold small mb-1" style={{ color: "#0F2744" }}>
+                          Academic Session <span className="text-muted fw-normal">(Optional)</span>
+                        </label>
                         <select
                           className="form-select"
+                          style={{ borderColor: "#CBD5E1" }}
                           value={sessionId}
                           onChange={(e) => setSessionId(e.target.value)}
                           disabled={busyKey !== null || loadingMeta}
-                        title={!sessions.length ? "Optional (endpoint may not exist)" : ""}
+                          title={!sessions.length ? "Optional" : ""}
                         >
                           <option value="">All Sessions</option>
                           {sessions.map((s) => (
@@ -735,14 +761,17 @@ export default function StudentFeePaymentPage() {
                         </select>
                       </div>
 
-                      <div className="col-12 col-lg-4">
-                        <label className="form-label fw-semibold small mb-1">Term (optional)</label>
+                      <div className="col-12 col-md-3 col-lg-3">
+                        <label className="form-label fw-bold small mb-1" style={{ color: "#0F2744" }}>
+                          Term <span className="text-muted fw-normal">(Optional)</span>
+                        </label>
                         <select
                           className="form-select"
+                          style={{ borderColor: "#CBD5E1" }}
                           value={termId}
                           onChange={(e) => setTermId(e.target.value)}
                           disabled={busyKey !== null || loadingMeta}
-                          title={!terms.length ? "Optional (endpoint may not exist)" : ""}
+                          title={!terms.length ? "Optional" : ""}
                         >
                           <option value="">All Terms</option>
                           {terms.map((t) => (
@@ -752,28 +781,57 @@ export default function StudentFeePaymentPage() {
                           ))}
                         </select>
                       </div>
-                    </div>
 
-                    <hr style={{ opacity: 0.08 }} />
-
-                    <div className="row g-3">
-                      <div className="col-12 col-lg-8">
-                        <label className="form-label fw-semibold small mb-1">Filter fees</label>
-                        <input
-                          className="form-control"
-                          placeholder="Type to filter by fee name, term, session, status…"
-                          value={filter}
-                          onChange={(e) => setFilter(e.target.value)}
-                          disabled={!fees.length}
-                        />
-                      </div>
-
-                      <div className="col-12 col-lg-4 d-flex align-items-end gap-2">
-                        <button className="btn btn-outline-secondary w-100" onClick={() => setFilter("")} disabled={!filter} style={{ borderRadius: 10 }}>
-                          Clear filter
+                      <div className="col-12 col-md-2 col-lg-2">
+                        <button
+                          className="db-btn-gold w-100"
+                          style={{ height: 38, justifyContent: "center" }}
+                          onClick={fetchStudentFees}
+                          disabled={!canSearch}
+                          title={!regNo.trim() ? "Enter Registration Number first" : "Click or press Enter to fetch fees"}
+                        >
+                          {loadingDetails ? (
+                            <>
+                              <span className="spinner-border spinner-border-sm me-1" />
+                              Fetching…
+                            </>
+                          ) : (
+                            <>
+                              <i className="bi bi-search me-1" />
+                              Fetch Fees
+                            </>
+                          )}
                         </button>
                       </div>
                     </div>
+
+                    {fees.length > 0 && (
+                      <div className="mt-3 pt-3 border-top">
+                        <div className="row g-2 align-items-center">
+                          <div className="col-12 col-md-8">
+                            <div className="input-group input-group-sm">
+                              <span className="input-group-text bg-white border-end-0">
+                                <i className="bi bi-funnel text-muted" />
+                              </span>
+                              <input
+                                className="form-control border-start-0"
+                                placeholder="Filter loaded fees by fee name, term, status…"
+                                value={filter}
+                                onChange={(e) => setFilter(e.target.value)}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="col-12 col-md-4 d-flex justify-content-end">
+                            {filter && (
+                              <button className="btn btn-sm btn-outline-secondary w-100" onClick={() => setFilter("")} style={{ borderRadius: 8 }}>
+                                Clear Filter
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
