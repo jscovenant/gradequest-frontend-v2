@@ -91,10 +91,10 @@ type BillingPeriod = {
 const defaultPolicy: Policy = {
   online_grace_days: 14,
   online_minimum_coverage_percent: 70,
-  online_whole_school_block_enabled: true,
+  online_whole_school_block_enabled: false,
   online_student_level_block_enabled: true,
   offline_grace_days: 7,
-  offline_school_block_enabled: true,
+  offline_school_block_enabled: false,
   platform_fee_per_student: 500,
   basic_tier_price_per_student: 300,
   standard_cbt_tier_price_per_student: 500,
@@ -602,22 +602,22 @@ export default function BillingPolicyPage() {
                     <div className="bp-form-grid" style={{ marginTop: 14 }}>
                       <div className="bp-switch">
                         <div>
-                          <div className="bp-card-title" style={{ fontSize: 13 }}>Online student-level blocking</div>
-                          <div className="bp-muted">Protect results and promotion per uncovered student.</div>
+                          <div className="bp-card-title" style={{ fontSize: 13 }}>Student-level academic blocking (Recommended)</div>
+                          <div className="bp-muted">Restrict score entry, report cards, CBT, and promotion only for uncovered students without locking whole-school operations.</div>
                         </div>
                         <input type="checkbox" checked={asBool(policy.online_student_level_block_enabled)} onChange={(e) => setPolicy((p) => ({ ...p, online_student_level_block_enabled: e.target.checked }))} />
                       </div>
                       <div className="bp-switch">
                         <div>
-                          <div className="bp-card-title" style={{ fontSize: 13 }}>Online whole-school threshold</div>
-                          <div className="bp-muted">Block CRUD only below coverage after grace.</div>
+                          <div className="bp-card-title" style={{ fontSize: 13 }}>Online whole-school lock (Optional)</div>
+                          <div className="bp-muted">Lock out the entire school if overall collection coverage is below threshold after grace.</div>
                         </div>
                         <input type="checkbox" checked={asBool(policy.online_whole_school_block_enabled)} onChange={(e) => setPolicy((p) => ({ ...p, online_whole_school_block_enabled: e.target.checked }))} />
                       </div>
                       <div className="bp-switch">
                         <div>
-                          <div className="bp-card-title" style={{ fontSize: 13 }}>Offline invoice school block</div>
-                          <div className="bp-muted">Offline schools are responsible for direct invoice settlement.</div>
+                          <div className="bp-card-title" style={{ fontSize: 13 }}>Offline invoice whole-school lock (Optional)</div>
+                          <div className="bp-muted">Lock out the entire school for unpaid offline term invoices after grace.</div>
                         </div>
                         <input type="checkbox" checked={asBool(policy.offline_school_block_enabled)} onChange={(e) => setPolicy((p) => ({ ...p, offline_school_block_enabled: e.target.checked }))} />
                       </div>
