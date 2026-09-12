@@ -141,8 +141,42 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
     ai_cbt_question_generator: ["ai_cbt_question_generator", "support_ai_cbt_question_generator", "ai_question_generator", "cbt_ai", "gradequest_plus"],
   };
 
-  const canUseFeature = (_featureKey?: string) => true;
-  const shouldHideForPlan = (_item: MenuItem | MenuChild) => false;
+  const userTier = (
+    user?.school?.active_edition_tier ||
+    (user as any)?.active_edition_tier ||
+    (user?.schoolsetting as any)?.active_edition_tier ||
+    ""
+  ).toLowerCase();
+
+  const isBasicResultTier = userTier === "basic_result" || (featureAccess.features.length > 0 && !featureAccess.can("cbt_online"));
+
+  const canUseFeature = (featureKey?: string) => {
+    if (!featureKey) return true;
+    if (featureKey === "cbt_online" && isBasicResultTier) return false;
+    // Core features, WhatsApp notifications, and AI tools remain 100% accessible
+    if (
+      featureKey.startsWith("ai_") ||
+      featureKey === "gradequest_plus" ||
+      featureKey.startsWith("whatsapp_") ||
+      featureKey === "fees" ||
+      featureKey === "results"
+    ) {
+      return true;
+    }
+    return featureAccess.can(featureKey);
+  };
+
+  const shouldHideForPlan = (item: MenuItem | MenuChild) => {
+    if (isBasicResultTier) {
+      if (item.featureKey === "cbt_online" || (item as any).collapseId === "cbtMenu" || item.href?.includes("/cbt")) {
+        return true;
+      }
+    }
+    if (item.hideIfNoFeature && item.featureKey) {
+      return !canUseFeature(item.featureKey);
+    }
+    return false;
+  };
 
   const ComingSoonBadge = () => (
     <span
