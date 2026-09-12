@@ -71,6 +71,15 @@ export default function WalletPage() {
   // Wallet
   const [balance, setBalance] = useState<number>(0);
   const [product, setProduct] = useState<Product | null>(null);
+  const [bonusInfo, setBonusInfo] = useState<{
+    has_bonus: boolean;
+    amount: number;
+    remaining_amount: number;
+    is_activated: boolean;
+    is_expired: boolean;
+    expires_at: string | null;
+    days_remaining: number;
+  } | null>(null);
 
   // Topup form
   const [amount, setAmount] = useState<number>(5000);
@@ -95,6 +104,7 @@ export default function WalletPage() {
   const fetchBalance = async () => {
     const res = await authApi.get("/user/wallet");
     setBalance(Number(res.data?.balance ?? 0));
+    setBonusInfo(res.data?.welcome_bonus ?? null);
   };
 
   const fetchProduct = async () => {
@@ -508,6 +518,82 @@ export default function WalletPage() {
               </div>
             </div>
 
+            {/* ── WELCOME BONUS BANNER ── */}
+            {bonusInfo && bonusInfo.has_bonus && !bonusInfo.is_expired && (
+              <div
+                style={{
+                  marginTop: 16,
+                  marginBottom: 16,
+                  padding: "16px 20px",
+                  borderRadius: 14,
+                  background: bonusInfo.is_activated
+                    ? "linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.12))"
+                    : "linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.16))",
+                  border: bonusInfo.is_activated
+                    ? "1px solid rgba(16, 185, 129, 0.3)"
+                    : "1px solid rgba(245, 158, 11, 0.35)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: 12,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <div
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 12,
+                      background: bonusInfo.is_activated ? "#10b981" : "#f59e0b",
+                      color: "#fff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 20,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {bonusInfo.is_activated ? <i className="bi bi-check-circle-fill" /> : <i className="bi bi-gift-fill" />}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 15, color: "#1e293b", display: "flex", alignItems: "center", gap: 8 }}>
+                      <span>₦{Number(bonusInfo.amount).toLocaleString()} Welcome Bonus</span>
+                      <span
+                        className="badge"
+                        style={{
+                          background: bonusInfo.is_activated ? "rgba(16,185,129,0.2)" : "rgba(245,158,11,0.2)",
+                          color: bonusInfo.is_activated ? "#065f46" : "#92400e",
+                          fontSize: 11,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {bonusInfo.is_activated ? "ACTIVATED & PERMANENT" : `EXPIRES IN ${bonusInfo.days_remaining} DAY(S)`}
+                      </span>
+                    </div>
+                    <p style={{ margin: "3px 0 0", fontSize: 13, color: "#64748b", maxWidth: 680, lineHeight: 1.5 }}>
+                      {bonusInfo.is_activated
+                        ? "Congratulations! Your welcome bonus has been permanently unlocked and will not expire."
+                        : "Your ₦5,000 welcome bonus is active for 30 days. Fund your wallet with any top-up amount before the 30-day countdown ends to permanently activate and lock it in!"}
+                    </p>
+                  </div>
+                </div>
+
+                {!bonusInfo.is_activated && (
+                  <button
+                    className="db-btn-gold"
+                    style={{ padding: "8px 16px", fontSize: 13, minHeight: "auto" }}
+                    onClick={() => {
+                      const el = document.getElementById("walletTopupInput");
+                      el?.focus();
+                    }}
+                  >
+                    <i className="bi bi-lightning-charge-fill me-1" /> Fund Wallet to Activate
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* ── KPI STRIP ── */}
             <div className="row g-3 mt-1 mb-3">
               {[
@@ -589,6 +675,7 @@ export default function WalletPage() {
                     <div style={{ position: "relative" }}>
                       <span style={{ position: "absolute", left: 14, top: 12, fontWeight: 700, color: "#64748B", fontSize: 16 }}>₦</span>
                       <input
+                        id="walletTopupInput"
                         className="form-control"
                         type="number"
                         min={100}

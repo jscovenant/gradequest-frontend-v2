@@ -988,25 +988,25 @@ export default function OnboardingPage() {
                 )}
               </StepCard>
 
-              {/*  Step 5: Activation  */}
-              <StepCard number={5} title="Complete school activation"
-                subtitle={"All steps complete — finalize your setup to access your school dashboard."}
+              {/*  Step 5: Bonus  */}
+              <StepCard number={5} title="Claim your ₦5,000 welcome bonus"
+                subtitle={"All steps complete — your ₦5,000 wallet credit is ready. Add funds within 30 days to activate it permanently."}
                 done={status.bonus_given} active={activeStep === "bonus"}>
                 {!status.bonus_given && (
                   <div className="ob-bonus-claim">
-                    <div style={{ fontSize:32 }} aria-hidden="true">🚀</div>
-                    <div className="ob-bonus-amount" style={{ fontSize: 22 }}>Setup Complete</div>
+                    <div style={{ fontSize:32 }} aria-hidden="true">🎁</div>
+                    <div className="ob-bonus-amount">₦5,000</div>
                     <p className="ob-bonus-desc">
-                      Your school profile and academic structure are configured. Activate your account to start managing your school.
+                      Credited directly to your school wallet. Valid for 30 days — simply fund/add money to your wallet before the 30-day countdown ends to activate and keep your ₦5,000 permanently!
                     </p>
                     <button className="ob-btn-claim" onClick={handleClaimBonus} disabled={claiming}
                       style={{ maxWidth:280 }}>
-                      {claiming ? <><span className="ob-spinner ob-spinner--dark"/>Activating</> : <>
+                      {claiming ? <><span className="ob-spinner ob-spinner--dark"/>Claiming</> : <>
                         <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
                           <path d="M8 2l2 4h4l-3 2.6 1.2 4L8 10.3 3.8 12.6 5 8.6 2 6h4z"
                             stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
                         </svg>
-                        Activate &amp; Enter Dashboard
+                        Claim ₦5,000 &amp; Activate
                       </>}
                     </button>
                   </div>
