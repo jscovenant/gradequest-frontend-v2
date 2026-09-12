@@ -255,6 +255,11 @@ export default function SalesMarketingMaterialsPage() {
                         <h3>{m.title}</h3>
                         <p>{m.description}</p>
                         <div className="sales-work-actions">
+                          {m.asset_url && (
+                            <a className="sales-work-btn sales-work-btn-primary" href={m.asset_url} download target="_blank" rel="noreferrer">
+                              <i className="bi bi-download me-1" /> Download
+                            </a>
+                          )}
                           <button className="sales-work-btn sales-work-btn-light" onClick={() => toggle(m)}>{m.is_active ? "Pause" : "Activate"}</button>
                           <button className="sales-work-btn" onClick={() => remove(m)}>Remove</button>
                         </div>
