@@ -199,7 +199,7 @@ export default function OnboardingPage() {
     setClaiming(true);
     try {
       const res = await activateBonus();
-      showToast(res?.message || "Bonus activated.", "success");
+      showToast(res?.message || "Account activated successfully.", "success");
       await refresh();
     } catch (e: any) { showToast(e?.response?.data?.message || "Complete all steps first.", "error"); }
     finally { setClaiming(false); }
@@ -988,16 +988,16 @@ export default function OnboardingPage() {
                 )}
               </StepCard>
 
-              {/*  Step 5: Bonus  */}
-              <StepCard number={5} title="Claim your welcome bonus"
-                subtitle={"All steps complete - your 5,000 GradiosEduPlus wallet credit is ready."}
+              {/*  Step 5: Activation  */}
+              <StepCard number={5} title="Complete school activation"
+                subtitle={"All steps complete — finalize your setup to access your school dashboard."}
                 done={status.bonus_given} active={activeStep === "bonus"}>
                 {!status.bonus_given && (
                   <div className="ob-bonus-claim">
-                    <div style={{ fontSize:32 }} aria-hidden="true"></div>
-                    <div className="ob-bonus-amount">5,000</div>
+                    <div style={{ fontSize:32 }} aria-hidden="true">🚀</div>
+                    <div className="ob-bonus-amount" style={{ fontSize: 22 }}>Setup Complete</div>
                     <p className="ob-bonus-desc">
-                      Credited directly to your school wallet for GradiosEduPlus subscription. It expires after 30 days if it is not used.
+                      Your school profile and academic structure are configured. Activate your account to start managing your school.
                     </p>
                     <button className="ob-btn-claim" onClick={handleClaimBonus} disabled={claiming}
                       style={{ maxWidth:280 }}>
@@ -1006,7 +1006,7 @@ export default function OnboardingPage() {
                           <path d="M8 2l2 4h4l-3 2.6 1.2 4L8 10.3 3.8 12.6 5 8.6 2 6h4z"
                             stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
                         </svg>
-                        Claim 5,000 &amp; Activate
+                        Activate &amp; Enter Dashboard
                       </>}
                     </button>
                   </div>
