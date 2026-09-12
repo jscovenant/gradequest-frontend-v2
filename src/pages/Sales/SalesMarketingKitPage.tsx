@@ -127,7 +127,25 @@ export default function SalesMarketingKitPage() {
                       target="_blank"
                       rel="noreferrer"
                     >
-                      <i className="bi bi-eye me-1" /> Preview
+                      <i className="bi bi-eye me-1" /> Preview PDF
+                    </a>
+                    <a
+                      className="sales-work-btn sales-work-btn-light"
+                      style={{
+                        background: "#0284c7",
+                        color: "#fff",
+                        border: "none",
+                        fontWeight: 700,
+                        padding: "12px 18px",
+                        borderRadius: "10px",
+                        fontSize: "14px",
+                      }}
+                      href="/downloads/SchoolProfit-Comprehensive-Platform-Guide.docx"
+                      download
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <i className="bi bi-file-earmark-word me-1" /> Full Manual & Pitch Playbook (.DOCX)
                     </a>
                   </div>
                 </div>
