@@ -618,6 +618,81 @@ const removeDomain = async () => {
               </div>
             </div>
 
+            {/* QUICK SETTINGS NAVIGATION */}
+            <div className="row g-3 mb-4">
+              <div className="col-12 col-md-6 col-lg-3">
+                <Link
+                  to="/admin/school/domain-and-website"
+                  className="db-panel d-block text-decoration-none h-100 p-3"
+                  style={{ border: "1px solid rgba(201, 168, 76, 0.3)", background: "linear-gradient(135deg, #ffffff 0%, #fffdf8 100%)", transition: "transform 0.2s, box-shadow 0.2s" }}
+                >
+                  <div className="d-flex align-items-center gap-3">
+                    <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: 44, height: 44, background: "rgba(201, 168, 76, 0.15)", color: "#b89030" }}>
+                      <i className="bi bi-globe fs-5"></i>
+                    </div>
+                    <div>
+                      <div className="fw-bold text-dark" style={{ fontSize: "0.95rem" }}>Website & Domain</div>
+                      <div className="text-muted" style={{ fontSize: "0.78rem" }}>Custom colors, menus & Paystack domain</div>
+                    </div>
+                  </div>
+                </Link>
+              </div>
+
+              <div className="col-12 col-md-6 col-lg-3">
+                <Link
+                  to="/admin/admissions"
+                  className="db-panel d-block text-decoration-none h-100 p-3"
+                  style={{ border: "1px solid rgba(59, 130, 246, 0.25)", background: "linear-gradient(135deg, #ffffff 0%, #f8faff 100%)", transition: "transform 0.2s, box-shadow 0.2s" }}
+                >
+                  <div className="d-flex align-items-center gap-3">
+                    <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: 44, height: 44, background: "rgba(59, 130, 246, 0.12)", color: "#2563eb" }}>
+                      <i className="bi bi-clipboard-check fs-5"></i>
+                    </div>
+                    <div>
+                      <div className="fw-bold text-dark" style={{ fontSize: "0.95rem" }}>Online Admissions</div>
+                      <div className="text-muted" style={{ fontSize: "0.78rem" }}>Candidate portal & 1-click enroll</div>
+                    </div>
+                  </div>
+                </Link>
+              </div>
+
+              <div className="col-12 col-md-6 col-lg-3">
+                <Link
+                  to="/school/bank-account-setting"
+                  className="db-panel d-block text-decoration-none h-100 p-3"
+                  style={{ border: "1px solid rgba(34, 197, 94, 0.25)", background: "linear-gradient(135deg, #ffffff 0%, #f9fffb 100%)", transition: "transform 0.2s, box-shadow 0.2s" }}
+                >
+                  <div className="d-flex align-items-center gap-3">
+                    <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: 44, height: 44, background: "rgba(34, 197, 94, 0.12)", color: "#16a34a" }}>
+                      <i className="bi bi-bank fs-5"></i>
+                    </div>
+                    <div>
+                      <div className="fw-bold text-dark" style={{ fontSize: "0.95rem" }}>Bank Accounts</div>
+                      <div className="text-muted" style={{ fontSize: "0.78rem" }}>Settlement & payout bank setup</div>
+                    </div>
+                  </div>
+                </Link>
+              </div>
+
+              <div className="col-12 col-md-6 col-lg-3">
+                <Link
+                  to="/settings/whatsapp"
+                  className="db-panel d-block text-decoration-none h-100 p-3"
+                  style={{ border: "1px solid rgba(16, 185, 129, 0.25)", background: "linear-gradient(135deg, #ffffff 0%, #f7fdfb 100%)", transition: "transform 0.2s, box-shadow 0.2s" }}
+                >
+                  <div className="d-flex align-items-center gap-3">
+                    <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: 44, height: 44, background: "rgba(16, 185, 129, 0.12)", color: "#059669" }}>
+                      <i className="bi bi-whatsapp fs-5"></i>
+                    </div>
+                    <div>
+                      <div className="fw-bold text-dark" style={{ fontSize: "0.95rem" }}>WhatsApp Alerts</div>
+                      <div className="text-muted" style={{ fontSize: "0.78rem" }}>Fee notices & parent messaging</div>
+                    </div>
+                  </div>
+                </Link>
+              </div>
+            </div>
+
             {/* CONTENT */}
             <form onSubmit={saveSettings}>
               <div className="row g-3">

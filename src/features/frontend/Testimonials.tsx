@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import React from 'react';
 
 type Testimonial = {
   quote: string;
@@ -7,7 +7,6 @@ type Testimonial = {
   school: string;
   location: string;
   initials: string;
-  avatar: string;
   color: string;
   colorBg: string;
   rating: number;
@@ -23,25 +22,23 @@ const TESTIMONIALS: Testimonial[] = [
     school: "Samjane Arise & Shine Schools",
     location: "Badagry, Lagos",
     initials: "JA",
-    avatar: "/images/testimonials/adaeze-okonkwo.jpg",
     color: "#059669",
-    colorBg: "rgba(5, 150, 105, 0.1)",
+    colorBg: "#ECFDF5",
     rating: 5,
-    tag: "Results & Broadsheets",
+    tag: "Master Broadsheets",
   },
   {
     quote:
-      "The AI monitoring flagged three teachers who hadn't submitted scores three days before our term deadline. No chasing, no embarrassing last-minute scrambles. It handled the accountability automatically.",
+      "The automatic fee-gatekeeper completely solved our fee recovery issues. Parents settle tuition before the exam week because they know report cards and CBT tests lock automatically.",
     name: "Mr. Silvanus Segun",
     role: "School Administrator",
     school: "Jacktem Academic Excellence",
     location: "Sango Ota, Ogun",
     initials: "SS",
-    avatar: "/images/testimonials/tunde-adeyemi.jpg",
     color: "#1D4ED8",
-    colorBg: "rgba(29, 78, 216, 0.1)",
+    colorBg: "#EFF6FF",
     rating: 5,
-    tag: "AI Monitoring",
+    tag: "Zero Fee Debt",
   },
   {
     quote:
@@ -51,11 +48,10 @@ const TESTIMONIALS: Testimonial[] = [
     school: "Power of Success Int'l School",
     location: "Lagos State",
     initials: "DA",
-    avatar: "/images/testimonials/funmi-bello.jpg",
     color: "#D97706",
-    colorBg: "rgba(217, 119, 6, 0.12)",
+    colorBg: "#FEF3C7",
     rating: 5,
-    tag: "Parent Portal & WhatsApp",
+    tag: "WhatsApp Dispatches",
   },
   {
     quote:
@@ -65,25 +61,23 @@ const TESTIMONIALS: Testimonial[] = [
     school: "Dr. Raphael Arinze Memorial College",
     location: "Ukpor, Anambra",
     initials: "LJ",
-    avatar: "/images/testimonials/emeka-nwosu.jpg",
     color: "#7C3AED",
-    colorBg: "rgba(124, 58, 237, 0.1)",
+    colorBg: "#F5F3FF",
     rating: 5,
-    tag: "Fees Tracking & Bursary",
+    tag: "Bursary Ledger",
   },
   {
     quote:
-      "The analytics dashboard helped us identify class areas that needed academic reinforcement in Mathematics. We took immediate action, and by the next term our students' subject average rose by 18 points.",
+      "The offline LAN CBT exam engine allowed us to conduct mid-term mock assessments for 400 students across 3 computer labs without relying on expensive campus internet.",
     name: "Mr. Benjamin John",
     role: "Academic Director",
     school: "Heart International School",
     location: "Sagamu, Ogun",
     initials: "BJ",
-    avatar: "/images/testimonials/ngozi-eze.jpg",
-    color: "#0284C7",
-    colorBg: "rgba(2, 132, 199, 0.1)",
+    color: "#059669",
+    colorBg: "#ECFDF5",
     rating: 5,
-    tag: "Academic Analytics",
+    tag: "Hybrid CBT Lab",
   },
   {
     quote:
@@ -93,429 +87,238 @@ const TESTIMONIALS: Testimonial[] = [
     school: "Borgu School of Excellence",
     location: "New Bussa, Niger",
     initials: "KB",
-    avatar: "/images/testimonials/seun-fashola.jpg",
-    color: "#E11D48",
-    colorBg: "rgba(225, 29, 72, 0.1)",
+    color: "#DB2777",
+    colorBg: "#FDF2F8",
     rating: 5,
-    tag: "Seamless Onboarding",
+    tag: "Rapid Migration",
   },
 ];
 
 function Stars({ count }: { count: number }) {
   return (
-    <span className="tm-stars d-inline-flex gap-1" aria-label={`${count} out of 5 stars`}>
+    <div style={{ display: 'flex', gap: '3px' }}>
       {Array.from({ length: 5 }).map((_, i) => (
         <svg
           key={i}
-          width="13"
-          height="13"
-          viewBox="0 0 12 12"
-          fill={i < count ? "#D97706" : "none"}
-          aria-hidden="true"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill={i < count ? "#D97706" : "#E2E8F0"}
+          stroke={i < count ? "#D97706" : "#CBD5E1"}
+          strokeWidth="1"
         >
-          <path
-            d="M6 1l1.4 3.4H11L8.2 6.7l1.1 3.3L6 8.3 2.7 10l1.1-3.3L1 4.4h3.6z"
-            stroke="#D97706"
-            strokeWidth="0.6"
-          />
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
         </svg>
       ))}
-    </span>
-  );
-}
-
-function useReveal(ref: React.RefObject<HTMLElement | null>, delay = 0) {
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setTimeout(() => el.classList.add("tm-visible"), delay);
-          io.unobserve(el);
-        }
-      },
-      { threshold: 0.08 }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [ref, delay]);
-}
-
-function TestimonialCard({ t, index }: { t: Testimonial; index: number }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useReveal(ref, 100 + (index % 2) * 110);
-
-  return (
-    <div
-      ref={ref}
-      className="tm-card"
-      style={{ "--c": t.color, "--c-bg": t.colorBg } as React.CSSProperties}
-    >
-      <div className="d-flex justify-content-between align-items-center mb-2">
-        <span className="tm-tag">{t.tag}</span>
-        <span className="badge bg-light text-dark fw-bold" style={{ fontSize: "10.5px", border: "1px solid #E2E8F0" }}>
-          Verified School
-        </span>
-      </div>
-
-      <div className="mb-3">
-        <Stars count={t.rating} />
-      </div>
-
-      <blockquote className="tm-quote mb-4">
-        <span className="tm-open-quote" aria-hidden="true">"</span>
-        {t.quote}
-      </blockquote>
-
-      <div className="tm-author d-flex align-items-center gap-3 pt-3">
-        <div className="position-relative flex-shrink-0">
-          <img
-            src={t.avatar}
-            alt={t.name}
-            className="tm-avatar-img"
-            loading="lazy"
-            onError={(e) => {
-              // fallback to initials if missing
-              (e.target as HTMLElement).style.display = "none";
-            }}
-          />
-          <span
-            className="position-absolute bottom-0 end-0 p-1 bg-success rounded-circle border border-white"
-            style={{ width: "10px", height: "10px" }}
-            title="Verified Administrator"
-          />
-        </div>
-
-        <div className="d-flex flex-column gap-0.5">
-          <span className="tm-name">{t.name}</span>
-          <span className="tm-role">{t.role} · <strong>{t.school}</strong></span>
-          <span className="tm-location d-inline-flex align-items-center gap-1">
-            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-              <path
-                d="M6 1C4.067 1 2.5 2.567 2.5 4.5c0 3 3.5 6.5 3.5 6.5s3.5-3.5 3.5-6.5C9.5 2.567 7.933 1 6 1z"
-                stroke="currentColor"
-                strokeWidth="1.2"
-              />
-              <circle cx="6" cy="4.5" r="1.2" fill="currentColor" />
-            </svg>
-            {t.location}
-          </span>
-        </div>
-      </div>
     </div>
   );
 }
 
 export default function Testimonials() {
-  const headerRef = useRef<HTMLDivElement>(null);
-  const summaryRef = useRef<HTMLDivElement>(null);
-  useReveal(headerRef, 0);
-  useReveal(summaryRef, 350);
-
-  const col1 = TESTIMONIALS.filter((_, i) => i % 2 === 0);
-  const col2 = TESTIMONIALS.filter((_, i) => i % 2 !== 0);
-
   return (
-    <>
+    <section id="testimonials" className="sp-testi-section">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-
-        :root {
-          --tm-dark:   #0F2744;
-          --tm-navy:   #0A192F;
-          --tm-gold:   #D97706;
-          --tm-muted:  #475569;
-          --tm-border: rgba(15, 39, 68, 0.08);
-          --tm-bg:     #F8FAFC;
-        }
-
-        .tm-section {
-          background: var(--tm-bg);
+        .sp-testi-section {
+          background-color: #FFFFFF;
           padding: 100px 0 110px;
           position: relative;
           overflow: hidden;
-          font-family: 'Plus Jakarta Sans', sans-serif;
+          border-top: 1px solid #E2E8F0;
         }
 
-        .tm-inner { position: relative; z-index: 1; }
-
-        .tm-header {
-          display: flex;
-          align-items: flex-end;
-          justify-content: space-between;
-          flex-wrap: wrap;
-          gap: 24px;
-          margin-bottom: 56px;
+        .sp-testi-container {
+          max-width: 1240px;
+          margin: 0 auto;
+          padding: 0 24px;
         }
 
-        .tm-kicker {
+        .sp-testi-header {
+          text-align: center;
+          max-width: 760px;
+          margin: 0 auto 60px;
+        }
+
+        .sp-testi-pill {
           display: inline-flex;
           align-items: center;
           gap: 8px;
-          font-size: 11.5px;
-          font-weight: 700;
-          letter-spacing: 0.1em;
+          padding: 6px 16px;
+          border-radius: 999px;
+          background: #ECFDF5;
+          border: 1px solid #A7F3D0;
+          color: #059669;
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
           text-transform: uppercase;
-          color: var(--tm-gold);
-          background: #FEF3C7;
-          border: 1px solid #FDE68A;
-          border-radius: 100px;
-          padding: 5px 16px;
+          margin-bottom: 16px;
         }
 
-        .tm-title {
-          font-family: 'Playfair Display', Georgia, serif;
-          font-size: clamp(30px, 3.8vw, 48px);
+        .sp-testi-title {
+          font-size: clamp(28px, 3.8vw, 44px);
           font-weight: 800;
-          line-height: 1.18;
-          color: var(--tm-dark);
+          color: #0A192F;
+          line-height: 1.2;
           letter-spacing: -0.02em;
+          margin-bottom: 16px;
         }
-        .tm-title em {
-          font-style: italic;
-          color: var(--tm-gold);
+
+        .sp-testi-title span {
+          color: #D97706;
           background: linear-gradient(135deg, #D97706 0%, #B45309 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
         }
 
-        .tm-desc {
-          font-size: 15px;
-          color: var(--tm-muted);
-          max-width: 520px;
-          line-height: 1.65;
+        .sp-testi-desc {
+          font-size: 16px;
+          line-height: 1.7;
+          color: #64748B;
+          margin: 0;
         }
 
-        .tm-rating-pill {
+        /* ── Testimonial Grid ── */
+        .sp-testi-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 28px;
+        }
+
+        @media (max-width: 1024px) {
+          .sp-testi-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
+        @media (max-width: 640px) {
+          .sp-testi-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        .sp-testi-card {
           background: #FFFFFF;
           border: 1px solid #E2E8F0;
-          border-radius: 16px;
-          padding: 14px 22px;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          box-shadow: 0 4px 16px rgba(15, 39, 68, 0.06);
-        }
-        .tm-rating-val {
-          font-size: 26px;
-          font-weight: 800;
-          color: var(--tm-dark);
-          line-height: 1;
-        }
-        .tm-rating-label {
-          font-size: 12px;
-          color: var(--tm-muted);
-          font-weight: 600;
-        }
-
-        .tm-col {
+          border-radius: 20px;
+          padding: 32px 28px;
           display: flex;
           flex-direction: column;
-          gap: 24px;
+          box-shadow: 0 4px 16px rgba(10, 25, 47, 0.04);
+          transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
 
-        .tm-card {
-          background: #FFFFFF;
-          border: 1px solid var(--tm-border);
-          border-radius: 20px;
-          padding: 28px;
-          box-shadow: 0 4px 20px -4px rgba(15, 39, 68, 0.05);
-          position: relative;
-          overflow: hidden;
-          transition: all .35s cubic-bezier(0.16, 1, 0.3, 1);
-          opacity: 0;
-          transform: translateY(20px);
-        }
-        .tm-card.tm-visible {
-          opacity: 1;
-          transform: translateY(0);
-        }
-        .tm-card:hover {
-          box-shadow: 0 16px 40px rgba(15, 39, 68, 0.12);
-          border-color: rgba(217, 119, 6, 0.35);
-          transform: translateY(-4px);
+        .sp-testi-card:hover {
+          transform: translateY(-5px);
+          box-shadow: 0 16px 36px rgba(10, 25, 47, 0.08);
+          border-color: #CBD5E1;
         }
 
-        .tm-tag {
-          display: inline-block;
+        .sp-card-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 16px;
+        }
+
+        .sp-testi-tag {
           font-size: 11px;
           font-weight: 700;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          color: var(--c);
-          background: var(--c-bg);
-          border-radius: 100px;
-          padding: 4px 12px;
+          padding: 4px 10px;
+          border-radius: 6px;
         }
 
-        .tm-quote {
-          font-family: 'Playfair Display', Georgia, serif;
-          font-size: 15.5px;
-          font-weight: 400;
-          font-style: italic;
-          line-height: 1.75;
-          color: #1E293B;
-          margin: 0;
-          border: none;
-          padding: 0;
-        }
-
-        .tm-open-quote {
-          font-family: 'Playfair Display', serif;
-          font-size: 52px;
-          line-height: 0;
-          vertical-align: -20px;
-          color: #D97706;
-          opacity: 0.35;
-          margin-right: 4px;
+        .sp-testi-quote {
+          font-size: 14.5px;
+          line-height: 1.65;
+          color: #334155;
+          margin-bottom: 24px;
+          flex: 1;
           font-style: normal;
         }
 
-        .tm-author {
-          border-top: 1px solid var(--tm-border);
+        .sp-testi-author {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          border-top: 1px solid #F1F5F9;
+          padding-top: 16px;
         }
 
-        .tm-avatar-img {
-          width: 48px;
-          height: 48px;
-          border-radius: 50%;
-          object-fit: cover;
-          border: 2px solid #D97706;
-          box-shadow: 0 4px 10px rgba(15, 39, 68, 0.12);
-        }
-
-        .tm-name {
-          font-size: 14.5px;
+        .sp-testi-avatar {
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           font-weight: 800;
-          color: var(--tm-dark);
-          line-height: 1.2;
-        }
-        .tm-role {
-          font-size: 12.5px;
-          font-weight: 500;
-          color: var(--tm-muted);
-          line-height: 1.3;
-        }
-        .tm-location {
-          font-size: 11.5px;
-          color: #64748B;
-          font-weight: 600;
-        }
-
-        .tm-summary {
-          border-radius: 20px;
-          padding: 36px 40px;
-          background: #0F2744;
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          box-shadow: 0 16px 40px rgba(15, 39, 68, 0.15);
-          opacity: 0;
-          transform: translateY(18px);
-          transition: opacity .65s ease, transform .65s ease;
-        }
-        .tm-summary.tm-visible {
-          opacity: 1;
-          transform: translateY(0);
-        }
-
-        .tm-summary-val {
-          font-family: 'Playfair Display', serif;
-          font-size: 32px;
-          font-weight: 800;
-          color: #FBBF24;
-          line-height: 1;
-        }
-        .tm-summary-label {
-          font-size: 11.5px;
-          font-weight: 600;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          color: #E2E8F0;
-        }
-        .tm-summary-sep {
-          width: 1px; height: 44px;
-          background: rgba(255,255,255,0.15);
+          font-size: 14px;
           flex-shrink: 0;
+        }
+
+        .sp-author-details {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .sp-author-name {
+          font-size: 14px;
+          font-weight: 800;
+          color: #0A192F;
+        }
+
+        .sp-author-role {
+          font-size: 12px;
+          color: #64748B;
+        }
+
+        .sp-author-school {
+          font-size: 11.5px;
+          font-weight: 700;
+          color: #059669;
         }
       `}</style>
 
-      <section className="tm-section gq-scroll-reveal" id="testimonials">
-        <div className="tm-inner container-xl">
-          {/* Header */}
-          <div ref={headerRef} className="tm-header">
-            <div>
-              <div className="tm-kicker mb-3">
-                <span>💬</span> Real Voices From Partner Schools
-              </div>
-              <h2 className="tm-title mb-3">
-                Proven impact from<br />
-                <em>distinguished school leaders.</em>
-              </h2>
-              <p className="tm-desc mb-0">
-                Authentic experiences from school proprietors, principals, and exam officers operating SchoolProfit Worldwide.
-              </p>
-            </div>
-
-            {/* Aggregate rating pill */}
-            <div className="tm-header-right">
-              <div className="tm-rating-pill">
-                <span className="tm-rating-val">4.9</span>
-                <span className="d-flex gap-1">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <svg key={i} width="14" height="14" viewBox="0 0 12 12"
-                      fill="#D97706" aria-hidden="true">
-                      <path d="M6 1l1.4 3.4H11L8.2 6.7l1.1 3.3L6 8.3 2.7 10l1.1-3.3L1 4.4h3.6z"/>
-                    </svg>
-                  ))}
-                </span>
-                <span className="tm-rating-label">from 500+ schools</span>
-              </div>
-            </div>
+      <div className="sp-testi-container">
+        <div className="sp-testi-header">
+          <div className="sp-testi-pill">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            <span>Verified Administrator Feedback</span>
           </div>
-
-          {/* Masonry two-col */}
-          <div className="row g-4">
-            <div className="col-12 col-md-6">
-              <div className="tm-col">
-                {col1.map((t, i) => (
-                  <TestimonialCard key={t.name} t={t} index={i * 2} />
-                ))}
-              </div>
-            </div>
-            <div className="col-12 col-md-6">
-              <div className="tm-col">
-                {col2.map((t, i) => (
-                  <TestimonialCard key={t.name} t={t} index={i * 2 + 1} />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Summary bar */}
-          <div
-            ref={summaryRef}
-            className="tm-summary d-flex align-items-center justify-content-center flex-wrap gap-5 mt-5"
-          >
-            {[
-              { val: "500+", label: "Schools onboarded" },
-              { val: "4.9★", label: "Average rating" },
-              { val: "2.4M+", label: "Results processed" },
-              { val: "99.2%", label: "Term renewal rate" },
-            ].map((s, i, arr) => (
-              <div key={s.label} className="d-flex align-items-center gap-5">
-                <div className="d-flex flex-column align-items-center gap-1">
-                  <span className="tm-summary-val">{s.val}</span>
-                  <span className="tm-summary-label">{s.label}</span>
-                </div>
-                {i < arr.length - 1 && (
-                  <span className="tm-summary-sep d-none d-sm-block" />
-                )}
-              </div>
-            ))}
-          </div>
+          <h2 className="sp-testi-title">
+            Loved by <span>Proprietors & Principals</span>
+          </h2>
+          <p className="sp-testi-desc">
+            Real stories from school leaders who eliminated manual calculation errors and recovered lost tuition revenues.
+          </p>
         </div>
-      </section>
-    </>
+
+        <div className="sp-testi-grid">
+          {TESTIMONIALS.map((t, idx) => (
+            <div key={idx} className="sp-testi-card">
+              <div className="sp-card-head">
+                <span className="sp-testi-tag" style={{ background: t.colorBg, color: t.color }}>
+                  {t.tag}
+                </span>
+                <Stars count={t.rating} />
+              </div>
+              <p className="sp-testi-quote">"{t.quote}"</p>
+              <div className="sp-testi-author">
+                <div className="sp-testi-avatar" style={{ background: t.colorBg, color: t.color }}>
+                  {t.initials}
+                </div>
+                <div className="sp-author-details">
+                  <span className="sp-author-name">{t.name}</span>
+                  <span className="sp-author-role">{t.role}</span>
+                  <span className="sp-author-school">{t.school} · {t.location}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }

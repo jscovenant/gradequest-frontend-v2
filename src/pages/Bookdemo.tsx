@@ -4,6 +4,7 @@ import { publicApi } from "../utils/axios";
 import Navbar from "../features/frontend/Navbar";
 import Footer from "../features/frontend/footer";
 import SwipeUpWidget from "../features/frontend/SwipeUpWidget";
+import AiSalesChatWidget from "../components/AiSalesChatWidget";
 import PageTitle from "../components/PageTitle";
 import { usePlatformInfo } from "../hooks/usePlatformInfo";
 
@@ -1182,6 +1183,9 @@ export default function BookDemo() {
 
         {/* Global Footer */}
         <Footer />
+
+        {/* AI Growth Consultant Floating Chat Widget */}
+        <AiSalesChatWidget />
 
         {/* Swipe Up Widget */}
         <SwipeUpWidget />

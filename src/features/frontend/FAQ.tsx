@@ -1,47 +1,10 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { usePlatformInfo } from "../../hooks/usePlatformInfo";
 
 type FAQ = { q: string; a: string; tag: string };
 
-const FAQS: FAQ[] = [
-  {
-    tag: "Security",
-    q: "How secure is our school's academic and financial data on SchoolProfit?",
-    a: "Bank-grade. All data is encrypted both at rest (AES-256) and in transit (SSL/TLS). Every account uses strict role-based access control — meaning teachers only access their assigned classes, bursars manage finance ledgers, and proprietors maintain overarching branch oversight. We perform automated daily backups and maintain detailed audit logs.",
-  },
-  {
-    tag: "Results",
-    q: "How does automated result computation and broadsheet compilation work?",
-    a: "Teachers upload Continuous Assessment (CA) and examination scores through their authenticated portal. SchoolProfit automatically computes totals, weighted averages, class positions, and cumulative GPAs adhering to NERDC standards — generating print-ready master broadsheets and transcripts in seconds.",
-  },
-  {
-    tag: "CBT Exams",
-    q: "Can we conduct computer-based assessments in our lab without full-time internet?",
-    a: "Yes. SchoolProfit features a hybrid LAN offline testing engine. Computer laboratories can administer continuous assessments, mock exams, and timed tests on a local network. Student answers are auto-saved locally in real-time and synchronize seamlessly to academic records when connected.",
-  },
-  {
-    tag: "Bursary",
-    q: "How does the fee management module track tuition and receipts?",
-    a: "The bursary module provides a clear, real-time ledger for every enrolled student — detailing billed amounts, payment history, and outstanding balances. You can record payments, generate electronic receipts with cryptographic verification seals, and automate statements for parents.",
-  },
-  {
-    tag: "AI Tools",
-    q: "How does the AI Assistant support teaching staff?",
-    a: "The AI Assistant helps teachers structure curriculum-compliant schemes of work, generate weekly lesson notes, and compose personalized student evaluations. It also alerts academic coordinators to incomplete score submissions before publishing deadlines.",
-  },
-  {
-    tag: "Parent Access",
-    q: "How do parents receive report cards and school updates?",
-    a: "Parents access authenticated result links, daily attendance logs, and school notices directly on their mobile phones via direct WhatsApp and SMS notifications, eliminating the friction of unread portal emails or lost physical reports.",
-  },
-  {
-    tag: "Migration",
-    q: "We have years of existing student records in Excel. How difficult is migration?",
-    a: "Effortless. Our onboarding team provides standard Excel/CSV templates. Once uploaded, we validate and import all historical student and academic records within 24 hours with zero operational downtime.",
-  },
-];
-
 const TAG_COLORS: Record<string, { color: string; bg: string }> = {
+  Pricing: { color: "#D97706", bg: "rgba(217, 119, 6, 0.12)" },
   Security: { color: "#1D4ED8", bg: "rgba(29, 78, 216, 0.1)" },
   Results: { color: "#059669", bg: "rgba(5, 150, 105, 0.1)" },
   "CBT Exams": { color: "#1D4ED8", bg: "rgba(29, 78, 216, 0.12)" },
@@ -104,7 +67,7 @@ function AccordionItem({
       </button>
 
       <div ref={bodyRef} className="fq-body" style={{ maxHeight: 0, opacity: 0 }}>
-        <p className="fq-answer">{faq.a}</p>
+        <p className="fq-answer" style={{ whiteSpace: "pre-line" }}>{faq.a}</p>
       </div>
     </div>
   );
@@ -131,213 +94,224 @@ function useReveal(ref: React.RefObject<HTMLElement | null>, delay = 0) {
 }
 
 export default function FAQ() {
-  const { whatsappLink } = usePlatformInfo();
+  const { whatsappLink, formattedBasicPrice, formattedStandardCbtPrice } = usePlatformInfo();
   const [openIndex, setOpenIndex] = useState<number | null>(0);
+
+  const basicPrice = formattedBasicPrice || "₦300";
+  const cbtPrice = formattedStandardCbtPrice || "₦500";
+
+  const faqs: FAQ[] = useMemo(() => [
+    {
+      tag: "Pricing",
+      q: "What is SchoolProfit's pricing model and how much does it cost?",
+      a: `SchoolProfit operates on a transparent, pay-as-you-go per-student model with zero expensive upfront software license fees. We offer two clear editions:\n\n• **Basic Result Edition (${basicPrice} per student/term)**: Continuous Assessment score capture, automated NERDC grading computation, print-ready terminal report cards, master broadsheets, student & staff records, and bursary accounting.\n• **Standard CBT & AI Edition (${cbtPrice} per student/term)**: All Basic features plus Offline/Online Computer-Based Testing (CBT) engine for exams/mock tests, AI lesson note & question generator, biometric QR attendance tracking, and automated parent WhatsApp delivery.`,
+    },
+    {
+      tag: "Pricing",
+      q: "Are there any setup fees, training costs, or hidden maintenance charges?",
+      a: "None. System onboarding, staff training workshops, historical data migration from Excel/paper, and ongoing technical support are 100% free. You only pay for enrolled students per academic term with no annual renewal surprises or hidden hosting surcharges.",
+    },
+    {
+      tag: "Pricing",
+      q: "Can our school switch or upgrade between Basic and Standard CBT plans?",
+      a: `Yes, schools can seamlessly switch between the Basic Result Edition (${basicPrice}/student) and the Standard CBT & AI Edition (${cbtPrice}/student) at the start of any academic term based on their computer lab setup, exam requirements, and administrative goals.`,
+    },
+    {
+      tag: "Security",
+      q: "How secure is our school's academic and financial data on SchoolProfit?",
+      a: "Bank-grade. All data is encrypted both at rest (AES-256) and in transit (SSL/TLS). Every account uses strict role-based access control — meaning teachers only access their assigned classes, bursars manage finance ledgers, and proprietors maintain overarching branch oversight. We perform automated daily backups and maintain detailed audit logs.",
+    },
+    {
+      tag: "Results",
+      q: "How does automated result computation and broadsheet compilation work?",
+      a: "Teachers upload Continuous Assessment (CA) and examination scores through their authenticated portal. SchoolProfit automatically computes totals, weighted averages, class positions, and cumulative GPAs adhering to NERDC standards — generating print-ready master broadsheets and transcripts in seconds.",
+    },
+    {
+      tag: "CBT Exams",
+      q: "Can we conduct computer-based assessments in our lab without full-time internet?",
+      a: "Yes. SchoolProfit features a hybrid LAN offline testing engine. Computer laboratories can administer continuous assessments, mock exams, and timed tests on a local network. Student answers are auto-saved locally in real-time and synchronize seamlessly to academic records when connected.",
+    },
+    {
+      tag: "Bursary",
+      q: "How does the fee management module track tuition and receipts?",
+      a: "The bursary module provides a clear, real-time ledger for every enrolled student — detailing billed amounts, payment history, and outstanding balances. You can record payments, generate electronic receipts with cryptographic verification seals, and automate statements for parents.",
+    },
+    {
+      tag: "AI Tools",
+      q: "How does the AI Assistant support teaching staff?",
+      a: "The AI Assistant helps teachers structure curriculum-compliant schemes of work, generate weekly lesson notes, and compose personalized student evaluations. It also alerts academic coordinators to incomplete score submissions before publishing deadlines.",
+    },
+    {
+      tag: "Parent Access",
+      q: "How do parents receive report cards and school updates?",
+      a: "Parents access authenticated result links, daily attendance logs, and school notices directly on their mobile phones via direct WhatsApp and SMS notifications, eliminating the friction of unread portal emails or lost physical reports.",
+    },
+    {
+      tag: "Migration",
+      q: "We have years of existing student records in Excel. How difficult is migration?",
+      a: "Effortless. Our onboarding team provides standard Excel/CSV templates. Once uploaded, we validate and import all historical student and academic records within 24 hours with zero operational downtime.",
+    },
+  ], [basicPrice, cbtPrice]);
+
   const headerRef = useRef<HTMLDivElement>(null);
   const ctaRef = useRef<HTMLDivElement>(null);
 
-  useReveal(headerRef, 0);
-  useReveal(ctaRef, 300);
+  useReveal(headerRef);
+  useReveal(ctaRef, 120);
 
-  const leftFaqs = FAQS.filter((_, i) => i % 2 === 0);
-  const rightFaqs = FAQS.filter((_, i) => i % 2 !== 0);
+  const toggle = (i: number) => {
+    setOpenIndex((cur) => (cur === i ? null : i));
+  };
 
-  const toggle = (globalIndex: number) =>
-    setOpenIndex((prev) => (prev === globalIndex ? null : globalIndex));
+  const mid = Math.ceil(faqs.length / 2);
+  const leftFaqs = faqs.slice(0, mid);
+  const rightFaqs = faqs.slice(mid);
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-
         :root {
-          --fq-bg: #F8FAFC;
-          --fq-source: #FFFFFF;
-          --fq-dark: #0F2744;
-          --fq-accent: #D97706;
-          --fq-gold-light: #F59E0B;
-          --fq-muted: #64748B;
+          --fq-navy: #0A192F;
+          --fq-gold: #D97706;
+          --fq-bg: #FFFFFF;
+          --fq-subtle: #F8FAFC;
           --fq-border: #E2E8F0;
-          --fq-card-bg: #FFFFFF;
-
-          --fq-accent-glow: rgba(217, 119, 6, 0.07);
-          --fq-accent-border: rgba(217, 119, 6, 0.22);
-          --fq-accent-ring: rgba(217, 119, 6, 0.10);
+          --fq-text: #0F172A;
+          --fq-muted: #64748B;
         }
 
         .fq-wave {
           display: block;
-          width: 100%;
-          overflow: hidden;
+          background: #F8FAFC;
           line-height: 0;
-          background: var(--fq-source);
+          overflow: hidden;
         }
         .fq-wave svg {
           display: block;
           width: 100%;
-          height: 56px;
+          height: 48px;
         }
 
         .fq-section {
-          background: var(--fq-bg);
-          padding: 108px 0 128px;
+          background: #F8FAFC;
+          padding: 80px 0 100px;
           position: relative;
-          overflow: hidden;
-          font-family: 'Plus Jakarta Sans', sans-serif;
           border-top: 1px solid #E2E8F0;
         }
 
         .fq-inner {
-          position: relative;
-          z-index: 1;
-        }
-
-        @media (max-width: 640px) {
-          .fq-section {
-            padding: 72px 0 88px;
-          }
+          max-width: 1140px;
         }
 
         .fq-header {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 48px;
-          align-items: end;
-          margin-bottom: 72px;
-        }
-        @media (max-width: 800px) {
-          .fq-header {
-            grid-template-columns: 1fr;
-            gap: 20px;
-          }
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          flex-wrap: wrap;
+          gap: 24px;
+          margin-bottom: 56px;
         }
 
         .fq-kicker {
           display: inline-flex;
           align-items: center;
-          gap: 10px;
+          gap: 8px;
           font-size: 11.5px;
           font-weight: 700;
-          letter-spacing: 0.16em;
+          letter-spacing: 0.18em;
           text-transform: uppercase;
-          color: #B45309;
-          background: #FFFFFF;
-          border: 1px solid rgba(217, 119, 6, 0.25);
-          padding: 5px 14px;
-          border-radius: 999px;
+          color: #D97706;
         }
-
         .fq-kicker__line {
-          display: block;
-          width: 20px;
+          width: 22px;
           height: 2px;
           background: #D97706;
-          border-radius: 99px;
+          border-radius: 2px;
         }
 
         .fq-title {
           font-family: 'Playfair Display', Georgia, serif;
-          font-size: clamp(30px, 3.8vw, 50px);
-          font-weight: 900;
-          color: var(--fq-dark);
-          line-height: 1.15;
+          font-size: clamp(26px, 3.2vw, 40px);
+          font-weight: 800;
+          line-height: 1.2;
+          color: #0F2744;
+          letter-spacing: -0.01em;
         }
-
         .fq-title em {
           font-style: italic;
           color: #D97706;
-          background: linear-gradient(135deg, #D97706 0%, #B45309 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
         }
 
         .fq-desc {
-          font-size: 15.5px;
+          font-size: 15px;
           font-weight: 400;
-          color: var(--fq-muted);
-          max-width: 380px;
           line-height: 1.7;
+          color: #64748B;
+          max-width: 520px;
         }
 
         .fq-filter-pill {
-          font-size: 12px;
-          font-weight: 600;
+          font-size: 11.5px;
+          font-weight: 700;
+          padding: 4px 12px;
+          border-radius: 999px;
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
           color: #475569;
-          background: var(--fq-card-bg);
-          border: 1px solid var(--fq-border);
-          border-radius: 100px;
-          padding: 6px 16px;
-          cursor: default;
-          transition: background .2s, border-color .2s, color .2s;
-        }
-        .fq-filter-pill:hover {
-          background: rgba(217, 119, 6, 0.1);
-          border-color: rgba(217, 119, 6, 0.35);
-          color: #0F2744;
+          letter-spacing: 0.04em;
         }
 
         .fq-col {
           display: flex;
           flex-direction: column;
+          gap: 12px;
         }
 
         .fq-item {
-          border-bottom: 1px solid var(--fq-border);
-          transition: background .2s;
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
+          border-radius: 16px;
+          padding: 0 24px;
+          transition: border-color .25s, box-shadow .25s;
         }
-        .fq-item:first-child {
-          border-top: 1px solid var(--fq-border);
+        .fq-item:hover {
+          border-color: #CBD5E1;
         }
         .fq-item--open {
-          background: var(--fq-card-bg);
-          border-radius: 12px;
-          padding: 0 16px;
-          border: 1px solid #E2E8F0;
-          margin-bottom: 10px;
-          box-shadow: 0 4px 16px rgba(15, 39, 68, 0.04);
+          border-color: #CBD5E1;
+          box-shadow: 0 4px 16px rgba(15, 39, 68, 0.05);
         }
 
         .fq-question {
           background: none;
           border: none;
-          padding: 22px 20px 18px 0;
+          padding: 22px 0;
+          cursor: pointer;
           display: flex;
           align-items: flex-start;
           justify-content: space-between;
           gap: 16px;
-          cursor: pointer;
           text-align: left;
         }
 
         .fq-tag {
-          display: inline-block;
-          width: fit-content;
           font-size: 10.5px;
-          font-weight: 700;
-          letter-spacing: 0.08em;
+          font-weight: 800;
+          letter-spacing: 0.1em;
           text-transform: uppercase;
           color: var(--c);
-          background: var(--c-bg);
-          border-radius: 100px;
-          padding: 3px 10px;
-          transition: opacity .2s;
-        }
-        .fq-item:not(.fq-item--open) .fq-tag {
-          opacity: 0.85;
+          align-self: flex-start;
         }
 
         .fq-q-text {
-          font-family: 'Playfair Display', Georgia, serif;
-          font-size: 16.5px;
+          font-size: 15.5px;
           font-weight: 700;
-          color: var(--fq-dark);
-          line-height: 1.35;
+          color: #0F2744;
+          line-height: 1.4;
           transition: color .2s;
         }
-
-        .fq-question:hover .fq-q-text,
         .fq-item--open .fq-q-text {
-          color: #0F2744;
+          color: #D97706;
         }
 
         .fq-icon {
@@ -492,7 +466,7 @@ export default function FAQ() {
               </h2>
 
               <p className="fq-desc mb-0">
-                Straight answers about security, results, fees, onboarding, and pricing —
+                Straight answers about pricing, results, offline CBT exams, fees, and data security —
                 no fluff, no sales spin.
               </p>
             </div>
@@ -510,7 +484,7 @@ export default function FAQ() {
             <div className="col-12 col-md-6">
               <div className="fq-col">
                 {leftFaqs.map((faq) => {
-                  const globalIndex = FAQS.indexOf(faq);
+                  const globalIndex = faqs.indexOf(faq);
                   return (
                     <AccordionItem
                       key={faq.q}
@@ -527,7 +501,7 @@ export default function FAQ() {
             <div className="col-12 col-md-6">
               <div className="fq-col">
                 {rightFaqs.map((faq) => {
-                  const globalIndex = FAQS.indexOf(faq);
+                  const globalIndex = faqs.indexOf(faq);
                   return (
                     <AccordionItem
                       key={faq.q}

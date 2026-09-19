@@ -70,6 +70,11 @@ const LevelsPage = lazyWithRetry(() => import("./pages/Admin/Level/LevelsPage"))
 const SubjectsPage = lazyWithRetry(() => import("./pages/Admin/Subjects/SubjectsPage"));
 const DepartmentPage = lazyWithRetry(() => import("./pages/Admin/Academics/DepartmentPage"));
 const SectionsPage = lazyWithRetry(() => import("./pages/Admin/Academics/SectionsPage"));
+
+const StorePosPage = lazyWithRetry(() => import("./pages/Admin/Store/StorePosPage"));
+const StoreInventoryPage = lazyWithRetry(() => import("./pages/Admin/Store/StoreInventoryPage"));
+const StoreCategoriesPage = lazyWithRetry(() => import("./pages/Admin/Store/StoreCategoriesPage"));
+const StoreSalesPage = lazyWithRetry(() => import("./pages/Admin/Store/StoreSalesPage"));
 const FeeMethodsPage = lazyWithRetry(() => import("./pages/Admin/Fees/FeeMethodsPage"));
 const FeeStructurePage = lazyWithRetry(() => import("./pages/Admin/Fees/FeeStructurePage"));
 const StudentFeePaymentPage = lazyWithRetry(() => import("./pages/Admin/Fees/StudentFeePaymentPage"));
@@ -91,6 +96,7 @@ const PlatformStaffPage = lazyWithRetry(() => import("./pages/Super-Admin/Platfo
 const SubscriptionPlansPage = lazyWithRetry(() => import("./pages/Super-Admin/SubscriptionPlansPage"));
 const BillingPolicyPage = lazyWithRetry(() => import("./pages/Super-Admin/BillingPolicyPage"));
 const TwilioWhatsappPage = lazyWithRetry(() => import("./pages/Super-Admin/TwilioWhatsappPage"));
+const AiSalesAgentPage = lazyWithRetry(() => import("./pages/Super-Admin/AiSalesAgentPage"));
 const BlogsPage = lazyWithRetry(() => import("./pages/Super-Admin/BlogsPage"));
 const TestimonialsPage = lazyWithRetry(() => import("./pages/Super-Admin/TestimonialsPage"));
 const StaffQrAttendancePage = lazyWithRetry(() => import("./pages/Admin/Biometric/StaffQrAttendancePage"));
@@ -154,6 +160,11 @@ const WithdrawnStudentResultsPage = lazyWithRetry(() => import("./pages/Admin/St
 const TranscriptsPage = lazyWithRetry(() => import("./pages/Admin/StudentResult/TranscriptsPage"));
 const NewsletterSubscribersPage = lazyWithRetry(() => import("./pages/Super-Admin/NewsletterSubscribersPage"));
 const PublicBlogDetailPage = lazyWithRetry(() => import("./pages/PublicBlogDetailPage"));
+const DomainAndWebsitePage = lazyWithRetry(() => import("./pages/Admin/School/DomainAndWebsitePage"));
+const AdmissionsManagementPage = lazyWithRetry(() => import("./pages/Admin/Admissions/AdmissionsManagementPage"));
+const PublicSchoolWebsitePage = lazyWithRetry(() => import("./pages/PublicSchoolWebsitePage"));
+const PublicAdmissionFormPage = lazyWithRetry(() => import("./pages/PublicAdmissionFormPage"));
+const PublicAdmissionStatusPage = lazyWithRetry(() => import("./pages/PublicAdmissionStatusPage"));
 
 function App() {
   return (
@@ -163,7 +174,12 @@ function App() {
           <Suspense fallback={<Loader message="Preparing page..." />}>
         <Routes>
           {/*  PUBLIC ROUTES (NO GUARDS) */}
-          <Route path="/" element={isCustomPortalHost() ? <Navigate to="/login" replace /> : <HomePage />} />
+          <Route path="/" element={isCustomPortalHost() ? <PublicSchoolWebsitePage /> : <HomePage />} />
+          <Route path="/school/:slugOrId" element={<PublicSchoolWebsitePage />} />
+          <Route path="/school/:slugOrId/admission" element={<PublicAdmissionFormPage />} />
+          <Route path="/admission" element={<PublicAdmissionFormPage />} />
+          <Route path="/admissions/apply/:slugOrId" element={<PublicAdmissionFormPage />} />
+          <Route path="/admissions/status" element={<PublicAdmissionStatusPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Signup />} />
           <Route path="/sales-representative/register" element={<PublicRepresentativeRegisterPage />} />
@@ -254,6 +270,47 @@ function App() {
             element={
               <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["support"]}>
                 <SupportTicketsPage />
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/admin/school/domain-and-website"
+            element={
+              <RequireAuth roles={["Admin"]}>
+                <OnboardingGuard>
+                  <DomainAndWebsitePage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/domain"
+            element={
+              <RequireAuth roles={["Admin"]}>
+                <OnboardingGuard>
+                  <DomainAndWebsitePage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/admissions"
+            element={
+              <RequireAuth roles={["Admin", "Bursar"]}>
+                <OnboardingGuard>
+                  <AdmissionsManagementPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admissions"
+            element={
+              <RequireAuth roles={["Admin", "Bursar"]}>
+                <OnboardingGuard>
+                  <AdmissionsManagementPage />
+                </OnboardingGuard>
               </RequireAuth>
             }
           />
@@ -670,8 +727,40 @@ function App() {
             }
           />
 
-          <Route
-            path="/fees/methods"
+          
+                    <Route
+                      path="/store/pos"
+                      element={
+                        <RequireAuth roles={["Admin", "Bursar", "Super-Admin", "Platform-Staff", "Teacher"]}>
+                          <StorePosPage />
+                        </RequireAuth>
+                      }
+                    />
+                    <Route
+                      path="/store/inventory"
+                      element={
+                        <RequireAuth roles={["Admin", "Bursar", "Super-Admin", "Platform-Staff", "Teacher"]}>
+                          <StoreInventoryPage />
+                        </RequireAuth>
+                      }
+                    />
+                    <Route
+                      path="/store/categories"
+                      element={
+                        <RequireAuth roles={["Admin", "Bursar", "Super-Admin", "Platform-Staff", "Teacher"]}>
+                          <StoreCategoriesPage />
+                        </RequireAuth>
+                      }
+                    />
+                    <Route
+                      path="/store/sales"
+                      element={
+                        <RequireAuth roles={["Admin", "Bursar", "Super-Admin", "Platform-Staff", "Teacher"]}>
+                          <StoreSalesPage />
+                        </RequireAuth>
+                      }
+                    />
+                    <Route path="/fees/methods"
             element={
               <RequireAuth roles={["Admin", "Bursar"]}>
                 <OnboardingGuard>
@@ -1264,6 +1353,26 @@ function App() {
               <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["support"]}>
                 <OnboardingGuard>
                   <TwilioWhatsappPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/super-admin/ai-sales-agent"
+            element={
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["sales", "support"]}>
+                <OnboardingGuard>
+                  <AiSalesAgentPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/superadmin/ai-sales-agent"
+            element={
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["sales", "support"]}>
+                <OnboardingGuard>
+                  <AiSalesAgentPage />
                 </OnboardingGuard>
               </RequireAuth>
             }

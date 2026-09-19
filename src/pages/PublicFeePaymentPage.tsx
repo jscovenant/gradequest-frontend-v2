@@ -180,6 +180,33 @@ export default function PublicFeePaymentPage() {
       .finally(() => setVerifying(false));
   }, [initialReference]);
 
+  // Real-Time Background Listener for Virtual Account Transfer
+  useEffect(() => {
+    if (!activeReference || !virtualAccount || receiptData) return;
+
+    const pollInterval = window.setInterval(() => {
+      publicApi
+        .get(`/public/fee-payment/verify/${encodeURIComponent(activeReference)}`)
+        .then((res) => {
+          if (res.data?.status === "success" || res.data?.receipt) {
+            if (res.data?.receipt) {
+              setReceiptData({
+                ...res.data.receipt,
+                pdf_download_url: res.data.pdf_download_url,
+              });
+            }
+            setVirtualAccount(null);
+            setMessage("Payment received and settled successfully by Wema Bank!");
+          }
+        })
+        .catch(() => {
+          // Keep listening quietly in the background
+        });
+    }, 4000);
+
+    return () => window.clearInterval(pollInterval);
+  }, [activeReference, virtualAccount, receiptData]);
+
   // Lookup School by Code
   useEffect(() => {
     const value = schoolCode.trim();
@@ -1140,10 +1167,10 @@ export default function PublicFeePaymentPage() {
                 {error && <div className="gq-alert-error"><i className="bi bi-exclamation-octagon-fill" /> {error}</div>}
 
                 {virtualAccount ? (
-                  <div style={{ background: '#F0FDF4', border: '2px solid #10B981', borderRadius: 16, padding: '20px', marginBottom: 16 }}>
+                  <div style={{ background: '#F0FDF4', border: '2px solid #10B981', borderRadius: 16, padding: '20px', marginBottom: 16, boxShadow: '0 8px 24px rgba(16, 185, 129, 0.12)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                      <span style={{ background: '#10B981', color: '#FFFFFF', padding: '4px 12px', borderRadius: 999, fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        <i className="bi bi-bank me-1" /> Dedicated Wema Account Generated
+                      <span style={{ background: '#0F2744', color: '#FFFFFF', padding: '5px 12px', borderRadius: 999, fontSize: 11.5, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <i className="bi bi-shield-check text-success" /> Powered by ALATPay / Wema Bank
                       </span>
                       <button
                         type="button"
@@ -1157,9 +1184,9 @@ export default function PublicFeePaymentPage() {
 
                     <div style={{ textAlign: 'center', margin: '12px 0 18px' }}>
                       <div style={{ fontSize: 12, color: '#166534', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        Transfer Exact Amount To:
+                        Transfer Exact Amount To Dedicated Account:
                       </div>
-                      <div style={{ fontSize: 30, fontWeight: 950, color: '#0F172A', letterSpacing: '0.05em', margin: '6px 0', fontFamily: 'monospace' }}>
+                      <div style={{ fontSize: 32, fontWeight: 950, color: '#0F2744', letterSpacing: '0.05em', margin: '6px 0', fontFamily: 'monospace' }}>
                         {virtualAccount.account_number}
                       </div>
                       <button
@@ -1174,11 +1201,12 @@ export default function PublicFeePaymentPage() {
                           color: copied ? '#FFFFFF' : '#0F172A',
                           border: '1.5px solid #CBD5E1',
                           borderRadius: 8,
-                          padding: '6px 14px',
-                          fontSize: 12.5,
+                          padding: '7px 16px',
+                          fontSize: 13,
                           fontWeight: 800,
                           cursor: 'pointer',
-                          transition: 'all 0.15s ease'
+                          transition: 'all 0.15s ease',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
                         }}
                       >
                         <i className={`bi ${copied ? 'bi-check-lg' : 'bi-clipboard'} me-1`} />
@@ -1186,30 +1214,72 @@ export default function PublicFeePaymentPage() {
                       </button>
                     </div>
 
-                    <div style={{ background: '#FFFFFF', borderRadius: 12, padding: '14px 16px', border: '1px solid #E2E8F0', marginBottom: 18, fontSize: 13 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div style={{ background: '#FFFFFF', borderRadius: 14, padding: '16px 18px', border: '1.5px solid #E2E8F0', marginBottom: 16, fontSize: 13, boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid #F1F5F9' }}>
                         <span style={{ color: '#64748B', fontWeight: 600 }}>Bank Name:</span>
-                        <strong style={{ color: '#0F172A', fontWeight: 800 }}>{virtualAccount.bank_name || 'Wema Bank / ALAT'}</strong>
+                        <strong style={{ color: '#0F172A', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <i className="bi bi-bank2 text-primary" />
+                          {virtualAccount.bank_name || 'Wema Bank'}
+                        </strong>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <span style={{ color: '#64748B', fontWeight: 600 }}>Beneficiary Name:</span>
-                        <strong style={{ color: '#0F172A', fontWeight: 800 }}>{virtualAccount.account_name}</strong>
+                      
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid #F1F5F9' }}>
+                        <div>
+                          <span style={{ color: '#64748B', fontWeight: 600 }}>Recipient (on Bank App):</span>
+                          <div style={{ fontSize: 11, color: '#94A3B8' }}>Official Gateway Account</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <strong style={{ color: '#0F172A', fontWeight: 800 }}>Samaritan Technologies</strong>
+                          <div style={{ fontSize: 11, color: '#2563EB', fontWeight: 700 }}>
+                            <i className="bi bi-shield-check me-1" />
+                            SchoolProfit Payment Processor
+                          </div>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <span style={{ color: '#64748B', fontWeight: 600 }}>Exact Payable Amount:</span>
-                        <strong style={{ color: '#047857', fontWeight: 950, fontSize: 15 }}>{money(virtualAccount.amount)}</strong>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid #F1F5F9' }}>
+                        <span style={{ color: '#64748B', fontWeight: 600 }}>Student / Beneficiary:</span>
+                        <strong style={{ color: '#0F172A', fontWeight: 800, textAlign: 'right', maxWidth: '60%' }}>
+                          {studentData?.student?.name || studentData?.student?.firstname || 'Student'} 
+                          {school?.name ? ` (${school.name})` : ''}
+                        </strong>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid #F1F5F9' }}>
+                        <span style={{ color: '#64748B', fontWeight: 600 }}>Payable Amount:</span>
+                        <strong style={{ color: '#047857', fontWeight: 950, fontSize: 17 }}>{money(virtualAccount.amount)}</strong>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ color: '#64748B', fontWeight: 600 }}>Payment Reference:</span>
-                        <strong style={{ color: '#334155', fontFamily: 'monospace', fontSize: 11 }}>{activeReference}</strong>
+                        <strong style={{ color: '#334155', fontFamily: 'monospace', fontSize: 11.5 }}>{activeReference}</strong>
                       </div>
+                    </div>
+
+                    {/* Bank App Notice Card */}
+                    <div style={{ background: '#EFF6FF', border: '1.5px solid #BFDBFE', borderRadius: 12, padding: '12px 16px', marginBottom: 16, fontSize: 12.5, color: '#1E40AF', lineHeight: 1.5 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 800, marginBottom: 4, color: '#1D4ED8' }}>
+                        <i className="bi bi-info-circle-fill" />
+                        <span>Transfer Notice for Banking Apps (OPay, PalmPay, Kuda, GTBank, etc.)</span>
+                      </div>
+                      <div>
+                        When you paste or type this account number in your bank app, the account name will show as <strong>Samaritan Technologies</strong> (the official corporate gateway for SchoolProfit). Transfers are instantly tracked and credited to <strong>{studentData?.student?.name || studentData?.student?.firstname || 'your child'}</strong>.
+                      </div>
+                    </div>
+
+                    {/* Live Transfer Listener Pulse */}
+                    <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 10, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: '#065F46' }}>
+                      <span className="spinner-grow spinner-grow-sm text-success" style={{ width: 12, height: 12 }} />
+                      <span>
+                        <strong>Live Settlement Listener Active:</strong> Transfers clear via Wema NIP within 30-60 seconds. This page will automatically update with your official receipt upon confirmation.
+                      </span>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       <button
                         type="button"
                         className="gq-btn-download"
-                        style={{ width: '100%', justifyContent: 'center', minHeight: 48 }}
+                        style={{ width: '100%', justifyContent: 'center', minHeight: 48, fontSize: 14 }}
                         disabled={verifying}
                         onClick={() => {
                           setVerifying(true);
@@ -1218,11 +1288,13 @@ export default function PublicFeePaymentPage() {
                           publicApi
                             .get(`/public/fee-payment/verify/${encodeURIComponent(activeReference)}`)
                             .then((res) => {
-                              if (res.data?.receipt) {
-                                setReceiptData({
-                                  ...res.data.receipt,
-                                  pdf_download_url: res.data.pdf_download_url,
-                                });
+                              if (res.data?.status === 'success' || res.data?.receipt) {
+                                if (res.data?.receipt) {
+                                  setReceiptData({
+                                    ...res.data.receipt,
+                                    pdf_download_url: res.data.pdf_download_url,
+                                  });
+                                }
                                 setVirtualAccount(null);
                               } else {
                                 setMessage("Payment verification in progress. Interbank NIP transfers take 30-60 seconds to clear.");
@@ -1237,15 +1309,28 @@ export default function PublicFeePaymentPage() {
                         {verifying ? (
                           <>
                             <span className="spinner-border spinner-border-sm me-1" />
-                            Verifying Bank Clearing…
+                            Checking Wema Bank Settlement…
                           </>
                         ) : (
                           <>
                             <i className="bi bi-patch-check-fill" />
-                            I Have Made This Transfer (Verify Payment)
+                            I Have Made This Transfer (Instant Verify)
                           </>
                         )}
                       </button>
+
+
+
+                      {checkoutUrl && (
+                        <a
+                          href={checkoutUrl}
+                          className="gq-btn-print"
+                          style={{ width: '100%', justifyContent: 'center', minHeight: 44, textDecoration: 'none', background: '#FFFFFF', color: '#0F2744', border: '1.5px solid #CBD5E1', fontSize: 13, fontWeight: 700 }}
+                        >
+                          <i className="bi bi-credit-card-2-front-fill text-primary" />
+                          Pay Online with Card / USSD / ALAT App
+                        </a>
+                      )}
                     </div>
                   </div>
                 ) : (

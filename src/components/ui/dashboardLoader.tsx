@@ -1,9 +1,18 @@
 interface LoaderProps {
   message?: string;
   eyebrow?: string;
+  showLogo?: boolean;
 }
 
-export default function Loader({ message = "Loading…", eyebrow = "SchoolProfit" }: LoaderProps) {
+export default function Loader({ message = "Loading…", eyebrow = "SchoolProfit", showLogo }: LoaderProps) {
+  const isSchoolPage = typeof window !== "undefined" && (
+    window.location.pathname.startsWith("/school") ||
+    window.location.pathname.startsWith("/admissions")
+  );
+
+  const displayEyebrow = isSchoolPage && eyebrow === "SchoolProfit" ? "Official School Portal" : eyebrow;
+  const shouldShowLogo = showLogo !== undefined ? showLogo : !isSchoolPage;
+
   return (
     <div className="gq-loader-backdrop" role="status" aria-live="polite" aria-label={message}>
       <style>{`
@@ -130,16 +139,22 @@ export default function Loader({ message = "Loading…", eyebrow = "SchoolProfit
       <div className="gq-loader-box">
         <div className="gq-loader-icon-wrap">
           <div className="gq-loader-spinner-ring" />
-          <img
-            src="/media/logo/schoolprofit-logo.png"
-            alt="SchoolProfit"
-            className="gq-loader-logo"
-            onError={(e) => {
-              (e.target as HTMLElement).style.display = "none";
-            }}
-          />
+          {shouldShowLogo ? (
+            <img
+              src="/media/logo/schoolprofit-logo.png"
+              alt="SchoolProfit"
+              className="gq-loader-logo"
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = "none";
+              }}
+            />
+          ) : (
+            <div className="gq-loader-logo d-flex align-items-center justify-content-center text-primary" style={{ fontSize: 22 }}>
+              <i className="bi bi-mortarboard-fill"></i>
+            </div>
+          )}
         </div>
-        <div className="gq-loader-eyebrow">{eyebrow}</div>
+        {displayEyebrow && <div className="gq-loader-eyebrow">{displayEyebrow}</div>}
         <p className="gq-loader-message">{message}</p>
         <div className="gq-loader-bar" />
       </div>

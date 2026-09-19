@@ -348,6 +348,31 @@ export default function SchoolProfitInvoicePaymentPage() {
                       </div>
                     ) : (
                       <>
+                        <div
+                          style={{
+                            background: "#FEF3C7",
+                            border: "1px solid #FDE68A",
+                            borderRadius: 12,
+                            padding: "10px 14px",
+                            marginBottom: 14,
+                            fontSize: 12,
+                            color: "#92400E",
+                            lineHeight: 1.4,
+                          }}
+                        >
+                          <strong>💡 Selective Student Clearance:</strong> You don't have to pay for all students at once. You can select only the students who have paid their fees and clear them directly from your school wallet.
+                          <div style={{ marginTop: 6 }}>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-dark"
+                              style={{ fontSize: 11.5, fontWeight: 700, borderRadius: 8, padding: "3px 10px" }}
+                              onClick={() => navigate("/billing#selective-clearance-section")}
+                            >
+                              <i className="bi bi-check2-square me-1" /> Pay For Selected Students Instead
+                            </button>
+                          </div>
+                        </div>
+
                         <div className="invoice-strong" style={{ fontSize: 16, marginBottom: 14 }}>Select Payment Method</div>
 
                         {/* Payment Method Tabs */}

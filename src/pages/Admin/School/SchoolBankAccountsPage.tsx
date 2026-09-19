@@ -79,7 +79,7 @@ export default function SchoolBankAccountsPage() {
   const [verified, setVerified] = useState(false);
   const [currency, setCurrency] = useState("NGN");
   const [isActive, setIsActive] = useState(true);
-  const [acceptsOnlinePayment, setAcceptsOnlinePayment] = useState(false); // NEW
+  const [acceptsOnlinePayment, setAcceptsOnlinePayment] = useState(true);
   const [sortOrder, setSortOrder] = useState<number>(0);
 
   // Security OTP State

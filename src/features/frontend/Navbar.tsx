@@ -5,8 +5,8 @@ import { usePlatformInfo } from "../../hooks/usePlatformInfo";
 const NAV_LINKS = [
   { label: "Features", href: "#features" },
   { label: "Why SchoolProfit", href: "#why-schoolprofit" },
+  { label: "Profit Calculator", href: "#calculator" },
   { label: "Our Schools", href: "#schools" },
-  { label: "Pricing", href: "#pricing" },
   { label: "Testimonials", href: "#testimonials" },
   { label: "Blog", href: "#blog" },
   { label: "FAQ", href: "#faq" },

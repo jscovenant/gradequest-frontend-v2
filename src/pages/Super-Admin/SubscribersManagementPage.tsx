@@ -1,5 +1,5 @@
 // src/pages/SuperAdmin/SubscribersManagementPage.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import TopNav from "../../components/LayoutComponents/TopNav";
@@ -9,35 +9,47 @@ import Loader from "../../components/ui/dashboardLoader";
 import { authApi } from "../../utils/axios";
 import { useToast } from "../../contexts/ToastContext";
 
-/* =========================
+/* ==========================================================================
    TYPES
-========================= */
+   ========================================================================== */
 
-type Plan = {
+type SchoolInfo = {
   id: number;
-  name: string;
-  price?: number | null;
-  duration_in_days?: number | null;
-};
-
-type SubscriberUser = {
-  id: number;
-  firstname?: string;
-  surname?: string;
-  name?: string;
-  email?: string;
+  school_name: string;
+  active_edition_tier?: string | null;
+  active_edition_tier_label?: string | null;
+  online_payment_enabled?: boolean | number;
+  email?: string | null;
   phone?: string | null;
-  school_id?: number | null;
+  address?: string | null;
+  created_at?: string | null;
 };
 
-type SubscriptionRow = {
+type SchoolOwnerRow = {
   id: number;
-  status: string;
-  starts_at?: string | null;
-  ends_at?: string | null;
-  auto_renew?: boolean;
-  user?: SubscriberUser;
-  plan?: Plan | null;
+  firstname: string;
+  surname: string;
+  name?: string;
+  email: string;
+  phone?: string | null;
+  status: string | number;
+  role: string;
+  school_id?: number | null;
+  student_count?: number;
+  active_edition_tier?: string;
+  active_edition_tier_label?: string;
+  online_payment_enabled?: boolean;
+  created_at?: string | null;
+  school?: SchoolInfo | null;
+};
+
+type TierCounts = {
+  total: number;
+  standard_cbt: number;
+  basic_result: number;
+  annual_full_session: number;
+  online_pay_enabled: number;
+  online_pay_disabled: number;
 };
 
 type Paginated<T> = {
@@ -48,68 +60,48 @@ type Paginated<T> = {
   last_page: number;
   per_page: number;
   total: number;
+  tier_counts?: TierCounts;
 };
 
-/* =========================
-   HELPERS
-========================= */
-
-type Tier = "free" | "premium_active" | "premium_expired";
-type TierFilter = "all" | "free" | "premium_all" | "premium_active" | "premium_expired";
-
-function isFreePlanName(name?: string | null) {
-  const n = (name || "").trim().toLowerCase();
-  return !n || n === "free";
-}
-
-function deriveTier(s: SubscriptionRow): Tier {
-  const planName = s.plan?.name ?? null;
-  if (isFreePlanName(planName)) return "free";
-
-  // If ends_at is null or far future, it is a lifetime active subscription
-  if (!s.ends_at) return "premium_active";
-
-  const ends = new Date(s.ends_at);
-  if (Number.isNaN(ends.getTime()) || ends.getFullYear() >= 2099) {
-    return "premium_active";
-  }
-
-  return ends.getTime() >= Date.now() ? "premium_active" : "premium_expired";
-}
-
-function tierLabel(t: Tier) {
-  if (t === "premium_active") return "Premium (Active)";
-  if (t === "premium_expired") return "Premium (Expired)";
-  return "Free";
-}
-
-function tierBadge(t: Tier) {
-  if (t === "premium_active") return "bg-success";
-  if (t === "premium_expired") return "bg-warning text-dark";
-  return "bg-secondary";
-}
+/* ==========================================================================
+   HELPERS & FORMATTERS
+   ========================================================================== */
 
 function fmtDate(val?: string | null) {
-  if (!val) return "Lifetime / Forever";
+  if (!val) return "—";
   const d = new Date(val);
-  if (Number.isNaN(d.getTime())) return val;
-  if (d.getFullYear() >= 2099) return "Lifetime / Forever";
-  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  return Number.isNaN(d.getTime())
+    ? val
+    : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-function nameOf(u?: SubscriberUser) {
+function nameOf(u?: { firstname?: string; surname?: string; name?: string; email?: string } | null) {
   if (!u) return "—";
-  const composed = `${u.surname ?? ""} ${u.firstname ?? ""}`.trim();
-  return composed || u.name || u.email || "—";
+  const full = `${u.surname ?? ""} ${u.firstname ?? ""}`.trim();
+  return full || u.name || u.email || "—";
 }
 
-function statusBadge(status: string) {
-  const s = (status || "").toLowerCase();
-  if (s.includes("active")) return "bg-success";
-  if (s.includes("pending")) return "bg-warning text-dark";
-  if (s.includes("cancel")) return "bg-secondary";
-  if (s.includes("expire")) return "bg-danger";
-  return "bg-light text-dark";
+function getTierBadgeInfo(tier?: string | null) {
+  const t = (tier || "").toLowerCase();
+  if (t === "basic_result") {
+    return {
+      label: "Basic Result (₦300/student)",
+      badgeClass: "bg-info text-dark",
+      icon: "bi-file-earmark-text",
+    };
+  }
+  if (t === "annual_full_session") {
+    return {
+      label: "Annual Full Session",
+      badgeClass: "bg-warning text-dark",
+      icon: "bi-calendar-check",
+    };
+  }
+  return {
+    label: "Standard CBT & AI (₦500/student)",
+    badgeClass: "bg-primary text-white",
+    icon: "bi-cpu",
+  };
 }
 
 function toCsv(rows: Record<string, any>[], columns: { key: string; label: string }[]) {
@@ -127,514 +119,598 @@ function toCsv(rows: Record<string, any>[], columns: { key: string; label: strin
 function downloadCsv(filename: string, csv: string) {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
-
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
   a.click();
-
   URL.revokeObjectURL(url);
 }
 
-/* =========================
+/* ==========================================================================
    COMPONENT
-========================= */
+   ========================================================================== */
 
 export default function SubscribersManagementPage() {
   const { showError, showSuccess } = useToast();
   const navigate = useNavigate();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  // Loading states
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
 
-  // Server paging
+  // Pagination
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
 
-  // Server filters
-  const [status, setStatus] = useState("");
-  const [activeOnly, setActiveOnly] = useState(false);
-
-  // Search (debounced)
+  // Filters
+  const [tierFilter, setTierFilter] = useState<string>("all");
+  const [onlinePayFilter, setOnlinePayFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  // UI-only tier filter
-  const [tierFilter, setTierFilter] = useState<TierFilter>("all");
+  const [togglingAdminId, setTogglingAdminId] = useState<number | null>(null);
+  const [schoolsData, setSchoolsData] = useState<Paginated<SchoolOwnerRow> | null>(null);
 
-  // Optional: show badge when filters changed (nice UX)
-  const [isDirty, setIsDirty] = useState(false);
-
-  // Data
-  const [subs, setSubs] = useState<Paginated<SubscriptionRow> | null>(null);
-
-  /* =========================
-     FETCHER
-  ========================= */
-
-  const fetchSubscribers = async (p: number, pp: number) => {
-    const params = new URLSearchParams();
-    params.set("page", String(p));
-    params.set("per_page", String(pp));
-    if (status) params.set("status", status);
-    if (activeOnly) params.set("active", "1");
-    if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
-
-    const res = await authApi.get(`/admin/subscriptions?${params.toString()}`);
-    const paginated: Paginated<SubscriptionRow> = res.data?.data;
-    setSubs(paginated);
-  };
+  useEffect(() => {
+    document.title = "School Directory & Edition Tiers - SchoolProfit";
+  }, []);
 
   /* =========================
      DEBOUNCE SEARCH
   ========================= */
-
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(search), 350);
     return () => window.clearTimeout(t);
   }, [search]);
 
   /* =========================
-     MARK FILTERS DIRTY + RESET PAGE
-     (server-affecting filters)
+     FETCHER
   ========================= */
-
-  useEffect(() => {
-    // whenever any server filter changes, reset paging
-    setPage(1);
-    setIsDirty(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, activeOnly, debouncedSearch, perPage]);
-
-  // Tier filter is UI-only. We still mark dirty so user sees it changed.
-  useEffect(() => {
-    setIsDirty(true);
-  }, [tierFilter]);
-
-  /* =========================
-     AUTO-FETCH ON FILTER CHANGE
-  ========================= */
-
-  useEffect(() => {
+  const fetchSchools = async (p = page, pp = perPage) => {
     setLoading(true);
-    fetchSubscribers(1, perPage)
-      .catch((err) => {
-        console.error(err);
-        showError(err?.response?.data?.message || "Failed to load subscribers.");
-      })
-      .finally(() => {
-        setLoading(false);
-        setIsDirty(false);
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, activeOnly, debouncedSearch, perPage]);
-
-  /* =========================
-     FETCH ON PAGE CHANGE
-  ========================= */
-
-  useEffect(() => {
-    // page changes fetch current page
-    setLoading(true);
-    fetchSubscribers(page, perPage)
-      .catch((err) => {
-        console.error(err);
-        showError(err?.response?.data?.message || "Failed to load subscribers.");
-      })
-      .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
-
-  /* =========================
-     MANUAL APPLY (OPTIONAL)
-  ========================= */
-
-  const applyFilters = () => {
-    setLoading(true);
-    setPage(1);
-    fetchSubscribers(1, perPage)
-      .then(() => showSuccess("Subscribers updated."))
-      .catch(() => showError("Failed to apply filters."))
-      .finally(() => {
-        setLoading(false);
-        setIsDirty(false);
-      });
-  };
-
-  /* =========================
-     UI FILTER: TIER ON TOP OF SERVER
-  ========================= */
-
-  const visibleRows = useMemo(() => {
-    const rows = subs?.data || [];
-    return rows.filter((s) => {
-      const t = deriveTier(s);
-
-      if (tierFilter === "free" && t !== "free") return false;
-      if (tierFilter === "premium_active" && t !== "premium_active") return false;
-      if (tierFilter === "premium_expired" && t !== "premium_expired") return false;
-      if (tierFilter === "premium_all" && !(t === "premium_active" || t === "premium_expired")) return false;
-
-      return true;
-    });
-  }, [subs, tierFilter]);
-
-  const tierCounts = useMemo(() => {
-    const rows = subs?.data || [];
-    let free = 0;
-    let pa = 0;
-    let pe = 0;
-
-    rows.forEach((r) => {
-      const t = deriveTier(r);
-      if (t === "free") free++;
-      if (t === "premium_active") pa++;
-      if (t === "premium_expired") pe++;
-    });
-
-    return { free, premium_active: pa, premium_expired: pe, premium_all: pa + pe, total: rows.length };
-  }, [subs]);
-
-  /* =========================
-     EXPORT
-  ========================= */
-
-  const columns = useMemo(
-    () => [
-      { key: "user_name", label: "User" },
-      { key: "email", label: "Email" },
-      { key: "tier", label: "Tier" },
-      { key: "plan", label: "Plan" },
-      { key: "status", label: "Status" },
-      { key: "starts_at", label: "Start Date" },
-      { key: "ends_at", label: "End Date" },
-      { key: "auto_renew", label: "Auto Renew" },
-    ],
-    []
-  );
-
-  const exportCurrentPageCsv = () => {
-    const rows = visibleRows.map((s) => {
-      const t = deriveTier(s);
-      return {
-        user_name: nameOf(s.user),
-        email: s.user?.email || "",
-        tier: tierLabel(t),
-        plan: s.plan?.name || "",
-        status: s.status || "",
-        starts_at: fmtDate(s.starts_at),
-        ends_at: fmtDate(s.ends_at),
-        auto_renew: s.auto_renew ? "Yes" : "No",
-      };
-    });
-
-    const csv = toCsv(rows, columns);
-    downloadCsv(`subscribers_visible_page_${subs?.current_page ?? 1}.csv`, csv);
-    showSuccess("Exported CSV (visible rows on this page).");
-  };
-
-  const exportAllPagesCsv = async () => {
-    setExporting(true);
     try {
-      const firstParams = new URLSearchParams();
-      firstParams.set("page", "1");
-      firstParams.set("per_page", String(perPage));
-      if (status) firstParams.set("status", status);
-      if (activeOnly) firstParams.set("active", "1");
-      if (debouncedSearch.trim()) firstParams.set("search", debouncedSearch.trim());
+      const params = new URLSearchParams();
+      params.set("page", String(p));
+      params.set("perPage", String(pp));
+      if (tierFilter && tierFilter !== "all") params.set("tier", tierFilter);
+      if (onlinePayFilter && onlinePayFilter !== "all") params.set("online_payment", onlinePayFilter);
+      if (statusFilter && statusFilter !== "all") params.set("status", statusFilter);
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
 
-      const firstRes = await authApi.get(`/admin/subscriptions?${firstParams.toString()}`);
-      const first: Paginated<SubscriptionRow> = firstRes.data?.data;
+      const res = await authApi.get(`/admin-users?${params.toString()}`);
+      setSchoolsData(res.data || null);
+    } catch (e: any) {
+      showError(e?.response?.data?.message || "Failed to load registered schools.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      const all: SubscriptionRow[] = [...(first?.data || [])];
-      const last = first?.last_page ?? 1;
+  useEffect(() => {
+    void fetchSchools(page, perPage);
+  }, [page, perPage, debouncedSearch, tierFilter, onlinePayFilter, statusFilter]);
 
-      for (let p = 2; p <= last; p++) {
-        const params = new URLSearchParams(firstParams);
-        params.set("page", String(p));
-        const res = await authApi.get(`/admin/subscriptions?${params.toString()}`);
-        const paginated: Paginated<SubscriptionRow> = res.data?.data;
-        all.push(...(paginated?.data || []));
-      }
+  /* =========================
+     ONLINE PAY TOGGLE
+  ========================= */
+  const toggleSchoolOnlinePayment = async (adminRow: SchoolOwnerRow) => {
+    if (!adminRow.id) return;
+    const isCurrentlyOn = adminRow.school?.online_payment_enabled !== false && (adminRow.school?.online_payment_enabled as any) !== 0;
+    const nextState = !isCurrentlyOn;
+    const schoolName = adminRow.school?.school_name || nameOf(adminRow) + "'s School";
 
-      const filtered = all.filter((s) => {
-        const t = deriveTier(s);
-        if (tierFilter === "free" && t !== "free") return false;
-        if (tierFilter === "premium_active" && t !== "premium_active") return false;
-        if (tierFilter === "premium_expired" && t !== "premium_expired") return false;
-        if (tierFilter === "premium_all" && !(t === "premium_active" || t === "premium_expired")) return false;
-        return true;
+    const promptText = nextState
+      ? `Enable online fee payments for ${schoolName}?\n\nParents and students will be allowed to make fee payments online on /pay-school-fee.`
+      : `Switch OFF online fee payments for ${schoolName}?\n\nThe platform will REJECT all fee payment attempts on /pay-school-fee for this school and notify parents.`;
+
+    if (!window.confirm(promptText)) {
+      return;
+    }
+
+    setTogglingAdminId(adminRow.id);
+    try {
+      const res = await authApi.patch(`/admin-users/${adminRow.id}/toggle-online-payment`, {
+        enabled: nextState,
       });
-
-      const rows = filtered.map((s) => {
-        const t = deriveTier(s);
+      showSuccess(res.data?.message || `Online payment ${nextState ? "enabled" : "disabled"} successfully.`);
+      
+      setSchoolsData((prev) => {
+        if (!prev) return prev;
         return {
-          user_name: nameOf(s.user),
-          email: s.user?.email || "",
-          tier: tierLabel(t),
-          plan: s.plan?.name || "",
-          status: s.status || "",
-          starts_at: fmtDate(s.starts_at),
-          ends_at: fmtDate(s.ends_at),
-          auto_renew: s.auto_renew ? "Yes" : "No",
+          ...prev,
+          data: prev.data.map((item) => {
+            if (item.id === adminRow.id) {
+              return {
+                ...item,
+                online_payment_enabled: nextState,
+                school: item.school ? { ...item.school, online_payment_enabled: nextState } : null,
+              };
+            }
+            return item;
+          }),
         };
       });
-
-      const csv = toCsv(rows, columns);
-      downloadCsv(`subscribers_all_pages_${tierFilter}.csv`, csv);
-      showSuccess("Exported CSV (all pages with current filters).");
     } catch (err: any) {
-      console.error(err);
-      showError(err?.response?.data?.message || "Failed to export all pages.");
+      showError(err?.response?.data?.message || "Failed to update online payment switch.");
+    } finally {
+      setTogglingAdminId(null);
+    }
+  };
+
+  /* =========================
+     BULK ONLINE PAY TOGGLE (ALL SCHOOLS)
+  ========================= */
+  const [bulkToggling, setBulkToggling] = useState(false);
+
+  const bulkToggleAllSchoolsOnlinePayment = async (enable: boolean) => {
+    const actionWord = enable ? "ENABLE" : "DISABLE";
+    const promptText = enable
+      ? `Are you sure you want to ENABLE Online Fee Payment for ALL schools on the platform?\n\nParents and students across all registered schools will be allowed to make fee payments online via payment gateways.`
+      : `Are you sure you want to DISABLE Online Fee Payment for ALL schools on the platform?\n\nOnline fee payment attempts will be REJECTED platform-wide.`;
+
+    if (!window.confirm(promptText)) {
+      return;
+    }
+
+    setBulkToggling(true);
+    try {
+      const res = await authApi.post("/superadmin/schools/bulk-toggle-online-payment", {
+        enabled: enable,
+      });
+      showSuccess(res.data?.message || `Online payment ${actionWord.toLowerCase()}d for all schools.`);
+      await fetchSchools(page, perPage);
+    } catch (err: any) {
+      showError(err?.response?.data?.message || `Failed to ${actionWord.toLowerCase()} online payment for all schools.`);
+    } finally {
+      setBulkToggling(false);
+    }
+  };
+
+  /* =========================
+     EXPORT CSV
+  ========================= */
+  const exportAllToCsv = async () => {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("page", "1");
+      params.set("perPage", "500");
+      if (tierFilter && tierFilter !== "all") params.set("tier", tierFilter);
+      if (onlinePayFilter && onlinePayFilter !== "all") params.set("online_payment", onlinePayFilter);
+      if (statusFilter && statusFilter !== "all") params.set("status", statusFilter);
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+
+      const res = await authApi.get(`/admin-users?${params.toString()}`);
+      const exportList: SchoolOwnerRow[] = res.data?.data || [];
+
+      if (!exportList.length) {
+        showError("No schools available to export.");
+        return;
+      }
+
+      const rows = exportList.map((row) => ({
+        school_name: row.school?.school_name || "School Not Linked",
+        owner_name: nameOf(row),
+        email: row.email || "—",
+        phone: row.phone || row.school?.phone || "—",
+        tier: row.school?.active_edition_tier_label || getTierBadgeInfo(row.school?.active_edition_tier).label,
+        student_count: row.student_count || 0,
+        online_payment: row.school?.online_payment_enabled !== false ? "Enabled" : "Disabled",
+        status: String(row.status) === "1" ? "Active" : "Suspended",
+        joined_at: fmtDate(row.created_at),
+      }));
+
+      const columns = [
+        { key: "school_name", label: "School Name" },
+        { key: "owner_name", label: "Owner Name" },
+        { key: "email", label: "Email Address" },
+        { key: "phone", label: "Phone Number" },
+        { key: "tier", label: "Pricing Edition Tier" },
+        { key: "student_count", label: "Students" },
+        { key: "online_payment", label: "Online Fee Pay" },
+        { key: "status", label: "Account Status" },
+        { key: "joined_at", label: "Joined Date" },
+      ];
+
+      downloadCsv(`SchoolProfit-Schools-Directory-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(rows, columns));
+      showSuccess("Export downloaded successfully.");
+    } catch (e: any) {
+      showError(e?.response?.data?.message || "Failed to export schools.");
     } finally {
       setExporting(false);
     }
   };
 
-  /* =========================
-     NAV
-  ========================= */
-
-  const openAdminDetails = (userId?: number) => {
-    if (!userId) return;
-    navigate(`/admin-users/view/${userId}`);
+  const counts = schoolsData?.tier_counts || {
+    total: 0,
+    standard_cbt: 0,
+    basic_result: 0,
+    annual_full_session: 0,
+    online_pay_enabled: 0,
+    online_pay_disabled: 0,
   };
 
   return (
     <>
-      <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+      <style>{`
+        .sp-filter-card {
+          border-radius: 12px;
+          border: 1px solid #E2E8F0;
+          background: #FFFFFF;
+          padding: 16px;
+          transition: all 0.2s ease;
+          cursor: pointer;
+        }
+        .sp-filter-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 14px rgba(15, 39, 68, 0.08);
+        }
+        .sp-filter-card.active {
+          border-color: #1D4ED8;
+          background: #EFF6FF;
+        }
+      `}</style>
 
-      <div className="container-fluid">
-        <div className="row">
-          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+      <div className="container-fluid position-relative bg-white d-flex p-0">
+        <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-          <main className="col-md-9 col-lg-10 ms-auto px-4 d-flex flex-column min-vh-100 sa-main">
-            {(loading || exporting) && <Loader message={exporting ? "Exporting CSV..." : "Loading subscribers..."} />}
+        <div className="content flex-grow-1 d-flex flex-column min-vh-100">
+          <TopNav setSidebarOpen={setSidebarOpen} />
 
-            {/* HERO */}
+          {loading && <Loader message="Loading registered schools..." />}
+
+          <main className="container-fluid px-3 px-md-4 py-4 flex-grow-1">
+            {/* HERO HEADER */}
+            <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+              <div>
+                <h4 className="fw-bold mb-1 text-dark" style={{ letterSpacing: "-0.02em" }}>
+                  Registered Schools &amp; Edition Tiers
+                </h4>
+                <p className="text-muted small mb-0">
+                  Manage active school accounts, edition tiers, online fee gateways, free credits, and quick WhatsApp re-engagement.
+                </p>
+              </div>
+
+              <div className="d-flex gap-2">
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2"
+                  style={{ borderRadius: 10, fontWeight: 600 }}
+                  onClick={() => fetchSchools(page, perPage)}
+                  disabled={loading}
+                >
+                  <i className="bi bi-arrow-clockwise" />
+                  Refresh
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-sm btn-primary d-flex align-items-center gap-2"
+                  style={{ borderRadius: 10, fontWeight: 600, background: "#0F2744", borderColor: "#0F2744" }}
+                  onClick={exportAllToCsv}
+                  disabled={exporting || loading}
+                >
+                  <i className="bi bi-download" />
+                  {exporting ? "Exporting..." : "Export CSV"}
+                </button>
+              </div>
+            </div>
+
+            {/* MASTER PLATFORM ONLINE PAYMENT BULK SWITCH */}
             <div
-              className="mt-4 p-4 position-relative overflow-hidden sa-hero"
+              className="card shadow-sm border-0 mb-4"
               style={{
                 borderRadius: 16,
+                background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+                color: "#fff",
               }}
             >
-              <div className="row align-items-center g-3 position-relative">
-                <div className="col-lg-8">
-                  <div className="d-flex flex-wrap gap-2 align-items-center mb-2">
-                    <span
-                      className="badge px-3 py-2"
-                      style={{
-                        backgroundColor: "rgba(255, 255, 255, 0.2)",
-                        color: "#fff",
-                        borderRadius: 999,
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                      }}
-                    >
-                      <i className="bi bi-people me-1" />
-                      Subscribers Management
-                    </span>
-                    <span
-                      className="badge px-3 py-2"
-                      style={{
-                        backgroundColor: "rgba(255, 255, 255, 0.2)",
-                        color: "#fff",
-                        borderRadius: 999,
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                      }}
-                    >
-                      <i className="bi bi-database me-1" />
-                      /admin/subscriptions
-                    </span>
+              <div className="card-body p-3 p-md-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <div>
+                  <div className="d-flex align-items-center gap-2 mb-1">
+                    <i className="bi bi-globe2 text-warning fs-5" />
+                    <h6 className="mb-0 fw-bold text-white fs-5">Platform-Wide Online Fee Payment Switch</h6>
+                    <span className="badge bg-warning text-dark px-2 py-1" style={{ fontSize: 11, fontWeight: 800 }}>Master Control</span>
                   </div>
-
-                  <h2 className="fw-bold text-white mb-2">Subscribers</h2>
-                  <p className="text-white mb-0" style={{ opacity: 0.9 }}>
-                    Tier view: <b>Free</b>, <b>Premium (Active)</b>, <b>Premium (Expired)</b>.
+                  <p className="mb-0 text-white-50" style={{ fontSize: 13, maxWidth: 680 }}>
+                    Enable or disable online fee payments for <strong>ALL {counts.total} registered schools</strong> at once. When disabled, public online fee checkouts are safely rejected platform-wide.
                   </p>
-
-                  <div className="d-flex flex-wrap gap-2 mt-3">
-                    <span className="badge bg-light text-dark" style={{ borderRadius: 999 }}>
-                      Free: <b>{tierCounts.free}</b>
-                    </span>
-                    <span className="badge bg-light text-dark" style={{ borderRadius: 999 }}>
-                      Premium Active: <b>{tierCounts.premium_active}</b>
-                    </span>
-                    <span className="badge bg-light text-dark" style={{ borderRadius: 999 }}>
-                      Premium Expired: <b>{tierCounts.premium_expired}</b>
-                    </span>
-                    <span className="badge bg-light text-dark" style={{ borderRadius: 999 }}>
-                      Premium Total: <b>{tierCounts.premium_all}</b>
-                    </span>
-                  </div>
                 </div>
-
-                <div className="col-lg-4 d-none d-lg-block">
-                  <div
-                    style={{
-                      background: "rgba(255, 255, 255, 0.15)",
-                      backdropFilter: "blur(10px)",
-                      borderRadius: 16,
-                      padding: "1.25rem",
-                      border: "1px solid rgba(255, 255, 255, 0.2)",
-                    }}
+                <div className="d-flex align-items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    className="btn btn-success fw-bold d-flex align-items-center gap-2 px-3 py-2"
+                    style={{ borderRadius: 10, fontSize: 13 }}
+                    onClick={() => bulkToggleAllSchoolsOnlinePayment(true)}
+                    disabled={bulkToggling || loading}
                   >
-                    <div className="text-white" style={{ opacity: 0.95 }}>
-                      <div className="d-flex justify-content-between">
-                        <span style={{ opacity: 0.85 }}>Total</span>
-                        <b>{subs?.total ?? "-"}</b>
-                      </div>
-                      <div className="d-flex justify-content-between">
-                        <span style={{ opacity: 0.85 }}>Page</span>
-                        <b>
-                          {subs?.current_page ?? "-"} / {subs?.last_page ?? "-"}
-                        </b>
-                      </div>
-
-                      <div className="mt-3 d-flex gap-2">
-                        <button className="btn btn-light btn-sm" style={{ borderRadius: 10, fontWeight: 700 }} onClick={exportCurrentPageCsv} disabled={!visibleRows.length}>
-                          <i className="bi bi-download me-1" />
-                          Export visible
-                        </button>
-                        <button className="btn btn-outline-light btn-sm" style={{ borderRadius: 10, fontWeight: 700 }} onClick={exportAllPagesCsv} disabled={!subs?.data?.length || exporting}>
-                          <i className="bi bi-cloud-download me-1" />
-                          Export all
-                        </button>
-                      </div>
-
-                      <div className="mt-2 text-white small" style={{ opacity: 0.9 }}>
-                        Export respects the selected <b>Tier</b> filter.
-                      </div>
-                    </div>
-                  </div>
+                    {bulkToggling ? (
+                      <span className="spinner-border spinner-border-sm" />
+                    ) : (
+                      <i className="bi bi-check-circle-fill" />
+                    )}
+                    Enable for ALL Schools
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline-danger fw-bold d-flex align-items-center gap-2 px-3 py-2 text-white border-danger"
+                    style={{ borderRadius: 10, fontSize: 13, background: "rgba(220, 38, 38, 0.2)" }}
+                    onClick={() => bulkToggleAllSchoolsOnlinePayment(false)}
+                    disabled={bulkToggling || loading}
+                  >
+                    {bulkToggling ? (
+                      <span className="spinner-border spinner-border-sm" />
+                    ) : (
+                      <i className="bi bi-x-circle-fill text-danger" />
+                    )}
+                    Disable for ALL Schools
+                  </button>
                 </div>
               </div>
             </div>
 
-            {/* FILTERS */}
-            <div className="card border-0 shadow-sm my-4" style={{ borderRadius: 12 }}>
-              <div className="card-body p-3 p-md-4">
-                <div className="d-flex flex-wrap gap-2 align-items-center justify-content-between">
-                  <div>
-                    <div className="fw-semibold" style={{ color: "#1e293b" }}>
-                      Filters
-                    </div>
-                    <div className="text-muted small">Dynamic server filters + Tier filter (computed).</div>
+            {/* QUICK STATS / FILTER CARDS */}
+            <div className="row g-3 mb-4">
+              <div className="col-6 col-md-3">
+                <div
+                  className={`sp-filter-card ${tierFilter === "all" ? "active" : ""}`}
+                  onClick={() => {
+                    setTierFilter("all");
+                    setPage(1);
+                  }}
+                >
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span className="text-muted small fw-bold">All Schools</span>
+                    <i className="bi bi-buildings text-secondary" />
                   </div>
-
-                  <div className="d-flex flex-wrap gap-2">
-                    <select className="form-select form-select-sm" style={{ width: 170, borderRadius: 10 }} value={status} onChange={(e) => setStatus(e.target.value)}>
-                      <option value="">All Status</option>
-                      <option value="active">Active</option>
-                      <option value="pending">Pending</option>
-                      <option value="cancelled">Cancelled</option>
-                      <option value="expired">Expired</option>
-                    </select>
-
-                    <div className="form-check d-flex align-items-center gap-2 px-2">
-                      <input className="form-check-input" type="checkbox" id="activeOnly" checked={activeOnly} onChange={(e) => setActiveOnly(e.target.checked)} />
-                      <label className="form-check-label small" htmlFor="activeOnly">
-                        Active only (server)
-                      </label>
-                    </div>
-
-                    <select className="form-select form-select-sm" style={{ width: 210, borderRadius: 10 }} value={tierFilter} onChange={(e) => setTierFilter(e.target.value as TierFilter)}>
-                      <option value="all">All tiers</option>
-                      <option value="free">Free</option>
-                      <option value="premium_all">Premium (Active + Expired)</option>
-                      <option value="premium_active">Premium (Active)</option>
-                      <option value="premium_expired">Premium (Expired)</option>
-                    </select>
-
-                    <div className="input-group input-group-sm" style={{ width: 280 }}>
-                      <span className="input-group-text">
-                        <i className="bi bi-search" />
-                      </span>
-                      <input className="form-control" placeholder="Search name/email..." value={search} onChange={(e) => setSearch(e.target.value)} />
-                    </div>
-
-                    <button className="btn btn-sm btn-primary" style={{ borderRadius: 10, fontWeight: 700 }} onClick={applyFilters} disabled={loading}>
-                      <i className="bi bi-funnel me-1" />
-                      {loading ? "Applying..." : "Apply"}
-                    </button>
-
-                    {isDirty && !loading && (
-                      <span className="badge bg-light text-dark" style={{ borderRadius: 999, alignSelf: "center" }}>
-                        Filters changed
-                      </span>
-                    )}
-                  </div>
+                  <h4 className="fw-bold text-dark mt-2 mb-0">{counts.total}</h4>
                 </div>
+              </div>
 
-                <div className="mt-3 text-muted small">
-                  <i className="bi bi-info-circle me-1" />
-                  Tier is computed from <b>plan</b> + <b>ends_at</b>. Free plan name expected: <b>“Free”</b>.
-                  Search is debounced (350ms) to avoid too many requests.
+              <div className="col-6 col-md-3">
+                <div
+                  className={`sp-filter-card ${tierFilter === "standard_cbt" ? "active" : ""}`}
+                  onClick={() => {
+                    setTierFilter("standard_cbt");
+                    setPage(1);
+                  }}
+                >
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span className="text-primary small fw-bold">Standard CBT & AI</span>
+                    <i className="bi bi-cpu text-primary" />
+                  </div>
+                  <h4 className="fw-bold text-primary mt-2 mb-0">{counts.standard_cbt}</h4>
+                  <small className="text-muted" style={{ fontSize: 11 }}>₦500/student plan</small>
+                </div>
+              </div>
+
+              <div className="col-6 col-md-3">
+                <div
+                  className={`sp-filter-card ${tierFilter === "basic_result" ? "active" : ""}`}
+                  onClick={() => {
+                    setTierFilter("basic_result");
+                    setPage(1);
+                  }}
+                >
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span className="text-info small fw-bold">Basic Result</span>
+                    <i className="bi bi-file-earmark-text text-info" />
+                  </div>
+                  <h4 className="fw-bold text-info mt-2 mb-0">{counts.basic_result}</h4>
+                  <small className="text-muted" style={{ fontSize: 11 }}>₦300/student plan</small>
+                </div>
+              </div>
+
+              <div className="col-6 col-md-3">
+                <div
+                  className={`sp-filter-card ${onlinePayFilter === "enabled" ? "active" : ""}`}
+                  onClick={() => {
+                    setOnlinePayFilter(onlinePayFilter === "enabled" ? "all" : "enabled");
+                    setPage(1);
+                  }}
+                >
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span className="text-success small fw-bold">Online Pay Active</span>
+                    <i className="bi bi-credit-card-2-front text-success" />
+                  </div>
+                  <h4 className="fw-bold text-success mt-2 mb-0">{counts.online_pay_enabled}</h4>
+                  <small className="text-muted" style={{ fontSize: 11 }}>Live Fee Collection</small>
+                </div>
+              </div>
+            </div>
+
+            {/* FILTER BAR */}
+            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 14 }}>
+              <div className="card-body p-3">
+                <div className="d-flex flex-wrap align-items-center gap-3">
+                  {/* Pricing Edition Filter */}
+                  <div style={{ minWidth: 200 }}>
+                    <label className="form-label small text-muted fw-bold mb-1">Pricing Edition</label>
+                    <select
+                      className="form-select form-select-sm"
+                      style={{ borderRadius: 10 }}
+                      value={tierFilter}
+                      onChange={(e) => {
+                        setTierFilter(e.target.value);
+                        setPage(1);
+                      }}
+                    >
+                      <option value="all">All Pricing Editions</option>
+                      <option value="standard_cbt">Standard CBT & AI Edition</option>
+                      <option value="basic_result">Basic Result Edition</option>
+                    </select>
+                  </div>
+
+                  {/* Online Payment Filter */}
+                  <div style={{ minWidth: 170 }}>
+                    <label className="form-label small text-muted fw-bold mb-1">Online Fee Payment</label>
+                    <select
+                      className="form-select form-select-sm"
+                      style={{ borderRadius: 10 }}
+                      value={onlinePayFilter}
+                      onChange={(e) => {
+                        setOnlinePayFilter(e.target.value);
+                        setPage(1);
+                      }}
+                    >
+                      <option value="all">All Online Pay States</option>
+                      <option value="enabled">Online Pay ON</option>
+                      <option value="disabled">Online Pay OFF</option>
+                    </select>
+                  </div>
+
+                  {/* Account Status Filter */}
+                  <div style={{ minWidth: 140 }}>
+                    <label className="form-label small text-muted fw-bold mb-1">Status</label>
+                    <select
+                      className="form-select form-select-sm"
+                      style={{ borderRadius: 10 }}
+                      value={statusFilter}
+                      onChange={(e) => {
+                        setStatusFilter(e.target.value);
+                        setPage(1);
+                      }}
+                    >
+                      <option value="all">All Statuses</option>
+                      <option value="active">Active</option>
+                      <option value="suspended">Suspended</option>
+                    </select>
+                  </div>
+
+                  {/* Search Box */}
+                  <div className="flex-grow-1" style={{ minWidth: 240 }}>
+                    <label className="form-label small text-muted fw-bold mb-1">Search Directory</label>
+                    <div className="input-group input-group-sm">
+                      <span className="input-group-text bg-white" style={{ borderRadius: "10px 0 0 10px" }}>
+                        <i className="bi bi-search text-muted" />
+                      </span>
+                      <input
+                        className="form-control"
+                        style={{ borderRadius: "0 10px 10px 0" }}
+                        placeholder="Search school name, owner, email or phone..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* TABLE */}
-            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 12 }}>
+            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: 14 }}>
               <div className="card-body p-3 p-md-4">
                 <div className="table-responsive">
                   <table className="table table-hover align-middle mb-0">
-                    <thead style={{ background: "#eef2ff" }}>
+                    <thead style={{ background: "#F8FAFC" }}>
                       <tr>
-                        <th>User</th>
-                        <th>Email</th>
-                        <th>Tier</th>
-                        <th>Plan</th>
-                        <th>Status</th>
-                        <th>Start</th>
-                        <th>End</th>
-                        <th style={{ width: 220 }}>Actions</th>
+                        <th style={{ fontWeight: 700, color: "#475569" }}>School &amp; Owner</th>
+                        <th style={{ fontWeight: 700, color: "#475569" }}>Contact</th>
+                        <th style={{ fontWeight: 700, color: "#475569" }}>Pricing Edition Tier</th>
+                        <th style={{ fontWeight: 700, color: "#475569" }}>Students</th>
+                        <th style={{ fontWeight: 700, color: "#475569" }}>Online Fee Pay</th>
+                        <th style={{ fontWeight: 700, color: "#475569" }}>Status</th>
+                        <th style={{ fontWeight: 700, color: "#475569", width: 170 }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {visibleRows.length === 0 ? (
+                      {!schoolsData?.data || schoolsData.data.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="text-center text-muted py-4">
-                            No subscribers found for the selected filters.
+                          <td colSpan={7} className="text-center text-muted py-5">
+                            <i className="bi bi-buildings fs-1 d-block mb-2 text-secondary" />
+                            No schools found matching the selected filters.
                           </td>
                         </tr>
                       ) : (
-                        visibleRows.map((s) => {
-                          const t = deriveTier(s);
+                        schoolsData.data.map((row) => {
+                          const tierInfo = getTierBadgeInfo(row.school?.active_edition_tier);
+                          const isOnlinePay = row.school?.online_payment_enabled !== false && (row.school?.online_payment_enabled as any) !== 0;
+                          const isSuspended = String(row.status) === "0";
+                          const isToggling = togglingAdminId === row.id;
+                          const phoneClean = (row.phone || row.school?.phone || "").replace(/[^0-9]/g, "");
+                          const waPhone = phoneClean.startsWith("0") ? "234" + phoneClean.slice(1) : phoneClean;
+
                           return (
-                            <tr key={s.id}>
-                              <td className="fw-semibold">{nameOf(s.user)}</td>
-                              <td className="text-muted">{s.user?.email || "—"}</td>
+                            <tr key={row.id}>
                               <td>
-                                <span className={`badge ${tierBadge(t)}`} style={{ borderRadius: 999 }}>
-                                  {tierLabel(t)}
+                                <div>
+                                  <div className="fw-bold text-dark fs-6">{row.school?.school_name || "School Not Linked"}</div>
+                                  <div className="text-muted small">
+                                    Owner: <span className="fw-semibold text-secondary">{nameOf(row)}</span> • Joined {fmtDate(row.created_at)}
+                                  </div>
+                                </div>
+                              </td>
+
+                              <td>
+                                <div>
+                                  <div className="small fw-semibold text-dark">{row.email || "—"}</div>
+                                  <div className="text-muted small">{row.phone || row.school?.phone || "No phone"}</div>
+                                </div>
+                              </td>
+
+                              <td>
+                                <span className={`badge ${tierInfo.badgeClass}`} style={{ borderRadius: 999, padding: "6px 12px" }}>
+                                  <i className={`bi ${tierInfo.icon} me-1`} />
+                                  {tierInfo.label}
                                 </span>
                               </td>
-                              <td>{s.plan?.name || "—"}</td>
+
                               <td>
-                                <span className={`badge ${statusBadge(s.status)}`} style={{ borderRadius: 999 }}>
-                                  {s.status}
+                                <span className="fw-bold text-dark">{(row.student_count || 0).toLocaleString()}</span>{" "}
+                                <span className="text-muted small">students</span>
+                              </td>
+
+                              <td>
+                                <button
+                                  type="button"
+                                  className={`btn btn-sm ${isOnlinePay ? "btn-success" : "btn-danger"}`}
+                                  style={{ borderRadius: 999, fontSize: 11, fontWeight: 700, padding: "4px 12px" }}
+                                  onClick={() => toggleSchoolOnlinePayment(row)}
+                                  disabled={isToggling}
+                                  title={isOnlinePay ? "Click to switch OFF online fee payments (system will reject payments on /pay-school-fee)" : "Click to ENABLE online fee payments"}
+                                >
+                                  {isToggling ? (
+                                    <span className="spinner-border spinner-border-sm me-1" style={{ width: 11, height: 11 }} />
+                                  ) : (
+                                    <i className={`bi ${isOnlinePay ? "bi-check-circle-fill" : "bi-slash-circle-fill"} me-1`} />
+                                  )}
+                                  {isOnlinePay ? "Online Pay ON" : "Online Pay OFF"}
+                                </button>
+                              </td>
+
+                              <td>
+                                <span className={`badge ${isSuspended ? "bg-danger" : "bg-success"}`} style={{ borderRadius: 999 }}>
+                                  {isSuspended ? "Suspended" : "Active"}
                                 </span>
                               </td>
-                              <td className="text-muted">{fmtDate(s.starts_at)}</td>
-                              <td className="text-muted">{fmtDate(s.ends_at)}</td>
+
                               <td>
-                                <div className="d-flex gap-2 flex-wrap">
-                                  <button className="btn btn-sm btn-outline-primary" style={{ borderRadius: 10 }} onClick={() => openAdminDetails(s.user?.id)}>
-                                    <i className="bi bi-person-badge me-1" />
-                                    View User
+                                <div className="d-flex align-items-center gap-1">
+                                  <button
+                                    className="btn btn-sm btn-outline-primary"
+                                    style={{ borderRadius: 10, fontWeight: 600 }}
+                                    onClick={() => navigate(`/admin-users/view/${row.id}`)}
+                                  >
+                                    <i className="bi bi-gear me-1" />
+                                    Manage
                                   </button>
 
-                                  <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 10 }} onClick={() => openAdminDetails(s.user?.id)}>
-                                    <i className="bi bi-buildings me-1" />
-                                    View School
-                                  </button>
+                                  {phoneClean.length >= 8 && (
+                                    <a
+                                      href={`https://wa.me/${waPhone}?text=${encodeURIComponent(
+                                        `Good day Proprietor / Principal of ${row.school?.school_name || "your school"},\n\nExciting news! SchoolProfit has credited your school account with 50 FREE AI Lesson Planning & CBT Credits with zero upfront subscription fees.\n\nYou can log in at https://schoolprofit.ng/login to explore, or let us know if you need help uploading your students for free!`
+                                      )}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="btn btn-sm btn-outline-success"
+                                      style={{ borderRadius: 10, fontWeight: 600, padding: "4px 8px" }}
+                                      title="Reach out on WhatsApp"
+                                    >
+                                      <i className="bi bi-whatsapp" />
+                                    </a>
+                                  )}
                                 </div>
-                                <div className="text-muted small mt-1">Tip: “View School” is inside Admin details.</div>
                               </td>
                             </tr>
                           );
@@ -644,10 +720,11 @@ export default function SubscribersManagementPage() {
                   </table>
                 </div>
 
-                {subs && subs.last_page > 1 && (
-                  <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+                {/* PAGINATION */}
+                {schoolsData && schoolsData.last_page > 1 && (
+                  <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3 pt-3 border-top">
                     <div className="text-muted small">
-                      Showing {subs.from ?? 0} - {subs.to ?? 0} of {subs.total} (server paging)
+                      Showing {schoolsData.from ?? 0} - {schoolsData.to ?? 0} of {schoolsData.total} schools
                     </div>
 
                     <div className="d-flex gap-2 align-items-center">
@@ -667,15 +744,25 @@ export default function SubscribersManagementPage() {
                         ))}
                       </select>
 
-                      <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 10 }} disabled={subs.current_page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                      <button
+                        className="btn btn-sm btn-outline-secondary"
+                        style={{ borderRadius: 10 }}
+                        disabled={page <= 1}
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      >
                         <i className="bi bi-chevron-left" />
                       </button>
 
                       <span className="small text-muted">
-                        Page <b>{subs.current_page}</b> / {subs.last_page}
+                        Page <b>{page}</b> / {schoolsData.last_page}
                       </span>
 
-                      <button className="btn btn-sm btn-outline-secondary" style={{ borderRadius: 10 }} disabled={subs.current_page >= subs.last_page} onClick={() => setPage((p) => Math.min(subs.last_page, p + 1))}>
+                      <button
+                        className="btn btn-sm btn-outline-secondary"
+                        style={{ borderRadius: 10 }}
+                        disabled={page >= schoolsData.last_page}
+                        onClick={() => setPage((p) => Math.min(schoolsData.last_page, p + 1))}
+                      >
                         <i className="bi bi-chevron-right" />
                       </button>
                     </div>

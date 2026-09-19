@@ -282,6 +282,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
     },
 
     {
+      label: "Online Admissions",
+      icon: "clipboard-check",
+      href: "/admin/admissions",
+      roles: ["Admin", "Bursar"],
+    },
+    {
       label: "School Operators",
       icon: "person-badge",
       collapseId: "operatorsMenu",
@@ -331,6 +337,18 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       roles: ["Admin", "Teacher", "Bursar"],
       featureKey: "gradequest_plus",
       hideIfNoFeature: true,
+    },
+    {
+      label: "Store & POS",
+      icon: "cart3",
+      collapseId: "storeMenu",
+      roles: ["Admin", "Bursar", "Super-Admin", "Platform-Staff", "Teacher"],
+      children: [
+        { label: "Point of Sale (POS)", href: "/store/pos" },
+        { label: "Inventory & Stock", href: "/store/inventory" },
+        { label: "Categories", href: "/store/categories" },
+        { label: "Sales & Receipts", href: "/store/sales" },
+      ],
     },
     {
       label: "Fees",
@@ -408,6 +426,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       icon: "megaphone",
       collapseId: "marketingMenu",
       children: [
+        { label: "AI Sales & Growth Agent", href: "/super-admin/ai-sales-agent", superAdminPermission: "sales" },
         { label: "Sales Representatives", href: "/superadmin/sales-representatives", superAdminPermission: "sales" },
         { label: "Sales Leads", href: "/superadmin/sales-leads", superAdminPermission: "sales" },
         { label: "Marketing Materials", href: "/superadmin/sales-marketing-materials", superAdminPermission: "marketing" },
@@ -470,6 +489,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       collapseId: "settingsMenu",
       children: [
         { label: "School Profile", href: "/school/settings" },
+        { label: "Website & Custom Domain", href: "/admin/school/domain-and-website" },
+        { label: "Online Admissions", href: "/admin/admissions" },
         { label: "Bank Accounts", href: "/school/bank-account-setting" },
         { label: "Result Deadline Setting", href: "/results/deadlines" },
         { label: "WhatsApp Notification Settings", href: "/settings/whatsapp", featureKey: "gradequest_plus", hideIfNoFeature: true },

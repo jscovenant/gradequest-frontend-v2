@@ -1,8 +1,9 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../utils/api";
 import { setToken, setUser } from "../utils/token";
 import PageTitle from "../components/PageTitle";
+import AiSalesChatWidget from "../components/AiSalesChatWidget";
 
 type PortalTab = "school" | "parent" | "platform";
 
@@ -13,7 +14,21 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState("");
+  const [schoolBranding, setSchoolBranding] = useState<any>(null);
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const schoolParam = searchParams.get("school");
+    const identifier = schoolParam || "current";
+    api.get(`/public/school/${identifier}`)
+      .then((res) => {
+        if (res.data?.status && res.data?.school) {
+          setSchoolBranding(res.data);
+        }
+      })
+      .catch(() => {});
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -534,11 +549,40 @@ export default function Login() {
         {/* ── Right Form Panel ── */}
         <div className="gq-auth-right">
           <div className="gq-auth-card">
-            {/* Mobile Logo */}
-            <Link to="/" className="gq-auth-mobile-logo">
-              <img src="/media/logo/schoolprofit-logo.png" alt="SchoolProfit" style={{ width: "auto", height: 32, objectFit: "contain", borderRadius: 6 }} />
-              <span style={{ fontSize: 19, fontWeight: 800, color: "#0F2744" }}>School<span style={{ color: "#059669" }}>Profit</span></span>
-            </Link>
+            {/* Custom School Branding Banner if on custom domain or school portal */}
+            {schoolBranding?.school ? (
+              <div className="text-center mb-4 pb-3 border-bottom">
+                {schoolBranding.school.logo ? (
+                  <img
+                    src={schoolBranding.school.logo}
+                    alt={schoolBranding.school.name}
+                    className="mb-2"
+                    style={{ height: 48, objectFit: "contain" }}
+                  />
+                ) : (
+                  <div
+                    className="rounded-circle mx-auto mb-2 text-white fw-bold d-flex align-items-center justify-content-center"
+                    style={{
+                      width: 48,
+                      height: 48,
+                      backgroundColor: schoolBranding.website?.theme_color_primary || "#0F2744",
+                    }}
+                  >
+                    {schoolBranding.school.name?.[0] || "S"}
+                  </div>
+                )}
+                <h5 className="fw-bold mb-0" style={{ color: schoolBranding.website?.theme_color_primary || "#0F2744" }}>
+                  {schoolBranding.school.name}
+                </h5>
+                <small className="text-muted">Official Digital School Portal</small>
+              </div>
+            ) : (
+              /* Mobile Logo */
+              <Link to="/" className="gq-auth-mobile-logo">
+                <img src="/media/logo/schoolprofit-logo.png" alt="SchoolProfit" style={{ width: "auto", height: 32, objectFit: "contain", borderRadius: 6 }} />
+                <span style={{ fontSize: 19, fontWeight: 800, color: "#0F2744" }}>School<span style={{ color: "#059669" }}>Profit</span></span>
+              </Link>
+            )}
 
             {/* Portal Tab Switcher */}
             <div className="gq-portal-tabs" role="tablist">
@@ -683,6 +727,9 @@ export default function Login() {
             </div>
           </div>
         </div>
+
+        {/* AI Growth Consultant Floating Chat Widget */}
+        <AiSalesChatWidget />
       </div>
     </>
   );
