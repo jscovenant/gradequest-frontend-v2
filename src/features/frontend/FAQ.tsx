@@ -15,6 +15,109 @@ const TAG_COLORS: Record<string, { color: string; bg: string }> = {
   Support: { color: "#D97706", bg: "rgba(217, 119, 6, 0.12)" },
 };
 
+function renderFaqAnswer(text: string) {
+  if (!text) return null;
+
+  const lines = text.split("\n");
+  const elements: React.ReactNode[] = [];
+
+  const parseInline = (lineText: string, keyPrefix: string) => {
+    const parts: React.ReactNode[] = [];
+    const regex = /(\*\*([^*]+)\*\*)|(\[([^\]]+)\]\(([^)]+)\))/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(lineText)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(lineText.substring(lastIndex, match.index));
+      }
+
+      if (match[1]) {
+        // **bold**
+        parts.push(
+          <strong key={`${keyPrefix}-b-${match.index}`} style={{ color: "#0F2744", fontWeight: 700 }}>
+            {match[2]}
+          </strong>
+        );
+      } else if (match[3]) {
+        // [label](url)
+        parts.push(
+          <a
+            key={`${keyPrefix}-link-${match.index}`}
+            href={match[5]}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "#D97706", fontWeight: 600, textDecoration: "underline" }}
+          >
+            {match[4]}
+          </a>
+        );
+      }
+      lastIndex = regex.lastIndex;
+    }
+
+    if (lastIndex < lineText.length) {
+      parts.push(lineText.substring(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : lineText;
+  };
+
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      elements.push(<div key={`sp-${index}`} style={{ height: 6 }} />);
+      return;
+    }
+
+    // Heading level (if any ## or ### appears)
+    if (trimmed.startsWith("### ") || trimmed.startsWith("## ") || trimmed.startsWith("# ")) {
+      const headingText = trimmed.replace(/^#{1,3}\s+/, "");
+      elements.push(
+        <div key={`h-${index}`} className="fw-bold mt-2 mb-1" style={{ color: "#0F2744", fontSize: 14 }}>
+          {parseInline(headingText, `h-${index}`)}
+        </div>
+      );
+      return;
+    }
+
+    // Bullet item
+    if (trimmed.startsWith("• ") || trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+      const bulletContent = trimmed.replace(/^[•\-\*]\s+/, "");
+      elements.push(
+        <div key={`b-${index}`} className="d-flex align-items-start gap-2 my-1.5">
+          <span style={{ color: "#D97706", fontWeight: 800, lineHeight: 1.4, minWidth: 10 }}>•</span>
+          <div style={{ flex: 1 }}>{parseInline(bulletContent, `b-${index}`)}</div>
+        </div>
+      );
+      return;
+    }
+
+    // Numbered item
+    const numMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
+    if (numMatch) {
+      const num = numMatch[1];
+      const numContent = numMatch[2];
+      elements.push(
+        <div key={`num-${index}`} className="d-flex align-items-start gap-2 my-1.5">
+          <span className="fw-bold" style={{ color: "#0F2744", minWidth: 16 }}>{num}.</span>
+          <div style={{ flex: 1 }}>{parseInline(numContent, `num-${index}`)}</div>
+        </div>
+      );
+      return;
+    }
+
+    elements.push(
+      <div key={`p-${index}`} className="my-0.5" style={{ lineHeight: 1.75 }}>
+        {parseInline(line, `p-${index}`)}
+      </div>
+    );
+  });
+
+  return elements;
+}
+
 function AccordionItem({
   faq,
   index,
@@ -67,7 +170,7 @@ function AccordionItem({
       </button>
 
       <div ref={bodyRef} className="fq-body" style={{ maxHeight: 0, opacity: 0 }}>
-        <p className="fq-answer" style={{ whiteSpace: "pre-line" }}>{faq.a}</p>
+        <div className="fq-answer">{renderFaqAnswer(faq.a)}</div>
       </div>
     </div>
   );

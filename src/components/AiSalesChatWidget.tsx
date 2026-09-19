@@ -207,12 +207,173 @@ export default function AiSalesChatWidget() {
       {
         role: "assistant",
         content:
-          "Hello! 👋 I am Sarah, your AI Growth Consultant at SchoolProfit.\n\nAsk me anything about eliminating fee debts, automated broadsheets, or our zero-cost per-student model!",
+          "Hello! 👋 I am Sarah, your Lead Growth Advisor at SchoolProfit.\n\nI can help explain how our platform **eliminates unpaid school fee debts** with automated parent accounts, compiles **1-click broadsheets**, and runs **offline CBT exams** at **zero cost (₦0.00)** to your school.\n\nHow can I help your school today?",
         timestamp: new Date().toISOString(),
       },
     ];
     setMessages(initial);
     sessionStorage.setItem("sp_sales_messages", JSON.stringify(initial));
+  };
+
+  const renderFormattedMessage = (text: string) => {
+    if (!text) return null;
+
+    const lines = text.split("\n");
+    const elements: React.ReactNode[] = [];
+
+    const parseInline = (lineText: string, keyPrefix: string) => {
+      const parts: React.ReactNode[] = [];
+      const regex = /(\[([^\]]+)\]\(([^)]+)\))|(\*\*([^*]+)\*\*)/g;
+      let lastIndex = 0;
+      let match: RegExpExecArray | null;
+
+      while ((match = regex.exec(lineText)) !== null) {
+        if (match.index > lastIndex) {
+          parts.push(lineText.substring(lastIndex, match.index));
+        }
+
+        if (match[1]) {
+          const label = match[2];
+          const url = match[3];
+          const isInternal = url.startsWith("/");
+          parts.push(
+            isInternal ? (
+              <Link
+                key={`${keyPrefix}-link-${match.index}`}
+                to={url}
+                onClick={() => setIsOpen(false)}
+                className="fw-bold"
+                style={{ color: "#2563EB", textDecoration: "underline" }}
+              >
+                {label}
+              </Link>
+            ) : (
+              <a
+                key={`${keyPrefix}-link-${match.index}`}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="fw-bold"
+                style={{ color: "#2563EB", textDecoration: "underline" }}
+              >
+                {label}
+              </a>
+            )
+          );
+        } else if (match[4]) {
+          const boldText = match[5];
+          parts.push(
+            <strong key={`${keyPrefix}-b-${match.index}`} style={{ fontWeight: 700, color: "#0F2744" }}>
+              {boldText}
+            </strong>
+          );
+        }
+        lastIndex = regex.lastIndex;
+      }
+
+      if (lastIndex < lineText.length) {
+        parts.push(lineText.substring(lastIndex));
+      }
+
+      return parts.length > 0 ? parts : lineText;
+    };
+
+    lines.forEach((line, index) => {
+      const trimmed = line.trim();
+
+      if (!trimmed) {
+        elements.push(<div key={`sp-${index}`} style={{ height: 6 }} />);
+        return;
+      }
+
+      // Heading 3: ###
+      if (trimmed.startsWith("### ")) {
+        const headingText = trimmed.replace(/^###\s+/, "");
+        elements.push(
+          <div
+            key={`h3-${index}`}
+            className="fw-bold mt-2 mb-1"
+            style={{ fontSize: 13.5, color: "#0F2744", borderLeft: "3px solid #F59E0B", paddingLeft: 6 }}
+          >
+            {parseInline(headingText, `h3-${index}`)}
+          </div>
+        );
+        return;
+      }
+
+      // Heading 2: ##
+      if (trimmed.startsWith("## ")) {
+        const headingText = trimmed.replace(/^##\s+/, "");
+        elements.push(
+          <div
+            key={`h2-${index}`}
+            className="fw-bold mt-2 mb-1"
+            style={{ fontSize: 14, color: "#0F2744", borderLeft: "3px solid #D97706", paddingLeft: 6 }}
+          >
+            {parseInline(headingText, `h2-${index}`)}
+          </div>
+        );
+        return;
+      }
+
+      // Heading 1: #
+      if (trimmed.startsWith("# ")) {
+        const headingText = trimmed.replace(/^#\s+/, "");
+        elements.push(
+          <div
+            key={`h1-${index}`}
+            className="fw-bold mt-2 mb-1"
+            style={{ fontSize: 14.5, color: "#0F2744", borderLeft: "4px solid #D97706", paddingLeft: 6 }}
+          >
+            {parseInline(headingText, `h1-${index}`)}
+          </div>
+        );
+        return;
+      }
+
+      // Bullet points: • or - or *
+      if (trimmed.startsWith("• ") || trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+        const bulletContent = trimmed.replace(/^[•\-\*]\s+/, "");
+        elements.push(
+          <div
+            key={`b-${index}`}
+            className="d-flex align-items-start gap-1.5 ms-1 my-0.5"
+            style={{ fontSize: 13, lineHeight: 1.5 }}
+          >
+            <span style={{ color: "#D97706", fontWeight: "bold", marginRight: 4 }}>•</span>
+            <div style={{ flex: 1 }}>{parseInline(bulletContent, `b-${index}`)}</div>
+          </div>
+        );
+        return;
+      }
+
+      // Numbered items: 1. 2.
+      const numMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
+      if (numMatch) {
+        const num = numMatch[1];
+        const numContent = numMatch[2];
+        elements.push(
+          <div
+            key={`num-${index}`}
+            className="d-flex align-items-start gap-1.5 ms-1 my-0.5"
+            style={{ fontSize: 13, lineHeight: 1.5 }}
+          >
+            <span className="fw-bold" style={{ color: "#0F2744", minWidth: 16 }}>{num}.</span>
+            <div style={{ flex: 1 }}>{parseInline(numContent, `num-${index}`)}</div>
+          </div>
+        );
+        return;
+      }
+
+      // Regular paragraph line
+      elements.push(
+        <div key={`p-${index}`} style={{ lineHeight: 1.55 }}>
+          {parseInline(line, `p-${index}`)}
+        </div>
+      );
+    });
+
+    return <>{elements}</>;
   };
 
   return (
@@ -367,11 +528,10 @@ export default function AiSalesChatWidget() {
         .sp-ai-msg-bubble {
           padding: 10px 14px;
           border-radius: 14px;
-          max-width: 86%;
+          max-width: 88%;
           font-size: 13px;
           line-height: 1.55;
           word-break: break-word;
-          white-space: pre-wrap;
         }
 
         .sp-ai-msg-assistant {
@@ -387,6 +547,7 @@ export default function AiSalesChatWidget() {
           color: #FFFFFF;
           align-self: flex-end;
           border-bottom-right-radius: 4px;
+          white-space: pre-wrap;
         }
 
         .sp-ai-chip {
@@ -622,6 +783,17 @@ export default function AiSalesChatWidget() {
               className="sp-ai-chip"
               onClick={() =>
                 handleSendMessage(
+                  "How is your pricing plan and what is included in each edition?"
+                )
+              }
+            >
+              💰 How is your pricing plan?
+            </button>
+            <button
+              type="button"
+              className="sp-ai-chip"
+              onClick={() =>
+                handleSendMessage(
                   "How does the zero-cost (₦0.00) parent payment option work?"
                 )
               }
@@ -633,18 +805,40 @@ export default function AiSalesChatWidget() {
               className="sp-ai-chip"
               onClick={() =>
                 handleSendMessage(
-                  `What is included in the Basic (${basicPrice}) vs Full CBT (${cbtPrice}) Package?`
+                  "How does 1-click broadsheet and WAEC-standard report card generation work?"
                 )
               }
             >
-              📊 Basic ({basicPrice}) vs Full CBT ({cbtPrice})
+              📊 1-Click Broadsheets
             </button>
             <button
               type="button"
               className="sp-ai-chip"
               onClick={() =>
                 handleSendMessage(
-                  "How do we get started and book our onboarding session?"
+                  "Can we conduct CBT mock and term exams in our computer lab without internet?"
+                )
+              }
+            >
+              💻 Offline CBT Exams
+            </button>
+            <button
+              type="button"
+              className="sp-ai-chip"
+              onClick={() =>
+                handleSendMessage(
+                  "How does SchoolProfit eliminate unpaid school fee debts using parent virtual accounts?"
+                )
+              }
+            >
+              📱 Stop Fee Debts
+            </button>
+            <button
+              type="button"
+              className="sp-ai-chip"
+              onClick={() =>
+                handleSendMessage(
+                  "How do we get started and book our onboarding walkthrough session?"
                 )
               }
             >
@@ -664,7 +858,7 @@ export default function AiSalesChatWidget() {
                       style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", flexShrink: 0, marginTop: 2 }}
                     />
                     <div className="sp-ai-msg-bubble sp-ai-msg-assistant">
-                      {m.content}
+                      {renderFormattedMessage(m.content)}
                     </div>
                   </div>
                 ) : (

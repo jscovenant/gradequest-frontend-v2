@@ -192,6 +192,154 @@ export default function AiSalesAgentPage() {
     showInfo("Started a fresh sandbox conversation session.");
   };
 
+  const renderFormattedMessage = (text: string) => {
+    if (!text) return null;
+
+    const lines = text.split("\n");
+    const elements: React.ReactNode[] = [];
+
+    const parseInline = (lineText: string, keyPrefix: string) => {
+      const parts: React.ReactNode[] = [];
+      const regex = /(\[([^\]]+)\]\(([^)]+)\))|(\*\*([^*]+)\*\*)/g;
+      let lastIndex = 0;
+      let match: RegExpExecArray | null;
+
+      while ((match = regex.exec(lineText)) !== null) {
+        if (match.index > lastIndex) {
+          parts.push(lineText.substring(lastIndex, match.index));
+        }
+
+        if (match[1]) {
+          const label = match[2];
+          const url = match[3];
+          parts.push(
+            <a
+              key={`${keyPrefix}-link-${match.index}`}
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="fw-bold"
+              style={{ color: "#2563EB", textDecoration: "underline" }}
+            >
+              {label}
+            </a>
+          );
+        } else if (match[4]) {
+          const boldText = match[5];
+          parts.push(
+            <strong key={`${keyPrefix}-b-${match.index}`} style={{ fontWeight: 700, color: "#0F2744" }}>
+              {boldText}
+            </strong>
+          );
+        }
+        lastIndex = regex.lastIndex;
+      }
+
+      if (lastIndex < lineText.length) {
+        parts.push(lineText.substring(lastIndex));
+      }
+
+      return parts.length > 0 ? parts : lineText;
+    };
+
+    lines.forEach((line, index) => {
+      const trimmed = line.trim();
+
+      if (!trimmed) {
+        elements.push(<div key={`sp-${index}`} style={{ height: 6 }} />);
+        return;
+      }
+
+      // Heading 3: ###
+      if (trimmed.startsWith("### ")) {
+        const headingText = trimmed.replace(/^###\s+/, "");
+        elements.push(
+          <div
+            key={`h3-${index}`}
+            className="fw-bold mt-2 mb-1"
+            style={{ fontSize: 14, color: "#0F2744", borderLeft: "3px solid #F59E0B", paddingLeft: 6 }}
+          >
+            {parseInline(headingText, `h3-${index}`)}
+          </div>
+        );
+        return;
+      }
+
+      // Heading 2: ##
+      if (trimmed.startsWith("## ")) {
+        const headingText = trimmed.replace(/^##\s+/, "");
+        elements.push(
+          <div
+            key={`h2-${index}`}
+            className="fw-bold mt-2 mb-1"
+            style={{ fontSize: 14.5, color: "#0F2744", borderLeft: "3px solid #D97706", paddingLeft: 6 }}
+          >
+            {parseInline(headingText, `h2-${index}`)}
+          </div>
+        );
+        return;
+      }
+
+      // Heading 1: #
+      if (trimmed.startsWith("# ")) {
+        const headingText = trimmed.replace(/^#\s+/, "");
+        elements.push(
+          <div
+            key={`h1-${index}`}
+            className="fw-bold mt-2 mb-1"
+            style={{ fontSize: 15, color: "#0F2744", borderLeft: "4px solid #D97706", paddingLeft: 6 }}
+          >
+            {parseInline(headingText, `h1-${index}`)}
+          </div>
+        );
+        return;
+      }
+
+      // Bullet points: • or - or *
+      if (trimmed.startsWith("• ") || trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+        const bulletContent = trimmed.replace(/^[•\-\*]\s+/, "");
+        elements.push(
+          <div
+            key={`b-${index}`}
+            className="d-flex align-items-start gap-1.5 ms-1 my-0.5"
+            style={{ fontSize: 13.5, lineHeight: 1.5 }}
+          >
+            <span style={{ color: "#D97706", fontWeight: "bold", marginRight: 4 }}>•</span>
+            <div style={{ flex: 1 }}>{parseInline(bulletContent, `b-${index}`)}</div>
+          </div>
+        );
+        return;
+      }
+
+      // Numbered items: 1. 2.
+      const numMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
+      if (numMatch) {
+        const num = numMatch[1];
+        const numContent = numMatch[2];
+        elements.push(
+          <div
+            key={`num-${index}`}
+            className="d-flex align-items-start gap-1.5 ms-1 my-0.5"
+            style={{ fontSize: 13.5, lineHeight: 1.5 }}
+          >
+            <span className="fw-bold" style={{ color: "#0F2744", minWidth: 16 }}>{num}.</span>
+            <div style={{ flex: 1 }}>{parseInline(numContent, `num-${index}`)}</div>
+          </div>
+        );
+        return;
+      }
+
+      // Regular paragraph line
+      elements.push(
+        <div key={`p-${index}`} style={{ lineHeight: 1.55 }}>
+          {parseInline(line, `p-${index}`)}
+        </div>
+      );
+    });
+
+    return <>{elements}</>;
+  };
+
   // Trigger Scanner
   const handleRunInactivityScan = async () => {
     setScanning(true);
@@ -499,6 +647,17 @@ export default function AiSalesAgentPage() {
                         className="prompt-chip border-0"
                         onClick={() =>
                           handleSendMessage(
+                            "How is your pricing plan and what is included in each edition?"
+                          )
+                        }
+                      >
+                        💰 How is your pricing plan?
+                      </button>
+                      <button
+                        type="button"
+                        className="prompt-chip border-0"
+                        onClick={() =>
+                          handleSendMessage(
                             "I am a school proprietor with 350 students. How can I use SchoolProfit at zero cost (₦0.00) by letting parents pay the platform fee during tuition payment?"
                           )
                         }
@@ -510,33 +669,44 @@ export default function AiSalesAgentPage() {
                         className="prompt-chip border-0"
                         onClick={() =>
                           handleSendMessage(
+                            "How does 1-click broadsheet compilation and WAEC-standard report card generation work?"
+                          )
+                        }
+                      >
+                        📊 1-Click Broadsheets &amp; Report Cards
+                      </button>
+                      <button
+                        type="button"
+                        className="prompt-chip border-0"
+                        onClick={() =>
+                          handleSendMessage(
+                            "Can we conduct CBT mock and term exams in our computer lab without internet?"
+                          )
+                        }
+                      >
+                        💻 Offline CBT Examination Engine
+                      </button>
+                      <button
+                        type="button"
+                        className="prompt-chip border-0"
+                        onClick={() =>
+                          handleSendMessage(
+                            "How does SchoolProfit eliminate unpaid school fee debts using parent virtual accounts?"
+                          )
+                        }
+                      >
+                        📱 Stop School Fee Debts
+                      </button>
+                      <button
+                        type="button"
+                        className="prompt-chip border-0"
+                        onClick={() =>
+                          handleSendMessage(
                             "I just booked a demo session at https://schoolprofit.ng/book-demo for tomorrow. What should our bursar and academic head prepare for the walkthrough?"
                           )
                         }
                       >
                         📅 Demo Meeting Next Steps &amp; Checklist
-                      </button>
-                      <button
-                        type="button"
-                        className="prompt-chip border-0"
-                        onClick={() =>
-                          handleSendMessage(
-                            "What is the difference between the Basic Package (Result Broadsheets/Core) and the Full Package with CBT? What are the per-student charges?"
-                          )
-                        }
-                      >
-                        📊 Basic vs Full CBT Package
-                      </button>
-                      <button
-                        type="button"
-                        className="prompt-chip border-0"
-                        onClick={() =>
-                          handleSendMessage(
-                            "How does a new school get onboarded, and can we choose to deduct the platform fee from collected school fees instead of charging parents?"
-                          )
-                        }
-                      >
-                        🔗 Getting Started &amp; Fee Deductions
                       </button>
                     </div>
                   </div>
@@ -564,7 +734,7 @@ export default function AiSalesAgentPage() {
                           </div>
                           <span>{msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}</span>
                         </div>
-                        <div>{msg.content}</div>
+                        <div>{msg.role === "assistant" ? renderFormattedMessage(msg.content) : msg.content}</div>
                       </div>
                     ))}
                     {sendingMessage && (
