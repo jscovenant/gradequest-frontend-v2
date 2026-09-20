@@ -324,6 +324,9 @@ export default function PublicSchoolWebsitePage() {
   const portalLoginUrl = isCustomPortalHost()
     ? "/auth/login"
     : `/school/${school.subdomain || school.id}/login`;
+  const payFeesUrl = isCustomPortalHost()
+    ? "/pay-fees"
+    : `/school/${school.subdomain || school.id}/pay`;
 
   // Programs
   const programsList = website.programs?.length > 0 ? website.programs : [
@@ -773,6 +776,9 @@ export default function PublicSchoolWebsitePage() {
                 <i className="bi bi-stars me-1"></i> {admission.session_name || "2026/2027 Admissions Open"}
               </span>
             )}
+            <Link to={payFeesUrl} className="btn btn-sm btn-outline-light rounded-pill py-0.5 px-2.5 d-flex align-items-center gap-1" style={{ fontSize: "11.5px" }}>
+              <i className="bi bi-credit-card-2-front-fill text-warning"></i> Pay Fees
+            </Link>
             <Link to={portalLoginUrl} className="btn btn-sm btn-outline-light rounded-pill py-0.5 px-2.5 d-flex align-items-center gap-1" style={{ fontSize: "11.5px" }}>
               <i className="bi bi-lock-fill text-warning"></i> Portal Sign In
             </Link>
@@ -862,6 +868,9 @@ export default function PublicSchoolWebsitePage() {
             </ul>
 
             <div className="d-flex align-items-center gap-2 mt-3 mt-lg-0">
+              <Link to={payFeesUrl} className="btn btn-outline-light rounded-pill fw-bold py-2 px-3 small d-flex align-items-center gap-1" onClick={() => setMobileMenuOpen(false)}>
+                <i className="bi bi-credit-card-2-front-fill text-warning"></i> Pay Fees
+              </Link>
               {admission.is_open && (
                 <Link to={admissionUrl} className="sp-btn-gold py-2 px-3.5" onClick={() => setMobileMenuOpen(false)}>
                   Apply Online
@@ -1697,6 +1706,7 @@ export default function PublicSchoolWebsitePage() {
               <ul className="list-unstyled small d-flex flex-column gap-2 text-white-50">
                 <li><Link to={admissionUrl} className="text-white-50 text-decoration-none">Apply for Admission</Link></li>
                 <li><Link to="/admissions/status" className="text-white-50 text-decoration-none">Admission Status Checker</Link></li>
+                <li><Link to={payFeesUrl} className="text-white-50 text-decoration-none">Pay School Fees Online</Link></li>
                 <li><Link to={portalLoginUrl} className="text-white-50 text-decoration-none">Student & Parent Portal</Link></li>
                 <li><Link to="/check-result" className="text-white-50 text-decoration-none">Term Result Checker</Link></li>
               </ul>

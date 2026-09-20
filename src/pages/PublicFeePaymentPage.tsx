@@ -1,6 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import { publicApi } from "../utils/axios";
+import { isCustomPortalHost } from "../utils/portal";
 import PageTitle from "../components/PageTitle";
+
+// Helper to sanitize and normalize media URLs
+const resolveMediaUrl = (url?: string | null) => {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) return url;
+  const clean = url.replace(/^\/+/, "");
+  if (clean.startsWith("uploads/") || clean.startsWith("storage/")) {
+    return `https://schoolprofit.ng/${clean}`;
+  }
+  return `https://schoolprofit.ng/storage/${clean}`;
+};
 
 type SchoolInfo = {
   id: number;
@@ -10,6 +23,10 @@ type SchoolInfo = {
   phone?: string | null;
   address?: string | null;
   logo?: string | null;
+  subdomain?: string | null;
+  custom_domain?: string | null;
+  primary_color?: string | null;
+  secondary_color?: string | null;
 };
 
 type StudentInfo = {
@@ -77,6 +94,7 @@ type VirtualAccountInfo = {
   amount: number;
   expiry_date?: string;
   note?: string;
+  beneficiary_label?: string;
 };
 
 type StudentLookupResponse = {
@@ -112,12 +130,15 @@ const money = (value: number) =>
   new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(Number(value || 0));
 
 export default function PublicFeePaymentPage() {
-  const query = useMemo(() => new URLSearchParams(window.location.search), []);
-  const initialReference = query.get("paymentReference") || query.get("reference") || query.get("trxref") || query.get("ref") || "";
-  const initialSchoolCode = query.get("school_code") || "";
-  const initialRegNo = query.get("student_reg_no") || query.get("reg_no") || "";
+  const { slugOrId } = useParams<{ slugOrId?: string }>();
+  const [searchParams] = useSearchParams();
 
-  const [schoolCode, setSchoolCode] = useState(initialSchoolCode);
+  const initialReference = searchParams.get("paymentReference") || searchParams.get("reference") || searchParams.get("trxref") || searchParams.get("ref") || "";
+  const initialSchoolParam = slugOrId || searchParams.get("school") || searchParams.get("school_code") || searchParams.get("slug") || searchParams.get("id") || (isCustomPortalHost() ? window.location.hostname : "");
+  const initialRegNo = searchParams.get("student_reg_no") || searchParams.get("reg_no") || "";
+
+  const [schoolCode, setSchoolCode] = useState(initialSchoolParam);
+  const [isLockedSchool, setIsLockedSchool] = useState(!!slugOrId || isCustomPortalHost() || !!searchParams.get("school"));
   const [studentRegNo, setStudentRegNo] = useState(initialRegNo);
   const [amount, setAmount] = useState("");
   const [payerEmail, setPayerEmail] = useState("");
@@ -207,7 +228,7 @@ export default function PublicFeePaymentPage() {
     return () => window.clearInterval(pollInterval);
   }, [activeReference, virtualAccount, receiptData]);
 
-  // Lookup School by Code
+  // Lookup School by Code or Slug or Domain
   useEffect(() => {
     const value = schoolCode.trim();
     if (value.length < 2) {
@@ -227,12 +248,39 @@ export default function PublicFeePaymentPage() {
             setSchool(res.data.school);
           }
         })
-        .catch((err) => {
-          setSchool(null);
-          setError(err?.response?.data?.message || "School code not found. Please check your school ID/code.");
+        .catch(() => {
+          // If school endpoint with code failed, try public website resolver
+          publicApi
+            .get(`/public/school/${encodeURIComponent(value)}`)
+            .then((siteRes) => {
+              if (siteRes.data?.status && siteRes.data?.school) {
+                const s = siteRes.data.school;
+                setSchool({
+                  id: s.id,
+                  name: s.name,
+                  code: String(s.id),
+                  email: s.email,
+                  phone: s.phone,
+                  address: s.address,
+                  logo: s.logo_url || s.logo,
+                  subdomain: s.subdomain,
+                  custom_domain: s.custom_domain,
+                  primary_color: siteRes.data?.website?.primary_color || "#0F2744",
+                  secondary_color: siteRes.data?.website?.secondary_color || "#D97706",
+                });
+                setSchoolCode(String(s.id));
+              } else {
+                setSchool(null);
+                setError("School portal not found. Please verify the school link or code.");
+              }
+            })
+            .catch((err) => {
+              setSchool(null);
+              setError(err?.response?.data?.message || "School code not found. Please check your school ID/code.");
+            });
         })
         .finally(() => setSchoolLoading(false));
-    }, 400);
+    }, 350);
 
     return () => window.clearTimeout(timer);
   }, [schoolCode]);
@@ -256,7 +304,7 @@ export default function PublicFeePaymentPage() {
         })
         .then((res) => {
           setStudentData(res.data);
-          if (res.data?.school) setSchool(res.data.school);
+          if (res.data?.school) setSchool((prev) => ({ ...(prev || {}), ...res.data.school }));
           if (!amount && Number(res.data?.summary?.balance || 0) > 0) {
             const disc = res.data?.installment_plan?.full_payment_discount || res.data?.full_payment_discount;
             if (disc?.enabled && disc.discount_amount > 0 && disc.discounted_payable_amount > 0) {
@@ -340,9 +388,13 @@ export default function PublicFeePaymentPage() {
     window.history.replaceState({}, "", url.toString());
   };
 
+  const primaryColor = school?.primary_color || "#0F2744";
+  const secondaryColor = school?.secondary_color || "#D97706";
+  const schoolLogo = resolveMediaUrl(school?.logo);
+
   return (
-    <main className="gq-sec-page">
-      <PageTitle title="Pay School Fees Online | SchoolProfit" />
+    <main className="gq-sec-page" style={{ "--gq-primary": primaryColor, "--gq-secondary": secondaryColor } as React.CSSProperties}>
+      <PageTitle title={school ? `Pay School Fees | ${school.name}` : "Pay School Fees Online | SchoolProfit"} />
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,600;0,800;1,600&display=swap');
@@ -376,7 +428,7 @@ export default function PublicFeePaymentPage() {
         .gq-sec-brand {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 12px;
           font-weight: 800;
           font-size: 15px;
           color: #0F172A;
@@ -407,7 +459,7 @@ export default function PublicFeePaymentPage() {
 
         /* ── Hero Banner ── */
         .gq-sec-hero {
-          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
+          background: linear-gradient(135deg, ${primaryColor} 0%, #0A192F 100%);
           border-radius: 20px;
           padding: 32px 36px;
           color: #FFFFFF;
@@ -449,20 +501,19 @@ export default function PublicFeePaymentPage() {
         }
 
         .gq-sec-title {
-          font-family: 'Playfair Display', Georgia, serif;
-          font-size: clamp(24px, 3.8vw, 36px);
+          font-size: 28px;
           font-weight: 900;
-          line-height: 1.15;
           margin: 0 0 10px;
-          color: #FFFFFF;
+          letter-spacing: -0.02em;
+          line-height: 1.25;
         }
 
         .gq-sec-sub {
+          font-size: 14.5px;
+          color: rgba(255, 255, 255, 0.85);
           max-width: 680px;
-          color: #CBD5E1;
-          font-size: 14px;
-          line-height: 1.65;
           margin: 0;
+          line-height: 1.6;
         }
 
         /* ── Reassurance Pillars ── */
@@ -478,7 +529,7 @@ export default function PublicFeePaymentPage() {
           border: 1px solid #E2E8F0;
           border-radius: 14px;
           padding: 16px;
-          box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
+          box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
         }
 
         .gq-sec-trust-icon {
@@ -490,13 +541,13 @@ export default function PublicFeePaymentPage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 16px;
+          font-size: 18px;
           margin-bottom: 10px;
         }
 
         .gq-sec-trust-title {
+          font-size: 13.5px;
           font-weight: 800;
-          font-size: 13px;
           color: #0F172A;
           margin-bottom: 4px;
         }
@@ -553,28 +604,30 @@ export default function PublicFeePaymentPage() {
         /* ── Verified School Badge ── */
         .gq-school-profile {
           background: linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%);
-          border: 1px solid #86EFAC;
-          border-radius: 14px;
+          border: 1.5px solid #86EFAC;
+          border-radius: 16px;
           padding: 16px 18px;
           margin-bottom: 20px;
           display: flex;
           align-items: center;
+          justify-content: space-between;
           gap: 14px;
         }
 
         .gq-school-avatar {
-          width: 48px;
-          height: 48px;
+          width: 52px;
+          height: 52px;
           border-radius: 12px;
           background: #FFFFFF;
           border: 1px solid #86EFAC;
           color: #166534;
           font-weight: 900;
-          font-size: 20px;
+          font-size: 22px;
           display: flex;
           align-items: center;
           justify-content: center;
           flex-shrink: 0;
+          overflow: hidden;
           box-shadow: 0 4px 10px rgba(22, 101, 52, 0.08);
         }
 
@@ -628,8 +681,8 @@ export default function PublicFeePaymentPage() {
         }
 
         .gq-input:focus {
-          border-color: #1D4ED8;
-          box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.12);
+          border-color: ${primaryColor};
+          box-shadow: 0 0 0 3px rgba(15, 39, 68, 0.12);
         }
 
         .gq-form-hint {
@@ -673,7 +726,7 @@ export default function PublicFeePaymentPage() {
           min-height: 52px;
           border: none;
           border-radius: 12px;
-          background: linear-gradient(135deg, #0F2744 0%, #1E3A8A 100%);
+          background: linear-gradient(135deg, ${primaryColor} 0%, #0F2744 100%);
           color: #FFFFFF;
           font-size: 15.5px;
           font-weight: 800;
@@ -748,12 +801,29 @@ export default function PublicFeePaymentPage() {
         .gq-fee-item {
           border: 1px solid #E2E8F0;
           border-radius: 12px;
-          padding: 12px 14px;
+          padding: 14px;
+          background: #FFFFFF;
+        }
+
+        .gq-fee-item-title {
+          font-weight: 800;
+          font-size: 14px;
+          color: #0F172A;
+          margin-bottom: 2px;
+        }
+
+        .gq-fee-item-sub {
+          font-size: 11.5px;
+          color: #64748B;
+          margin-bottom: 8px;
+        }
+
+        .gq-fee-item-row {
           display: flex;
           justify-content: space-between;
-          align-items: center;
-          gap: 12px;
-          background: #FFFFFF;
+          font-size: 12.5px;
+          color: #475569;
+          margin-bottom: 2px;
         }
 
         .gq-fee-name {
@@ -776,22 +846,23 @@ export default function PublicFeePaymentPage() {
           white-space: nowrap;
         }
 
-        /* ── Official Stamped Receipt Card ── */
+        /* ── Receipt View ── */
         .gq-receipt-card {
           background: #FFFFFF;
-          border: 2px solid #10B981;
+          border: 1px solid #E2E8F0;
           border-radius: 20px;
-          padding: 28px;
-          box-shadow: 0 16px 40px rgba(16, 185, 129, 0.12);
+          padding: 32px;
+          box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+          margin-bottom: 30px;
         }
 
         .gq-receipt-header {
           display: flex;
           justify-content: space-between;
           align-items: flex-start;
-          border-bottom: 2px solid #0F172A;
-          padding-bottom: 18px;
-          margin-bottom: 20px;
+          padding-bottom: 20px;
+          border-bottom: 2px solid #F1F5F9;
+          margin-bottom: 24px;
         }
 
         .gq-receipt-verified-pill {
@@ -827,7 +898,7 @@ export default function PublicFeePaymentPage() {
         }
 
         .gq-receipt-table th {
-          background: #0F2744;
+          background: ${primaryColor};
           color: #FFFFFF;
           padding: 10px 14px;
           font-size: 11.5px;
@@ -968,8 +1039,15 @@ export default function PublicFeePaymentPage() {
         {/* ── Top Bar ── */}
         <div className="gq-sec-topbar">
           <div className="gq-sec-brand">
-            <i className="bi bi-shield-lock-fill text-success" style={{ fontSize: 20 }} />
-            <span>SchoolProfit Official Electronic Payment Gateway</span>
+            {schoolLogo ? (
+              <img src={schoolLogo} alt={school?.name || "School"} style={{ height: 36, width: 36, objectFit: "contain", borderRadius: 8 }} />
+            ) : (
+              <i className="bi bi-shield-lock-fill text-success" style={{ fontSize: 22 }} />
+            )}
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 14 }}>{school?.name || "SchoolProfit Official Payment Gateway"}</div>
+              <div style={{ fontSize: 11, color: "#64748B", fontWeight: 600 }}>Direct & Automated Institutional Settlement</div>
+            </div>
           </div>
           <div className="gq-sec-badge-row">
             <div className="gq-sec-badge-item">
@@ -991,11 +1069,15 @@ export default function PublicFeePaymentPage() {
         <section className="gq-sec-hero">
           <div>
             <div className="gq-sec-pill">
-              <i className="bi bi-patch-check-fill" /> Official Verified School Fee Portal
+              <i className="bi bi-patch-check-fill" /> {school?.name ? `${school.name} Verified Fee Portal` : "Official Verified School Fee Portal"}
             </div>
-            <h1 className="gq-sec-title">Pay School Fees Online</h1>
+            <h1 className="gq-sec-title">
+              {school ? `Pay Fees — ${school.name}` : "Pay School Fees Online"}
+            </h1>
             <p className="gq-sec-sub">
-              Enter your school ID code and student admission number below to view the itemized fee schedule and make an authentic, instant, and confidential payment.
+              {school
+                ? `Enter your child's student admission number below to view the official itemized fee schedule and make an instant, confidential tuition settlement.`
+                : `Enter your school ID code and student admission number below to view the itemized fee schedule and make an authentic, instant, and confidential payment.`}
             </p>
           </div>
         </section>
@@ -1033,10 +1115,10 @@ export default function PublicFeePaymentPage() {
                   <i className="bi bi-patch-check-fill" /> Official Payment Confirmed
                 </span>
                 <h2 style={{ fontSize: 24, fontWeight: 950, margin: "10px 0 4px", color: "#0F172A" }}>
-                  {receiptData.school?.school_name || receiptData.school?.name || "Official Payment Receipt"}
+                  {receiptData.school?.school_name || receiptData.school?.name || school?.name || "Official Payment Receipt"}
                 </h2>
                 <div style={{ color: "#64748B", fontSize: 13 }}>
-                  Address: {receiptData.school?.address || "Registered Campus"}
+                  Address: {receiptData.school?.address || school?.address || "Registered Campus"}
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
@@ -1154,7 +1236,9 @@ export default function PublicFeePaymentPage() {
                 <h2 className="gq-sec-card-title">
                   <i className="bi bi-credit-card-2-front-fill" /> Payment Details
                 </h2>
-                <p className="gq-sec-card-sub">Enter your school code and student admission number.</p>
+                <p className="gq-sec-card-sub">
+                  {school ? `Enter admission number for student at ${school.name}.` : "Enter your school code and student admission number."}
+                </p>
               </div>
 
               <div className="gq-sec-card-body">
@@ -1169,8 +1253,8 @@ export default function PublicFeePaymentPage() {
                 {virtualAccount ? (
                   <div style={{ background: '#F0FDF4', border: '2px solid #10B981', borderRadius: 16, padding: '20px', marginBottom: 16, boxShadow: '0 8px 24px rgba(16, 185, 129, 0.12)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                      <span style={{ background: '#0F2744', color: '#FFFFFF', padding: '5px 12px', borderRadius: 999, fontSize: 11.5, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <i className="bi bi-shield-check text-success" /> Powered by ALATPay / Wema Bank
+                      <span style={{ background: primaryColor, color: '#FFFFFF', padding: '5px 12px', borderRadius: 999, fontSize: 11.5, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <i className="bi bi-shield-check text-success" /> Dynamic Virtual Account (ALATPay / Wema)
                       </span>
                       <button
                         type="button"
@@ -1216,7 +1300,7 @@ export default function PublicFeePaymentPage() {
 
                     <div style={{ background: '#FFFFFF', borderRadius: 14, padding: '16px 18px', border: '1.5px solid #E2E8F0', marginBottom: 16, fontSize: 13, boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid #F1F5F9' }}>
-                        <span style={{ color: '#64748B', fontWeight: 600 }}>Bank Name:</span>
+                        <span style={{ color: '#64748B', fontWeight: 600 }}>Destination Bank:</span>
                         <strong style={{ color: '#0F172A', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                           <i className="bi bi-bank2 text-primary" />
                           {virtualAccount.bank_name || 'Wema Bank'}
@@ -1225,20 +1309,22 @@ export default function PublicFeePaymentPage() {
                       
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid #F1F5F9' }}>
                         <div>
-                          <span style={{ color: '#64748B', fontWeight: 600 }}>Recipient (on Bank App):</span>
-                          <div style={{ fontSize: 11, color: '#94A3B8' }}>Official Gateway Account</div>
+                          <span style={{ color: '#64748B', fontWeight: 600 }}>Account Name on Bank App:</span>
+                          <div style={{ fontSize: 11, color: '#94A3B8' }}>NIP Name Enquiry Result</div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <strong style={{ color: '#0F172A', fontWeight: 800 }}>Samaritan Technologies</strong>
+                          <strong style={{ color: '#0F172A', fontWeight: 800 }}>
+                            SAMARITAN / {school?.name ? school.name.toUpperCase() : 'SCHOOL'} - {studentData?.student?.name ? studentData.student.name.toUpperCase() : 'STUDENT'}
+                          </strong>
                           <div style={{ fontSize: 11, color: '#2563EB', fontWeight: 700 }}>
                             <i className="bi bi-shield-check me-1" />
-                            SchoolProfit Payment Processor
+                            Official School Beneficiary
                           </div>
                         </div>
                       </div>
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid #F1F5F9' }}>
-                        <span style={{ color: '#64748B', fontWeight: 600 }}>Student / Beneficiary:</span>
+                        <span style={{ color: '#64748B', fontWeight: 600 }}>Student Beneficiary:</span>
                         <strong style={{ color: '#0F172A', fontWeight: 800, textAlign: 'right', maxWidth: '60%' }}>
                           {studentData?.student?.name || studentData?.student?.firstname || 'Student'} 
                           {school?.name ? ` (${school.name})` : ''}
@@ -1260,10 +1346,10 @@ export default function PublicFeePaymentPage() {
                     <div style={{ background: '#EFF6FF', border: '1.5px solid #BFDBFE', borderRadius: 12, padding: '12px 16px', marginBottom: 16, fontSize: 12.5, color: '#1E40AF', lineHeight: 1.5 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 800, marginBottom: 4, color: '#1D4ED8' }}>
                         <i className="bi bi-info-circle-fill" />
-                        <span>Transfer Notice for Banking Apps (OPay, PalmPay, Kuda, GTBank, etc.)</span>
+                        <span>Transfer Instructions for Banking Apps (OPay, PalmPay, Kuda, GTBank, etc.)</span>
                       </div>
                       <div>
-                        When you paste or type this account number in your bank app, the account name will show as <strong>Samaritan Technologies</strong> (the official corporate gateway for SchoolProfit). Transfers are instantly tracked and credited to <strong>{studentData?.student?.name || studentData?.student?.firstname || 'your child'}</strong>.
+                        Select <strong>Wema Bank</strong> as the destination bank and paste the 10-digit virtual account number. The account name displays <strong>SAMARITAN / {school?.name || 'SCHOOL'} - {studentData?.student?.name || 'STUDENT'}</strong>. Transfers are instantly credited to the student tuition records.
                       </div>
                     </div>
 
@@ -1335,35 +1421,82 @@ export default function PublicFeePaymentPage() {
                   </div>
                 ) : (
                   <>
-                    {/* School ID / Code Input */}
-                    <div className="gq-form-group">
-                      <label className="gq-form-label">School ID / Code / Reg No</label>
-                      <input
-                        className="gq-input"
-                        value={schoolCode}
-                        onChange={(e) => setSchoolCode(e.target.value)}
-                        placeholder="Enter school code e.g. SCH-001 or school ID"
-                      />
-                      <div className="gq-form-hint">
-                        {schoolLoading ? "Locating school..." : "Enter the unique identification code assigned to your school."}
-                      </div>
-                    </div>
-
-                    {school && (
+                    {/* School Profile Display or Input */}
+                    {isLockedSchool && school ? (
                       <div className="gq-school-profile">
-                        <div className="gq-school-avatar">
-                          {school.name.charAt(0)}
-                        </div>
-                        <div>
-                          <div className="gq-school-meta-title">
-                            <i className="bi bi-patch-check-fill" /> Verified Beneficiary School
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                          {schoolLogo ? (
+                            <img src={schoolLogo} alt={school.name} className="gq-school-avatar" style={{ objectFit: 'contain', padding: 3 }} />
+                          ) : (
+                            <div className="gq-school-avatar">
+                              {school.name.charAt(0)}
+                            </div>
+                          )}
+                          <div>
+                            <div className="gq-school-meta-title">
+                              <i className="bi bi-patch-check-fill" /> Verified Beneficiary School
+                            </div>
+                            <h3 className="gq-school-name">{school.name}</h3>
+                            <div className="gq-school-address">
+                              {school.address || "Official Registered School Portal"}
+                            </div>
                           </div>
-                          <h3 className="gq-school-name">{school.name}</h3>
-                          <div className="gq-school-address">
-                            {school.address || "Official School Account"}
-                          </div>
                         </div>
+
+                        {!slugOrId && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsLockedSchool(false);
+                              setSchool(null);
+                              setSchoolCode("");
+                              setStudentData(null);
+                            }}
+                            className="btn btn-sm btn-outline-success"
+                            style={{ fontSize: 11.5, fontWeight: 700, borderRadius: 8 }}
+                          >
+                            Change
+                          </button>
+                        )}
                       </div>
+                    ) : (
+                      <>
+                        <div className="gq-form-group">
+                          <label className="gq-form-label">School ID / Code / Reg No</label>
+                          <input
+                            className="gq-input"
+                            value={schoolCode}
+                            onChange={(e) => setSchoolCode(e.target.value)}
+                            placeholder="Enter school code e.g. SCH-001 or school ID"
+                          />
+                          <div className="gq-form-hint">
+                            {schoolLoading ? "Locating school..." : "Enter the unique identification code assigned to your school."}
+                          </div>
+                        </div>
+
+                        {school && (
+                          <div className="gq-school-profile">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                              {schoolLogo ? (
+                                <img src={schoolLogo} alt={school.name} className="gq-school-avatar" style={{ objectFit: 'contain', padding: 3 }} />
+                              ) : (
+                                <div className="gq-school-avatar">
+                                  {school.name.charAt(0)}
+                                </div>
+                              )}
+                              <div>
+                                <div className="gq-school-meta-title">
+                                  <i className="bi bi-patch-check-fill" /> Verified Beneficiary School
+                                </div>
+                                <h3 className="gq-school-name">{school.name}</h3>
+                                <div className="gq-school-address">
+                                  {school.address || "Official School Account"}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
 
                     {/* Student Admission Number */}

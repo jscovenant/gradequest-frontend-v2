@@ -201,6 +201,10 @@ function App() {
           <Route path="/pay-fees" element={<PublicFeePaymentPage />} />
           <Route path="/pay-fee" element={<PublicFeePaymentPage />} />
           <Route path="/payonline" element={<PublicFeePaymentPage />} />
+          <Route path="/pay-fees/:slugOrId" element={<PublicFeePaymentPage />} />
+          <Route path="/school/:slugOrId/pay" element={<PublicFeePaymentPage />} />
+          <Route path="/school/:slugOrId/pay-fees" element={<PublicFeePaymentPage />} />
+          <Route path="/school/:slugOrId/fee-payment" element={<PublicFeePaymentPage />} />
           <Route path="/cbt/access" element={<PublicCbtAccessPage />} />
           <Route path="/cbt/offline-runner" element={<OfflineCbtRunnerPage />} />
           <Route path="/book-demo" element={<BookDemo />} />
