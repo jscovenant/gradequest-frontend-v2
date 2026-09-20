@@ -31,14 +31,30 @@ export default function Hero() {
           position: relative;
           overflow: hidden;
           font-family: 'Plus Jakarta Sans', sans-serif;
-          padding-top: max(130px, calc(100px + env(safe-area-inset-top)));
-          padding-bottom: 84px;
-          min-height: 100vh;
+          padding-top: calc(96px + env(safe-area-inset-top));
+          padding-bottom: 60px;
+          min-height: calc(100vh - 40px);
           display: flex;
           align-items: center;
           opacity: 1 !important;
           transform: none !important;
           visibility: visible !important;
+        }
+
+        @media (max-width: 991px) {
+          .gq-hero-section {
+            padding-top: calc(76px + env(safe-area-inset-top));
+            padding-bottom: 40px;
+            min-height: auto;
+          }
+        }
+
+        @media (max-width: 600px) {
+          .gq-hero-section {
+            padding-top: calc(64px + env(safe-area-inset-top));
+            padding-bottom: 28px;
+            min-height: auto;
+          }
         }
 
         /* Subtle grid background */
@@ -266,9 +282,36 @@ export default function Hero() {
         }
 
         @media (max-width: 600px) {
+          .gq-hero-kicker {
+            font-size: 11px;
+            padding: 5px 14px;
+            margin-bottom: 12px;
+          }
+          .gq-trust-avatars {
+            margin-bottom: 14px;
+          }
+          .gq-hero-title {
+            font-size: clamp(28px, 8.5vw, 40px);
+            line-height: 1.18;
+            margin-bottom: 14px;
+          }
+          .gq-hero-desc {
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 22px;
+          }
+          .gq-hero-actions {
+            margin-bottom: 24px;
+            gap: 10px;
+          }
+          .gq-btn-cta-main, .gq-btn-cta-secondary {
+            width: 100%;
+            padding: 12px 20px;
+          }
           .gq-stats-grid {
             grid-template-columns: repeat(2, 1fr);
-            gap: 14px;
+            gap: 12px;
+            padding-top: 18px;
           }
         }
 
