@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { publicApi } from "../utils/axios";
+import { isCustomPortalHost } from "../utils/portal";
 
 // Helper to sanitize and normalize asset URLs
 const resolveMediaUrl = (url?: string | null) => {
@@ -320,6 +321,9 @@ export default function PublicSchoolWebsitePage() {
   const heroBgImage = resolveMediaUrl(website.hero_image);
   const principalPhoto = resolveMediaUrl(website.principal_photo);
   const admissionUrl = `/school/${school.id}/admission`;
+  const portalLoginUrl = isCustomPortalHost()
+    ? "/auth/login"
+    : `/school/${school.subdomain || school.id}/login`;
 
   // Programs
   const programsList = website.programs?.length > 0 ? website.programs : [
@@ -769,7 +773,7 @@ export default function PublicSchoolWebsitePage() {
                 <i className="bi bi-stars me-1"></i> {admission.session_name || "2026/2027 Admissions Open"}
               </span>
             )}
-            <Link to="/login" className="btn btn-sm btn-outline-light rounded-pill py-0.5 px-2.5 d-flex align-items-center gap-1" style={{ fontSize: "11.5px" }}>
+            <Link to={portalLoginUrl} className="btn btn-sm btn-outline-light rounded-pill py-0.5 px-2.5 d-flex align-items-center gap-1" style={{ fontSize: "11.5px" }}>
               <i className="bi bi-lock-fill text-warning"></i> Portal Sign In
             </Link>
           </div>
@@ -863,7 +867,7 @@ export default function PublicSchoolWebsitePage() {
                   Apply Online
                 </Link>
               )}
-              <Link to="/login" className="btn btn-outline-light rounded-pill fw-bold py-2 px-3 small" onClick={() => setMobileMenuOpen(false)}>
+              <Link to={portalLoginUrl} className="btn btn-outline-light rounded-pill fw-bold py-2 px-3 small" onClick={() => setMobileMenuOpen(false)}>
                 Portal Login
               </Link>
             </div>
@@ -906,7 +910,7 @@ export default function PublicSchoolWebsitePage() {
                   <i className="bi bi-camera-fill fs-5"></i>
                   Explore Campus Tour
                 </a>
-                <Link to="/login" className="sp-btn-outline-white d-none d-sm-inline-flex">
+                <Link to={portalLoginUrl} className="sp-btn-outline-white d-none d-sm-inline-flex">
                   <i className="bi bi-mortarboard fs-5"></i>
                   Portal Sign In
                 </Link>
@@ -1693,7 +1697,7 @@ export default function PublicSchoolWebsitePage() {
               <ul className="list-unstyled small d-flex flex-column gap-2 text-white-50">
                 <li><Link to={admissionUrl} className="text-white-50 text-decoration-none">Apply for Admission</Link></li>
                 <li><Link to="/admissions/status" className="text-white-50 text-decoration-none">Admission Status Checker</Link></li>
-                <li><Link to="/login" className="text-white-50 text-decoration-none">Student & Parent Portal</Link></li>
+                <li><Link to={portalLoginUrl} className="text-white-50 text-decoration-none">Student & Parent Portal</Link></li>
                 <li><Link to="/check-result" className="text-white-50 text-decoration-none">Term Result Checker</Link></li>
               </ul>
             </div>

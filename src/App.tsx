@@ -165,6 +165,7 @@ const AdmissionsManagementPage = lazyWithRetry(() => import("./pages/Admin/Admis
 const PublicSchoolWebsitePage = lazyWithRetry(() => import("./pages/PublicSchoolWebsitePage"));
 const PublicAdmissionFormPage = lazyWithRetry(() => import("./pages/PublicAdmissionFormPage"));
 const PublicAdmissionStatusPage = lazyWithRetry(() => import("./pages/PublicAdmissionStatusPage"));
+const SchoolBrandedLoginPage = lazyWithRetry(() => import("./pages/Auth/SchoolBrandedLoginPage"));
 
 function App() {
   return (
@@ -176,7 +177,10 @@ function App() {
           {/*  PUBLIC ROUTES (NO GUARDS) */}
           <Route path="/" element={isCustomPortalHost() ? <PublicSchoolWebsitePage /> : <HomePage />} />
           <Route path="/school/:slugOrId" element={<PublicSchoolWebsitePage />} />
+          <Route path="/school/:slugOrId/login" element={<SchoolBrandedLoginPage />} />
           <Route path="/school/:slugOrId/admission" element={<PublicAdmissionFormPage />} />
+          <Route path="/auth/login" element={<SchoolBrandedLoginPage />} />
+          <Route path="/auth/login/:slugOrId" element={<SchoolBrandedLoginPage />} />
           <Route path="/admission" element={<PublicAdmissionFormPage />} />
           <Route path="/admissions/apply/:slugOrId" element={<PublicAdmissionFormPage />} />
           <Route path="/admissions/status" element={<PublicAdmissionStatusPage />} />
