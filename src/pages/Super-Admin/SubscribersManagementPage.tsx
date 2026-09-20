@@ -201,8 +201,8 @@ export default function SubscribersManagementPage() {
     const schoolName = adminRow.school?.school_name || nameOf(adminRow) + "'s School";
 
     const promptText = nextState
-      ? `Enable online fee payments for ${schoolName}?\n\nParents and students will be allowed to make fee payments online on /pay-school-fee.`
-      : `Switch OFF online fee payments for ${schoolName}?\n\nThe platform will REJECT all fee payment attempts on /pay-school-fee for this school and notify parents.`;
+      ? `Enable online fee payments for ${schoolName}?\n\nParents and students will be allowed to make fee payments online on /pay-fees and branded links.`
+      : `Switch OFF online fee payments for ${schoolName}?\n\nThe platform will REJECT all fee payment attempts on /pay-fees for this school and notify parents.`;
 
     if (!window.confirm(promptText)) {
       return;
@@ -668,7 +668,7 @@ export default function SubscribersManagementPage() {
                                   style={{ borderRadius: 999, fontSize: 11, fontWeight: 700, padding: "4px 12px" }}
                                   onClick={() => toggleSchoolOnlinePayment(row)}
                                   disabled={isToggling}
-                                  title={isOnlinePay ? "Click to switch OFF online fee payments (system will reject payments on /pay-school-fee)" : "Click to ENABLE online fee payments"}
+                                  title={isOnlinePay ? "Click to switch OFF online fee payments (system will reject payments on /pay-fees)" : "Click to ENABLE online fee payments"}
                                 >
                                   {isToggling ? (
                                     <span className="spinner-border spinner-border-sm me-1" style={{ width: 11, height: 11 }} />

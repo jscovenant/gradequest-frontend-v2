@@ -283,8 +283,8 @@ export default function SuperAdminDashboard() {
   async function bulkToggleAllSchoolsOnlinePayment(enable: boolean) {
     const actionWord = enable ? "ENABLE" : "DISABLE";
     const promptText = enable
-      ? `Are you sure you want to ENABLE Online Fee Payment for ALL registered schools on the platform?\n\nParents and students across all registered schools will be allowed to make fee payments online via payment gateways on /pay-school-fee.`
-      : `Are you sure you want to DISABLE Online Fee Payment for ALL registered schools on the platform?\n\nOnline fee payment attempts on /pay-school-fee will be REJECTED platform-wide.`;
+      ? `Are you sure you want to ENABLE Online Fee Payment for ALL registered schools on the platform?\n\nParents and students across all registered schools will be allowed to make fee payments online via payment gateways on /pay-fees.`
+      : `Are you sure you want to DISABLE Online Fee Payment for ALL registered schools on the platform?\n\nOnline fee payment attempts on /pay-fees will be REJECTED platform-wide.`;
 
     if (!window.confirm(promptText)) {
       return;
@@ -326,8 +326,8 @@ export default function SuperAdminDashboard() {
     const schoolName = adminRow.school?.school_name || personName(adminRow) + "'s School";
 
     const promptText = nextState
-      ? `Enable online fee payments for ${schoolName}?\n\nParents and students will be allowed to make fee payments online via Wema/ALATPay on /pay-school-fee.`
-      : `Switch OFF online fee payments for ${schoolName}?\n\nThe platform will REJECT all fee payment attempts on /pay-school-fee for this school and notify parents to contact school bursary.`;
+      ? `Enable online fee payments for ${schoolName}?\n\nParents and students will be allowed to make fee payments online via Wema/ALATPay on /pay-fees.`
+      : `Switch OFF online fee payments for ${schoolName}?\n\nThe platform will REJECT all fee payment attempts on /pay-fees for this school and notify parents to contact school bursary.`;
 
     if (!window.confirm(promptText)) {
       return;

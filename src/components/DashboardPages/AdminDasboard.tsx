@@ -347,7 +347,7 @@ export default function AdminDashboard() {
   const topLimit = 5;
   const totalPages = topMeta ? Math.max(1, Math.ceil(topMeta.total / topLimit)) : 1;
 
-  const paymentLink = `${window.location.origin}/pay-school-fee`;
+  const paymentLink = user?.school_id ? `${window.location.origin}/school/${user.school_id}/pay` : `${window.location.origin}/pay-fees`;
   const [paymentLinkCopied, setPaymentLinkCopied] = useState(false);
 
   const copyPaymentLink = () => {

@@ -197,10 +197,8 @@ function App() {
           <Route path="/verify-result" element={<VerifyResultPage />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
           <Route path="/payment-instructions/" element={<PaymentInstructionsPage />} />
-          <Route path="/pay-school-fee" element={<PublicFeePaymentPage />} />
+          <Route path="/pay-school-fee" element={<Navigate to="/pay-fees" replace />} />
           <Route path="/pay-fees" element={<PublicFeePaymentPage />} />
-          <Route path="/pay-fee" element={<PublicFeePaymentPage />} />
-          <Route path="/payonline" element={<PublicFeePaymentPage />} />
           <Route path="/pay-fees/:slugOrId" element={<PublicFeePaymentPage />} />
           <Route path="/school/:slugOrId/pay" element={<PublicFeePaymentPage />} />
           <Route path="/school/:slugOrId/pay-fees" element={<PublicFeePaymentPage />} />

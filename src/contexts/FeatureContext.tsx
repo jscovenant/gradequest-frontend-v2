@@ -25,6 +25,7 @@ const PUBLIC_PATHS = new Set([
   "/privacy-policy",
   "/terms-and-conditions",
   "/book-demo",
+  "/pay-fees",
   "/pay-school-fee"
 ]);
 

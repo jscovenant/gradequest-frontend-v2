@@ -293,8 +293,10 @@ export default function ParentDashboardPage() {
 
   const parentName = data?.parent?.name ?? "Parent";
   const children = data?.children ?? [];
-  const selectedChild = children.find((child) => child.id === selectedChildId) || children[0];
-  const paymentLink = `${window.location.origin}/pay-school-fee${selectedChild?.reg_no ? `?student_reg_no=${encodeURIComponent(selectedChild.reg_no)}` : ""}`;
+  const paymentLink = `${window.location.origin}/pay-fees?${new URLSearchParams({
+    ...(selectedChild?.school_id ? { school: String(selectedChild.school_id) } : {}),
+    ...(selectedChild?.reg_no ? { student_reg_no: selectedChild.reg_no } : {}),
+  }).toString()}`;
   const copyPaymentLink = async () => {
     try {
       await navigator.clipboard.writeText(paymentLink);
@@ -1052,7 +1054,10 @@ export default function ParentDashboardPage() {
                                 className="btn btn-sm btn-outline-success"
                                 style={{ borderRadius: 8, fontWeight: 700, fontSize: "12px" }}
                                 onClick={() => {
-                                  const childPayLink = `${window.location.origin}/pay-school-fee${c.reg_no ? `?student_reg_no=${encodeURIComponent(c.reg_no)}` : ""}`;
+                                  const childPayLink = `${window.location.origin}/pay-fees?${new URLSearchParams({
+                                    ...(c.school_id ? { school: String(c.school_id) } : {}),
+                                    ...(c.reg_no ? { student_reg_no: c.reg_no } : {}),
+                                  }).toString()}`;
                                   window.open(childPayLink, "_blank");
                                 }}
                               >
