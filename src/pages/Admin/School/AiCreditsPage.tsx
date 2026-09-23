@@ -67,7 +67,8 @@ type AiCreditQuote = {
   quantity: number;
   total_amount: number;
   currency: string;
-  wallet_balance: number;
+  can_use_wallet?: boolean;
+  wallet_balance?: number | null;
 };
 
 function fmtDate(value?: string | null) {
@@ -134,7 +135,7 @@ export default function AiCreditsPage() {
   }, [summary]);
 
   const estimatedTotal = Number(quote?.total_amount || quantity * Number(summary?.ai_credit_unit_price || quote?.unit_price || 0));
-  const canPayWithWallet = Number(quote?.wallet_balance || 0) >= estimatedTotal && estimatedTotal > 0;
+  const canPayWithWallet = isAdmin && quote?.can_use_wallet !== false && Number(quote?.wallet_balance || 0) >= estimatedTotal && estimatedTotal > 0;
 
   const load = async () => {
     setLoading(true);
@@ -617,22 +618,41 @@ export default function AiCreditsPage() {
                             <span className="ai-credit-label">Unit Price</span>
                             <span className="ai-credit-value">{fmtMoney(quote?.unit_price || summary?.ai_credit_unit_price || 25)}</span>
                           </div>
-                          <div className="ai-credit-row">
-                            <span className="ai-credit-label">{isAdmin ? "School Wallet Balance" : "Your Wallet Balance"}</span>
-                            <span className="ai-credit-value">{fmtMoney(quote?.wallet_balance)}</span>
-                          </div>
+                          {isAdmin && (
+                            <div className="ai-credit-row">
+                              <span className="ai-credit-label">School Wallet Balance</span>
+                              <span className="ai-credit-value">{fmtMoney(quote?.wallet_balance)}</span>
+                            </div>
+                          )}
                         </div>
                         <div className="d-flex gap-2 flex-wrap">
-                          <button className="ai-credit-btn" disabled={!!buying || verifying || !canPayWithWallet} onClick={buyWithWallet}>
-                            <i className="bi bi-wallet2" /> {buying === "wallet" ? "Processing..." : "Pay with Wallet"}
-                          </button>
-                          <button className="ai-credit-btn" style={{ background: "#050008", color: "#fff" }} disabled={!!buying || verifying} onClick={buyWithPaystack}>
-                            <i className="bi bi-credit-card-2-front" /> {buying === "paystack" ? "Processing..." : "Pay Online"}
+                          {isAdmin && (
+                            <button className="ai-credit-btn" disabled={!!buying || verifying || !canPayWithWallet} onClick={buyWithWallet}>
+                              <i className="bi bi-wallet2" /> {buying === "wallet" ? "Processing..." : "Pay with School Wallet"}
+                            </button>
+                          )}
+                          <button
+                            className="ai-credit-btn"
+                            style={{ background: "#050008", color: "#fff" }}
+                            disabled={!!buying || verifying}
+                            onClick={buyWithPaystack}
+                          >
+                            <i className="bi bi-credit-card-2-front" />{" "}
+                            {buying === "paystack"
+                              ? "Processing..."
+                              : isAdmin
+                              ? "Pay Online (Card / Bank Transfer)"
+                              : "Pay Online (Card / Bank Transfer)"}
                           </button>
                         </div>
-                        {!canPayWithWallet && estimatedTotal > 0 && (
+                        {isAdmin && !canPayWithWallet && estimatedTotal > 0 && (
                           <p className="ai-credit-muted mt-2">
-                            Wallet payment is disabled because your wallet balance is lower than {fmtMoney(estimatedTotal)}. Use <strong>Pay Online</strong> to pay instantly via card or bank transfer.
+                            Wallet payment is unavailable because school wallet balance is lower than {fmtMoney(estimatedTotal)}. Use <strong>Pay Online</strong> to fund credits instantly via debit card or bank transfer.
+                          </p>
+                        )}
+                        {!isAdmin && (
+                          <p className="ai-credit-muted mt-2">
+                            Pay securely with your debit card or bank app transfer. Credits are deposited directly into your personal teacher quota instantly.
                           </p>
                         )}
                       </div>
