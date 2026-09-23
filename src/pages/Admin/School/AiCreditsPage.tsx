@@ -171,14 +171,11 @@ export default function AiCreditsPage() {
   };
 
   const loadQuote = async (nextQuantity = quantity) => {
-    if (!isAdmin) return;
     try {
       const res = await authApi.get<AiCreditQuote>(`/admin/ai/credits/quote?quantity=${nextQuantity}`);
       setQuote(res.data || null);
     } catch (err: any) {
-      if (isAdmin) {
-        showError?.(err?.response?.data?.message || "Unable to load AI credit price.");
-      }
+      console.warn("Unable to load AI credit price:", err?.response?.data?.message);
     }
   };
 
@@ -195,6 +192,7 @@ export default function AiCreditsPage() {
       setSummary(res.data?.credits || null);
       showSuccess?.(res.data?.message || "AI credits purchased successfully.");
       await loadQuote(quantity);
+      await load();
     } catch (err: any) {
       showError?.(err?.response?.data?.message || "Unable to buy AI credits with wallet.");
     } finally {
@@ -225,6 +223,7 @@ export default function AiCreditsPage() {
       nextParams.delete("reference");
       nextParams.delete("trxref");
       setSearchParams(nextParams, { replace: true });
+      await load();
     } catch (err: any) {
       showError?.(err?.response?.data?.message || "Payment verification failed.");
     } finally {
@@ -297,13 +296,13 @@ export default function AiCreditsPage() {
 
   useEffect(() => {
     load();
+    loadQuote(quantity);
     if (isAdmin) {
-      loadQuote(quantity);
       loadStaff();
     }
 
     const returnedRef = searchParams.get("reference") || searchParams.get("trxref");
-    if (returnedRef && isAdmin) {
+    if (returnedRef) {
       verifyReturnedPayment(returnedRef);
     }
   }, [isAdmin]);
@@ -570,12 +569,10 @@ export default function AiCreditsPage() {
                           <span className="ai-credit-label">AI Access Valid Until</span>
                           <span className="ai-credit-value">{fmtDate(summary?.access_valid_until || summary?.cycle_end)}</span>
                         </div>
-                        {isAdmin && (
-                          <div className="ai-credit-row">
-                            <span className="ai-credit-label">Extra AI Credit Price</span>
-                            <span className="ai-credit-value">{fmtMoney(summary?.ai_credit_unit_price ?? 50)} / credit</span>
-                          </div>
-                        )}
+                        <div className="ai-credit-row">
+                          <span className="ai-credit-label">Extra AI Credit Price</span>
+                          <span className="ai-credit-value">{fmtMoney(summary?.ai_credit_unit_price ?? 25)} / credit</span>
+                        </div>
                         <div className="ai-credit-row">
                           <span className="ai-credit-label">AI Status</span>
                           <span className="ai-credit-value" style={{ color: "#15803d" }}>
@@ -584,16 +581,19 @@ export default function AiCreditsPage() {
                         </div>
                       </div>
 
-                      {/* Buy Extra Credits - Only for Administrators */}
-                      {isAdmin && (
-                        <div className="mt-4 pt-3 border-top">
-                          <div className="ai-credit-head mb-2">
-                            <div>
-                              <h2 className="ai-credit-card-title">Buy Extra Credits</h2>
-                              <p className="ai-credit-muted">Top up the school's central AI balance at standard rates.</p>
-                            </div>
+                      {/* Buy Extra Credits - Accessible for Admins & Teachers */}
+                      <div className="mt-4 pt-3 border-top">
+                        <div className="ai-credit-head mb-2">
+                          <div>
+                            <h2 className="ai-credit-card-title">{isAdmin ? "Buy Extra School Credits" : "Top Up My AI Credits"}</h2>
+                            <p className="ai-credit-muted">
+                              {isAdmin 
+                                ? "Top up the school's central AI balance at standard rates." 
+                                : "Purchase AI credits directly for your personal teacher allowance to generate lesson notes, schemes of work, and CBT questions."}
+                            </p>
                           </div>
-                          <div className="ai-credit-buy-grid">
+                        </div>
+                        <div className="ai-credit-buy-grid">
                           <div>
                             <label className="ai-credit-label d-block mb-1">Credit quantity</label>
                             <input
@@ -615,10 +615,10 @@ export default function AiCreditsPage() {
                         <div className="ai-credit-summary-box mb-3">
                           <div className="ai-credit-row">
                             <span className="ai-credit-label">Unit Price</span>
-                            <span className="ai-credit-value">{fmtMoney(quote?.unit_price || summary?.ai_credit_unit_price)}</span>
+                            <span className="ai-credit-value">{fmtMoney(quote?.unit_price || summary?.ai_credit_unit_price || 25)}</span>
                           </div>
                           <div className="ai-credit-row">
-                            <span className="ai-credit-label">School Wallet Balance</span>
+                            <span className="ai-credit-label">{isAdmin ? "School Wallet Balance" : "Your Wallet Balance"}</span>
                             <span className="ai-credit-value">{fmtMoney(quote?.wallet_balance)}</span>
                           </div>
                         </div>
@@ -632,11 +632,10 @@ export default function AiCreditsPage() {
                         </div>
                         {!canPayWithWallet && estimatedTotal > 0 && (
                           <p className="ai-credit-muted mt-2">
-                            Wallet payment is disabled because your wallet balance is lower than {fmtMoney(estimatedTotal)}.
+                            Wallet payment is disabled because your wallet balance is lower than {fmtMoney(estimatedTotal)}. Use <strong>Pay Online</strong> to pay instantly via card or bank transfer.
                           </p>
                         )}
                       </div>
-                    )}
                     </div>
                   </section>
 
