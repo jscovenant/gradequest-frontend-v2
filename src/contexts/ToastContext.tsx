@@ -56,7 +56,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       value={{ showToast, showSuccess, showError, showInfo, showWarning }}
     >
       {children}
-      <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 9999 }}>
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 9999999,
+          pointerEvents: "none",
+        }}
+      >
         {toasts.map((toast, index) => (
           <div
             key={toast.id}
@@ -64,6 +73,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               position: "absolute",
               top: `${20 + index * 80}px`,
               width: "100%",
+              pointerEvents: "auto",
             }}
           >
             <Toast
