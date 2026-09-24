@@ -847,15 +847,14 @@ export default function SubjectsPage() {
         }
       `}</style>
 
+      <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       <PageTitle title="Subjects & Academic Allocation | SchoolProfit" />
 
-      <div className="flex h-screen overflow-hidden bg-slate-50">
-        <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+      <div className="container-fluid">
+        <div className="row">
+          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-        <div className="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-          <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-
-          <main className="db-main">
+          <main className="col-md-9 col-lg-10 ms-auto gq-app-main db-main d-flex flex-column min-vh-100">
             {/* HERO */}
             <div className="db-hero">
               <div>
