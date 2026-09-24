@@ -208,7 +208,7 @@ export default function SubjectsPage() {
     s.section?.name ?? sections.find((x) => x.id === s.section_id)?.name ?? "Universal / All";
 
   const departmentName = (s: Subject) =>
-    s.department?.name ?? departments.find((x) => x.id === s.department_id)?.name ?? "Core / General";
+    s.department?.name ?? departments.find((x) => x.id === s.department_id)?.name ?? "All Departments";
 
   const filteredSubjects = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -893,7 +893,7 @@ export default function SubjectsPage() {
                   </div>
                   <div className="db-hero-stat-sep" />
                   <div className="db-hero-stat-item">
-                    <span className="db-hero-stat-label">Senior Departments</span>
+                    <span className="db-hero-stat-label">Departments</span>
                     <span className="db-hero-stat-val" style={{ color: "#34D399" }}>{departments.length}</span>
                   </div>
                 </div>
@@ -931,15 +931,14 @@ export default function SubjectsPage() {
                     ))}
                   </select>
 
-                  {/* Department Filter (Only for Senior Secondary) */}
+                  {/* Department Filter */}
                   <select
                     className="db-select"
                     value={departmentFilter}
                     onChange={(e) => setDepartmentFilter(e.target.value)}
-                    title="Filter by Senior Department"
+                    title="Filter by Department"
                   >
                     <option value="">All Departments</option>
-                    <option value="general">General / Core Only</option>
                     {departments.map((d) => (
                       <option key={d.id} value={d.id}>
                         {d.name}
@@ -1049,7 +1048,7 @@ export default function SubjectsPage() {
                       <th>Subject Name</th>
                       <th style={{ width: 140 }}>Code</th>
                       <th style={{ width: 180 }}>Section</th>
-                      <th style={{ width: 180 }}>Senior Dept.</th>
+                      <th style={{ width: 180 }}>Department</th>
                       <th style={{ width: 180, textAlign: "right" }}>Actions</th>
                     </tr>
                   </thead>
@@ -1170,7 +1169,7 @@ export default function SubjectsPage() {
                   <div>
                     <h2 className="db-panel-title">Subject Allocation Matrix</h2>
                     <p className="db-panel-sub">
-                      Assign which subjects belong to each class (e.g. Primary 1, JSS 1) or Senior Department (e.g. SSS 1 Science).
+                      Assign which subjects belong to each class (e.g. Primary 1, JSS 1) or Department (e.g. SSS 1 Science).
                     </p>
                   </div>
                 </div>
@@ -1207,7 +1206,7 @@ export default function SubjectsPage() {
                 </div>
 
                 <div className="db-field" style={{ minWidth: 190, margin: 0 }}>
-                  <label>Senior Dept. (Optional)</label>
+                  <label>Department (Optional)</label>
                   <select value={offeringDepartmentId} onChange={(e) => setOfferingDepartmentId(e.target.value)}>
                     <option value="">All Departments</option>
                     {departments.map((item) => (
@@ -1319,16 +1318,16 @@ export default function SubjectsPage() {
                     </div>
 
                     <div className="db-field">
-                      <label>Senior Department (Optional)</label>
+                      <label>Department (Optional)</label>
                       <select value={createDepartmentId} onChange={(e) => setCreateDepartmentId(e.target.value)}>
-                        <option value="">Core / All Departments (General)</option>
+                        <option value="">All Departments</option>
                         {departments.map((d) => (
                           <option key={d.id} value={d.id}>
                             {d.name}
                           </option>
                         ))}
                       </select>
-                      <span className="db-help">Only select for Senior Secondary specialized subjects (e.g. Science or Arts).</span>
+                      <span className="db-help">Only select if this subject belongs to a specific department (e.g. Science, Arts, Commercial).</span>
                     </div>
                   </div>
 
@@ -1379,9 +1378,9 @@ export default function SubjectsPage() {
                     </div>
 
                     <div className="db-field">
-                      <label>Senior Department</label>
+                      <label>Department (Optional)</label>
                       <select value={editDepartmentId} onChange={(e) => setEditDepartmentId(e.target.value)}>
-                        <option value="">Core / All Departments (General)</option>
+                        <option value="">All Departments</option>
                         {departments.map((d) => (
                           <option key={d.id} value={d.id}>
                             {d.name}
