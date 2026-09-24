@@ -456,26 +456,6 @@ export default function SubjectsPage() {
   function openAddModal() {
     setCreateName("");
     setCreateCode("");
-    // Pre-fill section based on current active tab
-    if (activeSectionTab === "primary" && primarySection) {
-      setCreateSectionId(String(primarySection.id));
-      setCreateDepartmentId("");
-    } else if (activeSectionTab === "junior" && juniorSection) {
-      setCreateSectionId(String(juniorSection.id));
-      setCreateDepartmentId("");
-    } else if (activeSectionTab === "senior") {
-      if (seniorSection) setCreateSectionId(String(seniorSection.id));
-      else setCreateSectionId("");
-
-      if (activeSeniorDept !== "all_senior" && activeSeniorDept !== "compulsory") {
-        setCreateDepartmentId(activeSeniorDept);
-      } else {
-        setCreateDepartmentId("");
-      }
-    } else {
-      setCreateSectionId("");
-      setCreateDepartmentId("");
-    }
     setShowCreate(true);
   }
 
@@ -487,9 +467,6 @@ export default function SubjectsPage() {
       setBusyKey("subject:create");
       const payload: any = { name };
       if (createCode.trim()) payload.code = createCode.trim().toUpperCase();
-      if (createSectionId) payload.section_id = Number(createSectionId);
-      if (createDepartmentId) payload.department_id = Number(createDepartmentId);
-      else payload.is_general = true;
 
       const res = await authApi.post("/subjects", payload);
       const code = res.data?.subject_code ? ` (${res.data.subject_code})` : "";
@@ -497,8 +474,6 @@ export default function SubjectsPage() {
 
       setCreateName("");
       setCreateCode("");
-      setCreateSectionId("");
-      setCreateDepartmentId("");
       setShowCreate(false);
       await fetchSubjects();
     } catch (err: any) {
@@ -512,8 +487,6 @@ export default function SubjectsPage() {
     setEditId(subject.id);
     setEditName(subject.name ?? "");
     setEditCode(subject.subject_id ?? "");
-    setEditSectionId(subject.section_id ? String(subject.section_id) : "");
-    setEditDepartmentId(subject.department_id ? String(subject.department_id) : "");
     setShowEdit(true);
   }
 
@@ -525,9 +498,6 @@ export default function SubjectsPage() {
     try {
       setBusyKey(`subject:update:${editId}`);
       const payload: any = { name };
-      payload.section_id = editSectionId ? Number(editSectionId) : null;
-      payload.department_id = editDepartmentId ? Number(editDepartmentId) : null;
-      payload.is_general = !editDepartmentId;
 
       const res = await authApi.put(`/subjects/${editId}`, payload);
       showSuccess(res.data?.message ?? "Subject updated successfully.");
@@ -536,8 +506,6 @@ export default function SubjectsPage() {
       setEditId(null);
       setEditName("");
       setEditCode("");
-      setEditSectionId("");
-      setEditDepartmentId("");
       await fetchSubjects();
     } catch (err: any) {
       showError(getErrorMessage(err));
@@ -1940,17 +1908,17 @@ export default function SubjectsPage() {
             <Footer />
 
             {/* ========================================================
-                MODAL 1: ADD NEW SUBJECT (High-visibility, Clear UI)
+                MODAL 1: ADD NEW SUBJECT (Clean & Fast)
                ======================================================== */}
             {showCreate && (
               <div className="db-modal-overlay" onMouseDown={() => setShowCreate(false)}>
-                <div className="db-modal-card" onMouseDown={(e) => e.stopPropagation()}>
+                <div className="db-modal-card" style={{ maxWidth: 520 }} onMouseDown={(e) => e.stopPropagation()}>
                   <div className="db-modal-top">
                     <div>
                       <h3 className="db-modal-heading">
                         <span>➕ Add New Subject</span>
                       </h3>
-                      <p className="db-modal-desc">Register a master subject in your school curriculum.</p>
+                      <p className="db-modal-desc">Register a master subject in your school catalog.</p>
                     </div>
                     <button className="db-modal-close-btn" onClick={() => setShowCreate(false)} type="button">
                       ✕
@@ -1999,44 +1967,6 @@ export default function SubjectsPage() {
                         ))}
                       </div>
                     </div>
-
-                    {/* Academic Section */}
-                    <div className="db-form-group">
-                      <label>Academic Level / Section (Optional)</label>
-                      <select
-                        className="db-form-input"
-                        value={createSectionId}
-                        onChange={(e) => setCreateSectionId(e.target.value)}
-                      >
-                        <option value="">Universal / All Levels</option>
-                        {sections.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.name}
-                          </option>
-                        ))}
-                      </select>
-                      <span className="db-form-hint">Leave as Universal if taught across multiple school sections.</span>
-                    </div>
-
-                    {/* Department */}
-                    <div className="db-form-group">
-                      <label>Department (Optional)</label>
-                      <select
-                        className="db-form-input"
-                        value={createDepartmentId}
-                        onChange={(e) => setCreateDepartmentId(e.target.value)}
-                      >
-                        <option value="">Compulsory / All Departments</option>
-                        {departments.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.name}
-                          </option>
-                        ))}
-                      </select>
-                      <span className="db-form-hint">
-                        Only select if this subject belongs strictly to a specific department (e.g. Science, Arts, Commercial).
-                      </span>
-                    </div>
                   </div>
 
                   <div className="db-modal-bottom">
@@ -2056,13 +1986,13 @@ export default function SubjectsPage() {
                ======================================================== */}
             {showEdit && (
               <div className="db-modal-overlay" onMouseDown={() => setShowEdit(false)}>
-                <div className="db-modal-card" onMouseDown={(e) => e.stopPropagation()}>
+                <div className="db-modal-card" style={{ maxWidth: 520 }} onMouseDown={(e) => e.stopPropagation()}>
                   <div className="db-modal-top">
                     <div>
                       <h3 className="db-modal-heading">
                         <span>✏️ Edit Subject</span>
                       </h3>
-                      <p className="db-modal-desc">Update subject name and academic categorization.</p>
+                      <p className="db-modal-desc">Update subject name.</p>
                     </div>
                     <button className="db-modal-close-btn" onClick={() => setShowEdit(false)} type="button">
                       ✕
@@ -2078,39 +2008,8 @@ export default function SubjectsPage() {
                         className="db-form-input"
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
+                        autoFocus
                       />
-                    </div>
-
-                    <div className="db-form-group">
-                      <label>Academic Section</label>
-                      <select
-                        className="db-form-input"
-                        value={editSectionId}
-                        onChange={(e) => setEditSectionId(e.target.value)}
-                      >
-                        <option value="">Universal / All Sections</option>
-                        {sections.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="db-form-group">
-                      <label>Department</label>
-                      <select
-                        className="db-form-input"
-                        value={editDepartmentId}
-                        onChange={(e) => setEditDepartmentId(e.target.value)}
-                      >
-                        <option value="">Compulsory / All Departments</option>
-                        {departments.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.name}
-                          </option>
-                        ))}
-                      </select>
                     </div>
                   </div>
 
