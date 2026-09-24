@@ -36,118 +36,129 @@ type CurriculumTemplateItem = {
   code: string;
   section_tag: string;
   dept_tag?: string;
+  category_label?: string;
 };
 
 /* =========================
    STANDARD CURRICULUM PRESETS
 ========================= */
-const STANDARD_CURRICULUM: Record<string, { label: string; icon: string; items: CurriculumTemplateItem[] }> = {
+const STANDARD_CURRICULUM: Record<
+  string,
+  { label: string; icon: string; tag: string; items: CurriculumTemplateItem[] }
+> = {
   primary: {
-    label: "Primary / Basic Section",
+    label: "Primary / Basic",
     icon: "🎒",
+    tag: "Primary",
     items: [
-      { name: "Mathematics", code: "MTH", section_tag: "primary" },
-      { name: "English Studies", code: "ENG", section_tag: "primary" },
-      { name: "Basic Science & Technology", code: "BST", section_tag: "primary" },
-      { name: "Social Studies", code: "SOS", section_tag: "primary" },
-      { name: "Civic Education", code: "CIV", section_tag: "primary" },
-      { name: "Quantitative Reasoning", code: "QTR", section_tag: "primary" },
-      { name: "Verbal Reasoning", code: "VRB", section_tag: "primary" },
-      { name: "Christian Religious Studies (CRS)", code: "CRS", section_tag: "primary" },
-      { name: "Islamic Religious Studies (IRS)", code: "IRS", section_tag: "primary" },
-      { name: "Cultural & Creative Arts (CCA)", code: "CCA", section_tag: "primary" },
-      { name: "Physical & Health Education (PHE)", code: "PHE", section_tag: "primary" },
-      { name: "Agricultural Science", code: "AGR", section_tag: "primary" },
-      { name: "Home Economics", code: "HEC", section_tag: "primary" },
-      { name: "Computer Studies / ICT", code: "ICT", section_tag: "primary" },
-      { name: "Handwriting & Phonics", code: "HWT", section_tag: "primary" },
-      { name: "French Language", code: "FRN", section_tag: "primary" },
+      { name: "Mathematics", code: "MTH", section_tag: "primary", category_label: "Primary" },
+      { name: "English Studies", code: "ENG", section_tag: "primary", category_label: "Primary" },
+      { name: "Basic Science & Technology", code: "BST", section_tag: "primary", category_label: "Primary" },
+      { name: "Social Studies", code: "SOS", section_tag: "primary", category_label: "Primary" },
+      { name: "Civic Education", code: "CIV", section_tag: "primary", category_label: "Primary" },
+      { name: "Quantitative Reasoning", code: "QTR", section_tag: "primary", category_label: "Primary" },
+      { name: "Verbal Reasoning", code: "VRB", section_tag: "primary", category_label: "Primary" },
+      { name: "Christian Religious Studies (CRS)", code: "CRS", section_tag: "primary", category_label: "Primary" },
+      { name: "Islamic Religious Studies (IRS)", code: "IRS", section_tag: "primary", category_label: "Primary" },
+      { name: "Cultural & Creative Arts (CCA)", code: "CCA", section_tag: "primary", category_label: "Primary" },
+      { name: "Physical & Health Education (PHE)", code: "PHE", section_tag: "primary", category_label: "Primary" },
+      { name: "Agricultural Science", code: "AGR", section_tag: "primary", category_label: "Primary" },
+      { name: "Home Economics", code: "HEC", section_tag: "primary", category_label: "Primary" },
+      { name: "Computer Studies / ICT", code: "ICT", section_tag: "primary", category_label: "Primary" },
+      { name: "Handwriting & Phonics", code: "HWT", section_tag: "primary", category_label: "Primary" },
+      { name: "French Language", code: "FRN", section_tag: "primary", category_label: "Primary" },
     ],
   },
   junior: {
     label: "Junior Secondary (JSS)",
     icon: "📘",
+    tag: "Junior Sec",
     items: [
-      { name: "English Studies", code: "ENG", section_tag: "junior" },
-      { name: "General Mathematics", code: "MTH", section_tag: "junior" },
-      { name: "Basic Science", code: "BSC", section_tag: "junior" },
-      { name: "Basic Technology", code: "BTE", section_tag: "junior" },
-      { name: "Business Studies", code: "BST", section_tag: "junior" },
-      { name: "Social Studies", code: "SOS", section_tag: "junior" },
-      { name: "Civic Education", code: "CIV", section_tag: "junior" },
-      { name: "Agricultural Science", code: "AGR", section_tag: "junior" },
-      { name: "Home Economics", code: "HEC", section_tag: "junior" },
-      { name: "Computer Studies / ICT", code: "ICT", section_tag: "junior" },
-      { name: "Physical & Health Education (PHE)", code: "PHE", section_tag: "junior" },
-      { name: "Cultural & Creative Arts (CCA)", code: "CCA", section_tag: "junior" },
-      { name: "Christian Religious Studies (CRS)", code: "CRS", section_tag: "junior" },
-      { name: "Islamic Religious Studies (IRS)", code: "IRS", section_tag: "junior" },
-      { name: "French Language", code: "FRN", section_tag: "junior" },
-      { name: "Nigerian Language (Hausa / Igbo / Yoruba)", code: "NLN", section_tag: "junior" },
+      { name: "English Studies", code: "ENG", section_tag: "junior", category_label: "Junior Sec" },
+      { name: "General Mathematics", code: "MTH", section_tag: "junior", category_label: "Junior Sec" },
+      { name: "Basic Science", code: "BSC", section_tag: "junior", category_label: "Junior Sec" },
+      { name: "Basic Technology", code: "BTE", section_tag: "junior", category_label: "Junior Sec" },
+      { name: "Business Studies", code: "BST", section_tag: "junior", category_label: "Junior Sec" },
+      { name: "Social Studies", code: "SOS", section_tag: "junior", category_label: "Junior Sec" },
+      { name: "Civic Education", code: "CIV", section_tag: "junior", category_label: "Junior Sec" },
+      { name: "Agricultural Science", code: "AGR", section_tag: "junior", category_label: "Junior Sec" },
+      { name: "Home Economics", code: "HEC", section_tag: "junior", category_label: "Junior Sec" },
+      { name: "Computer Studies / ICT", code: "ICT", section_tag: "junior", category_label: "Junior Sec" },
+      { name: "Physical & Health Education (PHE)", code: "PHE", section_tag: "junior", category_label: "Junior Sec" },
+      { name: "Cultural & Creative Arts (CCA)", code: "CCA", section_tag: "junior", category_label: "Junior Sec" },
+      { name: "Christian Religious Studies (CRS)", code: "CRS", section_tag: "junior", category_label: "Junior Sec" },
+      { name: "Islamic Religious Studies (IRS)", code: "IRS", section_tag: "junior", category_label: "Junior Sec" },
+      { name: "French Language", code: "FRN", section_tag: "junior", category_label: "Junior Sec" },
+      { name: "Nigerian Language (Hausa / Igbo / Yoruba)", code: "NLN", section_tag: "junior", category_label: "Junior Sec" },
     ],
   },
-  senior_core: {
-    label: "Senior Sec - General / All Depts",
+  senior_compulsory: {
+    label: "Senior Compulsory (All Depts)",
     icon: "⭐",
+    tag: "Senior Compulsory",
     items: [
-      { name: "English Language", code: "ENG", section_tag: "senior", dept_tag: "general" },
-      { name: "General Mathematics", code: "MTH", section_tag: "senior", dept_tag: "general" },
-      { name: "Civic Education", code: "CIV", section_tag: "senior", dept_tag: "general" },
-      { name: "Economics", code: "ECO", section_tag: "senior", dept_tag: "general" },
-      { name: "Data Processing", code: "DTP", section_tag: "senior", dept_tag: "general" },
-      { name: "Trade & Entrepreneurship", code: "TRD", section_tag: "senior", dept_tag: "general" },
+      { name: "English Language", code: "ENG", section_tag: "senior", dept_tag: "general", category_label: "Senior Compulsory" },
+      { name: "General Mathematics", code: "MTH", section_tag: "senior", dept_tag: "general", category_label: "Senior Compulsory" },
+      { name: "Civic Education", code: "CIV", section_tag: "senior", dept_tag: "general", category_label: "Senior Compulsory" },
+      { name: "Economics", code: "ECO", section_tag: "senior", dept_tag: "general", category_label: "Senior Compulsory" },
+      { name: "Data Processing", code: "DTP", section_tag: "senior", dept_tag: "general", category_label: "Senior Compulsory" },
+      { name: "Trade & Entrepreneurship", code: "TRD", section_tag: "senior", dept_tag: "general", category_label: "Senior Compulsory" },
     ],
   },
   senior_science: {
-    label: "Senior Sec - Science Department",
+    label: "Senior Science Department",
     icon: "🔬",
+    tag: "Senior Science",
     items: [
-      { name: "Physics", code: "PHY", section_tag: "senior", dept_tag: "science" },
-      { name: "Chemistry", code: "CHM", section_tag: "senior", dept_tag: "science" },
-      { name: "Biology", code: "BIO", section_tag: "senior", dept_tag: "science" },
-      { name: "Further Mathematics", code: "FMT", section_tag: "senior", dept_tag: "science" },
-      { name: "Agricultural Science", code: "AGR", section_tag: "senior", dept_tag: "science" },
-      { name: "Technical Drawing", code: "TDR", section_tag: "senior", dept_tag: "science" },
-      { name: "Geography", code: "GEO", section_tag: "senior", dept_tag: "science" },
+      { name: "Physics", code: "PHY", section_tag: "senior", dept_tag: "science", category_label: "Science" },
+      { name: "Chemistry", code: "CHM", section_tag: "senior", dept_tag: "science", category_label: "Science" },
+      { name: "Biology", code: "BIO", section_tag: "senior", dept_tag: "science", category_label: "Science" },
+      { name: "Further Mathematics", code: "FMT", section_tag: "senior", dept_tag: "science", category_label: "Science" },
+      { name: "Agricultural Science", code: "AGR", section_tag: "senior", dept_tag: "science", category_label: "Science" },
+      { name: "Technical Drawing", code: "TDR", section_tag: "senior", dept_tag: "science", category_label: "Science" },
+      { name: "Geography", code: "GEO", section_tag: "senior", dept_tag: "science", category_label: "Science" },
     ],
   },
   senior_arts: {
-    label: "Senior Sec - Arts & Humanities",
+    label: "Senior Arts & Humanities",
     icon: "🏛️",
+    tag: "Senior Arts",
     items: [
-      { name: "Literature in English", code: "LIT", section_tag: "senior", dept_tag: "arts" },
-      { name: "Government", code: "GOV", section_tag: "senior", dept_tag: "arts" },
-      { name: "Christian Religious Studies (CRS)", code: "CRS", section_tag: "senior", dept_tag: "arts" },
-      { name: "Islamic Religious Studies (IRS)", code: "IRS", section_tag: "senior", dept_tag: "arts" },
-      { name: "History", code: "HIS", section_tag: "senior", dept_tag: "arts" },
-      { name: "Visual Arts", code: "ART", section_tag: "senior", dept_tag: "arts" },
-      { name: "Music", code: "MUS", section_tag: "senior", dept_tag: "arts" },
-      { name: "French Language", code: "FRN", section_tag: "senior", dept_tag: "arts" },
-      { name: "Nigerian Language (Hausa / Igbo / Yoruba)", code: "NLN", section_tag: "senior", dept_tag: "arts" },
+      { name: "Literature in English", code: "LIT", section_tag: "senior", dept_tag: "arts", category_label: "Arts & Humanities" },
+      { name: "Government", code: "GOV", section_tag: "senior", dept_tag: "arts", category_label: "Arts & Humanities" },
+      { name: "Christian Religious Studies (CRS)", code: "CRS", section_tag: "senior", dept_tag: "arts", category_label: "Arts & Humanities" },
+      { name: "Islamic Religious Studies (IRS)", code: "IRS", section_tag: "senior", dept_tag: "arts", category_label: "Arts & Humanities" },
+      { name: "History", code: "HIS", section_tag: "senior", dept_tag: "arts", category_label: "Arts & Humanities" },
+      { name: "Visual Arts", code: "ART", section_tag: "senior", dept_tag: "arts", category_label: "Arts & Humanities" },
+      { name: "Music", code: "MUS", section_tag: "senior", dept_tag: "arts", category_label: "Arts & Humanities" },
+      { name: "French Language", code: "FRN", section_tag: "senior", dept_tag: "arts", category_label: "Arts & Humanities" },
+      { name: "Nigerian Language (Hausa / Igbo / Yoruba)", code: "NLN", section_tag: "senior", dept_tag: "arts", category_label: "Arts & Humanities" },
     ],
   },
   senior_commercial: {
-    label: "Senior Sec - Commercial Department",
+    label: "Senior Commercial Department",
     icon: "📊",
+    tag: "Senior Commercial",
     items: [
-      { name: "Financial Accounting", code: "ACC", section_tag: "senior", dept_tag: "commercial" },
-      { name: "Commerce", code: "COM", section_tag: "senior", dept_tag: "commercial" },
-      { name: "Book Keeping", code: "BKK", section_tag: "senior", dept_tag: "commercial" },
-      { name: "Store Management", code: "STM", section_tag: "senior", dept_tag: "commercial" },
-      { name: "Office Practice", code: "OFP", section_tag: "senior", dept_tag: "commercial" },
-      { name: "Insurance", code: "INS", section_tag: "senior", dept_tag: "commercial" },
+      { name: "Financial Accounting", code: "ACC", section_tag: "senior", dept_tag: "commercial", category_label: "Commercial" },
+      { name: "Commerce", code: "COM", section_tag: "senior", dept_tag: "commercial", category_label: "Commercial" },
+      { name: "Book Keeping", code: "BKK", section_tag: "senior", dept_tag: "commercial", category_label: "Commercial" },
+      { name: "Store Management", code: "STM", section_tag: "senior", dept_tag: "commercial", category_label: "Commercial" },
+      { name: "Office Practice", code: "OFP", section_tag: "senior", dept_tag: "commercial", category_label: "Commercial" },
+      { name: "Insurance", code: "INS", section_tag: "senior", dept_tag: "commercial", category_label: "Commercial" },
     ],
   },
   senior_vocational: {
-    label: "Senior Sec - Vocational & Technical",
+    label: "Senior Vocational & Technical",
     icon: "🛠️",
+    tag: "Senior Vocational",
     items: [
-      { name: "Food & Nutrition", code: "FDN", section_tag: "senior", dept_tag: "vocational" },
-      { name: "Clothing & Textiles", code: "CLT", section_tag: "senior", dept_tag: "vocational" },
-      { name: "Auto Mechanics", code: "MEC", section_tag: "senior", dept_tag: "vocational" },
-      { name: "Building Construction", code: "BLD", section_tag: "senior", dept_tag: "vocational" },
-      { name: "Electrical Installation", code: "ELE", section_tag: "senior", dept_tag: "vocational" },
-      { name: "Woodwork", code: "WDW", section_tag: "senior", dept_tag: "vocational" },
+      { name: "Food & Nutrition", code: "FDN", section_tag: "senior", dept_tag: "vocational", category_label: "Vocational" },
+      { name: "Clothing & Textiles", code: "CLT", section_tag: "senior", dept_tag: "vocational", category_label: "Vocational" },
+      { name: "Auto Mechanics", code: "MEC", section_tag: "senior", dept_tag: "vocational", category_label: "Vocational" },
+      { name: "Building Construction", code: "BLD", section_tag: "senior", dept_tag: "vocational", category_label: "Vocational" },
+      { name: "Electrical Installation", code: "ELE", section_tag: "senior", dept_tag: "vocational", category_label: "Vocational" },
+      { name: "Woodwork", code: "WDW", section_tag: "senior", dept_tag: "vocational", category_label: "Vocational" },
     ],
   },
 };
@@ -205,7 +216,7 @@ export default function SubjectsPage() {
 
   // active Section Tab: 'all' | 'primary' | 'junior' | 'senior' | number (custom section id)
   const [activeSectionTab, setActiveSectionTab] = useState<string>("all");
-  // active Senior Department Tab: 'all_senior' | 'core' | number (dept_id)
+  // active Senior Department Tab: 'all_senior' | 'compulsory' | number (dept_id)
   const [activeSeniorDept, setActiveSeniorDept] = useState<string>("all_senior");
 
   // filters & search
@@ -225,12 +236,14 @@ export default function SubjectsPage() {
 
   // create form
   const [createName, setCreateName] = useState("");
+  const [createCode, setCreateCode] = useState("");
   const [createSectionId, setCreateSectionId] = useState<string>("");
   const [createDepartmentId, setCreateDepartmentId] = useState<string>("");
 
   // edit form
   const [editId, setEditId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
+  const [editCode, setEditCode] = useState("");
   const [editSectionId, setEditSectionId] = useState<string>("");
   const [editDepartmentId, setEditDepartmentId] = useState<string>("");
 
@@ -349,17 +362,17 @@ export default function SubjectsPage() {
     s.section?.name ?? sections.find((x) => x.id === s.section_id)?.name ?? "Universal / All";
 
   const departmentName = (s: Subject) =>
-    s.department?.name ?? departments.find((x) => x.id === s.department_id)?.name ?? "All Departments";
+    s.department?.name ?? departments.find((x) => x.id === s.department_id)?.name ?? "Compulsory (All Depts)";
 
   const isSubjectInPrimary = (s: Subject) => {
-    if (!s.section_id) return true; // Universal
+    if (!s.section_id && !s.department_id) return true; // Universal
     if (primarySection && s.section_id === primarySection.id) return true;
     const name = sectionName(s).toLowerCase();
     return /primary|nursery|basic|grade|kinder/i.test(name);
   };
 
   const isSubjectInJunior = (s: Subject) => {
-    if (!s.section_id) return true; // Universal
+    if (!s.section_id && !s.department_id) return true; // Universal
     if (juniorSection && s.section_id === juniorSection.id) return true;
     const name = sectionName(s).toLowerCase();
     return /junior|jss/i.test(name);
@@ -388,7 +401,7 @@ export default function SubjectsPage() {
       list = list.filter(isSubjectInSenior);
 
       // Senior Department Sub-Filter
-      if (activeSeniorDept === "core") {
+      if (activeSeniorDept === "compulsory") {
         list = list.filter((s) => !s.department_id);
       } else if (activeSeniorDept !== "all_senior") {
         const deptIdNum = Number(activeSeniorDept);
@@ -442,6 +455,7 @@ export default function SubjectsPage() {
   ========================= */
   function openAddModal() {
     setCreateName("");
+    setCreateCode("");
     // Pre-fill section based on current active tab
     if (activeSectionTab === "primary" && primarySection) {
       setCreateSectionId(String(primarySection.id));
@@ -453,7 +467,7 @@ export default function SubjectsPage() {
       if (seniorSection) setCreateSectionId(String(seniorSection.id));
       else setCreateSectionId("");
 
-      if (activeSeniorDept !== "all_senior" && activeSeniorDept !== "core") {
+      if (activeSeniorDept !== "all_senior" && activeSeniorDept !== "compulsory") {
         setCreateDepartmentId(activeSeniorDept);
       } else {
         setCreateDepartmentId("");
@@ -472,6 +486,7 @@ export default function SubjectsPage() {
     try {
       setBusyKey("subject:create");
       const payload: any = { name };
+      if (createCode.trim()) payload.code = createCode.trim().toUpperCase();
       if (createSectionId) payload.section_id = Number(createSectionId);
       if (createDepartmentId) payload.department_id = Number(createDepartmentId);
       else payload.is_general = true;
@@ -481,6 +496,7 @@ export default function SubjectsPage() {
       showSuccess((res.data?.message ?? "Subject added successfully") + code);
 
       setCreateName("");
+      setCreateCode("");
       setCreateSectionId("");
       setCreateDepartmentId("");
       setShowCreate(false);
@@ -495,6 +511,7 @@ export default function SubjectsPage() {
   function openEdit(subject: Subject) {
     setEditId(subject.id);
     setEditName(subject.name ?? "");
+    setEditCode(subject.subject_id ?? "");
     setEditSectionId(subject.section_id ? String(subject.section_id) : "");
     setEditDepartmentId(subject.department_id ? String(subject.department_id) : "");
     setShowEdit(true);
@@ -518,6 +535,7 @@ export default function SubjectsPage() {
       setShowEdit(false);
       setEditId(null);
       setEditName("");
+      setEditCode("");
       setEditSectionId("");
       setEditDepartmentId("");
       await fetchSubjects();
@@ -605,39 +623,62 @@ export default function SubjectsPage() {
   ========================= */
   function openCurriculumModal(category: string = "all") {
     setSelectedCurriculumCategory(category);
-    // Pre-check all items for that category
+    // Pre-check all items that are NOT already in the school
     const initialMap: Record<string, boolean> = {};
-    if (category === "all") {
-      Object.values(STANDARD_CURRICULUM).forEach((group) => {
-        group.items.forEach((item) => {
+    Object.values(STANDARD_CURRICULUM).forEach((group) => {
+      group.items.forEach((item) => {
+        const alreadyInSchool = subjects.some(
+          (s) => s.name.toLowerCase().trim() === item.name.toLowerCase().trim()
+        );
+        if (!alreadyInSchool) {
           initialMap[item.name] = true;
-        });
+        }
       });
-    } else if (STANDARD_CURRICULUM[category]) {
-      STANDARD_CURRICULUM[category].items.forEach((item) => {
-        initialMap[item.name] = true;
-      });
-    }
+    });
     setCurriculumSelection(initialMap);
     setShowCurriculumModal(true);
   }
 
-  async function importSelectedCurriculum() {
-    const activeGroupKeys =
-      selectedCurriculumCategory === "all"
-        ? Object.keys(STANDARD_CURRICULUM)
-        : [selectedCurriculumCategory];
+  // Items currently visible in the modal based on active category
+  const activeModalCurriculumGroups = useMemo(() => {
+    if (selectedCurriculumCategory === "all") {
+      return Object.entries(STANDARD_CURRICULUM);
+    }
+    if (STANDARD_CURRICULUM[selectedCurriculumCategory]) {
+      return [[selectedCurriculumCategory, STANDARD_CURRICULUM[selectedCurriculumCategory]]] as [
+        string,
+        (typeof STANDARD_CURRICULUM)[string]
+      ][];
+    }
+    return Object.entries(STANDARD_CURRICULUM);
+  }, [selectedCurriculumCategory]);
 
+  const modalSelectedCount = useMemo(() => {
+    let count = 0;
+    activeModalCurriculumGroups.forEach(([, group]) => {
+      group.items.forEach((item) => {
+        const alreadyExists = subjects.some(
+          (s) => s.name.toLowerCase().trim() === item.name.toLowerCase().trim()
+        );
+        if (!alreadyExists && curriculumSelection[item.name]) {
+          count++;
+        }
+      });
+    });
+    return count;
+  }, [activeModalCurriculumGroups, curriculumSelection, subjects]);
+
+  async function importSelectedCurriculum() {
     const selectedItems: CurriculumTemplateItem[] = [];
-    activeGroupKeys.forEach((key) => {
-      const group = STANDARD_CURRICULUM[key];
-      if (group) {
-        group.items.forEach((item) => {
-          if (curriculumSelection[item.name]) {
-            selectedItems.push(item);
-          }
-        });
-      }
+    activeModalCurriculumGroups.forEach(([, group]) => {
+      group.items.forEach((item) => {
+        const alreadyExists = subjects.some(
+          (s) => s.name.toLowerCase().trim() === item.name.toLowerCase().trim()
+        );
+        if (!alreadyExists && curriculumSelection[item.name]) {
+          selectedItems.push(item);
+        }
+      });
     });
 
     if (selectedItems.length === 0) {
@@ -741,7 +782,7 @@ export default function SubjectsPage() {
         next[s.id] = true;
       } else if (isSeniorClass) {
         if (!s.department_id) {
-          next[s.id] = true; // Core Senior Subjects
+          next[s.id] = true; // Compulsory Senior Subjects
         } else if (offeringDepartmentId && s.department_id === Number(offeringDepartmentId)) {
           next[s.id] = true; // Specific Department Subjects
         }
@@ -752,7 +793,7 @@ export default function SubjectsPage() {
     });
 
     setOfferingSubjectIds(next);
-    showSuccess("Pre-selected standard subjects for this academic level.");
+    showSuccess("Pre-selected compulsory & standard subjects for this level.");
   }
 
   function clearAllOfferings() {
@@ -1140,88 +1181,215 @@ export default function SubjectsPage() {
         .db-option-card:hover { border-color: #3B82F6; background: #EFF6FF; }
         .db-option-card input[type="checkbox"] { width: 16px; height: 16px; accent-color: #2563EB; }
 
-        /* Modal */
-        .db-modal-backdrop {
+        /* ============================
+           MODAL SYSTEM - HIGH VISIBILITY
+        ============================ */
+        .db-modal-overlay {
           position: fixed;
-          top: 0; left: 0; right: 0; bottom: 0;
-          background: rgba(15, 23, 42, 0.65);
-          backdrop-filter: blur(4px);
+          inset: 0;
+          background: rgba(15, 23, 42, 0.75);
+          backdrop-filter: blur(5px);
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 9999;
+          z-index: 99999;
           padding: 16px;
+          overflow-y: auto;
         }
-        .db-modal {
-          background: #fff;
-          border-radius: 18px;
+        .db-modal-card {
+          background: #FFFFFF;
+          border-radius: 20px;
           width: 100%;
-          max-width: 580px;
-          box-shadow: 0 20px 40px rgba(0,0,0,0.2);
-          overflow: hidden;
-          max-height: 90vh;
+          max-width: 620px;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+          border: 1px solid #E2E8F0;
           display: flex;
-          flex-column: column;
+          flex-direction: column;
+          max-height: 90vh;
+          overflow: hidden;
+          animation: modalFadeIn 0.2s ease-out;
         }
-        .db-modal-head {
+        @keyframes modalFadeIn {
+          from { opacity: 0; transform: scale(0.97) translateY(8px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .db-modal-top {
           padding: 20px 24px;
-          background: #F8FAFC;
-          border-bottom: 1px solid #E2E8F0;
+          background: #FFFFFF;
+          border-bottom: 1px solid #F1F5F9;
           display: flex;
           justify-content: space-between;
           align-items: center;
         }
-        .db-modal-body {
+        .db-modal-heading {
+          font-size: 18px;
+          font-weight: 800;
+          color: #0F172A;
+          margin: 0;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .db-modal-desc {
+          font-size: 12.5px;
+          color: #64748B;
+          margin: 3px 0 0 0;
+        }
+        .db-modal-close-btn {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          border: 1px solid #E2E8F0;
+          background: #F8FAFC;
+          color: #64748B;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .db-modal-close-btn:hover {
+          background: #F1F5F9;
+          color: #0F172A;
+          border-color: #CBD5E1;
+        }
+        .db-modal-content {
           padding: 24px;
           overflow-y: auto;
           flex: 1;
         }
-        .db-modal-foot {
+        .db-modal-bottom {
           padding: 16px 24px;
           background: #F8FAFC;
           border-top: 1px solid #E2E8F0;
           display: flex;
           justify-content: flex-end;
-          gap: 10px;
+          gap: 12px;
+          align-items: center;
         }
-        .db-field {
-          margin-bottom: 16px;
+
+        /* Form Fields */
+        .db-form-group {
+          margin-bottom: 18px;
         }
-        .db-field label {
+        .db-form-group label {
           display: block;
           font-size: 13px;
           font-weight: 700;
           color: #0F172A;
-          margin-bottom: 6px;
+          margin-bottom: 7px;
         }
-        .db-field input, .db-field select {
+        .db-form-input {
           width: 100%;
-          padding: 9px 13px;
+          padding: 10px 14px;
           border: 1px solid #CBD5E1;
           border-radius: 10px;
-          font-size: 13.5px;
+          font-size: 14px;
+          color: #0F172A;
+          background: #FFFFFF;
           outline: none;
+          transition: border-color 0.2s, box-shadow 0.2s;
         }
-        .db-field input:focus, .db-field select:focus { border-color: #2563EB; }
-        .db-help { font-size: 12px; color: #64748B; margin-top: 4px; display: block; }
+        .db-form-input:focus {
+          border-color: #2563EB;
+          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+        .db-form-hint {
+          font-size: 12px;
+          color: #64748B;
+          margin-top: 5px;
+          display: block;
+        }
 
-        .db-suggest-chips {
+        /* Suggestion Pills */
+        .db-quick-chips {
           display: flex;
           gap: 6px;
           flex-wrap: wrap;
-          margin-top: 8px;
+          margin-top: 10px;
         }
-        .db-suggest-chip {
+        .db-quick-chip {
           font-size: 11.5px;
-          padding: 4px 8px;
-          border-radius: 6px;
+          padding: 4px 10px;
+          border-radius: 8px;
           background: #EFF6FF;
           border: 1px solid #BFDBFE;
           color: #1E40AF;
           cursor: pointer;
           font-weight: 600;
+          transition: all 0.15s;
         }
-        .db-suggest-chip:hover { background: #DBEAFE; }
+        .db-quick-chip:hover {
+          background: #DBEAFE;
+          border-color: #93C5FD;
+          transform: translateY(-1px);
+        }
+
+        /* Curriculum Modal Categories */
+        .db-curriculum-cat-bar {
+          display: flex;
+          gap: 6px;
+          overflow-x: auto;
+          padding-bottom: 8px;
+          margin-bottom: 16px;
+        }
+        .db-curriculum-cat-btn {
+          padding: 7px 12px;
+          border-radius: 10px;
+          font-size: 12px;
+          font-weight: 700;
+          border: 1px solid #E2E8F0;
+          background: #F8FAFC;
+          color: #475569;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: all 0.15s;
+        }
+        .db-curriculum-cat-btn:hover {
+          background: #EFF6FF;
+          color: #1E40AF;
+        }
+        .db-curriculum-cat-btn.active {
+          background: #7C3AED;
+          color: #FFFFFF;
+          border-color: #7C3AED;
+          box-shadow: 0 2px 6px rgba(124, 58, 237, 0.25);
+        }
+
+        /* Curriculum Preset Item Card */
+        .db-preset-card {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 14px;
+          border-radius: 10px;
+          border: 1px solid #E2E8F0;
+          background: #FFFFFF;
+          transition: all 0.15s;
+          cursor: pointer;
+        }
+        .db-preset-card:hover {
+          border-color: #93C5FD;
+          background: #F8FAFC;
+        }
+        .db-preset-card.checked {
+          border-color: #7C3AED;
+          background: #FAF5FF;
+        }
+        .db-preset-card.exists {
+          background: #F1F5F9;
+          border-color: #E2E8F0;
+          opacity: 0.75;
+          cursor: not-allowed;
+        }
+        .db-preset-card input[type="checkbox"] {
+          width: 17px;
+          height: 17px;
+          accent-color: #7C3AED;
+          cursor: pointer;
+        }
 
         /* Pagination */
         .db-pagination {
@@ -1366,11 +1534,11 @@ export default function SubjectsPage() {
                   All Senior ({seniorCount})
                 </button>
                 <button
-                  className={`db-dept-pill ${activeSeniorDept === "core" ? "active" : ""}`}
-                  onClick={() => setActiveSeniorDept("core")}
+                  className={`db-dept-pill ${activeSeniorDept === "compulsory" ? "active" : ""}`}
+                  onClick={() => setActiveSeniorDept("compulsory")}
                   type="button"
                 >
-                  ⭐ General / Core (All Depts)
+                  ⭐ Compulsory (All Depts)
                 </button>
                 {departments.map((d) => (
                   <button
@@ -1402,7 +1570,7 @@ export default function SubjectsPage() {
                         : activeSectionTab === "junior"
                         ? "Junior Secondary (JSS) Subjects"
                         : activeSectionTab === "senior"
-                        ? `Senior Secondary Subjects ${activeSeniorDept !== "all_senior" ? "— " + (activeSeniorDept === "core" ? "General / Core" : (departments.find((d) => String(d.id) === activeSeniorDept)?.name || "")) : ""}`
+                        ? `Senior Secondary Subjects ${activeSeniorDept !== "all_senior" ? "— " + (activeSeniorDept === "compulsory" ? "Compulsory (All Depts)" : (departments.find((d) => String(d.id) === activeSeniorDept)?.name || "")) : ""}`
                         : "Registered Subjects Master Catalog"}
                     </h2>
                     <p className="db-panel-sub">
@@ -1437,7 +1605,7 @@ export default function SubjectsPage() {
                       if (activeSectionTab === "primary") openCurriculumModal("primary");
                       else if (activeSectionTab === "junior") openCurriculumModal("junior");
                       else if (activeSectionTab === "senior") {
-                        if (activeSeniorDept === "core") openCurriculumModal("senior_core");
+                        if (activeSeniorDept === "compulsory") openCurriculumModal("senior_compulsory");
                         else if (activeSeniorDept !== "all_senior") {
                           const deptObj = departments.find((d) => String(d.id) === activeSeniorDept);
                           const deptName = (deptObj?.name || "").toLowerCase();
@@ -1523,7 +1691,7 @@ export default function SubjectsPage() {
                       <th>Subject Name</th>
                       <th style={{ width: 130 }}>Code</th>
                       <th style={{ width: 170 }}>Academic Section</th>
-                      <th style={{ width: 180 }}>Department</th>
+                      <th style={{ width: 190 }}>Department / Category</th>
                       <th style={{ width: 160, textAlign: "right" }}>Actions</th>
                     </tr>
                   </thead>
@@ -1658,9 +1826,13 @@ export default function SubjectsPage() {
 
               {/* Scope selectors */}
               <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 18 }}>
-                <div className="db-field" style={{ minWidth: 200, margin: 0 }}>
+                <div className="db-form-group" style={{ minWidth: 200, margin: 0 }}>
                   <label>Select Target Class</label>
-                  <select value={offeringClassId} onChange={(e) => setOfferingClassId(e.target.value)}>
+                  <select
+                    className="db-form-input"
+                    value={offeringClassId}
+                    onChange={(e) => setOfferingClassId(e.target.value)}
+                  >
                     <option value="">All Classes (School Default)</option>
                     {classes.map((item) => (
                       <option key={item.id} value={item.id}>
@@ -1670,9 +1842,13 @@ export default function SubjectsPage() {
                   </select>
                 </div>
 
-                <div className="db-field" style={{ minWidth: 170, margin: 0 }}>
+                <div className="db-form-group" style={{ minWidth: 170, margin: 0 }}>
                   <label>Section (Optional)</label>
-                  <select value={offeringSectionId} onChange={(e) => setOfferingSectionId(e.target.value)}>
+                  <select
+                    className="db-form-input"
+                    value={offeringSectionId}
+                    onChange={(e) => setOfferingSectionId(e.target.value)}
+                  >
                     <option value="">All Sections</option>
                     {sections.map((item) => (
                       <option key={item.id} value={item.id}>
@@ -1682,10 +1858,14 @@ export default function SubjectsPage() {
                   </select>
                 </div>
 
-                <div className="db-field" style={{ minWidth: 180, margin: 0 }}>
+                <div className="db-form-group" style={{ minWidth: 180, margin: 0 }}>
                   <label>Department (Optional)</label>
-                  <select value={offeringDepartmentId} onChange={(e) => setOfferingDepartmentId(e.target.value)}>
-                    <option value="">All Departments</option>
+                  <select
+                    className="db-form-input"
+                    value={offeringDepartmentId}
+                    onChange={(e) => setOfferingDepartmentId(e.target.value)}
+                  >
+                    <option value="">Compulsory / All Departments</option>
                     {departments.map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.name}
@@ -1710,7 +1890,7 @@ export default function SubjectsPage() {
                   type="button"
                   onClick={selectRecommendedOfferings}
                 >
-                  ⚡ Auto-Select Level Core
+                  ⚡ Auto-Select Compulsory Subjects
                 </button>
 
                 <button
@@ -1725,7 +1905,7 @@ export default function SubjectsPage() {
               </div>
 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                <div className="db-help">
+                <div className="db-form-hint">
                   Check the subjects offered by students in this class:
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
@@ -1759,40 +1939,60 @@ export default function SubjectsPage() {
 
             <Footer />
 
-            {/* MODAL: ADD SUBJECT */}
+            {/* ========================================================
+                MODAL 1: ADD NEW SUBJECT (High-visibility, Clear UI)
+               ======================================================== */}
             {showCreate && (
-              <div className="db-modal-backdrop" onMouseDown={() => setShowCreate(false)}>
-                <div className="db-modal" onMouseDown={(e) => e.stopPropagation()}>
-                  <div className="db-modal-head">
+              <div className="db-modal-overlay" onMouseDown={() => setShowCreate(false)}>
+                <div className="db-modal-card" onMouseDown={(e) => e.stopPropagation()}>
+                  <div className="db-modal-top">
                     <div>
-                      <h3 className="db-panel-title">Add New Subject</h3>
-                      <p className="db-panel-sub">Create a subject in your school catalog.</p>
+                      <h3 className="db-modal-heading">
+                        <span>➕ Add New Subject</span>
+                      </h3>
+                      <p className="db-modal-desc">Register a master subject in your school curriculum.</p>
                     </div>
-                    <button className="db-chip-btn" onClick={() => setShowCreate(false)} type="button">
+                    <button className="db-modal-close-btn" onClick={() => setShowCreate(false)} type="button">
                       ✕
                     </button>
                   </div>
 
-                  <div className="db-modal-body">
-                    <div className="db-field">
+                  <div className="db-modal-content">
+                    {/* Subject Name Input */}
+                    <div className="db-form-group">
                       <label>
                         Subject Name <span style={{ color: "#EF4444" }}>*</span>
                       </label>
                       <input
+                        className="db-form-input"
                         placeholder="e.g. Further Mathematics, Chemistry, Civic Education"
                         value={createName}
                         onChange={(e) => setCreateName(e.target.value)}
                         autoFocus
                       />
 
-                      {/* Common suggestions */}
-                      <div className="db-suggest-chips">
-                        {["Mathematics", "English Studies", "Biology", "Chemistry", "Physics", "Civic Education", "Economics", "Literature in English", "Financial Accounting", "Basic Science", "Social Studies"].map((item) => (
+                      {/* Common One-Click Suggestions */}
+                      <div className="db-quick-chips">
+                        {[
+                          "Mathematics",
+                          "English Studies",
+                          "Civic Education",
+                          "Biology",
+                          "Chemistry",
+                          "Physics",
+                          "Economics",
+                          "Literature in English",
+                          "Financial Accounting",
+                          "Basic Science",
+                          "Social Studies",
+                        ].map((item) => (
                           <button
                             key={item}
                             type="button"
-                            className="db-suggest-chip"
-                            onClick={() => setCreateName(item)}
+                            className="db-quick-chip"
+                            onClick={() => {
+                              setCreateName(item);
+                            }}
                           >
                             + {item}
                           </button>
@@ -1800,34 +2000,46 @@ export default function SubjectsPage() {
                       </div>
                     </div>
 
-                    <div className="db-field">
-                      <label>Academic Section (Optional)</label>
-                      <select value={createSectionId} onChange={(e) => setCreateSectionId(e.target.value)}>
-                        <option value="">Universal / All Sections</option>
+                    {/* Academic Section */}
+                    <div className="db-form-group">
+                      <label>Academic Level / Section (Optional)</label>
+                      <select
+                        className="db-form-input"
+                        value={createSectionId}
+                        onChange={(e) => setCreateSectionId(e.target.value)}
+                      >
+                        <option value="">Universal / All Levels</option>
                         {sections.map((s) => (
                           <option key={s.id} value={s.id}>
                             {s.name}
                           </option>
                         ))}
                       </select>
-                      <span className="db-help">Leave as Universal if taught across multiple school levels.</span>
+                      <span className="db-form-hint">Leave as Universal if taught across multiple school sections.</span>
                     </div>
 
-                    <div className="db-field">
+                    {/* Department */}
+                    <div className="db-form-group">
                       <label>Department (Optional)</label>
-                      <select value={createDepartmentId} onChange={(e) => setCreateDepartmentId(e.target.value)}>
-                        <option value="">All Departments</option>
+                      <select
+                        className="db-form-input"
+                        value={createDepartmentId}
+                        onChange={(e) => setCreateDepartmentId(e.target.value)}
+                      >
+                        <option value="">Compulsory / All Departments</option>
                         {departments.map((d) => (
                           <option key={d.id} value={d.id}>
                             {d.name}
                           </option>
                         ))}
                       </select>
-                      <span className="db-help">Only select if this subject belongs to a specific department (e.g. Science, Arts, Commercial).</span>
+                      <span className="db-form-hint">
+                        Only select if this subject belongs strictly to a specific department (e.g. Science, Arts, Commercial).
+                      </span>
                     </div>
                   </div>
 
-                  <div className="db-modal-foot">
+                  <div className="db-modal-bottom">
                     <button className="db-chip-btn" onClick={() => setShowCreate(false)} type="button">
                       Cancel
                     </button>
@@ -1839,31 +2051,43 @@ export default function SubjectsPage() {
               </div>
             )}
 
-            {/* MODAL: EDIT SUBJECT */}
+            {/* ========================================================
+                MODAL 2: EDIT SUBJECT
+               ======================================================== */}
             {showEdit && (
-              <div className="db-modal-backdrop" onMouseDown={() => setShowEdit(false)}>
-                <div className="db-modal" onMouseDown={(e) => e.stopPropagation()}>
-                  <div className="db-modal-head">
+              <div className="db-modal-overlay" onMouseDown={() => setShowEdit(false)}>
+                <div className="db-modal-card" onMouseDown={(e) => e.stopPropagation()}>
+                  <div className="db-modal-top">
                     <div>
-                      <h3 className="db-panel-title">Edit Subject</h3>
-                      <p className="db-panel-sub">Update subject details.</p>
+                      <h3 className="db-modal-heading">
+                        <span>✏️ Edit Subject</span>
+                      </h3>
+                      <p className="db-modal-desc">Update subject name and academic categorization.</p>
                     </div>
-                    <button className="db-chip-btn" onClick={() => setShowEdit(false)} type="button">
+                    <button className="db-modal-close-btn" onClick={() => setShowEdit(false)} type="button">
                       ✕
                     </button>
                   </div>
 
-                  <div className="db-modal-body">
-                    <div className="db-field">
+                  <div className="db-modal-content">
+                    <div className="db-form-group">
                       <label>
                         Subject Name <span style={{ color: "#EF4444" }}>*</span>
                       </label>
-                      <input value={editName} onChange={(e) => setEditName(e.target.value)} />
+                      <input
+                        className="db-form-input"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                      />
                     </div>
 
-                    <div className="db-field">
-                      <label>Applicable Section</label>
-                      <select value={editSectionId} onChange={(e) => setEditSectionId(e.target.value)}>
+                    <div className="db-form-group">
+                      <label>Academic Section</label>
+                      <select
+                        className="db-form-input"
+                        value={editSectionId}
+                        onChange={(e) => setEditSectionId(e.target.value)}
+                      >
                         <option value="">Universal / All Sections</option>
                         {sections.map((s) => (
                           <option key={s.id} value={s.id}>
@@ -1873,10 +2097,14 @@ export default function SubjectsPage() {
                       </select>
                     </div>
 
-                    <div className="db-field">
-                      <label>Department (Optional)</label>
-                      <select value={editDepartmentId} onChange={(e) => setEditDepartmentId(e.target.value)}>
-                        <option value="">All Departments</option>
+                    <div className="db-form-group">
+                      <label>Department</label>
+                      <select
+                        className="db-form-input"
+                        value={editDepartmentId}
+                        onChange={(e) => setEditDepartmentId(e.target.value)}
+                      >
+                        <option value="">Compulsory / All Departments</option>
                         {departments.map((d) => (
                           <option key={d.id} value={d.id}>
                             {d.name}
@@ -1886,7 +2114,7 @@ export default function SubjectsPage() {
                     </div>
                   </div>
 
-                  <div className="db-modal-foot">
+                  <div className="db-modal-bottom">
                     <button className="db-chip-btn" onClick={() => setShowEdit(false)} type="button">
                       Cancel
                     </button>
@@ -1898,116 +2126,161 @@ export default function SubjectsPage() {
               </div>
             )}
 
-            {/* MODAL: STANDARD CURRICULUM PRESET IMPORTER */}
+            {/* ========================================================
+                MODAL 3: STANDARD CURRICULUM PRESET IMPORTER
+               ======================================================== */}
             {showCurriculumModal && (
-              <div className="db-modal-backdrop" onMouseDown={() => setShowCurriculumModal(false)}>
-                <div className="db-modal" style={{ maxWidth: 650 }} onMouseDown={(e) => e.stopPropagation()}>
-                  <div className="db-modal-head">
+              <div className="db-modal-overlay" onMouseDown={() => setShowCurriculumModal(false)}>
+                <div className="db-modal-card" style={{ maxWidth: 680 }} onMouseDown={(e) => e.stopPropagation()}>
+                  <div className="db-modal-top">
                     <div>
-                      <h3 className="db-panel-title">✨ Standard Curriculum Presets</h3>
-                      <p className="db-panel-sub">Quickly import verified NERDC / WAEC national curriculum subjects.</p>
+                      <h3 className="db-modal-heading">
+                        <span>✨ Standard Curriculum Presets</span>
+                      </h3>
+                      <p className="db-modal-desc">
+                        Select and import standard NERDC / WAEC curriculum subjects into your school.
+                      </p>
                     </div>
-                    <button className="db-chip-btn" onClick={() => setShowCurriculumModal(false)} type="button">
+                    <button className="db-modal-close-btn" onClick={() => setShowCurriculumModal(false)} type="button">
                       ✕
                     </button>
                   </div>
 
-                  <div className="db-modal-body">
-                    {/* Category Selector */}
-                    <div className="db-field">
-                      <label>Select Curriculum Level to Review:</label>
-                      <select
-                        value={selectedCurriculumCategory}
-                        onChange={(e) => {
-                          const cat = e.target.value;
-                          setSelectedCurriculumCategory(cat);
-                          const nextMap: Record<string, boolean> = {};
-                          if (cat === "all") {
-                            Object.values(STANDARD_CURRICULUM).forEach((group) => {
-                              group.items.forEach((item) => (nextMap[item.name] = true));
-                            });
-                          } else if (STANDARD_CURRICULUM[cat]) {
-                            STANDARD_CURRICULUM[cat].items.forEach((item) => (nextMap[item.name] = true));
-                          }
-                          setCurriculumSelection(nextMap);
-                        }}
+                  <div className="db-modal-content">
+                    {/* Level Filter Buttons */}
+                    <div className="db-curriculum-cat-bar">
+                      <button
+                        type="button"
+                        className={`db-curriculum-cat-btn ${selectedCurriculumCategory === "all" ? "active" : ""}`}
+                        onClick={() => setSelectedCurriculumCategory("all")}
                       >
-                        <option value="all">🌟 Complete School Curriculum (All Levels)</option>
-                        <option value="primary">🎒 Primary / Basic Curriculum</option>
-                        <option value="junior">📘 Junior Secondary (JSS) Curriculum</option>
-                        <option value="senior_core">⭐ Senior Secondary - General / Core</option>
-                        <option value="senior_science">🔬 Senior Secondary - Science Department</option>
-                        <option value="senior_arts">🏛️ Senior Secondary - Arts & Humanities</option>
-                        <option value="senior_commercial">📊 Senior Secondary - Commercial Department</option>
-                        <option value="senior_vocational">🛠️ Senior Secondary - Vocational & Technical</option>
-                      </select>
+                        🌟 All Levels
+                      </button>
+                      <button
+                        type="button"
+                        className={`db-curriculum-cat-btn ${selectedCurriculumCategory === "primary" ? "active" : ""}`}
+                        onClick={() => setSelectedCurriculumCategory("primary")}
+                      >
+                        🎒 Primary
+                      </button>
+                      <button
+                        type="button"
+                        className={`db-curriculum-cat-btn ${selectedCurriculumCategory === "junior" ? "active" : ""}`}
+                        onClick={() => setSelectedCurriculumCategory("junior")}
+                      >
+                        📘 Junior Sec
+                      </button>
+                      <button
+                        type="button"
+                        className={`db-curriculum-cat-btn ${selectedCurriculumCategory === "senior_compulsory" ? "active" : ""}`}
+                        onClick={() => setSelectedCurriculumCategory("senior_compulsory")}
+                      >
+                        ⭐ Senior Compulsory
+                      </button>
+                      <button
+                        type="button"
+                        className={`db-curriculum-cat-btn ${selectedCurriculumCategory === "senior_science" ? "active" : ""}`}
+                        onClick={() => setSelectedCurriculumCategory("senior_science")}
+                      >
+                        🔬 Science
+                      </button>
+                      <button
+                        type="button"
+                        className={`db-curriculum-cat-btn ${selectedCurriculumCategory === "senior_arts" ? "active" : ""}`}
+                        onClick={() => setSelectedCurriculumCategory("senior_arts")}
+                      >
+                        🏛️ Arts
+                      </button>
+                      <button
+                        type="button"
+                        className={`db-curriculum-cat-btn ${selectedCurriculumCategory === "senior_commercial" ? "active" : ""}`}
+                        onClick={() => setSelectedCurriculumCategory("senior_commercial")}
+                      >
+                        📊 Commercial
+                      </button>
+                      <button
+                        type="button"
+                        className={`db-curriculum-cat-btn ${selectedCurriculumCategory === "senior_vocational" ? "active" : ""}`}
+                        onClick={() => setSelectedCurriculumCategory("senior_vocational")}
+                      >
+                        🛠️ Vocational
+                      </button>
                     </div>
 
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0F172A" }}>
-                        Select subjects to add to your school catalog:
+                    {/* Controls Row */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid #F1F5F9" }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>
+                        Available Subjects ({modalSelectedCount} selected for import)
                       </span>
-                      <div style={{ display: "flex", gap: 6 }}>
+                      <div style={{ display: "flex", gap: 8 }}>
                         <button
                           className="db-chip-btn"
-                          style={{ padding: "3px 8px", fontSize: 11.5 }}
+                          style={{ padding: "4px 10px", fontSize: 12 }}
                           onClick={() => {
-                            const map: Record<string, boolean> = {};
-                            const activeKeys =
-                              selectedCurriculumCategory === "all"
-                                ? Object.keys(STANDARD_CURRICULUM)
-                                : [selectedCurriculumCategory];
-                            activeKeys.forEach((key) => {
-                              STANDARD_CURRICULUM[key]?.items.forEach((it) => (map[it.name] = true));
+                            const nextMap: Record<string, boolean> = { ...curriculumSelection };
+                            activeModalCurriculumGroups.forEach(([, grp]) => {
+                              grp.items.forEach((it) => {
+                                const exists = subjects.some(
+                                  (s) => s.name.toLowerCase().trim() === it.name.toLowerCase().trim()
+                                );
+                                if (!exists) nextMap[it.name] = true;
+                              });
                             });
-                            setCurriculumSelection(map);
+                            setCurriculumSelection(nextMap);
                           }}
                           type="button"
                         >
-                          Select All
+                          Select All Available
                         </button>
                         <button
                           className="db-chip-btn"
-                          style={{ padding: "3px 8px", fontSize: 11.5 }}
-                          onClick={() => setCurriculumSelection({})}
+                          style={{ padding: "4px 10px", fontSize: 12 }}
+                          onClick={() => {
+                            const nextMap: Record<string, boolean> = { ...curriculumSelection };
+                            activeModalCurriculumGroups.forEach(([, grp]) => {
+                              grp.items.forEach((it) => {
+                                delete nextMap[it.name];
+                              });
+                            });
+                            setCurriculumSelection(nextMap);
+                          }}
                           type="button"
                         >
-                          Clear
+                          Clear Selection
                         </button>
                       </div>
                     </div>
 
-                    <div style={{ maxHeight: 300, overflowY: "auto", border: "1px solid #E2E8F0", borderRadius: 12, padding: 12 }}>
-                      {(selectedCurriculumCategory === "all"
-                        ? Object.keys(STANDARD_CURRICULUM)
-                        : [selectedCurriculumCategory]
-                      ).map((key) => {
-                        const group = STANDARD_CURRICULUM[key];
-                        if (!group) return null;
+                    {/* Grouped Subject Cards */}
+                    <div style={{ maxHeight: 360, overflowY: "auto", paddingRight: 4 }}>
+                      {activeModalCurriculumGroups.map(([key, group]) => {
                         return (
-                          <div key={key} style={{ marginBottom: 16 }}>
-                            <div style={{ fontSize: 12, fontWeight: 800, color: "#64748B", textTransform: "uppercase", marginBottom: 8 }}>
-                              {group.icon} {group.label}
+                          <div key={key} style={{ marginBottom: 18 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 800, color: "#64748B", textTransform: "uppercase", marginBottom: 8, letterSpacing: "0.05em" }}>
+                              <span>{group.icon}</span>
+                              <span>{group.label}</span>
+                              <span style={{ fontSize: 11, background: "#F1F5F9", padding: "1px 6px", borderRadius: 6, color: "#475569" }}>
+                                {group.items.length} subjects
+                              </span>
                             </div>
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8 }}>
+
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 8 }}>
                               {group.items.map((item) => {
                                 const alreadyExists = subjects.some(
                                   (s) => s.name.toLowerCase().trim() === item.name.toLowerCase().trim()
                                 );
+                                const isChecked = !alreadyExists && !!curriculumSelection[item.name];
+
                                 return (
-                                  <label
+                                  <div
                                     key={item.name}
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 8,
-                                      padding: "7px 10px",
-                                      borderRadius: 8,
-                                      background: alreadyExists ? "#F1F5F9" : "#F8FAFC",
-                                      border: "1px solid #E2E8F0",
-                                      fontSize: 12.5,
-                                      cursor: alreadyExists ? "default" : "pointer",
-                                      opacity: alreadyExists ? 0.7 : 1,
+                                    className={`db-preset-card ${alreadyExists ? "exists" : isChecked ? "checked" : ""}`}
+                                    onClick={() => {
+                                      if (alreadyExists) return;
+                                      setCurriculumSelection((prev) => ({
+                                        ...prev,
+                                        [item.name]: !prev[item.name],
+                                      }));
                                     }}
                                   >
                                     <input
@@ -2015,19 +2288,29 @@ export default function SubjectsPage() {
                                       checked={alreadyExists ? false : !!curriculumSelection[item.name]}
                                       disabled={alreadyExists}
                                       onChange={(e) => {
+                                        e.stopPropagation();
                                         setCurriculumSelection((prev) => ({
                                           ...prev,
                                           [item.name]: e.target.checked,
                                         }));
                                       }}
                                     />
-                                    <span style={{ fontWeight: 600, color: "#0F172A" }}>{item.name}</span>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ fontWeight: 700, color: "#0F172A", fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                        {item.name}
+                                      </div>
+                                      <div style={{ fontSize: 11, color: "#64748B", display: "flex", gap: 6, alignItems: "center", marginTop: 2 }}>
+                                        <span className="db-badge-code" style={{ fontSize: 10, padding: "1px 4px" }}>{item.code}</span>
+                                        <span>{item.category_label || group.tag}</span>
+                                      </div>
+                                    </div>
+
                                     {alreadyExists && (
-                                      <span style={{ fontSize: 10, background: "#D1FAE5", color: "#065F46", padding: "1px 5px", borderRadius: 4, marginLeft: "auto" }}>
-                                        ✓ Added
+                                      <span style={{ fontSize: 10.5, fontWeight: 700, background: "#D1FAE5", color: "#065F46", padding: "2px 6px", borderRadius: 4, whiteSpace: "nowrap" }}>
+                                        ✓ In School
                                       </span>
                                     )}
-                                  </label>
+                                  </div>
                                 );
                               })}
                             </div>
@@ -2037,43 +2320,53 @@ export default function SubjectsPage() {
                     </div>
                   </div>
 
-                  <div className="db-modal-foot">
+                  <div className="db-modal-bottom">
                     <button className="db-chip-btn" onClick={() => setShowCurriculumModal(false)} type="button">
                       Cancel
                     </button>
                     <button
                       className="db-btn-magic"
                       onClick={importSelectedCurriculum}
-                      disabled={busyKey !== null}
+                      disabled={busyKey !== null || modalSelectedCount === 0}
                       type="button"
                     >
-                      {isBusy("curriculum:import") ? "Importing..." : "Import Selected Subjects"}
+                      {isBusy("curriculum:import")
+                        ? "Importing..."
+                        : `Import ${modalSelectedCount} Selected Subjects`}
                     </button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* MODAL: BULK ASSIGN SECTION */}
+            {/* ========================================================
+                MODAL 4: BULK ASSIGN SECTION
+               ======================================================== */}
             {showAssign && (
-              <div className="db-modal-backdrop" onMouseDown={() => setShowAssign(false)}>
-                <div className="db-modal" onMouseDown={(e) => e.stopPropagation()}>
-                  <div className="db-modal-head">
+              <div className="db-modal-overlay" onMouseDown={() => setShowAssign(false)}>
+                <div className="db-modal-card" onMouseDown={(e) => e.stopPropagation()}>
+                  <div className="db-modal-top">
                     <div>
-                      <h3 className="db-panel-title">Bulk Assign Section</h3>
-                      <p className="db-panel-sub">Assign {selectedCount} selected subjects to a section.</p>
+                      <h3 className="db-modal-heading">
+                        <span>📦 Bulk Assign Section</span>
+                      </h3>
+                      <p className="db-modal-desc">Assign {selectedCount} selected subjects to an academic section.</p>
                     </div>
-                    <button className="db-chip-btn" onClick={() => setShowAssign(false)} type="button">
+                    <button className="db-modal-close-btn" onClick={() => setShowAssign(false)} type="button">
                       ✕
                     </button>
                   </div>
 
-                  <div className="db-modal-body">
-                    <div className="db-field">
+                  <div className="db-modal-content">
+                    <div className="db-form-group">
                       <label>
                         Select Target Section <span style={{ color: "#EF4444" }}>*</span>
                       </label>
-                      <select value={assignSectionId} onChange={(e) => setAssignSectionId(e.target.value)}>
+                      <select
+                        className="db-form-input"
+                        value={assignSectionId}
+                        onChange={(e) => setAssignSectionId(e.target.value)}
+                      >
                         <option value="">Select Section</option>
                         {sections.map((s) => (
                           <option key={s.id} value={s.id}>
@@ -2084,7 +2377,7 @@ export default function SubjectsPage() {
                     </div>
                   </div>
 
-                  <div className="db-modal-foot">
+                  <div className="db-modal-bottom">
                     <button className="db-chip-btn" onClick={() => setShowAssign(false)} type="button">
                       Cancel
                     </button>
