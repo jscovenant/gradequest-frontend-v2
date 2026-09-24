@@ -31,6 +31,127 @@ type Subject = {
   department?: { id: number; name: string } | null;
 };
 
+type CurriculumTemplateItem = {
+  name: string;
+  code: string;
+  section_tag: string;
+  dept_tag?: string;
+};
+
+/* =========================
+   STANDARD CURRICULUM PRESETS
+========================= */
+const STANDARD_CURRICULUM: Record<string, { label: string; icon: string; items: CurriculumTemplateItem[] }> = {
+  primary: {
+    label: "Primary / Basic Section",
+    icon: "🎒",
+    items: [
+      { name: "Mathematics", code: "MTH", section_tag: "primary" },
+      { name: "English Studies", code: "ENG", section_tag: "primary" },
+      { name: "Basic Science & Technology", code: "BST", section_tag: "primary" },
+      { name: "Social Studies", code: "SOS", section_tag: "primary" },
+      { name: "Civic Education", code: "CIV", section_tag: "primary" },
+      { name: "Quantitative Reasoning", code: "QTR", section_tag: "primary" },
+      { name: "Verbal Reasoning", code: "VRB", section_tag: "primary" },
+      { name: "Christian Religious Studies (CRS)", code: "CRS", section_tag: "primary" },
+      { name: "Islamic Religious Studies (IRS)", code: "IRS", section_tag: "primary" },
+      { name: "Cultural & Creative Arts (CCA)", code: "CCA", section_tag: "primary" },
+      { name: "Physical & Health Education (PHE)", code: "PHE", section_tag: "primary" },
+      { name: "Agricultural Science", code: "AGR", section_tag: "primary" },
+      { name: "Home Economics", code: "HEC", section_tag: "primary" },
+      { name: "Computer Studies / ICT", code: "ICT", section_tag: "primary" },
+      { name: "Handwriting & Phonics", code: "HWT", section_tag: "primary" },
+      { name: "French Language", code: "FRN", section_tag: "primary" },
+    ],
+  },
+  junior: {
+    label: "Junior Secondary (JSS)",
+    icon: "📘",
+    items: [
+      { name: "English Studies", code: "ENG", section_tag: "junior" },
+      { name: "General Mathematics", code: "MTH", section_tag: "junior" },
+      { name: "Basic Science", code: "BSC", section_tag: "junior" },
+      { name: "Basic Technology", code: "BTE", section_tag: "junior" },
+      { name: "Business Studies", code: "BST", section_tag: "junior" },
+      { name: "Social Studies", code: "SOS", section_tag: "junior" },
+      { name: "Civic Education", code: "CIV", section_tag: "junior" },
+      { name: "Agricultural Science", code: "AGR", section_tag: "junior" },
+      { name: "Home Economics", code: "HEC", section_tag: "junior" },
+      { name: "Computer Studies / ICT", code: "ICT", section_tag: "junior" },
+      { name: "Physical & Health Education (PHE)", code: "PHE", section_tag: "junior" },
+      { name: "Cultural & Creative Arts (CCA)", code: "CCA", section_tag: "junior" },
+      { name: "Christian Religious Studies (CRS)", code: "CRS", section_tag: "junior" },
+      { name: "Islamic Religious Studies (IRS)", code: "IRS", section_tag: "junior" },
+      { name: "French Language", code: "FRN", section_tag: "junior" },
+      { name: "Nigerian Language (Hausa / Igbo / Yoruba)", code: "NLN", section_tag: "junior" },
+    ],
+  },
+  senior_core: {
+    label: "Senior Sec - General / All Depts",
+    icon: "⭐",
+    items: [
+      { name: "English Language", code: "ENG", section_tag: "senior", dept_tag: "general" },
+      { name: "General Mathematics", code: "MTH", section_tag: "senior", dept_tag: "general" },
+      { name: "Civic Education", code: "CIV", section_tag: "senior", dept_tag: "general" },
+      { name: "Economics", code: "ECO", section_tag: "senior", dept_tag: "general" },
+      { name: "Data Processing", code: "DTP", section_tag: "senior", dept_tag: "general" },
+      { name: "Trade & Entrepreneurship", code: "TRD", section_tag: "senior", dept_tag: "general" },
+    ],
+  },
+  senior_science: {
+    label: "Senior Sec - Science Department",
+    icon: "🔬",
+    items: [
+      { name: "Physics", code: "PHY", section_tag: "senior", dept_tag: "science" },
+      { name: "Chemistry", code: "CHM", section_tag: "senior", dept_tag: "science" },
+      { name: "Biology", code: "BIO", section_tag: "senior", dept_tag: "science" },
+      { name: "Further Mathematics", code: "FMT", section_tag: "senior", dept_tag: "science" },
+      { name: "Agricultural Science", code: "AGR", section_tag: "senior", dept_tag: "science" },
+      { name: "Technical Drawing", code: "TDR", section_tag: "senior", dept_tag: "science" },
+      { name: "Geography", code: "GEO", section_tag: "senior", dept_tag: "science" },
+    ],
+  },
+  senior_arts: {
+    label: "Senior Sec - Arts & Humanities",
+    icon: "🏛️",
+    items: [
+      { name: "Literature in English", code: "LIT", section_tag: "senior", dept_tag: "arts" },
+      { name: "Government", code: "GOV", section_tag: "senior", dept_tag: "arts" },
+      { name: "Christian Religious Studies (CRS)", code: "CRS", section_tag: "senior", dept_tag: "arts" },
+      { name: "Islamic Religious Studies (IRS)", code: "IRS", section_tag: "senior", dept_tag: "arts" },
+      { name: "History", code: "HIS", section_tag: "senior", dept_tag: "arts" },
+      { name: "Visual Arts", code: "ART", section_tag: "senior", dept_tag: "arts" },
+      { name: "Music", code: "MUS", section_tag: "senior", dept_tag: "arts" },
+      { name: "French Language", code: "FRN", section_tag: "senior", dept_tag: "arts" },
+      { name: "Nigerian Language (Hausa / Igbo / Yoruba)", code: "NLN", section_tag: "senior", dept_tag: "arts" },
+    ],
+  },
+  senior_commercial: {
+    label: "Senior Sec - Commercial Department",
+    icon: "📊",
+    items: [
+      { name: "Financial Accounting", code: "ACC", section_tag: "senior", dept_tag: "commercial" },
+      { name: "Commerce", code: "COM", section_tag: "senior", dept_tag: "commercial" },
+      { name: "Book Keeping", code: "BKK", section_tag: "senior", dept_tag: "commercial" },
+      { name: "Store Management", code: "STM", section_tag: "senior", dept_tag: "commercial" },
+      { name: "Office Practice", code: "OFP", section_tag: "senior", dept_tag: "commercial" },
+      { name: "Insurance", code: "INS", section_tag: "senior", dept_tag: "commercial" },
+    ],
+  },
+  senior_vocational: {
+    label: "Senior Sec - Vocational & Technical",
+    icon: "🛠️",
+    items: [
+      { name: "Food & Nutrition", code: "FDN", section_tag: "senior", dept_tag: "vocational" },
+      { name: "Clothing & Textiles", code: "CLT", section_tag: "senior", dept_tag: "vocational" },
+      { name: "Auto Mechanics", code: "MEC", section_tag: "senior", dept_tag: "vocational" },
+      { name: "Building Construction", code: "BLD", section_tag: "senior", dept_tag: "vocational" },
+      { name: "Electrical Installation", code: "ELE", section_tag: "senior", dept_tag: "vocational" },
+      { name: "Woodwork", code: "WDW", section_tag: "senior", dept_tag: "vocational" },
+    ],
+  },
+};
+
 /* =========================
    HELPERS
 ========================= */
@@ -62,7 +183,7 @@ function getGreeting() {
 const clamp = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
 
 /* =========================
-   PAGE
+   PAGE COMPONENT
 ========================= */
 export default function SubjectsPage() {
   const { showSuccess, showError } = useToast();
@@ -82,9 +203,12 @@ export default function SubjectsPage() {
   const [classes, setClasses] = useState<StudentClass[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
 
-  // filters
-  const [sectionFilter, setSectionFilter] = useState<string>("");
-  const [departmentFilter, setDepartmentFilter] = useState<string>("");
+  // active Section Tab: 'all' | 'primary' | 'junior' | 'senior' | number (custom section id)
+  const [activeSectionTab, setActiveSectionTab] = useState<string>("all");
+  // active Senior Department Tab: 'all_senior' | 'core' | number (dept_id)
+  const [activeSeniorDept, setActiveSeniorDept] = useState<string>("all_senior");
+
+  // filters & search
   const [query, setQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -93,6 +217,11 @@ export default function SubjectsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
+  const [showCurriculumModal, setShowCurriculumModal] = useState(false);
+
+  // curriculum importer state
+  const [selectedCurriculumCategory, setSelectedCurriculumCategory] = useState<string>("all");
+  const [curriculumSelection, setCurriculumSelection] = useState<Record<string, boolean>>({});
 
   // create form
   const [createName, setCreateName] = useState("");
@@ -119,7 +248,23 @@ export default function SubjectsPage() {
   const isBusy = (key: string) => busyKey === key;
 
   /* =========================
-     FETCH
+     DETECTED SECTION OBJECTS
+  ========================= */
+  const primarySection = useMemo(
+    () => sections.find((s) => /primary|nursery|basic|grade|kinder/i.test(s.name)),
+    [sections]
+  );
+  const juniorSection = useMemo(
+    () => sections.find((s) => /junior|jss/i.test(s.name)),
+    [sections]
+  );
+  const seniorSection = useMemo(
+    () => sections.find((s) => /senior|sss/i.test(s.name)),
+    [sections]
+  );
+
+  /* =========================
+     FETCH DATA
   ========================= */
   async function fetchDepartments() {
     try {
@@ -165,15 +310,11 @@ export default function SubjectsPage() {
       setLoadingSubjects(true);
       const params: any = {};
       if (showArchived) params.archived = 1;
-      if (sectionFilter) params.section_id = sectionFilter;
-      if (departmentFilter) params.department_id = departmentFilter;
-      if (query.trim()) params.search = query.trim();
 
       const res = await authApi.get<Subject[]>("/subjects/list", { params });
       const list = Array.isArray(res.data) ? res.data : [];
       setSubjects(list);
     } catch (err: any) {
-      // Fallback to legacy endpoint if /subjects/list route cache is warming up
       try {
         const res = await authApi.get<Subject[]>("/departments/all/subjects", {
           params: showArchived ? { archived: 1 } : {},
@@ -199,10 +340,10 @@ export default function SubjectsPage() {
   useEffect(() => {
     fetchSubjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sectionFilter, departmentFilter, showArchived]);
+  }, [showArchived]);
 
   /* =========================
-     DERIVED
+     CATEGORY RESOLUTION HELPERS
   ========================= */
   const sectionName = (s: Subject) =>
     s.section?.name ?? sections.find((x) => x.id === s.section_id)?.name ?? "Universal / All";
@@ -210,20 +351,74 @@ export default function SubjectsPage() {
   const departmentName = (s: Subject) =>
     s.department?.name ?? departments.find((x) => x.id === s.department_id)?.name ?? "All Departments";
 
+  const isSubjectInPrimary = (s: Subject) => {
+    if (!s.section_id) return true; // Universal
+    if (primarySection && s.section_id === primarySection.id) return true;
+    const name = sectionName(s).toLowerCase();
+    return /primary|nursery|basic|grade|kinder/i.test(name);
+  };
+
+  const isSubjectInJunior = (s: Subject) => {
+    if (!s.section_id) return true; // Universal
+    if (juniorSection && s.section_id === juniorSection.id) return true;
+    const name = sectionName(s).toLowerCase();
+    return /junior|jss/i.test(name);
+  };
+
+  const isSubjectInSenior = (s: Subject) => {
+    if (!s.section_id && !s.department_id) return true; // Universal
+    if (seniorSection && s.section_id === seniorSection.id) return true;
+    if (s.department_id) return true; // Any department subject belongs to Senior
+    const name = sectionName(s).toLowerCase();
+    return /senior|sss/i.test(name);
+  };
+
+  /* =========================
+     FILTERED SUBJECTS
+  ========================= */
   const filteredSubjects = useMemo(() => {
+    let list = subjects;
+
+    // 1. Section Tab Filter
+    if (activeSectionTab === "primary") {
+      list = list.filter(isSubjectInPrimary);
+    } else if (activeSectionTab === "junior") {
+      list = list.filter(isSubjectInJunior);
+    } else if (activeSectionTab === "senior") {
+      list = list.filter(isSubjectInSenior);
+
+      // Senior Department Sub-Filter
+      if (activeSeniorDept === "core") {
+        list = list.filter((s) => !s.department_id);
+      } else if (activeSeniorDept !== "all_senior") {
+        const deptIdNum = Number(activeSeniorDept);
+        list = list.filter((s) => s.department_id === deptIdNum);
+      }
+    } else if (activeSectionTab !== "all") {
+      const secIdNum = Number(activeSectionTab);
+      list = list.filter((s) => s.section_id === secIdNum || !s.section_id);
+    }
+
+    // 2. Search Query Filter
     const q = query.trim().toLowerCase();
-    if (!q) return subjects;
-    return subjects.filter((s) => {
-      const sec = sectionName(s).toLowerCase();
-      const dep = departmentName(s).toLowerCase();
-      const hay = `${s.name ?? ""} ${s.subject_id ?? ""} ${sec} ${dep}`.toLowerCase();
-      return hay.includes(q);
-    });
-  }, [subjects, query, sections, departments]);
+    if (q) {
+      list = list.filter((s) => {
+        const sec = sectionName(s).toLowerCase();
+        const dep = departmentName(s).toLowerCase();
+        const hay = `${s.name ?? ""} ${s.subject_id ?? ""} ${sec} ${dep}`.toLowerCase();
+        return hay.includes(q);
+      });
+    }
+
+    return list;
+  }, [subjects, activeSectionTab, activeSeniorDept, query, sections, departments, primarySection, juniorSection, seniorSection]);
 
   const totalSubjects = subjects.length;
-  const selectedCount = useMemo(() => Object.values(selectedIds).filter(Boolean).length, [selectedIds]);
+  const primaryCount = useMemo(() => subjects.filter(isSubjectInPrimary).length, [subjects, primarySection]);
+  const juniorCount = useMemo(() => subjects.filter(isSubjectInJunior).length, [subjects, juniorSection]);
+  const seniorCount = useMemo(() => subjects.filter(isSubjectInSenior).length, [subjects, seniorSection]);
 
+  const selectedCount = useMemo(() => Object.values(selectedIds).filter(Boolean).length, [selectedIds]);
   const allFilteredSelected =
     filteredSubjects.length > 0 && filteredSubjects.every((s) => !!selectedIds[s.id]);
 
@@ -233,7 +428,7 @@ export default function SubjectsPage() {
   const [page, setPage] = useState(1);
   const perPage = 12;
 
-  useEffect(() => setPage(1), [query, sectionFilter, departmentFilter]);
+  useEffect(() => setPage(1), [query, activeSectionTab, activeSeniorDept]);
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredSubjects.length / perPage)), [filteredSubjects.length]);
   const safePage = clamp(page, 1, totalPages);
@@ -243,8 +438,33 @@ export default function SubjectsPage() {
   }, [filteredSubjects, safePage]);
 
   /* =========================
-     ACTIONS
+     CONTEXT-AWARE ADD SUBJECT
   ========================= */
+  function openAddModal() {
+    setCreateName("");
+    // Pre-fill section based on current active tab
+    if (activeSectionTab === "primary" && primarySection) {
+      setCreateSectionId(String(primarySection.id));
+      setCreateDepartmentId("");
+    } else if (activeSectionTab === "junior" && juniorSection) {
+      setCreateSectionId(String(juniorSection.id));
+      setCreateDepartmentId("");
+    } else if (activeSectionTab === "senior") {
+      if (seniorSection) setCreateSectionId(String(seniorSection.id));
+      else setCreateSectionId("");
+
+      if (activeSeniorDept !== "all_senior" && activeSeniorDept !== "core") {
+        setCreateDepartmentId(activeSeniorDept);
+      } else {
+        setCreateDepartmentId("");
+      }
+    } else {
+      setCreateSectionId("");
+      setCreateDepartmentId("");
+    }
+    setShowCreate(true);
+  }
+
   async function createSubject() {
     const name = createName.trim();
     if (!name) return showError("Please enter a subject name.");
@@ -381,7 +601,67 @@ export default function SubjectsPage() {
   }
 
   /* =========================
-     SUBJECT OFFERINGS / ALLOCATION
+     CURRICULUM PRESET IMPORTER
+  ========================= */
+  function openCurriculumModal(category: string = "all") {
+    setSelectedCurriculumCategory(category);
+    // Pre-check all items for that category
+    const initialMap: Record<string, boolean> = {};
+    if (category === "all") {
+      Object.values(STANDARD_CURRICULUM).forEach((group) => {
+        group.items.forEach((item) => {
+          initialMap[item.name] = true;
+        });
+      });
+    } else if (STANDARD_CURRICULUM[category]) {
+      STANDARD_CURRICULUM[category].items.forEach((item) => {
+        initialMap[item.name] = true;
+      });
+    }
+    setCurriculumSelection(initialMap);
+    setShowCurriculumModal(true);
+  }
+
+  async function importSelectedCurriculum() {
+    const activeGroupKeys =
+      selectedCurriculumCategory === "all"
+        ? Object.keys(STANDARD_CURRICULUM)
+        : [selectedCurriculumCategory];
+
+    const selectedItems: CurriculumTemplateItem[] = [];
+    activeGroupKeys.forEach((key) => {
+      const group = STANDARD_CURRICULUM[key];
+      if (group) {
+        group.items.forEach((item) => {
+          if (curriculumSelection[item.name]) {
+            selectedItems.push(item);
+          }
+        });
+      }
+    });
+
+    if (selectedItems.length === 0) {
+      return showError("Please select at least one subject to import.");
+    }
+
+    try {
+      setBusyKey("curriculum:import");
+      const res = await authApi.post("/subjects/seed-curriculum", {
+        subjects: selectedItems,
+      });
+
+      showSuccess(res.data?.message ?? "Standard curriculum loaded successfully!");
+      setShowCurriculumModal(false);
+      await fetchSubjects();
+    } catch (err: any) {
+      showError(getErrorMessage(err));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  /* =========================
+     SUBJECT ALLOCATION MATRIX
   ========================= */
   const offeringSelectedCount = useMemo(
     () => Object.values(offeringSubjectIds).filter(Boolean).length,
@@ -404,7 +684,7 @@ export default function SubjectsPage() {
       });
       setOfferingSubjectIds(next);
       setOfferingLoaded(true);
-      showSuccess(`Loaded subject allocation for the selected class/scope.`);
+      showSuccess(`Loaded subject allocation for the selected scope.`);
     } catch (err: any) {
       showError(getErrorMessage(err));
     } finally {
@@ -445,70 +725,292 @@ export default function SubjectsPage() {
     setOfferingSubjectIds(next);
   }
 
+  function selectRecommendedOfferings() {
+    const next: Record<number, boolean> = { ...offeringSubjectIds };
+    const selClass = classes.find((c) => String(c.id) === offeringClassId);
+    const className = (selClass?.name || "").toLowerCase();
+
+    const isSeniorClass = /sss|senior|ss 1|ss 2|ss 3/i.test(className);
+    const isJuniorClass = /jss|junior|basic 7|basic 8|basic 9/i.test(className);
+    const isPrimaryClass = /primary|basic|grade|nursery|kinder/i.test(className);
+
+    subjects.forEach((s) => {
+      if (isPrimaryClass && isSubjectInPrimary(s)) {
+        next[s.id] = true;
+      } else if (isJuniorClass && isSubjectInJunior(s)) {
+        next[s.id] = true;
+      } else if (isSeniorClass) {
+        if (!s.department_id) {
+          next[s.id] = true; // Core Senior Subjects
+        } else if (offeringDepartmentId && s.department_id === Number(offeringDepartmentId)) {
+          next[s.id] = true; // Specific Department Subjects
+        }
+      } else {
+        // Universal subjects
+        if (!s.section_id && !s.department_id) next[s.id] = true;
+      }
+    });
+
+    setOfferingSubjectIds(next);
+    showSuccess("Pre-selected standard subjects for this academic level.");
+  }
+
   function clearAllOfferings() {
     setOfferingSubjectIds({});
   }
 
-  /* =========================
-     RENDER
-  ========================= */
   if (loadingPage) {
-    return <Loader />;
+    return (
+      <>
+        <PageTitle title="Subjects Management | SchoolProfit" />
+        <Loader />
+      </>
+    );
   }
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-        .db-main {
-          background: #F8FAFC;
+        /* Academic Subject Master System Styles */
+        .gq-app-main {
+          background-color: #F8FAFC;
           min-height: 100vh;
-          font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-          padding: 24px 28px 0;
+        }
+        .db-main {
+          padding: 24px 28px;
+          background: #F8FAFC;
+          box-sizing: border-box;
+        }
+        @media (max-width: 768px) {
+          .db-main { padding: 16px 14px; }
         }
 
+        /* Hero Banner */
         .db-hero {
-          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
-          border-radius: 18px;
-          padding: 28px 32px;
-          margin-bottom: 22px;
+          background: linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F2027 100%);
+          border-radius: 20px;
+          padding: 30px 32px;
+          color: #fff;
+          margin-bottom: 24px;
           display: flex;
-          align-items: center;
           justify-content: space-between;
-          flex-wrap: wrap;
+          align-items: center;
           gap: 20px;
-          position: relative;
-          overflow: hidden;
-          box-shadow: 0 10px 30px rgba(10, 25, 47, 0.15);
+          box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.18);
+          flex-wrap: wrap;
         }
-        .db-hero::before {
-          content: "";
-          position: absolute;
-          top: -60px; right: -60px;
-          width: 220px; height: 220px;
-          border-radius: 50%;
-          background: radial-gradient(circle, rgba(251, 191, 36, 0.12) 0%, transparent 70%);
-          pointer-events: none;
-        }
-
-        .db-greeting {
-          font-size: 22px;
-          font-weight: 800;
-          color: #FFFFFF;
-          letter-spacing: -0.4px;
+        .db-eyebrow {
+          font-size: 11.5px;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: #38BDF8;
+          font-weight: 700;
           margin-bottom: 6px;
         }
-        .db-greeting em { font-style: normal; color: #FBBF24; }
-
+        .db-greeting {
+          font-size: 24px;
+          font-weight: 800;
+          color: #fff;
+          margin: 0 0 6px 0;
+          letter-spacing: -0.02em;
+        }
         .db-hero-sub {
           font-size: 13.5px;
           color: #CBD5E1;
-          line-height: 1.6;
-          max-width: 620px;
-          margin-bottom: 18px;
+          line-height: 1.5;
+          max-width: 600px;
+          margin: 0;
         }
 
-        .db-hero-btns { display:flex; gap:10px; flex-wrap:wrap; }
+        /* Stat Chips */
+        .db-hero-stats {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+        .db-hero-stat-box {
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          border-radius: 14px;
+          padding: 12px 18px;
+          text-align: center;
+          min-width: 100px;
+        }
+        .db-hero-stat-num {
+          font-size: 22px;
+          font-weight: 800;
+          color: #F8FAFC;
+          display: block;
+        }
+        .db-hero-stat-lbl {
+          font-size: 11px;
+          color: #94A3B8;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          font-weight: 600;
+        }
+
+        /* Section Tabs Navigation */
+        .db-section-nav {
+          display: flex;
+          gap: 10px;
+          margin-bottom: 20px;
+          overflow-x: auto;
+          padding-bottom: 4px;
+        }
+        .db-sec-tab {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 18px;
+          border-radius: 12px;
+          font-size: 13.5px;
+          font-weight: 700;
+          border: 1px solid #E2E8F0;
+          background: #FFFFFF;
+          color: #475569;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          white-space: nowrap;
+        }
+        .db-sec-tab:hover {
+          border-color: #3B82F6;
+          color: #1E40AF;
+          background: #EFF6FF;
+        }
+        .db-sec-tab.active {
+          background: #0F172A;
+          border-color: #0F172A;
+          color: #FFFFFF;
+          box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+        }
+        .db-sec-tab-badge {
+          font-size: 11px;
+          font-weight: 800;
+          padding: 2px 7px;
+          border-radius: 99px;
+          background: rgba(148, 163, 184, 0.2);
+          color: inherit;
+        }
+        .db-sec-tab.active .db-sec-tab-badge {
+          background: rgba(255, 255, 255, 0.25);
+          color: #fff;
+        }
+
+        /* Sub-Department Pills for Senior Secondary */
+        .db-sub-dept-bar {
+          display: flex;
+          gap: 8px;
+          background: #F1F5F9;
+          padding: 8px 12px;
+          border-radius: 14px;
+          margin-bottom: 20px;
+          overflow-x: auto;
+          align-items: center;
+        }
+        .db-dept-pill {
+          padding: 6px 14px;
+          border-radius: 10px;
+          font-size: 12.5px;
+          font-weight: 700;
+          border: none;
+          background: transparent;
+          color: #475569;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          white-space: nowrap;
+        }
+        .db-dept-pill:hover {
+          background: #E2E8F0;
+          color: #0F172A;
+        }
+        .db-dept-pill.active {
+          background: #2563EB;
+          color: #FFFFFF;
+          box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+        }
+
+        /* Panels */
+        .db-panel {
+          background: #FFFFFF;
+          border-radius: 18px;
+          border: 1px solid #E2E8F0;
+          box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+          padding: 24px;
+          margin-bottom: 24px;
+        }
+        .db-panel-head {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 16px;
+          margin-bottom: 20px;
+          flex-wrap: wrap;
+        }
+        .db-panel-title-group {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .db-panel-icon {
+          width: 42px;
+          height: 42px;
+          border-radius: 12px;
+          background: #EFF6FF;
+          color: #2563EB;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .db-panel-title {
+          font-size: 17px;
+          font-weight: 800;
+          color: #0F172A;
+          margin: 0;
+        }
+        .db-panel-sub {
+          font-size: 12.5px;
+          color: #64748B;
+          margin: 2px 0 0 0;
+        }
+
+        /* Buttons & Actions */
+        .db-btn-primary {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          padding: 9px 18px;
+          font-size: 13px;
+          font-weight: 700;
+          color: #FFFFFF;
+          background: #2563EB;
+          border: none;
+          border-radius: 10px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .db-btn-primary:hover { background: #1D4ED8; }
+
+        .db-btn-magic {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          padding: 9px 18px;
+          font-size: 13px;
+          font-weight: 700;
+          color: #FFFFFF;
+          background: linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%);
+          border: none;
+          border-radius: 10px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          box-shadow: 0 3px 10px rgba(124, 58, 237, 0.25);
+        }
+        .db-btn-magic:hover {
+          opacity: 0.95;
+          transform: translateY(-1px);
+        }
 
         .db-btn-gold {
           display: inline-flex;
@@ -523,135 +1025,47 @@ export default function SubjectsPage() {
           border-radius: 10px;
           cursor: pointer;
           transition: all 0.2s ease;
-          text-decoration: none;
-          white-space: nowrap;
         }
-        .db-btn-gold:hover { background: #B45309; transform: translateY(-1px); color: #FFFFFF; }
-
-        .db-btn-outline {
-          display: inline-flex;
-          align-items: center;
-          gap: 7px;
-          padding: 9px 18px;
-          font-size: 13px;
-          font-weight: 600;
-          color: #FFFFFF;
-          background: rgba(255, 255, 255, 0.10);
-          border: 1px solid rgba(255, 255, 255, 0.20);
-          border-radius: 10px;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          white-space: nowrap;
-        }
-        .db-btn-outline:hover { background: rgba(255, 255, 255, 0.18); color: #fff; }
-
-        .db-hero-stat-card {
-          background: rgba(255, 255, 255, 0.08);
-          border: 1px solid rgba(255, 255, 255, 0.15);
-          backdrop-filter: blur(8px);
-          border-radius: 14px;
-          padding: 18px 22px;
-          min-width: 220px;
-        }
-        .db-hero-stat-row { display:flex; flex-direction:column; gap:10px; }
-        .db-hero-stat-item { display:flex; justify-content:space-between; align-items:center; gap:16px; }
-        .db-hero-stat-label { font-size: 12px; font-weight: 400; color: #CBD5E1; }
-        .db-hero-stat-val { font-size: 18px; font-weight: 800; color: #FBBF24; }
-        .db-hero-stat-sep { height: 1px; background: rgba(255, 255, 255, 0.08); }
-
-        .db-panel {
-          background: #FFFFFF;
-          border: 1px solid #E2E8F0;
-          border-radius: 16px;
-          padding: 24px;
-          box-shadow: 0 4px 16px rgba(0,0,0,0.03);
-          margin-bottom: 24px;
-        }
-
-        .db-panel-head {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          flex-wrap: wrap;
-          gap: 16px;
-          margin-bottom: 20px;
-        }
-
-        .db-panel-title-group { display: flex; align-items: center; gap: 14px; }
-        .db-panel-icon {
-          width: 44px; height: 44px;
-          border-radius: 12px;
-          display: flex; align-items: center; justify-content: center;
-          background: var(--pi, #FEF3C7);
-          color: var(--pc, #B45309);
-        }
-        .db-panel-title { font-size: 17px; font-weight: 800; color: #0F172A; margin: 0; }
-        .db-panel-sub { font-size: 13px; color: #64748B; margin: 2px 0 0; }
-
-        .db-toolbar {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          flex-wrap: wrap;
-        }
-
-        .db-select {
-          padding: 9px 14px;
-          font-size: 13px;
-          font-weight: 600;
-          color: #1E293B;
-          background: #F8FAFC;
-          border: 1px solid #CBD5E1;
-          border-radius: 10px;
-          outline: none;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .db-select:focus { border-color: #3B82F6; background: #fff; }
-
-        .db-input {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 8px 14px;
-          background: #F8FAFC;
-          border: 1px solid #CBD5E1;
-          border-radius: 10px;
-          font-size: 13px;
-          min-width: 220px;
-        }
-        .db-input input {
-          border: none;
-          background: transparent;
-          outline: none;
-          width: 100%;
-          font-size: 13px;
-          color: #0F172A;
-        }
+        .db-btn-gold:hover { background: #B45309; }
 
         .db-chip-btn {
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          padding: 8px 14px;
+          padding: 7px 14px;
+          border-radius: 8px;
           font-size: 12.5px;
-          font-weight: 700;
+          font-weight: 600;
+          border: 1px solid #E2E8F0;
+          background: #FFFFFF;
           color: #334155;
-          background: #F1F5F9;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .db-chip-btn:hover { border-color: #CBD5E1; background: #F8FAFC; }
+        .db-chip-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Search input */
+        .db-input {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: #F8FAFC;
           border: 1px solid #E2E8F0;
           border-radius: 10px;
-          cursor: pointer;
-          transition: all 0.2s;
+          padding: 7px 12px;
+          min-width: 240px;
         }
-        .db-chip-btn:hover { background: #E2E8F0; color: #0F172A; }
-
-        .db-chip-primary {
-          background: #2563EB;
-          color: #fff;
-          border-color: #2563EB;
+        .db-input input {
+          border: none;
+          background: transparent;
+          font-size: 13px;
+          color: #0F172A;
+          outline: none;
+          width: 100%;
         }
-        .db-chip-primary:hover { background: #1D4ED8; color: #fff; }
 
+        /* Tables */
         .db-table {
           width: 100%;
           border-collapse: collapse;
@@ -659,106 +1073,54 @@ export default function SubjectsPage() {
         }
         .db-table th {
           text-align: left;
-          padding: 12px 16px;
+          padding: 12px 14px;
           background: #F8FAFC;
-          color: #64748B;
-          font-weight: 700;
-          border-bottom: 1px solid #E2E8F0;
+          color: #475569;
           font-size: 12px;
+          font-weight: 700;
           text-transform: uppercase;
-          letter-spacing: 0.3px;
+          letter-spacing: 0.04em;
+          border-bottom: 1px solid #E2E8F0;
         }
         .db-table td {
-          padding: 14px 16px;
+          padding: 13px 14px;
           border-bottom: 1px solid #F1F5F9;
           color: #1E293B;
           vertical-align: middle;
         }
-        .db-table tr:hover td { background: #F8FAFC; }
-
-        .db-badge-code {
-          display: inline-block;
-          padding: 3px 8px;
-          border-radius: 6px;
-          background: #EFF6FF;
-          color: #1D4ED8;
-          font-size: 11.5px;
-          font-weight: 700;
-          font-family: monospace;
+        .db-table tr:hover td {
+          background: #F8FAFC;
         }
 
+        /* Badges & Pills */
         .db-pill {
           display: inline-flex;
           align-items: center;
-          gap: 5px;
-          padding: 3px 10px;
-          border-radius: 20px;
-          font-size: 12px;
-          font-weight: 600;
+          gap: 4px;
+          padding: 3px 9px;
+          border-radius: 6px;
+          font-size: 11.5px;
+          font-weight: 700;
           background: #F1F5F9;
           color: #475569;
         }
-        .db-pill-green { background: #ECFDF5; color: #047857; }
         .db-pill-blue { background: #EFF6FF; color: #1D4ED8; }
-        .db-pill-amber { background: #FEF3C7; color: #B45309; }
+        .db-pill-green { background: #ECFDF5; color: #047857; }
+        .db-pill-purple { background: #F5F3FF; color: #6D28D9; }
+        .db-pill-amber { background: #FFFBEB; color: #B45309; }
 
-        .db-actions { display: flex; gap: 8px; justify-content: flex-end; }
-        .db-action-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          padding: 6px 12px;
-          border-radius: 8px;
+        .db-badge-code {
+          font-family: monospace;
+          font-weight: 800;
+          background: #F1F5F9;
+          border: 1px solid #E2E8F0;
+          padding: 2px 7px;
+          border-radius: 6px;
+          color: #0F172A;
           font-size: 12px;
-          font-weight: 700;
-          cursor: pointer;
-          border: 1px solid transparent;
-          transition: all 0.15s;
-        }
-        .db-action-primary { background: #EFF6FF; color: #1D4ED8; border-color: #DBEAFE; }
-        .db-action-primary:hover { background: #DBEAFE; }
-        .db-action-danger { background: #FEF2F2; color: #DC2626; border-color: #FEE2E2; }
-        .db-action-danger:hover { background: #FEE2E2; }
-        .db-action-green { background: #ECFDF5; color: #047857; border-color: #D1FAE5; }
-        .db-action-green:hover { background: #D1FAE5; }
-
-        .db-helper-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 10px 16px;
-          background: #F8FAFC;
-          border: 1px solid #E2E8F0;
-          border-radius: 10px;
-          margin-bottom: 14px;
-          font-size: 13px;
         }
 
-        .db-pagination {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding-top: 18px;
-          font-size: 13px;
-          color: #64748B;
-        }
-        .db-page-btns { display: flex; gap: 6px; align-items: center; }
-        .db-page-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          padding: 6px 12px;
-          border-radius: 8px;
-          border: 1px solid #E2E8F0;
-          background: #fff;
-          font-size: 12.5px;
-          font-weight: 600;
-          cursor: pointer;
-        }
-        .db-page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .db-page-current { font-weight: 700; color: #0F172A; padding: 0 6px; }
-
-        /* Allocation Check Grid */
+        /* Allocation Grid */
         .db-check-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -782,7 +1144,7 @@ export default function SubjectsPage() {
         .db-modal-backdrop {
           position: fixed;
           top: 0; left: 0; right: 0; bottom: 0;
-          background: rgba(15, 23, 42, 0.6);
+          background: rgba(15, 23, 42, 0.65);
           backdrop-filter: blur(4px);
           display: flex;
           align-items: center;
@@ -794,27 +1156,26 @@ export default function SubjectsPage() {
           background: #fff;
           border-radius: 18px;
           width: 100%;
-          max-width: 520px;
+          max-width: 580px;
           box-shadow: 0 20px 40px rgba(0,0,0,0.2);
           overflow: hidden;
+          max-height: 90vh;
+          display: flex;
+          flex-column: column;
         }
         .db-modal-head {
           padding: 20px 24px;
+          background: #F8FAFC;
           border-bottom: 1px solid #E2E8F0;
           display: flex;
           justify-content: space-between;
           align-items: center;
         }
-        .db-modal-title { font-size: 17px; font-weight: 800; color: #0F172A; margin: 0; }
-        .db-modal-sub { font-size: 13px; color: #64748B; margin: 2px 0 0; }
-        .db-modal-close {
-          background: transparent;
-          border: none;
-          font-size: 18px;
-          cursor: pointer;
-          color: #94A3B8;
+        .db-modal-body {
+          padding: 24px;
+          overflow-y: auto;
+          flex: 1;
         }
-        .db-modal-body { padding: 24px; }
         .db-modal-foot {
           padding: 16px 24px;
           background: #F8FAFC;
@@ -823,132 +1184,237 @@ export default function SubjectsPage() {
           justify-content: flex-end;
           gap: 10px;
         }
-        .db-field { margin-bottom: 16px; display: flex; flex-direction: column; gap: 6px; }
-        .db-field label { font-size: 13px; font-weight: 700; color: #1E293B; }
+        .db-field {
+          margin-bottom: 16px;
+        }
+        .db-field label {
+          display: block;
+          font-size: 13px;
+          font-weight: 700;
+          color: #0F172A;
+          margin-bottom: 6px;
+        }
         .db-field input, .db-field select {
-          padding: 10px 14px;
+          width: 100%;
+          padding: 9px 13px;
           border: 1px solid #CBD5E1;
           border-radius: 10px;
           font-size: 13.5px;
           outline: none;
         }
         .db-field input:focus, .db-field select:focus { border-color: #2563EB; }
-        .db-help { font-size: 12px; color: #64748B; }
+        .db-help { font-size: 12px; color: #64748B; margin-top: 4px; display: block; }
 
-        .db-alert-tip {
-          padding: 12px 16px;
-          border-radius: 10px;
+        .db-suggest-chips {
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+          margin-top: 8px;
+        }
+        .db-suggest-chip {
+          font-size: 11.5px;
+          padding: 4px 8px;
+          border-radius: 6px;
           background: #EFF6FF;
           border: 1px solid #BFDBFE;
           color: #1E40AF;
-          font-size: 12.5px;
-          line-height: 1.5;
-          margin-bottom: 16px;
+          cursor: pointer;
+          font-weight: 600;
         }
+        .db-suggest-chip:hover { background: #DBEAFE; }
+
+        /* Pagination */
+        .db-pagination {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding-top: 18px;
+          font-size: 13px;
+          color: #64748B;
+        }
+        .db-page-btns { display: flex; gap: 6px; align-items: center; }
+        .db-page-btn {
+          padding: 6px 12px;
+          border-radius: 8px;
+          border: 1px solid #E2E8F0;
+          background: #fff;
+          font-size: 12.5px;
+          font-weight: 600;
+          cursor: pointer;
+        }
+        .db-page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .db-page-current { font-weight: 700; color: #0F172A; padding: 0 6px; }
       `}</style>
 
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-      <PageTitle title="Subjects & Academic Allocation | SchoolProfit" />
+      <PageTitle title="Academic Subjects & Curriculum | SchoolProfit" />
 
       <div className="container-fluid">
         <div className="row">
           <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
           <main className="col-md-9 col-lg-10 ms-auto gq-app-main db-main d-flex flex-column min-vh-100">
-            {/* HERO */}
+            {/* HERO BANNER */}
             <div className="db-hero">
               <div>
-                <h1 className="db-greeting">
-                  {getGreeting()}, <em>Admin</em>
-                </h1>
+                <div className="db-eyebrow">Academic Curriculum Management</div>
+                <h1 className="db-greeting">{getGreeting()}, Administrator</h1>
                 <p className="db-hero-sub">
-                  Universal Subject Bank. Manage single master subjects for your school and seamlessly allocate them across Nursery, Primary, Junior, and Senior Secondary classes.
+                  Organize subjects by educational level (Primary, Junior Secondary, and Senior Secondary Departments) and easily allocate curriculum to classes.
                 </p>
-                <div className="db-hero-btns">
-                  <button className="db-btn-gold" onClick={() => setShowCreate(true)} type="button">
-                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                      <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                    </svg>
-                    Add New Subject
-                  </button>
-                  <a href="#allocation-section" className="db-btn-outline">
-                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                      <path d="M3 4h10M3 8h10M3 12h6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                    </svg>
-                    Subject Allocation Matrix
-                  </a>
-                </div>
               </div>
 
-              <div className="db-hero-stat-card">
-                <div className="db-hero-stat-row">
-                  <div className="db-hero-stat-item">
-                    <span className="db-hero-stat-label">Total School Subjects</span>
-                    <span className="db-hero-stat-val">{totalSubjects}</span>
-                  </div>
-                  <div className="db-hero-stat-sep" />
-                  <div className="db-hero-stat-item">
-                    <span className="db-hero-stat-label">Sections Configured</span>
-                    <span className="db-hero-stat-val" style={{ color: "#60A5FA" }}>{sections.length}</span>
-                  </div>
-                  <div className="db-hero-stat-sep" />
-                  <div className="db-hero-stat-item">
-                    <span className="db-hero-stat-label">Departments</span>
-                    <span className="db-hero-stat-val" style={{ color: "#34D399" }}>{departments.length}</span>
-                  </div>
+              <div className="db-hero-stats">
+                <div className="db-hero-stat-box">
+                  <span className="db-hero-stat-num">{totalSubjects}</span>
+                  <span className="db-hero-stat-lbl">Total Subjects</span>
+                </div>
+                <div className="db-hero-stat-box">
+                  <span className="db-hero-stat-num" style={{ color: "#34D399" }}>{primaryCount}</span>
+                  <span className="db-hero-stat-lbl">Primary</span>
+                </div>
+                <div className="db-hero-stat-box">
+                  <span className="db-hero-stat-num" style={{ color: "#60A5FA" }}>{juniorCount}</span>
+                  <span className="db-hero-stat-lbl">Junior Sec</span>
+                </div>
+                <div className="db-hero-stat-box">
+                  <span className="db-hero-stat-num" style={{ color: "#F472B6" }}>{seniorCount}</span>
+                  <span className="db-hero-stat-lbl">Senior Sec</span>
                 </div>
               </div>
             </div>
+
+            {/* SECTION LEVEL TABS */}
+            <div className="db-section-nav">
+              <button
+                className={`db-sec-tab ${activeSectionTab === "all" ? "active" : ""}`}
+                onClick={() => {
+                  setActiveSectionTab("all");
+                  setActiveSeniorDept("all_senior");
+                }}
+                type="button"
+              >
+                <span>🌐 All Subjects</span>
+                <span className="db-sec-tab-badge">{totalSubjects}</span>
+              </button>
+
+              <button
+                className={`db-sec-tab ${activeSectionTab === "primary" ? "active" : ""}`}
+                onClick={() => {
+                  setActiveSectionTab("primary");
+                  setActiveSeniorDept("all_senior");
+                }}
+                type="button"
+              >
+                <span>🎒 Primary / Basic</span>
+                <span className="db-sec-tab-badge">{primaryCount}</span>
+              </button>
+
+              <button
+                className={`db-sec-tab ${activeSectionTab === "junior" ? "active" : ""}`}
+                onClick={() => {
+                  setActiveSectionTab("junior");
+                  setActiveSeniorDept("all_senior");
+                }}
+                type="button"
+              >
+                <span>📘 Junior Secondary (JSS)</span>
+                <span className="db-sec-tab-badge">{juniorCount}</span>
+              </button>
+
+              <button
+                className={`db-sec-tab ${activeSectionTab === "senior" ? "active" : ""}`}
+                onClick={() => {
+                  setActiveSectionTab("senior");
+                  setActiveSeniorDept("all_senior");
+                }}
+                type="button"
+              >
+                <span>🎓 Senior Secondary (SSS)</span>
+                <span className="db-sec-tab-badge">{seniorCount}</span>
+              </button>
+
+              {/* Dynamic Tabs for other custom school sections if any */}
+              {sections
+                .filter((s) => !/primary|basic|junior|jss|senior|sss|kinder/i.test(s.name))
+                .map((sec) => (
+                  <button
+                    key={sec.id}
+                    className={`db-sec-tab ${activeSectionTab === String(sec.id) ? "active" : ""}`}
+                    onClick={() => {
+                      setActiveSectionTab(String(sec.id));
+                      setActiveSeniorDept("all_senior");
+                    }}
+                    type="button"
+                  >
+                    <span>🏫 {sec.name}</span>
+                  </button>
+                ))}
+            </div>
+
+            {/* SENIOR SECONDARY DEPARTMENT SUB-NAV */}
+            {activeSectionTab === "senior" && (
+              <div className="db-sub-dept-bar">
+                <span style={{ fontSize: 12, fontWeight: 800, color: "#64748B", textTransform: "uppercase", paddingRight: 6 }}>
+                  Departments:
+                </span>
+                <button
+                  className={`db-dept-pill ${activeSeniorDept === "all_senior" ? "active" : ""}`}
+                  onClick={() => setActiveSeniorDept("all_senior")}
+                  type="button"
+                >
+                  All Senior ({seniorCount})
+                </button>
+                <button
+                  className={`db-dept-pill ${activeSeniorDept === "core" ? "active" : ""}`}
+                  onClick={() => setActiveSeniorDept("core")}
+                  type="button"
+                >
+                  ⭐ General / Core (All Depts)
+                </button>
+                {departments.map((d) => (
+                  <button
+                    key={d.id}
+                    className={`db-dept-pill ${activeSeniorDept === String(d.id) ? "active" : ""}`}
+                    onClick={() => setActiveSeniorDept(String(d.id))}
+                    type="button"
+                  >
+                    {/science/i.test(d.name) ? "🔬 " : /art/i.test(d.name) ? "🏛️ " : /comm/i.test(d.name) ? "📊 " : "🛠️ "}
+                    {d.name}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* SUBJECTS CATALOG PANEL */}
             <div className="db-panel">
               <div className="db-panel-head">
                 <div className="db-panel-title-group">
                   <div className="db-panel-icon">
-                    <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
                       <path d="M3 4.5h10M3 8h10M3 11.5h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                     </svg>
                   </div>
                   <div>
-                    <h2 className="db-panel-title">Subjects Master List</h2>
-                    <p className="db-panel-sub">All active subjects registered in your school.</p>
+                    <h2 className="db-panel-title">
+                      {activeSectionTab === "primary"
+                        ? "Primary / Basic Subjects"
+                        : activeSectionTab === "junior"
+                        ? "Junior Secondary (JSS) Subjects"
+                        : activeSectionTab === "senior"
+                        ? `Senior Secondary Subjects ${activeSeniorDept !== "all_senior" ? "— " + (activeSeniorDept === "core" ? "General / Core" : (departments.find((d) => String(d.id) === activeSeniorDept)?.name || "")) : ""}`
+                        : "Registered Subjects Master Catalog"}
+                    </h2>
+                    <p className="db-panel-sub">
+                      Showing {filteredSubjects.length} active subjects for this level.
+                    </p>
                   </div>
                 </div>
 
-                <div className="db-toolbar">
-                  {/* Section Filter */}
-                  <select
-                    className="db-select"
-                    value={sectionFilter}
-                    onChange={(e) => setSectionFilter(e.target.value)}
-                    title="Filter by Section"
-                  >
-                    <option value="">All Sections</option>
-                    {sections.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-
-                  {/* Department Filter */}
-                  <select
-                    className="db-select"
-                    value={departmentFilter}
-                    onChange={(e) => setDepartmentFilter(e.target.value)}
-                    title="Filter by Department"
-                  >
-                    <option value="">All Departments</option>
-                    {departments.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
-
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                   {/* Search */}
                   <div className="db-input">
-                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
                       <circle cx="7" cy="7" r="4.5" stroke="#64748B" strokeWidth="1.4" />
                       <path d="M11 11l3 3" stroke="#64748B" strokeWidth="1.4" strokeLinecap="round" />
                     </svg>
@@ -958,18 +1424,45 @@ export default function SubjectsPage() {
                       onChange={(e) => setQuery(e.target.value)}
                     />
                     {query.trim() && (
-                      <button className="db-chip-btn" style={{ padding: "4px 8px" }} onClick={() => setQuery("")} type="button">
-                        Clear
+                      <button className="db-chip-btn" style={{ padding: "2px 6px" }} onClick={() => setQuery("")} type="button">
+                        ✕
                       </button>
                     )}
                   </div>
 
-                  <button className="db-chip-btn" onClick={fetchSubjects} disabled={loadingSubjects} type="button">
-                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                      <path d="M12 7A5 5 0 112 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                      <path d="M12 3v4h-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                  {/* 1-Click Load Standard Curriculum */}
+                  <button
+                    className="db-btn-magic"
+                    onClick={() => {
+                      if (activeSectionTab === "primary") openCurriculumModal("primary");
+                      else if (activeSectionTab === "junior") openCurriculumModal("junior");
+                      else if (activeSectionTab === "senior") {
+                        if (activeSeniorDept === "core") openCurriculumModal("senior_core");
+                        else if (activeSeniorDept !== "all_senior") {
+                          const deptObj = departments.find((d) => String(d.id) === activeSeniorDept);
+                          const deptName = (deptObj?.name || "").toLowerCase();
+                          if (/sci/i.test(deptName)) openCurriculumModal("senior_science");
+                          else if (/art|hum/i.test(deptName)) openCurriculumModal("senior_arts");
+                          else if (/com/i.test(deptName)) openCurriculumModal("senior_commercial");
+                          else openCurriculumModal("senior_vocational");
+                        } else {
+                          openCurriculumModal("all");
+                        }
+                      } else {
+                        openCurriculumModal("all");
+                      }
+                    }}
+                    type="button"
+                  >
+                    ✨ Standard Curriculum Presets
+                  </button>
+
+                  {/* Add Subject */}
+                  <button className="db-btn-primary" onClick={openAddModal} type="button">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                      <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                     </svg>
-                    Refresh
+                    Add Subject
                   </button>
 
                   <button
@@ -977,45 +1470,19 @@ export default function SubjectsPage() {
                     onClick={() => setShowArchived((v) => !v)}
                     type="button"
                   >
-                    {showArchived ? "Show Active" : "View Archived"}
+                    {showArchived ? "Show Active" : "Archived"}
                   </button>
-
-                  {!showArchived && (
-                    <>
-                      <button className="db-chip-btn db-chip-primary" onClick={() => setShowCreate(true)} type="button">
-                        <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                          <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                        </svg>
-                        Add Subject
-                      </button>
-
-                      <button
-                        className="db-chip-btn"
-                        onClick={() => setShowAssign(true)}
-                        disabled={selectedCount === 0}
-                        title={selectedCount === 0 ? "Select subjects first" : ""}
-                        type="button"
-                      >
-                        Assign Section ({selectedCount})
-                      </button>
-                    </>
-                  )}
                 </div>
               </div>
 
-              {/* Helper toolbar for selection */}
-              <div className="db-helper-row">
-                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                  <span>
-                    Total: <b style={{ color: "#0F172A" }}>{filteredSubjects.length}</b> subjects
-                  </span>
+              {/* Table Toolbar */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 14, borderBottom: "1px solid #F1F5F9", marginBottom: 12 }}>
+                <div style={{ fontSize: 13, color: "#64748B" }}>
+                  Total: <b style={{ color: "#0F172A" }}>{filteredSubjects.length}</b> subjects
                   {selectedCount > 0 && (
-                    <>
-                      <span style={{ color: "#CBD5E1" }}>|</span>
-                      <span>
-                        Selected: <b style={{ color: "#2563EB" }}>{selectedCount}</b>
-                      </span>
-                    </>
+                    <span style={{ marginLeft: 10, color: "#2563EB", fontWeight: 700 }}>
+                      • {selectedCount} selected
+                    </span>
                   )}
                 </div>
 
@@ -1026,10 +1493,18 @@ export default function SubjectsPage() {
                   <button className="db-chip-btn" onClick={clearSelection} disabled={selectedCount === 0} type="button">
                     Clear
                   </button>
+                  <button
+                    className="db-chip-btn"
+                    onClick={() => setShowAssign(true)}
+                    disabled={selectedCount === 0}
+                    type="button"
+                  >
+                    Assign Section ({selectedCount})
+                  </button>
                 </div>
               </div>
 
-              {/* Table */}
+              {/* Subject Table */}
               <div style={{ overflowX: "auto" }}>
                 <table className="db-table">
                   <thead>
@@ -1046,10 +1521,10 @@ export default function SubjectsPage() {
                         />
                       </th>
                       <th>Subject Name</th>
-                      <th style={{ width: 140 }}>Code</th>
-                      <th style={{ width: 180 }}>Section</th>
+                      <th style={{ width: 130 }}>Code</th>
+                      <th style={{ width: 170 }}>Academic Section</th>
                       <th style={{ width: 180 }}>Department</th>
-                      <th style={{ width: 180, textAlign: "right" }}>Actions</th>
+                      <th style={{ width: 160, textAlign: "right" }}>Actions</th>
                     </tr>
                   </thead>
 
@@ -1062,9 +1537,10 @@ export default function SubjectsPage() {
                       </tr>
                     ) : pageRows.length === 0 ? (
                       <tr>
-                        <td colSpan={6} style={{ padding: 36, textAlign: "center", color: "#64748B" }}>
-                          <div style={{ fontWeight: 800, color: "#0F172A", fontSize: 15 }}>No subjects found</div>
-                          <div style={{ marginTop: 4 }}>Click "Add Subject" to register a new subject.</div>
+                        <td colSpan={6} style={{ padding: 40, textAlign: "center", color: "#64748B" }}>
+                          <div style={{ fontSize: 28, marginBottom: 8 }}>📚</div>
+                          <div style={{ fontWeight: 800, color: "#0F172A", fontSize: 15 }}>No subjects found in this view</div>
+                          <div style={{ marginTop: 4, fontSize: 13 }}>Click "+ Add Subject" or use "✨ Standard Curriculum Presets" to populate.</div>
                         </td>
                       </tr>
                     ) : (
@@ -1080,7 +1556,7 @@ export default function SubjectsPage() {
                           </td>
                           <td>
                             <div style={{ fontWeight: 800, color: "#0F172A" }}>{s.name}</div>
-                            <div style={{ fontSize: 11.5, color: "#64748B" }}>ID: {s.id}</div>
+                            <div style={{ fontSize: 11, color: "#94A3B8" }}>ID: {s.id}</div>
                           </td>
                           <td>
                             <span className="db-badge-code">{s.subject_id || `SUB${s.id}`}</span>
@@ -1100,9 +1576,9 @@ export default function SubjectsPage() {
                             </span>
                           </td>
                           <td style={{ textAlign: "right" }}>
-                            <div className="db-actions">
+                            <div style={{ display: "inline-flex", gap: 6 }}>
                               <button
-                                className="db-action-btn db-action-primary"
+                                className="db-chip-btn"
                                 onClick={() => openEdit(s)}
                                 disabled={showArchived}
                                 type="button"
@@ -1111,9 +1587,8 @@ export default function SubjectsPage() {
                               </button>
 
                               <button
-                                className={`db-action-btn ${
-                                  showArchived ? "db-action-green" : "db-action-danger"
-                                }`}
+                                className="db-chip-btn"
+                                style={{ color: showArchived ? "#059669" : "#DC2626" }}
                                 onClick={() => (showArchived ? restoreSubject(s) : archiveSubject(s))}
                                 type="button"
                               >
@@ -1161,27 +1636,29 @@ export default function SubjectsPage() {
             <div className="db-panel" id="allocation-section">
               <div className="db-panel-head">
                 <div className="db-panel-title-group">
-                  <div className="db-panel-icon" style={{ "--pi": "#E0F2FE", "--pc": "#0369A1" } as React.CSSProperties}>
-                    <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+                  <div className="db-panel-icon" style={{ background: "#FEF3C7", color: "#D97706" }}>
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
                       <path d="M3 4h10M3 8h10M3 12h6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                     </svg>
                   </div>
                   <div>
                     <h2 className="db-panel-title">Subject Allocation Matrix</h2>
                     <p className="db-panel-sub">
-                      Assign which subjects belong to each class (e.g. Primary 1, JSS 1) or Department (e.g. SSS 1 Science).
+                      Assign which master subjects belong to each target class (e.g. Primary 1, JSS 1) or Senior Department (e.g. SSS 1 Science).
                     </p>
                   </div>
                 </div>
 
-                <div className="db-panel-actions">
-                  <span className="db-pill db-pill-blue">{offeringSelectedCount} subjects selected</span>
+                <div>
+                  <span className="db-pill db-pill-blue" style={{ fontSize: 13, padding: "6px 12px" }}>
+                    {offeringSelectedCount} subjects selected for this class
+                  </span>
                 </div>
               </div>
 
               {/* Scope selectors */}
-              <div className="db-toolbar" style={{ alignItems: "flex-end", marginBottom: 16 }}>
-                <div className="db-field" style={{ minWidth: 190, margin: 0 }}>
+              <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 18 }}>
+                <div className="db-field" style={{ minWidth: 200, margin: 0 }}>
                   <label>Select Target Class</label>
                   <select value={offeringClassId} onChange={(e) => setOfferingClassId(e.target.value)}>
                     <option value="">All Classes (School Default)</option>
@@ -1205,7 +1682,7 @@ export default function SubjectsPage() {
                   </select>
                 </div>
 
-                <div className="db-field" style={{ minWidth: 190, margin: 0 }}>
+                <div className="db-field" style={{ minWidth: 180, margin: 0 }}>
                   <label>Department (Optional)</label>
                   <select value={offeringDepartmentId} onChange={(e) => setOfferingDepartmentId(e.target.value)}>
                     <option value="">All Departments</option>
@@ -1218,13 +1695,22 @@ export default function SubjectsPage() {
                 </div>
 
                 <button
-                  className="db-btn-outline"
-                  style={{ background: "#0F172A", borderColor: "#0F172A", color: "#fff", height: 42 }}
+                  className="db-chip-btn"
+                  style={{ height: 42, background: "#0F172A", color: "#fff", borderColor: "#0F172A" }}
                   type="button"
                   onClick={loadOfferings}
                   disabled={busyKey !== null}
                 >
                   {isBusy("offerings:load") ? "Loading..." : "Load Current Setup"}
+                </button>
+
+                <button
+                  className="db-chip-btn"
+                  style={{ height: 42, background: "#EFF6FF", color: "#1D4ED8", borderColor: "#BFDBFE" }}
+                  type="button"
+                  onClick={selectRecommendedOfferings}
+                >
+                  ⚡ Auto-Select Level Core
                 </button>
 
                 <button
@@ -1234,13 +1720,13 @@ export default function SubjectsPage() {
                   onClick={saveOfferings}
                   disabled={busyKey !== null}
                 >
-                  {isBusy("offerings:save") ? "Saving..." : "Save Subject Allocation"}
+                  {isBusy("offerings:save") ? "Saving..." : "Save Allocation"}
                 </button>
               </div>
 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                 <div className="db-help">
-                  Check the subjects that students in this target class or department take:
+                  Check the subjects offered by students in this class:
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button className="db-chip-btn" onClick={selectAllOfferings} type="button">
@@ -1279,33 +1765,43 @@ export default function SubjectsPage() {
                 <div className="db-modal" onMouseDown={(e) => e.stopPropagation()}>
                   <div className="db-modal-head">
                     <div>
-                      <h3 className="db-modal-title">Add New Subject</h3>
-                      <p className="db-modal-sub">Register a single master subject for your school.</p>
+                      <h3 className="db-panel-title">Add New Subject</h3>
+                      <p className="db-panel-sub">Create a subject in your school catalog.</p>
                     </div>
-                    <button className="db-modal-close" onClick={() => setShowCreate(false)} type="button">
+                    <button className="db-chip-btn" onClick={() => setShowCreate(false)} type="button">
                       ✕
                     </button>
                   </div>
 
                   <div className="db-modal-body">
-                    <div className="db-alert-tip">
-                      💡 <b>Pro Tip:</b> Create each subject name once (e.g. <i>Mathematics</i> or <i>Chemistry</i>). You can allocate it to any class or department in the Subject Allocation Matrix below.
-                    </div>
-
                     <div className="db-field">
                       <label>
                         Subject Name <span style={{ color: "#EF4444" }}>*</span>
                       </label>
                       <input
-                        placeholder="e.g. Further Mathematics, Civic Education"
+                        placeholder="e.g. Further Mathematics, Chemistry, Civic Education"
                         value={createName}
                         onChange={(e) => setCreateName(e.target.value)}
                         autoFocus
                       />
+
+                      {/* Common suggestions */}
+                      <div className="db-suggest-chips">
+                        {["Mathematics", "English Studies", "Biology", "Chemistry", "Physics", "Civic Education", "Economics", "Literature in English", "Financial Accounting", "Basic Science", "Social Studies"].map((item) => (
+                          <button
+                            key={item}
+                            type="button"
+                            className="db-suggest-chip"
+                            onClick={() => setCreateName(item)}
+                          >
+                            + {item}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     <div className="db-field">
-                      <label>Applicable Section (Optional)</label>
+                      <label>Academic Section (Optional)</label>
                       <select value={createSectionId} onChange={(e) => setCreateSectionId(e.target.value)}>
                         <option value="">Universal / All Sections</option>
                         {sections.map((s) => (
@@ -1335,7 +1831,7 @@ export default function SubjectsPage() {
                     <button className="db-chip-btn" onClick={() => setShowCreate(false)} type="button">
                       Cancel
                     </button>
-                    <button className="db-btn-gold" onClick={createSubject} disabled={busyKey !== null} type="button">
+                    <button className="db-btn-primary" onClick={createSubject} disabled={busyKey !== null} type="button">
                       {isBusy("subject:create") ? "Saving..." : "Save Subject"}
                     </button>
                   </div>
@@ -1349,10 +1845,10 @@ export default function SubjectsPage() {
                 <div className="db-modal" onMouseDown={(e) => e.stopPropagation()}>
                   <div className="db-modal-head">
                     <div>
-                      <h3 className="db-modal-title">Edit Subject</h3>
-                      <p className="db-modal-sub">Update subject details.</p>
+                      <h3 className="db-panel-title">Edit Subject</h3>
+                      <p className="db-panel-sub">Update subject details.</p>
                     </div>
-                    <button className="db-modal-close" onClick={() => setShowEdit(false)} type="button">
+                    <button className="db-chip-btn" onClick={() => setShowEdit(false)} type="button">
                       ✕
                     </button>
                   </div>
@@ -1394,8 +1890,164 @@ export default function SubjectsPage() {
                     <button className="db-chip-btn" onClick={() => setShowEdit(false)} type="button">
                       Cancel
                     </button>
-                    <button className="db-btn-gold" onClick={updateSubject} disabled={busyKey !== null} type="button">
+                    <button className="db-btn-primary" onClick={updateSubject} disabled={busyKey !== null} type="button">
                       {isBusy(`subject:update:${editId}`) ? "Updating..." : "Update Subject"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL: STANDARD CURRICULUM PRESET IMPORTER */}
+            {showCurriculumModal && (
+              <div className="db-modal-backdrop" onMouseDown={() => setShowCurriculumModal(false)}>
+                <div className="db-modal" style={{ maxWidth: 650 }} onMouseDown={(e) => e.stopPropagation()}>
+                  <div className="db-modal-head">
+                    <div>
+                      <h3 className="db-panel-title">✨ Standard Curriculum Presets</h3>
+                      <p className="db-panel-sub">Quickly import verified NERDC / WAEC national curriculum subjects.</p>
+                    </div>
+                    <button className="db-chip-btn" onClick={() => setShowCurriculumModal(false)} type="button">
+                      ✕
+                    </button>
+                  </div>
+
+                  <div className="db-modal-body">
+                    {/* Category Selector */}
+                    <div className="db-field">
+                      <label>Select Curriculum Level to Review:</label>
+                      <select
+                        value={selectedCurriculumCategory}
+                        onChange={(e) => {
+                          const cat = e.target.value;
+                          setSelectedCurriculumCategory(cat);
+                          const nextMap: Record<string, boolean> = {};
+                          if (cat === "all") {
+                            Object.values(STANDARD_CURRICULUM).forEach((group) => {
+                              group.items.forEach((item) => (nextMap[item.name] = true));
+                            });
+                          } else if (STANDARD_CURRICULUM[cat]) {
+                            STANDARD_CURRICULUM[cat].items.forEach((item) => (nextMap[item.name] = true));
+                          }
+                          setCurriculumSelection(nextMap);
+                        }}
+                      >
+                        <option value="all">🌟 Complete School Curriculum (All Levels)</option>
+                        <option value="primary">🎒 Primary / Basic Curriculum</option>
+                        <option value="junior">📘 Junior Secondary (JSS) Curriculum</option>
+                        <option value="senior_core">⭐ Senior Secondary - General / Core</option>
+                        <option value="senior_science">🔬 Senior Secondary - Science Department</option>
+                        <option value="senior_arts">🏛️ Senior Secondary - Arts & Humanities</option>
+                        <option value="senior_commercial">📊 Senior Secondary - Commercial Department</option>
+                        <option value="senior_vocational">🛠️ Senior Secondary - Vocational & Technical</option>
+                      </select>
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0F172A" }}>
+                        Select subjects to add to your school catalog:
+                      </span>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button
+                          className="db-chip-btn"
+                          style={{ padding: "3px 8px", fontSize: 11.5 }}
+                          onClick={() => {
+                            const map: Record<string, boolean> = {};
+                            const activeKeys =
+                              selectedCurriculumCategory === "all"
+                                ? Object.keys(STANDARD_CURRICULUM)
+                                : [selectedCurriculumCategory];
+                            activeKeys.forEach((key) => {
+                              STANDARD_CURRICULUM[key]?.items.forEach((it) => (map[it.name] = true));
+                            });
+                            setCurriculumSelection(map);
+                          }}
+                          type="button"
+                        >
+                          Select All
+                        </button>
+                        <button
+                          className="db-chip-btn"
+                          style={{ padding: "3px 8px", fontSize: 11.5 }}
+                          onClick={() => setCurriculumSelection({})}
+                          type="button"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ maxHeight: 300, overflowY: "auto", border: "1px solid #E2E8F0", borderRadius: 12, padding: 12 }}>
+                      {(selectedCurriculumCategory === "all"
+                        ? Object.keys(STANDARD_CURRICULUM)
+                        : [selectedCurriculumCategory]
+                      ).map((key) => {
+                        const group = STANDARD_CURRICULUM[key];
+                        if (!group) return null;
+                        return (
+                          <div key={key} style={{ marginBottom: 16 }}>
+                            <div style={{ fontSize: 12, fontWeight: 800, color: "#64748B", textTransform: "uppercase", marginBottom: 8 }}>
+                              {group.icon} {group.label}
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8 }}>
+                              {group.items.map((item) => {
+                                const alreadyExists = subjects.some(
+                                  (s) => s.name.toLowerCase().trim() === item.name.toLowerCase().trim()
+                                );
+                                return (
+                                  <label
+                                    key={item.name}
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 8,
+                                      padding: "7px 10px",
+                                      borderRadius: 8,
+                                      background: alreadyExists ? "#F1F5F9" : "#F8FAFC",
+                                      border: "1px solid #E2E8F0",
+                                      fontSize: 12.5,
+                                      cursor: alreadyExists ? "default" : "pointer",
+                                      opacity: alreadyExists ? 0.7 : 1,
+                                    }}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={alreadyExists ? false : !!curriculumSelection[item.name]}
+                                      disabled={alreadyExists}
+                                      onChange={(e) => {
+                                        setCurriculumSelection((prev) => ({
+                                          ...prev,
+                                          [item.name]: e.target.checked,
+                                        }));
+                                      }}
+                                    />
+                                    <span style={{ fontWeight: 600, color: "#0F172A" }}>{item.name}</span>
+                                    {alreadyExists && (
+                                      <span style={{ fontSize: 10, background: "#D1FAE5", color: "#065F46", padding: "1px 5px", borderRadius: 4, marginLeft: "auto" }}>
+                                        ✓ Added
+                                      </span>
+                                    )}
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="db-modal-foot">
+                    <button className="db-chip-btn" onClick={() => setShowCurriculumModal(false)} type="button">
+                      Cancel
+                    </button>
+                    <button
+                      className="db-btn-magic"
+                      onClick={importSelectedCurriculum}
+                      disabled={busyKey !== null}
+                      type="button"
+                    >
+                      {isBusy("curriculum:import") ? "Importing..." : "Import Selected Subjects"}
                     </button>
                   </div>
                 </div>
@@ -1408,10 +2060,10 @@ export default function SubjectsPage() {
                 <div className="db-modal" onMouseDown={(e) => e.stopPropagation()}>
                   <div className="db-modal-head">
                     <div>
-                      <h3 className="db-modal-title">Bulk Assign Section</h3>
-                      <p className="db-modal-sub">Assign {selectedCount} selected subjects to a section.</p>
+                      <h3 className="db-panel-title">Bulk Assign Section</h3>
+                      <p className="db-panel-sub">Assign {selectedCount} selected subjects to a section.</p>
                     </div>
-                    <button className="db-modal-close" onClick={() => setShowAssign(false)} type="button">
+                    <button className="db-chip-btn" onClick={() => setShowAssign(false)} type="button">
                       ✕
                     </button>
                   </div>
@@ -1436,7 +2088,7 @@ export default function SubjectsPage() {
                     <button className="db-chip-btn" onClick={() => setShowAssign(false)} type="button">
                       Cancel
                     </button>
-                    <button className="db-btn-gold" onClick={assignSectionToSelected} disabled={busyKey !== null} type="button">
+                    <button className="db-btn-primary" onClick={assignSectionToSelected} disabled={busyKey !== null} type="button">
                       {isBusy("subject:assign") ? "Assigning..." : "Assign Section"}
                     </button>
                   </div>
