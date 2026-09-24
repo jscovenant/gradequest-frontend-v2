@@ -8,10 +8,12 @@ import { authApi } from "../../../utils/axios";
 import { useToast } from "../../../contexts/ToastContext";
 
 const safeAiError = (message: string | undefined, fallback: string) => {
-  const text = String(message || fallback);
-  return /openai|api key|quota|billing|organization|insufficient_quota|provider/i.test(text)
-    ? "Something went wrong while processing this AI request. Please try again later."
-    : text;
+  if (!message) return fallback;
+  const text = String(message);
+  if (/sk-[a-zA-Z0-9]{20,}|AQ\.[a-zA-Z0-9]{20,}/i.test(text)) {
+    return "AI request failed due to authentication configuration. Please contact administrator.";
+  }
+  return text;
 };
 
 type SchemeTopic = { week?: number; topic: string; subtopics?: string[]; objectives?: string[]; activities?: string[]; resources?: string[]; assessment?: string[] };
@@ -685,6 +687,137 @@ export default function AiLessonPlanPage() {
     reader.readAsText(file);
   };
 
+  const [viewingScheme, setViewingScheme] = useState<LessonScheme | null>(null);
+
+  const downloadBlankSchemeTemplate = () => {
+    const headers = [
+      "Week",
+      "Topic",
+      "Subtopics",
+      "Learning Objectives",
+      "Teacher & Student Activities",
+      "Teaching Resources",
+      "Assessment Questions",
+    ];
+    const rows = [
+      [
+        "Week 1",
+        "Introduction to Whole Numbers",
+        "Place value and large number notation",
+        "Identify and write place values up to millions; Express numbers in figures and words",
+        "Teacher demonstrates place value abacus; Learners solve group drill exercises",
+        "Place value charts, Flashcards, Textbooks",
+        "What is the place value of 7 in 8,745,210?",
+      ],
+      [
+        "Week 2",
+        "Basic Operations on Numbers",
+        "Addition and subtraction of multi-digit numbers with carrying and borrowing",
+        "Perform accurate addition and subtraction involving large numbers",
+        "Teacher illustrates regrouping on whiteboard; Learners practice workbook problems",
+        "Whiteboard, Worksheets, Abacus",
+        "Calculate: 458,920 + 384,195",
+      ],
+      [
+        "Week 3",
+        "Fractions & Decimals",
+        "Types of fractions, conversions, and decimal representation",
+        "Convert proper/improper fractions to decimals and percentages",
+        "Teacher models fraction division strips; Students shade fractional segments",
+        "Fraction strips, Charts, Geometric models",
+        "Convert 7/4 into a mixed number and a decimal.",
+      ],
+      [
+        "Week 4",
+        "Review & Continuous Assessment",
+        "Review of topics covered in weeks 1 to 3",
+        "Assess learners' retention and provide targeted remediation",
+        "Teacher conducts test and reviews marking scheme interactively",
+        "Question papers, Answer booklets",
+        "Complete continuous assessment test items 1 to 10.",
+      ],
+    ];
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [
+        headers.join(","),
+        ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")),
+      ].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "Scheme_of_Work_Template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showSuccess?.("Scheme of work template (.CSV) downloaded.");
+  };
+
+  const downloadSchemeAsCsv = (s: LessonScheme) => {
+    const headers = [
+      "Week",
+      "Topic",
+      "Subtopics",
+      "Learning Objectives",
+      "Teacher & Student Activities",
+      "Teaching Resources",
+      "Assessment Questions",
+    ];
+    const topics = s.topics || [];
+    const rows = topics.map((t, idx) => [
+      `Week ${t.week || idx + 1}`,
+      t.topic || "",
+      (t.subtopics || []).join("; "),
+      (t.objectives || []).join("; "),
+      (t.activities || []).join("; "),
+      (t.resources || []).join("; "),
+      (t.assessment || []).join("; "),
+    ]);
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [
+        `"Title: ${s.title || ""}"`,
+        `"Subject: ${s.subject || ""}"`,
+        `"Class: ${s.class_name || ""}"`,
+        `"Term: ${s.term || ""}"`,
+        `"Curriculum: ${s.curriculum || ""}"`,
+        "",
+        headers.join(","),
+        ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")),
+      ].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute(
+      "download",
+      `${(s.subject || "Scheme").replace(/\s+/g, "_")}_${(s.class_name || "Class").replace(/\s+/g, "_")}_Scheme_of_Work.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showSuccess?.("Scheme of work exported to CSV.");
+  };
+
+  const copySchemeText = (s: LessonScheme) => {
+    const topics = s.topics || [];
+    let text = `${s.title}\nSubject: ${s.subject} | Class: ${s.class_name} | Term: ${s.term || "N/A"} | Curriculum: ${s.curriculum || "N/A"}\n\n`;
+    topics.forEach((t, i) => {
+      text += `--- WEEK ${t.week || i + 1}: ${t.topic} ---\n`;
+      if (t.subtopics?.length) text += `Subtopics: ${t.subtopics.join(", ")}\n`;
+      if (t.objectives?.length) text += `Objectives:\n - ${t.objectives.join("\n - ")}\n`;
+      if (t.activities?.length) text += `Activities:\n - ${t.activities.join("\n - ")}\n`;
+      if (t.resources?.length) text += `Resources: ${t.resources.join(", ")}\n`;
+      if (t.assessment?.length) text += `Assessment:\n - ${t.assessment.join("\n - ")}\n`;
+      text += "\n";
+    });
+    navigator.clipboard.writeText(text);
+    showSuccess?.("Scheme of work copied to clipboard.");
+  };
+
   const chooseScheme = (id: string) => {
     const s = schemes.find((item) => String(item.id) === id);
     setForm((p) => ({ ...p, scheme_id: id, level_id: String(s?.level_id || ""), section_id: String(s?.section_id || ""), department_id: String(s?.department_id || ""), subject_id: String(s?.subject_id || ""), subject: s?.subject || p.subject, class: s?.class_name || p.class, topic: s?.topics?.[0]?.topic || p.topic }));
@@ -962,10 +1095,21 @@ export default function AiLessonPlanPage() {
                     <button className="lp-btn full" disabled={loading} onClick={generateScheme}>
                       Generate Scheme with AI
                     </button>
+                    <div className="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                      <span className="lp-muted fw-bold">Offline Scheme Preparation</span>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
+                        style={{ borderRadius: "8px", fontWeight: 700, fontSize: "12px" }}
+                        onClick={downloadBlankSchemeTemplate}
+                      >
+                        <i className="bi bi-download" /> Download Template (.CSV)
+                      </button>
+                    </div>
                     <label className="lp-field">
                       <span>Upload or paste scheme text</span>
                       <input className="lp-input" type="file" accept=".txt,.csv" onChange={(e) => readSchemeFile(e.target.files?.[0])} />
-                      <textarea className="lp-textarea" value={schemeForm.content} onChange={(e) => setSchemeForm({ ...schemeForm, content: e.target.value })} placeholder="Paste scheme of work text here." />
+                      <textarea className="lp-textarea" value={schemeForm.content} onChange={(e) => setSchemeForm({ ...schemeForm, content: e.target.value })} placeholder="Paste scheme of work text or weekly topics here." />
                     </label>
                     <button className="lp-btn soft full" disabled={loading} onClick={saveUploadedScheme}>
                       Save Uploaded Scheme
@@ -980,7 +1124,17 @@ export default function AiLessonPlanPage() {
 
                 <section className="lp-card">
                   <div className="lp-pad">
-                    <h2>Saved schemes</h2>
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <h2 className="m-0">Saved schemes of work</h2>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1"
+                        style={{ borderRadius: "8px", fontWeight: 700, fontSize: "12px" }}
+                        onClick={downloadBlankSchemeTemplate}
+                      >
+                        <i className="bi bi-file-earmark-spreadsheet" /> Blank Template
+                      </button>
+                    </div>
                     <div className="lp-scroll">
                       <table className="lp-table">
                         <thead>
@@ -1008,7 +1162,24 @@ export default function AiLessonPlanPage() {
                               <td>
                                 <div className="lp-actions">
                                   <button
+                                    className="lp-btn"
+                                    style={{ padding: "6px 12px", fontSize: "12px", marginTop: 0 }}
+                                    onClick={() => setViewingScheme(s)}
+                                    title="View complete weekly scheme and print / export"
+                                  >
+                                    <i className="bi bi-eye me-1" /> View & Print
+                                  </button>
+                                  <button
                                     className="lp-btn soft"
+                                    style={{ padding: "6px 10px", fontSize: "12px", marginTop: 0 }}
+                                    onClick={() => downloadSchemeAsCsv(s)}
+                                    title="Download as CSV spreadsheet"
+                                  >
+                                    <i className="bi bi-file-earmark-arrow-down" /> CSV
+                                  </button>
+                                  <button
+                                    className="lp-btn soft"
+                                    style={{ padding: "6px 10px", fontSize: "12px", marginTop: 0 }}
                                     onClick={() => {
                                       chooseScheme(String(s.id));
                                       setTab("plan");
@@ -1016,10 +1187,19 @@ export default function AiLessonPlanPage() {
                                   >
                                     Use
                                   </button>
-                                  <button className="lp-btn soft" onClick={() => openSchemeForEdit(s)}>
+                                  <button
+                                    className="lp-btn soft"
+                                    style={{ padding: "6px 10px", fontSize: "12px", marginTop: 0 }}
+                                    onClick={() => openSchemeForEdit(s)}
+                                  >
                                     Edit
                                   </button>
-                                  <button className="lp-btn danger" disabled={loading} onClick={() => archiveLessonItem("scheme", s.id)}>
+                                  <button
+                                    className="lp-btn danger"
+                                    style={{ padding: "6px 10px", fontSize: "12px", marginTop: 0 }}
+                                    disabled={loading}
+                                    onClick={() => archiveLessonItem("scheme", s.id)}
+                                  >
                                     Archive
                                   </button>
                                 </div>
@@ -1650,6 +1830,195 @@ export default function AiLessonPlanPage() {
                     </div>
                   </div>
                 </section>
+              </div>
+            )}
+            {/* SCHEME VIEW & PRINT MODAL */}
+            {viewingScheme && (
+              <div
+                className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center p-3"
+                style={{
+                  background: "rgba(15, 39, 68, 0.65)",
+                  backdropFilter: "blur(4px)",
+                  zIndex: 9999,
+                  overflowY: "auto",
+                }}
+              >
+                <div
+                  className="bg-white rounded-4 shadow-lg w-100 my-auto"
+                  style={{ maxWidth: "1100px", maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" }}
+                >
+                  {/* Modal Header */}
+                  <div className="p-3 px-4 border-bottom d-flex justify-content-between align-items-center bg-light flex-wrap gap-2 lp-modal-hide-print">
+                    <div>
+                      <span className="badge bg-primary mb-1">Scheme of Work Document</span>
+                      <h2 className="fs-5 fw-bold m-0 text-dark">{viewingScheme.title}</h2>
+                    </div>
+                    <div className="d-flex gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-dark d-inline-flex align-items-center gap-1"
+                        style={{ borderRadius: "8px", fontWeight: 700 }}
+                        onClick={() => copySchemeText(viewingScheme)}
+                      >
+                        <i className="bi bi-clipboard" /> Copy Text
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1"
+                        style={{ borderRadius: "8px", fontWeight: 700 }}
+                        onClick={() => downloadSchemeAsCsv(viewingScheme)}
+                      >
+                        <i className="bi bi-file-earmark-arrow-down" /> Export CSV / Excel
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1"
+                        style={{ borderRadius: "8px", fontWeight: 700 }}
+                        onClick={() => window.print()}
+                      >
+                        <i className="bi bi-printer" /> Print / Save PDF
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-dark"
+                        style={{ borderRadius: "8px", fontWeight: 700 }}
+                        onClick={() => {
+                          chooseScheme(String(viewingScheme.id));
+                          setViewingScheme(null);
+                          setTab("plan");
+                        }}
+                      >
+                        <i className="bi bi-arrow-right-circle me-1" /> Use in Lesson Plan
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-danger"
+                        style={{ borderRadius: "8px", fontWeight: 700 }}
+                        onClick={() => setViewingScheme(null)}
+                      >
+                        <i className="bi bi-x-lg" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Modal Content / Printable Scheme */}
+                  <div className="p-4" style={{ overflowY: "auto", flex: 1 }}>
+                    <div className="text-center pb-3 mb-3 border-bottom">
+                      <h1 className="fs-4 fw-bold text-dark m-0">{viewingScheme.title}</h1>
+                      <div className="d-flex justify-content-center gap-4 mt-2 flex-wrap text-muted" style={{ fontSize: "13px" }}>
+                        <span><strong>Subject:</strong> {viewingScheme.subject}</span>
+                        <span><strong>Class:</strong> {viewingScheme.class_name}</span>
+                        <span><strong>Term:</strong> {viewingScheme.term || "N/A"}</span>
+                        <span><strong>Curriculum:</strong> {viewingScheme.curriculum || "Nigeria National Curriculum"}</span>
+                        <span><strong>Total Weeks:</strong> {viewingScheme.topics?.length || 0}</span>
+                      </div>
+                    </div>
+
+                    {viewingScheme.topics?.length ? (
+                      <div className="table-responsive">
+                        <table className="table table-bordered table-striped align-middle" style={{ fontSize: "12.5px" }}>
+                          <thead className="table-dark">
+                            <tr>
+                              <th style={{ width: "70px", textAlign: "center" }}>Week</th>
+                              <th style={{ width: "18%" }}>Topic</th>
+                              <th style={{ width: "16%" }}>Subtopics</th>
+                              <th style={{ width: "20%" }}>Learning Objectives</th>
+                              <th style={{ width: "18%" }}>Teacher & Student Activities</th>
+                              <th style={{ width: "12%" }}>Teaching Resources</th>
+                              <th style={{ width: "16%" }}>Assessment Questions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {viewingScheme.topics.map((topic, tIdx) => (
+                              <tr key={tIdx}>
+                                <td className="fw-bold text-center bg-light">
+                                  Week {topic.week || tIdx + 1}
+                                </td>
+                                <td className="fw-bold text-primary">{topic.topic}</td>
+                                <td>
+                                  {topic.subtopics?.length ? (
+                                    <ul className="ps-3 m-0">
+                                      {topic.subtopics.map((s, i) => (
+                                        <li key={i}>{s}</li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <span className="text-muted">-</span>
+                                  )}
+                                </td>
+                                <td>
+                                  {topic.objectives?.length ? (
+                                    <ul className="ps-3 m-0">
+                                      {topic.objectives.map((o, i) => (
+                                        <li key={i}>{o}</li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <span className="text-muted">-</span>
+                                  )}
+                                </td>
+                                <td>
+                                  {topic.activities?.length ? (
+                                    <ul className="ps-3 m-0">
+                                      {topic.activities.map((a, i) => (
+                                        <li key={i}>{a}</li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <span className="text-muted">-</span>
+                                  )}
+                                </td>
+                                <td>
+                                  {topic.resources?.length ? (
+                                    <ul className="ps-3 m-0">
+                                      {topic.resources.map((r, i) => (
+                                        <li key={i}>{r}</li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <span className="text-muted">-</span>
+                                  )}
+                                </td>
+                                <td>
+                                  {topic.assessment?.length ? (
+                                    <ul className="ps-3 m-0">
+                                      {topic.assessment.map((q, i) => (
+                                        <li key={i}>{q}</li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <span className="text-muted">-</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-light rounded text-muted">
+                        <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit" }}>
+                          {viewingScheme.content || "No topics available."}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div className="p-3 px-4 border-top d-flex justify-content-between align-items-center bg-light lp-modal-hide-print">
+                    <span className="text-muted" style={{ fontSize: "12px" }}>
+                      Official Academic Scheme of Work
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      style={{ borderRadius: "8px", fontWeight: 700 }}
+                      onClick={() => setViewingScheme(null)}
+                    >
+                      Close Scheme Viewer
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
             <Footer />
