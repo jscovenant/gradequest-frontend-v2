@@ -133,6 +133,7 @@ const ForgotPasswordPage = lazyWithRetry(() => import("./pages/Forgotpasswordpag
 const ResetPasswordPage = lazyWithRetry(() => import("./pages/Resetpasswordpage"));
 const ResultSubmissionDeadlinePage = lazyWithRetry(() => import("./pages/Admin/StudentResult/ResultSubmissionDeadlinePage"));
 const ResultMonitoringPage = lazyWithRetry(() => import("./pages/Admin/StudentResult/Resultmonitoringpage"));
+const ResultsHubPage = lazyWithRetry(() => import("./pages/Admin/StudentResult/ResultsHubPage"));
 const CbtExamsPage = lazyWithRetry(() => import("./pages/Admin/CBT/CbtExamsPage"));
 const StudentCbtExamsPage = lazyWithRetry(() => import("./pages/Student/CBT/StudentCbtExamsPage"));
 const StudentLessonNotesPage = lazyWithRetry(() => import("./pages/Student/Lessons/StudentLessonNotesPage"));
@@ -429,6 +430,37 @@ function App() {
               <RequireAuth roles={["Admin"]}>
                 <OnboardingGuard>
                   <FinancialRecords />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/results"
+            element={
+              <RequireAuth roles={["Admin", "Teacher", "Super-Admin", "Platform-Staff"]}>
+                <OnboardingGuard>
+                  <ResultsHubPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/results/hub"
+            element={
+              <RequireAuth roles={["Admin", "Teacher", "Super-Admin", "Platform-Staff"]}>
+                <OnboardingGuard>
+                  <ResultsHubPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/results"
+            element={
+              <RequireAuth roles={["Admin", "Teacher", "Super-Admin", "Platform-Staff"]}>
+                <OnboardingGuard>
+                  <ResultsHubPage />
                 </OnboardingGuard>
               </RequireAuth>
             }
