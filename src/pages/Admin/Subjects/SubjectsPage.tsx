@@ -1324,8 +1324,9 @@ export default function SubjectsPage() {
             {/* SECTION LEVEL TABS */}
             <div className="db-section-nav">
               <button
-                className={`db-sec-tab ${activeSectionTab === "all" ? "active" : ""}`}
+                className={`db-sec-tab ${!showArchived && activeSectionTab === "all" ? "active" : ""}`}
                 onClick={() => {
+                  if (showArchived) setShowArchived(false);
                   setActiveSectionTab("all");
                   setActiveSeniorDept("all_senior");
                 }}
@@ -1336,8 +1337,9 @@ export default function SubjectsPage() {
               </button>
 
               <button
-                className={`db-sec-tab ${activeSectionTab === "primary" ? "active" : ""}`}
+                className={`db-sec-tab ${!showArchived && activeSectionTab === "primary" ? "active" : ""}`}
                 onClick={() => {
+                  if (showArchived) setShowArchived(false);
                   setActiveSectionTab("primary");
                   setActiveSeniorDept("all_senior");
                 }}
@@ -1348,8 +1350,9 @@ export default function SubjectsPage() {
               </button>
 
               <button
-                className={`db-sec-tab ${activeSectionTab === "junior" ? "active" : ""}`}
+                className={`db-sec-tab ${!showArchived && activeSectionTab === "junior" ? "active" : ""}`}
                 onClick={() => {
+                  if (showArchived) setShowArchived(false);
                   setActiveSectionTab("junior");
                   setActiveSeniorDept("all_senior");
                 }}
@@ -1360,8 +1363,9 @@ export default function SubjectsPage() {
               </button>
 
               <button
-                className={`db-sec-tab ${activeSectionTab === "senior" ? "active" : ""}`}
+                className={`db-sec-tab ${!showArchived && activeSectionTab === "senior" ? "active" : ""}`}
                 onClick={() => {
+                  if (showArchived) setShowArchived(false);
                   setActiveSectionTab("senior");
                   setActiveSeniorDept("all_senior");
                 }}
@@ -1377,8 +1381,9 @@ export default function SubjectsPage() {
                 .map((sec) => (
                   <button
                     key={sec.id}
-                    className={`db-sec-tab ${activeSectionTab === String(sec.id) ? "active" : ""}`}
+                    className={`db-sec-tab ${!showArchived && activeSectionTab === String(sec.id) ? "active" : ""}`}
                     onClick={() => {
+                      if (showArchived) setShowArchived(false);
                       setActiveSectionTab(String(sec.id));
                       setActiveSeniorDept("all_senior");
                     }}
@@ -1387,6 +1392,20 @@ export default function SubjectsPage() {
                     <span>🏫 {sec.name}</span>
                   </button>
                 ))}
+
+              {/* Archived Subjects Tab */}
+              <button
+                className={`db-sec-tab ${showArchived ? "active" : ""}`}
+                style={
+                  showArchived
+                    ? { background: "#DC2626", borderColor: "#DC2626", color: "#FFFFFF", boxShadow: "0 4px 12px rgba(220, 38, 38, 0.25)" }
+                    : { borderStyle: "dashed", borderColor: "#CBD5E1", color: "#64748B" }
+                }
+                onClick={() => setShowArchived((prev) => !prev)}
+                type="button"
+              >
+                <span>{showArchived ? "🔙 Active Subjects" : "📦 Archived Subjects"}</span>
+              </button>
             </div>
 
             {/* SENIOR SECONDARY DEPARTMENT SUB-NAV */}
@@ -1504,41 +1523,87 @@ export default function SubjectsPage() {
 
                   <button
                     className="db-chip-btn"
+                    style={
+                      showArchived
+                        ? { background: "#DC2626", borderColor: "#DC2626", color: "#FFFFFF", fontWeight: 700 }
+                        : { background: "#FEF2F2", color: "#DC2626", borderColor: "#FECACA", fontWeight: 700 }
+                    }
                     onClick={() => setShowArchived((v) => !v)}
                     type="button"
                   >
-                    {showArchived ? "Show Active" : "Archived"}
+                    <span style={{ fontSize: 13 }}>{showArchived ? "🔙" : "📦"}</span>
+                    {showArchived ? "Back to Active Subjects" : "View Archived Subjects"}
                   </button>
                 </div>
               </div>
 
+              {/* ARCHIVED RECOVERY ALERT BANNER */}
+              {showArchived && (
+                <div
+                  style={{
+                    background: "#FEF2F2",
+                    border: "1px solid #FECACA",
+                    borderRadius: 14,
+                    padding: "14px 18px",
+                    marginBottom: 16,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 22 }}>📦</span>
+                    <div>
+                      <div style={{ fontWeight: 800, color: "#991B1B", fontSize: 14 }}>
+                        Archived / Deactivated Subjects Mode
+                      </div>
+                      <div style={{ fontSize: 12.5, color: "#7F1D1D", marginTop: 2 }}>
+                        These subjects are currently deactivated and hidden from active classes. Click the green <strong>"↺ Restore Subject"</strong> button to bring any subject back to your active school curriculum.
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    className="db-chip-btn"
+                    style={{ background: "#FFFFFF", color: "#991B1B", borderColor: "#FCA5A5", fontWeight: 700 }}
+                    onClick={() => setShowArchived(false)}
+                    type="button"
+                  >
+                    🔙 Return to Active Subjects
+                  </button>
+                </div>
+              )}
+
               {/* Table Toolbar */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 14, borderBottom: "1px solid #F1F5F9", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
                 <div style={{ fontSize: 13, color: "#64748B" }}>
-                  Total: <b style={{ color: "#0F172A" }}>{filteredSubjects.length}</b> subjects
-                  {selectedCount > 0 && (
+                  Total: <b style={{ color: "#0F172A" }}>{filteredSubjects.length}</b> {showArchived ? "archived" : "active"} subjects
+                  {selectedCount > 0 && !showArchived && (
                     <span style={{ marginLeft: 10, color: "#2563EB", fontWeight: 700 }}>
                       • {selectedCount} selected
                     </span>
                   )}
                 </div>
 
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button className="db-chip-btn" onClick={selectAllFiltered} disabled={filteredSubjects.length === 0} type="button">
-                    Select All
-                  </button>
-                  <button className="db-chip-btn" onClick={clearSelection} disabled={selectedCount === 0} type="button">
-                    Clear
-                  </button>
-                  <button
-                    className="db-chip-btn"
-                    onClick={() => setShowAssignSection(true)}
-                    disabled={selectedCount === 0}
-                    type="button"
-                  >
-                    Assign Section ({selectedCount})
-                  </button>
-                </div>
+                {!showArchived && (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button className="db-chip-btn" onClick={selectAllFiltered} disabled={filteredSubjects.length === 0} type="button">
+                      Select All
+                    </button>
+                    <button className="db-chip-btn" onClick={clearSelection} disabled={selectedCount === 0} type="button">
+                      Clear
+                    </button>
+                    <button
+                      className="db-chip-btn"
+                      onClick={() => setShowAssignSection(true)}
+                      disabled={selectedCount === 0}
+                      type="button"
+                    >
+                      Assign Section ({selectedCount})
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Subject Table */}
@@ -1575,9 +1640,15 @@ export default function SubjectsPage() {
                     ) : pageRows.length === 0 ? (
                       <tr>
                         <td colSpan={6} style={{ padding: 40, textAlign: "center", color: "#64748B" }}>
-                          <div style={{ fontSize: 28, marginBottom: 8 }}>📚</div>
-                          <div style={{ fontWeight: 800, color: "#0F172A", fontSize: 15 }}>No subjects found in this view</div>
-                          <div style={{ marginTop: 4, fontSize: 13 }}>Click "+ Add Subject" or use "✨ Standard Curriculum Presets" to populate.</div>
+                          <div style={{ fontSize: 28, marginBottom: 8 }}>{showArchived ? "📦" : "📚"}</div>
+                          <div style={{ fontWeight: 800, color: "#0F172A", fontSize: 15 }}>
+                            {showArchived ? "No archived subjects found" : "No subjects found in this view"}
+                          </div>
+                          <div style={{ marginTop: 4, fontSize: 13 }}>
+                            {showArchived
+                              ? "There are no archived subjects in your school repository."
+                              : 'Click "+ Add Subject" or use "✨ Standard Curriculum Presets" to populate.'}
+                          </div>
                         </td>
                       </tr>
                     ) : (
@@ -1613,25 +1684,47 @@ export default function SubjectsPage() {
                             </span>
                           </td>
                           <td style={{ textAlign: "right" }}>
-                            <div style={{ display: "inline-flex", gap: 6 }}>
+                            {showArchived ? (
                               <button
                                 className="db-chip-btn"
-                                onClick={() => openEdit(s)}
-                                disabled={showArchived}
+                                style={{
+                                  background: "#ECFDF5",
+                                  color: "#047857",
+                                  borderColor: "#A7F3D0",
+                                  fontWeight: 800,
+                                  padding: "6px 14px",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                }}
+                                onClick={() => restoreSubject(s)}
+                                disabled={busyKey !== null}
                                 type="button"
                               >
-                                Edit
+                                <span>↺</span>
+                                <span>{isBusy(`subject:restore:${s.id}`) ? "Restoring..." : "Restore Subject"}</span>
                               </button>
+                            ) : (
+                              <div style={{ display: "inline-flex", gap: 6 }}>
+                                <button
+                                  className="db-chip-btn"
+                                  onClick={() => openEdit(s)}
+                                  disabled={showArchived}
+                                  type="button"
+                                >
+                                  Edit
+                                </button>
 
-                              <button
-                                className="db-chip-btn"
-                                style={{ color: showArchived ? "#059669" : "#DC2626" }}
-                                onClick={() => (showArchived ? restoreSubject(s) : archiveSubject(s))}
-                                type="button"
-                              >
-                                {showArchived ? "Restore" : "Archive"}
-                              </button>
-                            </div>
+                                <button
+                                  className="db-chip-btn"
+                                  style={{ color: "#DC2626" }}
+                                  onClick={() => archiveSubject(s)}
+                                  type="button"
+                                >
+                                  Archive
+                                </button>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       ))
@@ -1752,21 +1845,21 @@ export default function SubjectsPage() {
 
                     {/* Department */}
                     <div className="db-form-group">
-                      <label>Department (Optional)</label>
+                      <label>Department (Optional — Senior Secondary Only)</label>
                       <select
                         className="db-form-input"
                         value={createDepartmentId}
                         onChange={(e) => setCreateDepartmentId(e.target.value)}
                       >
-                        <option value="">Compulsory / All Departments</option>
+                        <option value="">No Department (Primary, Junior & Compulsory Senior)</option>
                         {departments.map((d) => (
                           <option key={d.id} value={d.id}>
-                            {d.name}
+                            {d.name} Department (Senior Secondary Only)
                           </option>
                         ))}
                       </select>
                       <span className="db-form-hint">
-                        Only select if this subject belongs strictly to a specific department (e.g. Science, Arts, Commercial).
+                        Choose <strong>"No Department"</strong> for Primary and Junior Secondary subjects, or for Compulsory Senior subjects (e.g. Maths, English). Only choose a department (e.g. Science, Arts, Commercial) for specialized Senior Secondary subjects.
                       </span>
                     </div>
                   </div>
@@ -1831,19 +1924,22 @@ export default function SubjectsPage() {
                     </div>
 
                     <div className="db-form-group">
-                      <label>Department</label>
+                      <label>Department (Optional — Senior Secondary Only)</label>
                       <select
                         className="db-form-input"
                         value={editDepartmentId}
                         onChange={(e) => setEditDepartmentId(e.target.value)}
                       >
-                        <option value="">Compulsory / All Departments</option>
+                        <option value="">No Department (Primary, Junior & Compulsory Senior)</option>
                         {departments.map((d) => (
                           <option key={d.id} value={d.id}>
-                            {d.name}
+                            {d.name} Department (Senior Secondary Only)
                           </option>
                         ))}
                       </select>
+                      <span className="db-form-hint">
+                        Choose <strong>"No Department"</strong> for Primary, Junior, and Compulsory subjects. Only assign a department for specialized Senior Secondary subjects.
+                      </span>
                     </div>
                   </div>
 
