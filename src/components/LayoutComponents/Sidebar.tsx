@@ -446,22 +446,10 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
     {
       label: "Results",
       icon: "file-earmark-text",
-      collapseId: "resultsMenu",
+      href: "/results",
+      roles: ["Admin", "Teacher"],
       featureKey: "support_results_upload",
       lockIfNoFeature: true,
-      children: [
-        { label: "📊 Results Command Hub", href: "/results", roles: ["Admin", "Teacher"] },
-        { label: "1. Enter Student Scores", href: "/students/results/add", roles: ["Admin", "Teacher"] },
-        { label: "2. Compile Term Results", href: "/students/results/batch", roles: ["Admin", "Teacher"] },
-        { label: "3. Review & Publish", href: "/results/review", roles: ["Admin"] },
-        { label: "4. Student Report Cards", href: "/results/student-editor", roles: ["Admin", "Teacher"] },
-        { label: "Submission Tracker", href: "/result/monitor", roles: ["Admin"] },
-        { label: "Report Card Design", href: "/results/design", roles: ["Admin"] },
-        { label: "Generate PIN", href: "/results/pins", roles: ["Admin"] },
-        { label: "Student Transcripts", href: "/transcripts", roles: ["Admin"] },
-        { label: "Withdrawn Archive", href: "/results/withdrawn-archive", roles: ["Admin"] },
-      ],
-      roles: ["Admin", "Teacher"],
     },
 
     {
