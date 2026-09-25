@@ -226,16 +226,17 @@ export default function ResultsHubPage() {
     <>
       <style>{`
         /* ======= Results Hub Styles ======= */
-        .gq-rh-page {
+        .gq-app-main {
           background-color: #F8FAFC;
           min-height: 100vh;
         }
-        .gq-rh-main {
+        .db-main {
           padding: 24px 28px;
+          background: #F8FAFC;
           box-sizing: border-box;
         }
         @media (max-width: 768px) {
-          .gq-rh-main { padding: 16px 14px; }
+          .db-main { padding: 16px 14px; }
         }
 
         /* Hero Banner */
@@ -599,7 +600,7 @@ export default function ResultsHubPage() {
         <div className="row">
           <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-          <main className="col-md-9 col-lg-10 ms-auto gq-rh-page gq-rh-main d-flex flex-column min-vh-100">
+          <main className="col-md-9 col-lg-10 ms-auto gq-app-main db-main d-flex flex-column min-vh-100">
             {/* HERO HEADER */}
             <div className="gq-rh-hero">
               <div className="gq-rh-hero-eyebrow">Result Management Command Center</div>
