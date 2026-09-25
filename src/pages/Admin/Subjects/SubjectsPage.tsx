@@ -13,7 +13,6 @@ import PageTitle from "../../../components/PageTitle";
 ========================= */
 type Department = { id: number; name: string };
 type Section = { id: number; name: string };
-type StudentClass = { id: number; name: string; section_id?: number | null };
 
 type Subject = {
   id: number;
@@ -211,7 +210,6 @@ export default function SubjectsPage() {
   // data
   const [departments, setDepartments] = useState<Department[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
-  const [classes, setClasses] = useState<StudentClass[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
 
   // active Section Tab: 'all' | 'primary' | 'junior' | 'senior' | number (custom section id)
@@ -227,7 +225,8 @@ export default function SubjectsPage() {
   // modals
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
-  const [showAssign, setShowAssign] = useState(false);
+  const [showAssignSection, setShowAssignSection] = useState(false);
+  const [showAssignDept, setShowAssignDept] = useState(false);
   const [showCurriculumModal, setShowCurriculumModal] = useState(false);
 
   // curriculum importer state
@@ -247,16 +246,10 @@ export default function SubjectsPage() {
   const [editSectionId, setEditSectionId] = useState<string>("");
   const [editDepartmentId, setEditDepartmentId] = useState<string>("");
 
-  // bulk section assignment
+  // bulk assignments
   const [selectedIds, setSelectedIds] = useState<Record<number, boolean>>({});
-  const [assignSectionId, setAssignSectionId] = useState<string>("");
-
-  // subject allocation matrix (offerings)
-  const [offeringClassId, setOfferingClassId] = useState("");
-  const [offeringSectionId, setOfferingSectionId] = useState("");
-  const [offeringDepartmentId, setOfferingDepartmentId] = useState("");
-  const [offeringSubjectIds, setOfferingSubjectIds] = useState<Record<number, boolean>>({});
-  const [offeringLoaded, setOfferingLoaded] = useState(false);
+  const [bulkSectionId, setBulkSectionId] = useState<string>("");
+  const [bulkDepartmentId, setBulkDepartmentId] = useState<string>("");
 
   const isBusy = (key: string) => busyKey === key;
 
@@ -308,16 +301,6 @@ export default function SubjectsPage() {
     }
   }
 
-  async function fetchClasses() {
-    try {
-      const res = await authApi.get("/levels");
-      const rows = Array.isArray(res.data) ? res.data : res.data?.data || [];
-      setClasses(rows);
-    } catch (err: any) {
-      showError(getErrorMessage(err));
-    }
-  }
-
   async function fetchSubjects() {
     try {
       setLoadingSubjects(true);
@@ -344,7 +327,7 @@ export default function SubjectsPage() {
 
   useEffect(() => {
     setLoadingPage(true);
-    Promise.all([fetchDepartments(), fetchSections(), fetchClasses(), fetchSubjects()]).finally(() =>
+    Promise.all([fetchDepartments(), fetchSections(), fetchSubjects()]).finally(() =>
       setLoadingPage(false)
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -365,25 +348,28 @@ export default function SubjectsPage() {
     s.department?.name ?? departments.find((x) => x.id === s.department_id)?.name ?? "Compulsory (All Depts)";
 
   const isSubjectInPrimary = (s: Subject) => {
-    if (!s.section_id && !s.department_id) return true; // Universal
     if (primarySection && s.section_id === primarySection.id) return true;
     const name = sectionName(s).toLowerCase();
-    return /primary|nursery|basic|grade|kinder/i.test(name);
+    if (/primary|nursery|basic|grade|kinder/i.test(name)) return true;
+    // If not assigned to senior or junior or any department, it's universal
+    return !s.section_id && !s.department_id;
   };
 
   const isSubjectInJunior = (s: Subject) => {
-    if (!s.section_id && !s.department_id) return true; // Universal
     if (juniorSection && s.section_id === juniorSection.id) return true;
     const name = sectionName(s).toLowerCase();
-    return /junior|jss/i.test(name);
+    if (/junior|jss/i.test(name)) return true;
+    // If not assigned to senior or primary or any department, it's universal
+    return !s.section_id && !s.department_id;
   };
 
   const isSubjectInSenior = (s: Subject) => {
-    if (!s.section_id && !s.department_id) return true; // Universal
     if (seniorSection && s.section_id === seniorSection.id) return true;
     if (s.department_id) return true; // Any department subject belongs to Senior
     const name = sectionName(s).toLowerCase();
-    return /senior|sss/i.test(name);
+    if (/senior|sss/i.test(name)) return true;
+    // If not assigned to primary or junior, it's universal
+    return !s.section_id;
   };
 
   /* =========================
@@ -456,6 +442,28 @@ export default function SubjectsPage() {
   function openAddModal() {
     setCreateName("");
     setCreateCode("");
+
+    // Auto preset section and department based on active tab
+    if (activeSectionTab === "primary" && primarySection) {
+      setCreateSectionId(String(primarySection.id));
+      setCreateDepartmentId("");
+    } else if (activeSectionTab === "junior" && juniorSection) {
+      setCreateSectionId(String(juniorSection.id));
+      setCreateDepartmentId("");
+    } else if (activeSectionTab === "senior") {
+      if (seniorSection) setCreateSectionId(String(seniorSection.id));
+      else setCreateSectionId("");
+
+      if (activeSeniorDept !== "all_senior" && activeSeniorDept !== "compulsory") {
+        setCreateDepartmentId(activeSeniorDept);
+      } else {
+        setCreateDepartmentId("");
+      }
+    } else {
+      setCreateSectionId("");
+      setCreateDepartmentId("");
+    }
+
     setShowCreate(true);
   }
 
@@ -467,6 +475,9 @@ export default function SubjectsPage() {
       setBusyKey("subject:create");
       const payload: any = { name };
       if (createCode.trim()) payload.code = createCode.trim().toUpperCase();
+      if (createSectionId) payload.section_id = Number(createSectionId);
+      if (createDepartmentId) payload.department_id = Number(createDepartmentId);
+      else payload.is_general = true;
 
       const res = await authApi.post("/subjects", payload);
       const code = res.data?.subject_code ? ` (${res.data.subject_code})` : "";
@@ -474,6 +485,8 @@ export default function SubjectsPage() {
 
       setCreateName("");
       setCreateCode("");
+      setCreateSectionId("");
+      setCreateDepartmentId("");
       setShowCreate(false);
       await fetchSubjects();
     } catch (err: any) {
@@ -487,6 +500,8 @@ export default function SubjectsPage() {
     setEditId(subject.id);
     setEditName(subject.name ?? "");
     setEditCode(subject.subject_id ?? "");
+    setEditSectionId(subject.section_id ? String(subject.section_id) : "");
+    setEditDepartmentId(subject.department_id ? String(subject.department_id) : "");
     setShowEdit(true);
   }
 
@@ -498,6 +513,9 @@ export default function SubjectsPage() {
     try {
       setBusyKey(`subject:update:${editId}`);
       const payload: any = { name };
+      payload.section_id = editSectionId ? Number(editSectionId) : null;
+      payload.department_id = editDepartmentId ? Number(editDepartmentId) : null;
+      payload.is_general = !editDepartmentId;
 
       const res = await authApi.put(`/subjects/${editId}`, payload);
       showSuccess(res.data?.message ?? "Subject updated successfully.");
@@ -506,6 +524,8 @@ export default function SubjectsPage() {
       setEditId(null);
       setEditName("");
       setEditCode("");
+      setEditSectionId("");
+      setEditDepartmentId("");
       await fetchSubjects();
     } catch (err: any) {
       showError(getErrorMessage(err));
@@ -557,8 +577,8 @@ export default function SubjectsPage() {
     setSelectedIds({});
   }
 
-  async function assignSectionToSelected() {
-    if (!assignSectionId) return showError("Please select a section.");
+  async function bulkAssignSection() {
+    if (!bulkSectionId) return showError("Please select a section.");
 
     const ids = Object.entries(selectedIds)
       .filter(([_, v]) => v)
@@ -567,16 +587,16 @@ export default function SubjectsPage() {
     if (ids.length === 0) return showError("Please select at least one subject.");
 
     try {
-      setBusyKey("subject:assign");
+      setBusyKey("subject:assign-sec");
       const res = await authApi.post("/subjects/assign-section", {
-        section_id: Number(assignSectionId),
+        section_id: Number(bulkSectionId),
         subject_ids: ids,
       });
 
       showSuccess(res.data?.message ?? "Subjects successfully assigned to section.");
 
-      setShowAssign(false);
-      setAssignSectionId("");
+      setShowAssignSection(false);
+      setBulkSectionId("");
       setSelectedIds({});
       await fetchSubjects();
     } catch (err: any) {
@@ -667,105 +687,6 @@ export default function SubjectsPage() {
     } finally {
       setBusyKey(null);
     }
-  }
-
-  /* =========================
-     SUBJECT ALLOCATION MATRIX
-  ========================= */
-  const offeringSelectedCount = useMemo(
-    () => Object.values(offeringSubjectIds).filter(Boolean).length,
-    [offeringSubjectIds]
-  );
-
-  async function loadOfferings() {
-    try {
-      setBusyKey("offerings:load");
-      const params: any = {};
-      if (offeringClassId) params.level_id = Number(offeringClassId);
-      if (offeringSectionId) params.section_id = Number(offeringSectionId);
-      if (offeringDepartmentId) params.department_id = Number(offeringDepartmentId);
-
-      const res = await authApi.get("/subject-offerings", { params });
-      const ids = new Set<number>((res.data?.subject_ids || []).map((id: number) => Number(id)));
-      const next: Record<number, boolean> = {};
-      subjects.forEach((subject) => {
-        next[subject.id] = ids.has(subject.id);
-      });
-      setOfferingSubjectIds(next);
-      setOfferingLoaded(true);
-      showSuccess(`Loaded subject allocation for the selected scope.`);
-    } catch (err: any) {
-      showError(getErrorMessage(err));
-    } finally {
-      setBusyKey(null);
-    }
-  }
-
-  async function saveOfferings() {
-    const subject_ids = Object.entries(offeringSubjectIds)
-      .filter(([, selected]) => selected)
-      .map(([id]) => Number(id));
-
-    try {
-      setBusyKey("offerings:save");
-      const payload: any = { subject_ids };
-      if (offeringClassId) payload.level_id = Number(offeringClassId);
-      if (offeringSectionId) payload.section_id = Number(offeringSectionId);
-      if (offeringDepartmentId) payload.department_id = Number(offeringDepartmentId);
-
-      const res = await authApi.post("/subject-offerings", payload);
-      showSuccess(res.data?.message || "Subject allocation saved successfully.");
-    } catch (err: any) {
-      showError(getErrorMessage(err));
-    } finally {
-      setBusyKey(null);
-    }
-  }
-
-  function toggleOfferingSubject(id: number) {
-    setOfferingSubjectIds((prev) => ({ ...prev, [id]: !prev[id] }));
-  }
-
-  function selectAllOfferings() {
-    const next: Record<number, boolean> = {};
-    subjects.forEach((s) => {
-      next[s.id] = true;
-    });
-    setOfferingSubjectIds(next);
-  }
-
-  function selectRecommendedOfferings() {
-    const next: Record<number, boolean> = { ...offeringSubjectIds };
-    const selClass = classes.find((c) => String(c.id) === offeringClassId);
-    const className = (selClass?.name || "").toLowerCase();
-
-    const isSeniorClass = /sss|senior|ss 1|ss 2|ss 3/i.test(className);
-    const isJuniorClass = /jss|junior|basic 7|basic 8|basic 9/i.test(className);
-    const isPrimaryClass = /primary|basic|grade|nursery|kinder/i.test(className);
-
-    subjects.forEach((s) => {
-      if (isPrimaryClass && isSubjectInPrimary(s)) {
-        next[s.id] = true;
-      } else if (isJuniorClass && isSubjectInJunior(s)) {
-        next[s.id] = true;
-      } else if (isSeniorClass) {
-        if (!s.department_id) {
-          next[s.id] = true; // Compulsory Senior Subjects
-        } else if (offeringDepartmentId && s.department_id === Number(offeringDepartmentId)) {
-          next[s.id] = true; // Specific Department Subjects
-        }
-      } else {
-        // Universal subjects
-        if (!s.section_id && !s.department_id) next[s.id] = true;
-      }
-    });
-
-    setOfferingSubjectIds(next);
-    showSuccess("Pre-selected compulsory & standard subjects for this level.");
-  }
-
-  function clearAllOfferings() {
-    setOfferingSubjectIds({});
   }
 
   if (loadingPage) {
@@ -1129,26 +1050,6 @@ export default function SubjectsPage() {
           font-size: 12px;
         }
 
-        /* Allocation Grid */
-        .db-check-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-          gap: 12px;
-        }
-        .db-option-card {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 12px 14px;
-          background: #F8FAFC;
-          border: 1px solid #E2E8F0;
-          border-radius: 10px;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .db-option-card:hover { border-color: #3B82F6; background: #EFF6FF; }
-        .db-option-card input[type="checkbox"] { width: 16px; height: 16px; accent-color: #2563EB; }
-
         /* ============================
            MODAL SYSTEM - HIGH VISIBILITY
         ============================ */
@@ -1160,7 +1061,7 @@ export default function SubjectsPage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 99999;
+          z-index: 10500;
           padding: 16px;
           overflow-y: auto;
         }
@@ -1396,7 +1297,7 @@ export default function SubjectsPage() {
                 <div className="db-eyebrow">Academic Curriculum Management</div>
                 <h1 className="db-greeting">{getGreeting()}, Administrator</h1>
                 <p className="db-hero-sub">
-                  Organize subjects by educational level (Primary, Junior Secondary, and Senior Secondary Departments) and easily allocate curriculum to classes.
+                  Organize subjects by educational level (Primary, Junior Secondary, and Senior Secondary Departments) with clean categorization and 1-click curriculum presets.
                 </p>
               </div>
 
@@ -1542,7 +1443,7 @@ export default function SubjectsPage() {
                         : "Registered Subjects Master Catalog"}
                     </h2>
                     <p className="db-panel-sub">
-                      Showing {filteredSubjects.length} active subjects for this level.
+                      Showing {filteredSubjects.length} active subjects for this view.
                     </p>
                   </div>
                 </div>
@@ -1612,7 +1513,7 @@ export default function SubjectsPage() {
               </div>
 
               {/* Table Toolbar */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 14, borderBottom: "1px solid #F1F5F9", marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 14, borderBottom: "1px solid #F1F5F9", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
                 <div style={{ fontSize: 13, color: "#64748B" }}>
                   Total: <b style={{ color: "#0F172A" }}>{filteredSubjects.length}</b> subjects
                   {selectedCount > 0 && (
@@ -1622,7 +1523,7 @@ export default function SubjectsPage() {
                   )}
                 </div>
 
-                <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <button className="db-chip-btn" onClick={selectAllFiltered} disabled={filteredSubjects.length === 0} type="button">
                     Select All
                   </button>
@@ -1631,7 +1532,7 @@ export default function SubjectsPage() {
                   </button>
                   <button
                     className="db-chip-btn"
-                    onClick={() => setShowAssign(true)}
+                    onClick={() => setShowAssignSection(true)}
                     disabled={selectedCount === 0}
                     type="button"
                   >
@@ -1768,157 +1669,20 @@ export default function SubjectsPage() {
               )}
             </div>
 
-            {/* SUBJECT ALLOCATION MATRIX PANEL */}
-            <div className="db-panel" id="allocation-section">
-              <div className="db-panel-head">
-                <div className="db-panel-title-group">
-                  <div className="db-panel-icon" style={{ background: "#FEF3C7", color: "#D97706" }}>
-                    <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
-                      <path d="M3 4h10M3 8h10M3 12h6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h2 className="db-panel-title">Subject Allocation Matrix</h2>
-                    <p className="db-panel-sub">
-                      Assign which master subjects belong to each target class (e.g. Primary 1, JSS 1) or Senior Department (e.g. SSS 1 Science).
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <span className="db-pill db-pill-blue" style={{ fontSize: 13, padding: "6px 12px" }}>
-                    {offeringSelectedCount} subjects selected for this class
-                  </span>
-                </div>
-              </div>
-
-              {/* Scope selectors */}
-              <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 18 }}>
-                <div className="db-form-group" style={{ minWidth: 200, margin: 0 }}>
-                  <label>Select Target Class</label>
-                  <select
-                    className="db-form-input"
-                    value={offeringClassId}
-                    onChange={(e) => setOfferingClassId(e.target.value)}
-                  >
-                    <option value="">All Classes (School Default)</option>
-                    {classes.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="db-form-group" style={{ minWidth: 170, margin: 0 }}>
-                  <label>Section (Optional)</label>
-                  <select
-                    className="db-form-input"
-                    value={offeringSectionId}
-                    onChange={(e) => setOfferingSectionId(e.target.value)}
-                  >
-                    <option value="">All Sections</option>
-                    {sections.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="db-form-group" style={{ minWidth: 180, margin: 0 }}>
-                  <label>Department (Optional)</label>
-                  <select
-                    className="db-form-input"
-                    value={offeringDepartmentId}
-                    onChange={(e) => setOfferingDepartmentId(e.target.value)}
-                  >
-                    <option value="">Compulsory / All Departments</option>
-                    {departments.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <button
-                  className="db-chip-btn"
-                  style={{ height: 42, background: "#0F172A", color: "#fff", borderColor: "#0F172A" }}
-                  type="button"
-                  onClick={loadOfferings}
-                  disabled={busyKey !== null}
-                >
-                  {isBusy("offerings:load") ? "Loading..." : "Load Current Setup"}
-                </button>
-
-                <button
-                  className="db-chip-btn"
-                  style={{ height: 42, background: "#EFF6FF", color: "#1D4ED8", borderColor: "#BFDBFE" }}
-                  type="button"
-                  onClick={selectRecommendedOfferings}
-                >
-                  ⚡ Auto-Select Compulsory Subjects
-                </button>
-
-                <button
-                  className="db-btn-gold"
-                  style={{ height: 42 }}
-                  type="button"
-                  onClick={saveOfferings}
-                  disabled={busyKey !== null}
-                >
-                  {isBusy("offerings:save") ? "Saving..." : "Save Allocation"}
-                </button>
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                <div className="db-form-hint">
-                  Check the subjects offered by students in this class:
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button className="db-chip-btn" onClick={selectAllOfferings} type="button">
-                    Select All
-                  </button>
-                  <button className="db-chip-btn" onClick={clearAllOfferings} type="button">
-                    Clear All
-                  </button>
-                </div>
-              </div>
-
-              <div className="db-check-grid">
-                {subjects.map((subj) => (
-                  <label key={subj.id} className="db-option-card">
-                    <input
-                      type="checkbox"
-                      checked={!!offeringSubjectIds[subj.id]}
-                      onChange={() => toggleOfferingSubject(subj.id)}
-                    />
-                    <div>
-                      <div style={{ fontWeight: 700, color: "#0F172A", fontSize: 13 }}>{subj.name}</div>
-                      <div style={{ fontSize: 11, color: "#64748B" }}>
-                        {subj.subject_id || `SUB${subj.id}`} | {sectionName(subj)}
-                      </div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-
             <Footer />
 
             {/* ========================================================
-                MODAL 1: ADD NEW SUBJECT (Clean & Fast)
+                MODAL 1: ADD NEW SUBJECT (Smart & Direct)
                ======================================================== */}
             {showCreate && (
               <div className="db-modal-overlay" onMouseDown={() => setShowCreate(false)}>
-                <div className="db-modal-card" style={{ maxWidth: 520 }} onMouseDown={(e) => e.stopPropagation()}>
+                <div className="db-modal-card" style={{ maxWidth: 540 }} onMouseDown={(e) => e.stopPropagation()}>
                   <div className="db-modal-top">
                     <div>
                       <h3 className="db-modal-heading">
                         <span>➕ Add New Subject</span>
                       </h3>
-                      <p className="db-modal-desc">Register a master subject in your school catalog.</p>
+                      <p className="db-modal-desc">Register a subject in your school catalog.</p>
                     </div>
                     <button className="db-modal-close-btn" onClick={() => setShowCreate(false)} type="button">
                       ✕
@@ -1967,6 +1731,44 @@ export default function SubjectsPage() {
                         ))}
                       </div>
                     </div>
+
+                    {/* Academic Section */}
+                    <div className="db-form-group">
+                      <label>Academic Level / Section (Optional)</label>
+                      <select
+                        className="db-form-input"
+                        value={createSectionId}
+                        onChange={(e) => setCreateSectionId(e.target.value)}
+                      >
+                        <option value="">Universal / All Levels</option>
+                        {sections.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="db-form-hint">Leave as Universal if taught across multiple school sections.</span>
+                    </div>
+
+                    {/* Department */}
+                    <div className="db-form-group">
+                      <label>Department (Optional)</label>
+                      <select
+                        className="db-form-input"
+                        value={createDepartmentId}
+                        onChange={(e) => setCreateDepartmentId(e.target.value)}
+                      >
+                        <option value="">Compulsory / All Departments</option>
+                        {departments.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="db-form-hint">
+                        Only select if this subject belongs strictly to a specific department (e.g. Science, Arts, Commercial).
+                      </span>
+                    </div>
                   </div>
 
                   <div className="db-modal-bottom">
@@ -1986,13 +1788,13 @@ export default function SubjectsPage() {
                ======================================================== */}
             {showEdit && (
               <div className="db-modal-overlay" onMouseDown={() => setShowEdit(false)}>
-                <div className="db-modal-card" style={{ maxWidth: 520 }} onMouseDown={(e) => e.stopPropagation()}>
+                <div className="db-modal-card" style={{ maxWidth: 540 }} onMouseDown={(e) => e.stopPropagation()}>
                   <div className="db-modal-top">
                     <div>
                       <h3 className="db-modal-heading">
                         <span>✏️ Edit Subject</span>
                       </h3>
-                      <p className="db-modal-desc">Update subject name.</p>
+                      <p className="db-modal-desc">Update subject details and academic categorization.</p>
                     </div>
                     <button className="db-modal-close-btn" onClick={() => setShowEdit(false)} type="button">
                       ✕
@@ -2010,6 +1812,38 @@ export default function SubjectsPage() {
                         onChange={(e) => setEditName(e.target.value)}
                         autoFocus
                       />
+                    </div>
+
+                    <div className="db-form-group">
+                      <label>Academic Section</label>
+                      <select
+                        className="db-form-input"
+                        value={editSectionId}
+                        onChange={(e) => setEditSectionId(e.target.value)}
+                      >
+                        <option value="">Universal / All Sections</option>
+                        {sections.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="db-form-group">
+                      <label>Department</label>
+                      <select
+                        className="db-form-input"
+                        value={editDepartmentId}
+                        onChange={(e) => setEditDepartmentId(e.target.value)}
+                      >
+                        <option value="">Compulsory / All Departments</option>
+                        {departments.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
@@ -2241,9 +2075,9 @@ export default function SubjectsPage() {
             {/* ========================================================
                 MODAL 4: BULK ASSIGN SECTION
                ======================================================== */}
-            {showAssign && (
-              <div className="db-modal-overlay" onMouseDown={() => setShowAssign(false)}>
-                <div className="db-modal-card" onMouseDown={(e) => e.stopPropagation()}>
+            {showAssignSection && (
+              <div className="db-modal-overlay" onMouseDown={() => setShowAssignSection(false)}>
+                <div className="db-modal-card" style={{ maxWidth: 520 }} onMouseDown={(e) => e.stopPropagation()}>
                   <div className="db-modal-top">
                     <div>
                       <h3 className="db-modal-heading">
@@ -2251,7 +2085,7 @@ export default function SubjectsPage() {
                       </h3>
                       <p className="db-modal-desc">Assign {selectedCount} selected subjects to an academic section.</p>
                     </div>
-                    <button className="db-modal-close-btn" onClick={() => setShowAssign(false)} type="button">
+                    <button className="db-modal-close-btn" onClick={() => setShowAssignSection(false)} type="button">
                       ✕
                     </button>
                   </div>
@@ -2263,8 +2097,8 @@ export default function SubjectsPage() {
                       </label>
                       <select
                         className="db-form-input"
-                        value={assignSectionId}
-                        onChange={(e) => setAssignSectionId(e.target.value)}
+                        value={bulkSectionId}
+                        onChange={(e) => setBulkSectionId(e.target.value)}
                       >
                         <option value="">Select Section</option>
                         {sections.map((s) => (
@@ -2277,11 +2111,11 @@ export default function SubjectsPage() {
                   </div>
 
                   <div className="db-modal-bottom">
-                    <button className="db-chip-btn" onClick={() => setShowAssign(false)} type="button">
+                    <button className="db-chip-btn" onClick={() => setShowAssignSection(false)} type="button">
                       Cancel
                     </button>
-                    <button className="db-btn-primary" onClick={assignSectionToSelected} disabled={busyKey !== null} type="button">
-                      {isBusy("subject:assign") ? "Assigning..." : "Assign Section"}
+                    <button className="db-btn-primary" onClick={bulkAssignSection} disabled={busyKey !== null} type="button">
+                      {isBusy("subject:assign-sec") ? "Assigning..." : "Assign Section"}
                     </button>
                   </div>
                 </div>
