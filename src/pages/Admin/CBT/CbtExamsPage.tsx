@@ -370,6 +370,22 @@ export default function CbtExamsPage() {
     return [];
   };
 
+  const isSectionWithoutDept = (sectionId: string | number | undefined | null) => {
+    if (!sectionId) return false;
+    const sec = sections.find((s) => Number(s.id) === Number(sectionId));
+    if (!sec) return false;
+    return /primary|nursery|basic|grade|kinder|creche|junior|jss|playgroup/i.test(sec.name);
+  };
+
+  const visibleClassesFor = (values: typeof emptyExam) => {
+    const selectedSection = values.section_id ? Number(values.section_id) : null;
+    if (!selectedSection) return classes;
+    return classes.filter((cls) => {
+      const clsSecId = cls.section_id ? Number(cls.section_id) : null;
+      return !clsSecId || clsSecId === selectedSection;
+    });
+  };
+
   const visibleSubjectsFor = (values: typeof emptyExam) => {
     const selectedDepartment = values.department_id ? Number(values.department_id) : null;
     const selectedSection = values.section_id ? Number(values.section_id) : null;
@@ -387,15 +403,15 @@ export default function CbtExamsPage() {
       const subjectSection = subject.section_id ? Number(subject.section_id) : null;
       const subjectClass = subject.class_id ? Number(subject.class_id) : null;
 
-      // 1. Department filter:
-      // If a department is selected: match subjects for that department OR general subjects (subjectDepartment == null)
-      if (selectedDepartment && subjectDepartment && subjectDepartment !== selectedDepartment) {
+      // 1. Section filter:
+      // If effectiveSectionId is selected: match subjects for that section OR general section subjects (subjectSection == null)
+      if (effectiveSectionId && subjectSection && subjectSection !== effectiveSectionId) {
         return false;
       }
 
-      // 2. Section filter:
-      // If effectiveSectionId is selected: match subjects for that section OR general section subjects (subjectSection == null)
-      if (effectiveSectionId && subjectSection && subjectSection !== effectiveSectionId) {
+      // 2. Department filter:
+      // If a department is selected: match subjects for that department OR general subjects (subjectDepartment == null)
+      if (selectedDepartment && subjectDepartment && subjectDepartment !== selectedDepartment) {
         return false;
       }
 
@@ -411,6 +427,8 @@ export default function CbtExamsPage() {
     return preferGeneralSubjects(filtered);
   };
 
+  const createClasses = useMemo(() => visibleClassesFor(form), [classes, form.section_id]);
+  const settingsClasses = useMemo(() => visibleClassesFor(settingsForm), [classes, settingsForm.section_id]);
   const createSubjects = useMemo(() => visibleSubjectsFor(form), [subjects, form.department_id, form.section_id, form.class_id, form.subject_id, classes]);
   const settingsSubjects = useMemo(() => visibleSubjectsFor(settingsForm), [subjects, settingsForm.department_id, settingsForm.section_id, settingsForm.class_id, settingsForm.subject_id, classes]);
 
@@ -1466,6 +1484,43 @@ export default function CbtExamsPage() {
                         <input className="cbt-input" value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} required placeholder="e.g. English Language CBT" />
                       </div>
                       <div className="cbt-field">
+                        <label className="cbt-label">Section</label>
+                        <select
+                          className="cbt-select"
+                          value={form.section_id}
+                          onChange={(e) => {
+                            const nextSecId = e.target.value;
+                            const noDept = isSectionWithoutDept(nextSecId);
+                            setForm((p) => {
+                              const curCls = classes.find((c) => String(c.id) === p.class_id);
+                              const classValid = !p.class_id || !nextSecId || (curCls?.section_id && String(curCls.section_id) === nextSecId);
+                              return {
+                                ...p,
+                                section_id: nextSecId,
+                                department_id: noDept ? "" : p.department_id,
+                                class_id: classValid ? p.class_id : "",
+                                subject_id: "",
+                              };
+                            });
+                          }}
+                        >
+                          <option value="">All sections</option>
+                          {sections.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="cbt-field">
+                        <label className="cbt-label">Department</label>
+                        <select
+                          className="cbt-select"
+                          value={form.department_id}
+                          disabled={isSectionWithoutDept(form.section_id)}
+                          onChange={(e) => setForm((p) => ({ ...p, department_id: e.target.value, subject_id: "" }))}
+                        >
+                          <option value="">{isSectionWithoutDept(form.section_id) ? "General (Not applicable for this section)" : "General Department / Common Subjects"}</option>
+                          {!isSectionWithoutDept(form.section_id) && departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="cbt-field">
                         <label className="cbt-label">Class</label>
                         <select
                           className="cbt-select"
@@ -1481,28 +1536,24 @@ export default function CbtExamsPage() {
                             }));
                           }}
                         >
-                          <option value="">All classes</option>
-                          {classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="cbt-field">
-                        <label className="cbt-label">Section</label>
-                        <select className="cbt-select" value={form.section_id} onChange={(e) => setForm((p) => ({ ...p, section_id: e.target.value, subject_id: "" }))}>
-                          <option value="">All sections</option>
-                          {sections.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="cbt-field">
-                        <label className="cbt-label">Department</label>
-                        <select className="cbt-select" value={form.department_id} onChange={(e) => setForm((p) => ({ ...p, department_id: e.target.value, subject_id: "" }))}>
-                          <option value="">General Department / Common Subjects</option>
-                          {departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                          <option value="">{form.section_id ? "All classes in section" : "All classes"}</option>
+                          {createClasses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                         </select>
                       </div>
                       <div className="cbt-field">
                         <label className="cbt-label">Subject</label>
-                        <select className="cbt-select" value={form.subject_id} onChange={(e) => setForm((p) => ({ ...p, subject_id: e.target.value }))}>
-                          <option value="">Select subject</option>
+                        <select
+                          className="cbt-select"
+                          value={form.subject_id}
+                          onChange={(e) => setForm((p) => ({ ...p, subject_id: e.target.value }))}
+                        >
+                          <option value="">
+                            {createSubjects.length === 0
+                              ? "No subjects matching selection"
+                              : form.section_id
+                              ? `Select subject (${createSubjects.length} available)`
+                              : "Select subject"}
+                          </option>
                           {createSubjects.map((item) => (
                             <option key={item.id} value={item.id}>
                               {getSubjectLabel(item)}
@@ -1948,6 +1999,44 @@ export default function CbtExamsPage() {
                           <input className="cbt-input" value={settingsForm.title} disabled={!examDetail || selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, title: e.target.value }))} required />
                         </div>
                         <div className="cbt-field">
+                          <label className="cbt-label">Section</label>
+                          <select
+                            className="cbt-select"
+                            value={settingsForm.section_id}
+                            disabled={!examDetail || selectedIsPublished}
+                            onChange={(e) => {
+                              const nextSecId = e.target.value;
+                              const noDept = isSectionWithoutDept(nextSecId);
+                              setSettingsForm((p) => {
+                                const curCls = classes.find((c) => String(c.id) === p.class_id);
+                                const classValid = !p.class_id || !nextSecId || (curCls?.section_id && String(curCls.section_id) === nextSecId);
+                                return {
+                                  ...p,
+                                  section_id: nextSecId,
+                                  department_id: noDept ? "" : p.department_id,
+                                  class_id: classValid ? p.class_id : "",
+                                  subject_id: "",
+                                };
+                              });
+                            }}
+                          >
+                            <option value="">All sections</option>
+                            {sections.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="cbt-field">
+                          <label className="cbt-label">Department</label>
+                          <select
+                            className="cbt-select"
+                            value={settingsForm.department_id}
+                            disabled={!examDetail || selectedIsPublished || isSectionWithoutDept(settingsForm.section_id)}
+                            onChange={(e) => setSettingsForm((p) => ({ ...p, department_id: e.target.value, subject_id: "" }))}
+                          >
+                            <option value="">{isSectionWithoutDept(settingsForm.section_id) ? "General (Not applicable for this section)" : "General Department / Common Subjects"}</option>
+                            {!isSectionWithoutDept(settingsForm.section_id) && departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="cbt-field">
                           <label className="cbt-label">Class</label>
                           <select
                             className="cbt-select"
@@ -1960,31 +2049,29 @@ export default function CbtExamsPage() {
                                 ...p,
                                 class_id: nextClassId,
                                 section_id: cls?.section_id ? String(cls.section_id) : (nextClassId ? p.section_id : ""),
+                                subject_id: "",
                               }));
                             }}
                           >
-                            <option value="">All classes</option>
-                            {classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                          </select>
-                        </div>
-                        <div className="cbt-field">
-                          <label className="cbt-label">Section</label>
-                          <select className="cbt-select" value={settingsForm.section_id} disabled={!examDetail || selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, section_id: e.target.value }))}>
-                            <option value="">All sections</option>
-                            {sections.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                          </select>
-                        </div>
-                        <div className="cbt-field">
-                          <label className="cbt-label">Department</label>
-                          <select className="cbt-select" value={settingsForm.department_id} disabled={!examDetail || selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, department_id: e.target.value }))}>
-                            <option value="">General Department / Common Subjects</option>
-                            {departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                            <option value="">{settingsForm.section_id ? "All classes in section" : "All classes"}</option>
+                            {settingsClasses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                           </select>
                         </div>
                         <div className="cbt-field">
                           <label className="cbt-label">Subject</label>
-                          <select className="cbt-select" value={settingsForm.subject_id} disabled={!examDetail || selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, subject_id: e.target.value }))}>
-                            <option value="">Select subject</option>
+                          <select
+                            className="cbt-select"
+                            value={settingsForm.subject_id}
+                            disabled={!examDetail || selectedIsPublished}
+                            onChange={(e) => setSettingsForm((p) => ({ ...p, subject_id: e.target.value }))}
+                          >
+                            <option value="">
+                              {settingsSubjects.length === 0
+                                ? "No subjects matching selection"
+                                : settingsForm.section_id
+                                ? `Select subject (${settingsSubjects.length} available)`
+                                : "Select subject"}
+                            </option>
                             {settingsSubjects.map((item) => (
                               <option key={item.id} value={item.id}>
                                 {getSubjectLabel(item)}
@@ -2138,6 +2225,43 @@ export default function CbtExamsPage() {
                   <input className="cbt-input" value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} required placeholder="e.g. English Language CBT" />
                 </div>
                 <div className="cbt-field">
+                  <label className="cbt-label">Section</label>
+                  <select
+                    className="cbt-select"
+                    value={form.section_id}
+                    onChange={(e) => {
+                      const nextSecId = e.target.value;
+                      const noDept = isSectionWithoutDept(nextSecId);
+                      setForm((p) => {
+                        const curCls = classes.find((c) => String(c.id) === p.class_id);
+                        const classValid = !p.class_id || !nextSecId || (curCls?.section_id && String(curCls.section_id) === nextSecId);
+                        return {
+                          ...p,
+                          section_id: nextSecId,
+                          department_id: noDept ? "" : p.department_id,
+                          class_id: classValid ? p.class_id : "",
+                          subject_id: "",
+                        };
+                      });
+                    }}
+                  >
+                    <option value="">All sections</option>
+                    {sections.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                  </select>
+                </div>
+                <div className="cbt-field">
+                  <label className="cbt-label">Department</label>
+                  <select
+                    className="cbt-select"
+                    value={form.department_id}
+                    disabled={isSectionWithoutDept(form.section_id)}
+                    onChange={(e) => setForm((p) => ({ ...p, department_id: e.target.value, subject_id: "" }))}
+                  >
+                    <option value="">{isSectionWithoutDept(form.section_id) ? "General (Not applicable for this section)" : "General Department / Common Subjects"}</option>
+                    {!isSectionWithoutDept(form.section_id) && departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                  </select>
+                </div>
+                <div className="cbt-field">
                   <label className="cbt-label">Class</label>
                   <select
                     className="cbt-select"
@@ -2153,28 +2277,24 @@ export default function CbtExamsPage() {
                       }));
                     }}
                   >
-                    <option value="">All classes</option>
-                    {classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                  </select>
-                </div>
-                <div className="cbt-field">
-                  <label className="cbt-label">Section</label>
-                  <select className="cbt-select" value={form.section_id} onChange={(e) => setForm((p) => ({ ...p, section_id: e.target.value, subject_id: "" }))}>
-                    <option value="">All sections</option>
-                    {sections.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                  </select>
-                </div>
-                <div className="cbt-field">
-                  <label className="cbt-label">Department</label>
-                  <select className="cbt-select" value={form.department_id} onChange={(e) => setForm((p) => ({ ...p, department_id: e.target.value, subject_id: "" }))}>
-                    <option value="">General Department / Common Subjects</option>
-                    {departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                    <option value="">{form.section_id ? "All classes in section" : "All classes"}</option>
+                    {createClasses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                   </select>
                 </div>
                 <div className="cbt-field">
                   <label className="cbt-label">Subject</label>
-                  <select className="cbt-select" value={form.subject_id} onChange={(e) => setForm((p) => ({ ...p, subject_id: e.target.value }))}>
-                    <option value="">Select subject</option>
+                  <select
+                    className="cbt-select"
+                    value={form.subject_id}
+                    onChange={(e) => setForm((p) => ({ ...p, subject_id: e.target.value }))}
+                  >
+                    <option value="">
+                      {createSubjects.length === 0
+                        ? "No subjects matching selection"
+                        : form.section_id
+                        ? `Select subject (${createSubjects.length} available)`
+                        : "Select subject"}
+                    </option>
                     {createSubjects.map((item) => (
                       <option key={item.id} value={item.id}>
                         {getSubjectLabel(item)}
@@ -2250,10 +2370,87 @@ export default function CbtExamsPage() {
               <div className="cbt-section-label">Basics</div>
               <div className="cbt-form-grid">
                 <div className="cbt-field cbt-field-full"><label className="cbt-label">Exam title</label><input className="cbt-input" value={settingsForm.title} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, title: e.target.value }))} required /></div>
-                <div className="cbt-field"><label className="cbt-label">Class</label><select className="cbt-select" value={settingsForm.class_id} disabled={selectedIsPublished} onChange={(e) => { const nextClassId = e.target.value; const cls = classes.find((c) => String(c.id) === nextClassId); setSettingsForm((p) => ({ ...p, class_id: nextClassId, section_id: cls?.section_id ? String(cls.section_id) : (nextClassId ? p.section_id : "") })); }}><option value="">All classes</option>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
-                <div className="cbt-field"><label className="cbt-label">Section</label><select className="cbt-select" value={settingsForm.section_id} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, section_id: e.target.value }))}><option value="">All sections</option>{sections.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
-                <div className="cbt-field"><label className="cbt-label">Department</label><select className="cbt-select" value={settingsForm.department_id} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, department_id: e.target.value }))}><option value="">General Department / Common Subjects</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
-                <div className="cbt-field"><label className="cbt-label">Subject</label><select className="cbt-select" value={settingsForm.subject_id} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, subject_id: e.target.value }))}><option value="">Select subject</option>{settingsSubjects.map((item) => <option key={item.id} value={item.id}>{getSubjectLabel(item)}</option>)}</select></div>
+                <div className="cbt-field">
+                  <label className="cbt-label">Section</label>
+                  <select
+                    className="cbt-select"
+                    value={settingsForm.section_id}
+                    disabled={selectedIsPublished}
+                    onChange={(e) => {
+                      const nextSecId = e.target.value;
+                      const noDept = isSectionWithoutDept(nextSecId);
+                      setSettingsForm((p) => {
+                        const curCls = classes.find((c) => String(c.id) === p.class_id);
+                        const classValid = !p.class_id || !nextSecId || (curCls?.section_id && String(curCls.section_id) === nextSecId);
+                        return {
+                          ...p,
+                          section_id: nextSecId,
+                          department_id: noDept ? "" : p.department_id,
+                          class_id: classValid ? p.class_id : "",
+                          subject_id: "",
+                        };
+                      });
+                    }}
+                  >
+                    <option value="">All sections</option>
+                    {sections.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                  </select>
+                </div>
+                <div className="cbt-field">
+                  <label className="cbt-label">Department</label>
+                  <select
+                    className="cbt-select"
+                    value={settingsForm.department_id}
+                    disabled={selectedIsPublished || isSectionWithoutDept(settingsForm.section_id)}
+                    onChange={(e) => setSettingsForm((p) => ({ ...p, department_id: e.target.value, subject_id: "" }))}
+                  >
+                    <option value="">{isSectionWithoutDept(settingsForm.section_id) ? "General (Not applicable for this section)" : "General Department / Common Subjects"}</option>
+                    {!isSectionWithoutDept(settingsForm.section_id) && departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                  </select>
+                </div>
+                <div className="cbt-field">
+                  <label className="cbt-label">Class</label>
+                  <select
+                    className="cbt-select"
+                    value={settingsForm.class_id}
+                    disabled={selectedIsPublished}
+                    onChange={(e) => {
+                      const nextClassId = e.target.value;
+                      const cls = classes.find((c) => String(c.id) === nextClassId);
+                      setSettingsForm((p) => ({
+                        ...p,
+                        class_id: nextClassId,
+                        section_id: cls?.section_id ? String(cls.section_id) : (nextClassId ? p.section_id : ""),
+                        subject_id: "",
+                      }));
+                    }}
+                  >
+                    <option value="">{settingsForm.section_id ? "All classes in section" : "All classes"}</option>
+                    {settingsClasses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                  </select>
+                </div>
+                <div className="cbt-field">
+                  <label className="cbt-label">Subject</label>
+                  <select
+                    className="cbt-select"
+                    value={settingsForm.subject_id}
+                    disabled={selectedIsPublished}
+                    onChange={(e) => setSettingsForm((p) => ({ ...p, subject_id: e.target.value }))}
+                  >
+                    <option value="">
+                      {settingsSubjects.length === 0
+                        ? "No subjects matching selection"
+                        : settingsForm.section_id
+                        ? `Select subject (${settingsSubjects.length} available)`
+                        : "Select subject"}
+                    </option>
+                    {settingsSubjects.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {getSubjectLabel(item)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="cbt-field"><label className="cbt-label">Mode</label><select className="cbt-select" value={settingsForm.delivery_mode} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, delivery_mode: e.target.value as any }))}><option value="online">Online</option><option value="offline">Offline/LAN</option><option value="hybrid">Online and Offline</option></select></div>
                 <div className="cbt-field"><label className="cbt-label">Duration</label><input className="cbt-input" type="number" min={1} value={settingsForm.duration_minutes} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, duration_minutes: Number(e.target.value) }))} /></div>
               </div>
