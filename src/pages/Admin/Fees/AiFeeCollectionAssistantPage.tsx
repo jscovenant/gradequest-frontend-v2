@@ -165,61 +165,65 @@ export default function AiFeeCollectionAssistantPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
         .fee-ai-main {
-          background: #F8FAFC;
-          min-height: 100vh;
-          padding: 20px 24px 32px;
+          background: #F8FAFC !important;
+          min-height: 100vh !important;
+          padding-top: calc(var(--gq-topnav-height, 66px) + 12px) !important;
+          padding-left: 20px !important;
+          padding-right: 20px !important;
+          padding-bottom: 24px !important;
           overflow-x: hidden;
           font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
         }
         .fee-ai-hero {
-          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
-          color: #fff;
-          border-radius: 16px;
-          padding: 18px 24px;
-          margin-bottom: 18px;
-          position: relative;
-          overflow: hidden;
-          box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
+          background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%) !important;
+          color: #fff !important;
+          border-radius: 12px !important;
+          padding: 12px 18px !important;
+          margin-bottom: 14px !important;
+          position: relative !important;
+          overflow: hidden !important;
+          box-shadow: 0 4px 14px -2px rgba(15, 39, 68, 0.12) !important;
         }
         .fee-ai-hero-glow {
-          position: absolute;
-          top: -60px;
-          right: -60px;
-          width: 320px;
-          height: 320px;
-          border-radius: 50%;
-          background: radial-gradient(circle, rgba(217, 119, 6, 0.15) 0%, transparent 65%);
-          pointer-events: none;
+          position: absolute !important;
+          top: -40px !important;
+          right: -40px !important;
+          width: 200px !important;
+          height: 200px !important;
+          border-radius: 50% !important;
+          background: radial-gradient(circle, rgba(217, 119, 6, 0.15) 0%, transparent 65%) !important;
+          pointer-events: none !important;
         }
         .fee-ai-hero>* { position: relative; z-index: 1; }
         .fee-ai-kicker {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.04em;
-          text-transform: uppercase;
-          color: #FBBF24;
-          background: rgba(217, 119, 6, 0.20);
-          border: 1px solid rgba(217, 119, 6, 0.35);
-          border-radius: 100px;
-          padding: 3px 10px;
-          margin-bottom: 6px;
+          display: inline-flex !important;
+          align-items: center !important;
+          gap: 5px !important;
+          font-size: 10px !important;
+          font-weight: 700 !important;
+          letter-spacing: 0.04em !important;
+          text-transform: uppercase !important;
+          color: #FBBF24 !important;
+          background: rgba(217, 119, 6, 0.20) !important;
+          border: 1px solid rgba(217, 119, 6, 0.35) !important;
+          border-radius: 6px !important;
+          padding: 2px 7px !important;
+          margin-bottom: 3px !important;
+          line-height: 1.2 !important;
         }
         .fee-ai-title {
-          font-weight: 800;
-          font-size: 20px;
-          margin: 0 0 4px;
-          color: #fff;
-          line-height: 1.25;
+          font-weight: 800 !important;
+          font-size: 18px !important;
+          margin: 0 0 2px !important;
+          color: #fff !important;
+          line-height: 1.2 !important;
         }
         .fee-ai-sub {
-          max-width: 800px;
-          color: #CBD5E1;
-          font-size: 12.5px;
-          line-height: 1.45;
-          margin: 0;
+          max-width: 850px !important;
+          color: #CBD5E1 !important;
+          font-size: 12px !important;
+          line-height: 1.35 !important;
+          margin: 0 !important;
         }
         .fee-ai-grid {
           display: grid;
@@ -314,7 +318,7 @@ export default function AiFeeCollectionAssistantPage() {
         .fee-ai-send:disabled { opacity: .6; cursor: not-allowed; }
         .fee-ai-message-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
         @media(max-width:1199.98px){.fee-ai-grid{grid-template-columns:1fr}.fee-ai-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
-        @media(max-width:767.98px){.fee-ai-main{padding:20px 16px 0}.fee-ai-stats{grid-template-columns:1fr}}
+        @media(max-width:767.98px){.fee-ai-main{padding: calc(var(--gq-topnav-height, 66px) + 10px) 14px 20px !important;}.fee-ai-stats{grid-template-columns:1fr}}
       `}</style>
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title="AI Fee Collection" />
       <div className="container-fluid"><div className="row"><Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
