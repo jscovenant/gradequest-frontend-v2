@@ -201,7 +201,7 @@ export default function GradingScalePage() {
   // Score coverage validation for active section (0 to 100 coverage check)
   const coverageAnalysis = useMemo(() => {
     if (!activeSection || !activeSection.uses_grading_scale || activeBands.length === 0) {
-      return { isComplete: true, minScore: 0, maxScore: 100, gaps: [], overlaps: [] };
+      return { isComplete: true, minScore: 0, maxScore: 100 };
     }
 
     // Sort descending by min
@@ -429,657 +429,693 @@ export default function GradingScalePage() {
   };
 
   return (
-    <div className="d-flex flex-column min-vh-100" style={{ background: "#F8FAFC", fontFamily: "Plus Jakarta Sans, sans-serif" }}>
+    <>
+      <style>{`
+        /* ======= GradingScalePage - Layout & Theme ======= */
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700;800&display=swap');
+        
+        .db-main {
+          background: #F8FAFC;
+          min-height: 100vh;
+          font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+          padding: 24px 28px 48px;
+        }
+
+        .active-section-tab {
+          background: linear-gradient(135deg, #0F2744 0%, #1E4976 100%) !important;
+          color: #ffffff !important;
+          box-shadow: 0 4px 14px rgba(15, 39, 68, 0.18) !important;
+        }
+
+        .spin-animation {
+          animation: dbSpin 0.8s linear infinite;
+        }
+
+        @keyframes dbSpin {
+          to { transform: rotate(360deg); }
+        }
+
+        .cursor-pointer {
+          cursor: pointer;
+        }
+
+        .transition-all {
+          transition: all 0.2s ease-in-out;
+        }
+      `}</style>
+
       <PageTitle title="Grading Scales & Evaluation System | SchoolProfit" />
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-      <div className="d-flex flex-grow-1">
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} setSidebarOpen={setSidebarOpen} />
+      <div className="container-fluid">
+        <div className="row">
+          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-        <main className="flex-grow-1 p-3 p-md-4" style={{ maxWidth: 1440, margin: "0 auto", width: "100%" }}>
-          {/* Header Banner */}
-          <div
-            className="mb-4 p-4 rounded-4 position-relative overflow-hidden shadow-sm"
-            style={{
-              background: "linear-gradient(135deg, #0F2744 0%, #17375E 60%, #1E4976 100%)",
-              color: "#ffffff",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-            }}
-          >
-            {/* Subtle background glow */}
+          <main className="col-md-9 col-lg-10 ms-auto db-main">
+            {/* Header Banner */}
             <div
+              className="mb-4 p-4 rounded-4 position-relative overflow-hidden shadow-sm"
               style={{
-                position: "absolute",
-                top: -40,
-                right: -40,
-                width: 220,
-                height: 220,
-                borderRadius: "50%",
-                background: "radial-gradient(circle, rgba(59,130,246,0.3) 0%, rgba(255,255,255,0) 70%)",
-                pointerEvents: "none",
+                background: "linear-gradient(135deg, #0F2744 0%, #17375E 60%, #1E4976 100%)",
+                color: "#ffffff",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
               }}
-            />
-
-            <div className="row align-items-center position-relative">
-              <div className="col-lg-8">
-                <div className="d-flex align-items-center gap-2 mb-2">
-                  <span
-                    className="badge rounded-pill px-3 py-1"
-                    style={{
-                      background: "rgba(59, 130, 246, 0.25)",
-                      border: "1px solid rgba(59, 130, 246, 0.4)",
-                      color: "#93C5FD",
-                      fontSize: "0.75rem",
-                      fontWeight: 700,
-                      letterSpacing: "0.04em",
-                    }}
-                  >
-                    ACADEMIC EVALUATION SYSTEM
-                  </span>
-                  <span className="text-light opacity-50">•</span>
-                  <span className="text-light opacity-75 small">{getGreeting()}, {user?.name || "Administrator"}</span>
-                </div>
-
-                <h1 className="h3 fw-bold mb-2 text-white" style={{ fontFamily: "Playfair Display, Georgia, serif", letterSpacing: "-0.01em" }}>
-                  Section-Based Grading Scales
-                </h1>
-                <p className="mb-0 text-light opacity-85 small" style={{ maxWidth: 700, lineHeight: 1.6 }}>
-                  Configure customized score ranges, letter grades, performance remarks, and GPA weights for each school section.
-                  You can also selectively disable letter grading for foundational sections (e.g. Nursery, Creche, Primary) to display purely raw marks on report cards.
-                </p>
-              </div>
-
-              <div className="col-lg-4 text-lg-end mt-3 mt-lg-0">
-                <button
-                  type="button"
-                  className="btn btn-light rounded-pill px-4 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm"
-                  style={{ color: "#0F2744", fontSize: "0.875rem" }}
-                  onClick={fetchGradingData}
-                  disabled={loading}
-                >
-                  <i className={`bi bi-arrow-clockwise ${loading ? "spin-animation" : ""}`} />
-                  Refresh Scales
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* KPI Summary Cards */}
-          <div className="row g-3 mb-4">
-            <div className="col-6 col-md-3">
+            >
+              {/* Subtle background glow */}
               <div
-                className="card h-100 border-0 rounded-4 p-3"
                 style={{
-                  background: "#ffffff",
-                  boxShadow: "0 2px 12px -2px rgba(15, 39, 68, 0.05)",
-                  border: "1px solid #E2E8F0",
+                  position: "absolute",
+                  top: -40,
+                  right: -40,
+                  width: 220,
+                  height: 220,
+                  borderRadius: "50%",
+                  background: "radial-gradient(circle, rgba(59,130,246,0.3) 0%, rgba(255,255,255,0) 70%)",
+                  pointerEvents: "none",
                 }}
-              >
-                <div className="d-flex align-items-center justify-content-between mb-2">
-                  <span className="text-muted small fw-medium">Total Sections</span>
-                  <div
-                    className="d-flex align-items-center justify-content-center rounded-3"
-                    style={{ width: 36, height: 36, background: "rgba(15, 39, 68, 0.08)", color: "#0F2744" }}
-                  >
-                    <i className="bi bi-diagram-3-fill fs-6" />
-                  </div>
-                </div>
-                <h3 className="fw-bold mb-0 text-dark">{stats.total}</h3>
-                <span className="text-muted small mt-1">School educational sections</span>
-              </div>
-            </div>
+              />
 
-            <div className="col-6 col-md-3">
-              <div
-                className="card h-100 border-0 rounded-4 p-3"
-                style={{
-                  background: "#ffffff",
-                  boxShadow: "0 2px 12px -2px rgba(15, 39, 68, 0.05)",
-                  border: "1px solid #E2E8F0",
-                }}
-              >
-                <div className="d-flex align-items-center justify-content-between mb-2">
-                  <span className="text-muted small fw-medium">Letter Grading Active</span>
-                  <div
-                    className="d-flex align-items-center justify-content-center rounded-3"
-                    style={{ width: 36, height: 36, background: "rgba(16, 185, 129, 0.12)", color: "#10B981" }}
-                  >
-                    <i className="bi bi-award-fill fs-6" />
-                  </div>
-                </div>
-                <h3 className="fw-bold mb-0 text-success">{stats.enabled}</h3>
-                <span className="text-muted small mt-1">Sections using A–F or WAEC scales</span>
-              </div>
-            </div>
-
-            <div className="col-6 col-md-3">
-              <div
-                className="card h-100 border-0 rounded-4 p-3"
-                style={{
-                  background: "#ffffff",
-                  boxShadow: "0 2px 12px -2px rgba(15, 39, 68, 0.05)",
-                  border: "1px solid #E2E8F0",
-                }}
-              >
-                <div className="d-flex align-items-center justify-content-between mb-2">
-                  <span className="text-muted small fw-medium">No-Grade Sections</span>
-                  <div
-                    className="d-flex align-items-center justify-content-center rounded-3"
-                    style={{ width: 36, height: 36, background: "rgba(245, 158, 11, 0.12)", color: "#D97706" }}
-                  >
-                    <i className="bi bi-dash-circle-fill fs-6" />
-                  </div>
-                </div>
-                <h3 className="fw-bold mb-0" style={{ color: "#D97706" }}>{stats.disabled}</h3>
-                <span className="text-muted small mt-1">Showing raw marks only (e.g. Primary)</span>
-              </div>
-            </div>
-
-            <div className="col-6 col-md-3">
-              <div
-                className="card h-100 border-0 rounded-4 p-3"
-                style={{
-                  background: "#ffffff",
-                  boxShadow: "0 2px 12px -2px rgba(15, 39, 68, 0.05)",
-                  border: "1px solid #E2E8F0",
-                }}
-              >
-                <div className="d-flex align-items-center justify-content-between mb-2">
-                  <span className="text-muted small fw-medium">Active Grade Bands</span>
-                  <div
-                    className="d-flex align-items-center justify-content-center rounded-3"
-                    style={{ width: 36, height: 36, background: "rgba(37, 99, 235, 0.12)", color: "#2563EB" }}
-                  >
-                    <i className="bi bi-sliders fs-6" />
-                  </div>
-                </div>
-                <h3 className="fw-bold mb-0 text-primary">{stats.totalBands}</h3>
-                <span className="text-muted small mt-1">Configured score tiers</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Loading View */}
-          {loading ? (
-            <div className="card border-0 rounded-4 p-5 text-center bg-white shadow-sm my-4">
-              <Loader />
-              <p className="text-muted mt-3 mb-0">Loading section grading scales and presets...</p>
-            </div>
-          ) : sections.length === 0 ? (
-            /* Empty State */
-            <div className="card border-0 rounded-4 p-5 text-center bg-white shadow-sm my-4">
-              <div
-                className="d-inline-flex align-items-center justify-content-center rounded-circle mb-3 mx-auto"
-                style={{ width: 72, height: 72, background: "rgba(15, 39, 68, 0.06)", color: "#0F2744" }}
-              >
-                <i className="bi bi-folder-x fs-2" />
-              </div>
-              <h4 className="fw-bold text-dark mb-2">No Academic Sections Found</h4>
-              <p className="text-muted mx-auto mb-4" style={{ maxWidth: 460 }}>
-                You have not created any sections yet. Please go to Academics &gt; Sections to create sections like Primary, Junior Secondary, and Senior Secondary first.
-              </p>
-              <div>
-                <a href="/sections" className="btn btn-primary rounded-pill px-4 py-2 fw-semibold">
-                  <i className="bi bi-plus-lg me-2" /> Go to Sections
-                </a>
-              </div>
-            </div>
-          ) : (
-            /* Main Workspace */
-            <div className="row g-4">
-              {/* Left Column: Section Selector Tabs */}
-              <div className="col-lg-4 col-xl-3">
-                <div
-                  className="card border-0 rounded-4 shadow-sm overflow-hidden"
-                  style={{ background: "#ffffff", border: "1px solid #E2E8F0" }}
-                >
-                  <div className="p-3 border-bottom" style={{ background: "#FAFCFF" }}>
-                    <div className="d-flex align-items-center justify-content-between mb-2">
-                      <span className="fw-bold text-dark small text-uppercase" style={{ letterSpacing: "0.05em" }}>
-                        School Sections
-                      </span>
-                      <span className="badge bg-light text-muted border rounded-pill">{sections.length}</span>
-                    </div>
-
-                    <div className="position-relative">
-                      <i
-                        className="bi bi-search position-absolute text-muted"
-                        style={{ top: "50%", left: 12, transform: "translateY(-50%)", fontSize: "0.85rem" }}
-                      />
-                      <input
-                        type="text"
-                        className="form-control form-control-sm rounded-pill ps-4"
-                        placeholder="Search section..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        style={{ fontSize: "0.85rem" }}
-                      />
-                    </div>
+              <div className="row align-items-center position-relative">
+                <div className="col-lg-8">
+                  <div className="d-flex align-items-center gap-2 mb-2">
+                    <span
+                      className="badge rounded-pill px-3 py-1"
+                      style={{
+                        background: "rgba(59, 130, 246, 0.25)",
+                        border: "1px solid rgba(59, 130, 246, 0.4)",
+                        color: "#93C5FD",
+                        fontSize: "0.75rem",
+                        fontWeight: 700,
+                        letterSpacing: "0.04em",
+                      }}
+                    >
+                      ACADEMIC EVALUATION SYSTEM
+                    </span>
+                    <span className="text-light opacity-50">•</span>
+                    <span className="text-light opacity-75 small">{getGreeting()}, {user?.name || "Administrator"}</span>
                   </div>
 
-                  <div className="list-group list-group-flush p-2" style={{ maxHeight: 520, overflowY: "auto" }}>
-                    {filteredSections.map((sec) => {
-                      const isActive = sec.id === activeTabSectionId;
-                      const isDirty = !!dirtySections[sec.id];
-                      const bandsCount = (workingScales[sec.id] || []).length;
-
-                      return (
-                        <button
-                          key={sec.id}
-                          type="button"
-                          className={`list-group-item list-group-item-action rounded-3 border-0 p-3 mb-1 text-start transition-all ${
-                            isActive ? "active-section-tab" : ""
-                          }`}
-                          onClick={() => setActiveTabSectionId(sec.id)}
-                          style={{
-                            background: isActive ? "linear-gradient(135deg, #0F2744 0%, #1E4976 100%)" : "transparent",
-                            color: isActive ? "#ffffff" : "#1E293B",
-                            border: isActive ? "none" : "1px solid transparent",
-                          }}
-                        >
-                          <div className="d-flex align-items-center justify-content-between mb-1">
-                            <span className="fw-bold fs-6" style={{ color: isActive ? "#ffffff" : "#0F2744" }}>
-                              {sec.name}
-                            </span>
-                            {isDirty && (
-                              <span
-                                className="badge rounded-pill"
-                                style={{
-                                  background: isActive ? "#F59E0B" : "rgba(245, 158, 11, 0.15)",
-                                  color: isActive ? "#0F2744" : "#B45309",
-                                  fontSize: "0.65rem",
-                                }}
-                              >
-                                Unsaved
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="d-flex align-items-center justify-content-between">
-                            <span
-                              className="badge rounded-pill small"
-                              style={{
-                                background: sec.uses_grading_scale
-                                  ? isActive
-                                    ? "rgba(16, 185, 129, 0.25)"
-                                    : "rgba(16, 185, 129, 0.12)"
-                                  : isActive
-                                  ? "rgba(245, 158, 11, 0.25)"
-                                  : "rgba(100, 116, 139, 0.12)",
-                                color: sec.uses_grading_scale
-                                  ? isActive
-                                    ? "#A7F3D0"
-                                    : "#059669"
-                                  : isActive
-                                  ? "#FDE68A"
-                                  : "#64748B",
-                                fontSize: "0.7rem",
-                                fontWeight: 600,
-                              }}
-                            >
-                              <i className={`bi ${sec.uses_grading_scale ? "bi-check2-circle" : "bi-dash-circle"} me-1`} />
-                              {sec.uses_grading_scale ? "Grading Enabled" : "No Grades"}
-                            </span>
-
-                            <span
-                              className="small"
-                              style={{ color: isActive ? "rgba(255,255,255,0.75)" : "#64748B", fontSize: "0.75rem" }}
-                            >
-                              {sec.uses_grading_scale ? `${bandsCount} bands` : "Raw marks"}
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Quick Info Box */}
-                <div
-                  className="card border-0 rounded-4 p-3 mt-3 shadow-sm"
-                  style={{ background: "#F1F5F9", border: "1px solid #E2E8F0" }}
-                >
-                  <div className="d-flex align-items-center gap-2 mb-2 text-primary fw-semibold small">
-                    <i className="bi bi-info-circle-fill" />
-                    How Section Grading Works
-                  </div>
-                  <p className="text-muted small mb-0" style={{ lineHeight: 1.5, fontSize: "0.8rem" }}>
-                    When results are computed, GradeQuest matches each student to their section's grading rules. If a section is toggled off, letter grades (e.g. A1, B, C) are suppressed on the report card while showing raw CA & Exam marks.
+                  <h1 className="h3 fw-bold mb-2 text-white" style={{ fontFamily: "Playfair Display, Georgia, serif", letterSpacing: "-0.01em" }}>
+                    Section-Based Grading Scales
+                  </h1>
+                  <p className="mb-0 text-light opacity-85 small" style={{ maxWidth: 700, lineHeight: 1.6 }}>
+                    Configure customized score ranges, letter grades, performance remarks, and GPA weights for each school section.
+                    You can also selectively disable letter grading for foundational sections (e.g. Nursery, Creche, Primary) to display purely raw marks on report cards.
                   </p>
                 </div>
+
+                <div className="col-lg-4 text-lg-end mt-3 mt-lg-0">
+                  <button
+                    type="button"
+                    className="btn btn-light rounded-pill px-4 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm"
+                    style={{ color: "#0F2744", fontSize: "0.875rem" }}
+                    onClick={fetchGradingData}
+                    disabled={loading}
+                  >
+                    <i className={`bi bi-arrow-clockwise ${loading ? "spin-animation" : ""}`} />
+                    Refresh Scales
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* KPI Summary Cards */}
+            <div className="row g-3 mb-4">
+              <div className="col-6 col-md-3">
+                <div
+                  className="card h-100 border-0 rounded-4 p-3"
+                  style={{
+                    background: "#ffffff",
+                    boxShadow: "0 2px 12px -2px rgba(15, 39, 68, 0.05)",
+                    border: "1px solid #E2E8F0",
+                  }}
+                >
+                  <div className="d-flex align-items-center justify-content-between mb-2">
+                    <span className="text-muted small fw-medium">Total Sections</span>
+                    <div
+                      className="d-flex align-items-center justify-content-center rounded-3"
+                      style={{ width: 36, height: 36, background: "rgba(15, 39, 68, 0.08)", color: "#0F2744" }}
+                    >
+                      <i className="bi bi-diagram-3-fill fs-6" />
+                    </div>
+                  </div>
+                  <h3 className="fw-bold mb-0 text-dark">{stats.total}</h3>
+                  <span className="text-muted small mt-1">School educational sections</span>
+                </div>
               </div>
 
-              {/* Right Column: Active Section Detail & Scale Matrix */}
-              <div className="col-lg-8 col-xl-9">
-                {activeSection && (
+              <div className="col-6 col-md-3">
+                <div
+                  className="card h-100 border-0 rounded-4 p-3"
+                  style={{
+                    background: "#ffffff",
+                    boxShadow: "0 2px 12px -2px rgba(15, 39, 68, 0.05)",
+                    border: "1px solid #E2E8F0",
+                  }}
+                >
+                  <div className="d-flex align-items-center justify-content-between mb-2">
+                    <span className="text-muted small fw-medium">Letter Grading Active</span>
+                    <div
+                      className="d-flex align-items-center justify-content-center rounded-3"
+                      style={{ width: 36, height: 36, background: "rgba(16, 185, 129, 0.12)", color: "#10B981" }}
+                    >
+                      <i className="bi bi-award-fill fs-6" />
+                    </div>
+                  </div>
+                  <h3 className="fw-bold mb-0 text-success">{stats.enabled}</h3>
+                  <span className="text-muted small mt-1">Sections using A–F or WAEC scales</span>
+                </div>
+              </div>
+
+              <div className="col-6 col-md-3">
+                <div
+                  className="card h-100 border-0 rounded-4 p-3"
+                  style={{
+                    background: "#ffffff",
+                    boxShadow: "0 2px 12px -2px rgba(15, 39, 68, 0.05)",
+                    border: "1px solid #E2E8F0",
+                  }}
+                >
+                  <div className="d-flex align-items-center justify-content-between mb-2">
+                    <span className="text-muted small fw-medium">No-Grade Sections</span>
+                    <div
+                      className="d-flex align-items-center justify-content-center rounded-3"
+                      style={{ width: 36, height: 36, background: "rgba(245, 158, 11, 0.12)", color: "#D97706" }}
+                    >
+                      <i className="bi bi-dash-circle-fill fs-6" />
+                    </div>
+                  </div>
+                  <h3 className="fw-bold mb-0" style={{ color: "#D97706" }}>{stats.disabled}</h3>
+                  <span className="text-muted small mt-1">Showing raw marks only (e.g. Primary)</span>
+                </div>
+              </div>
+
+              <div className="col-6 col-md-3">
+                <div
+                  className="card h-100 border-0 rounded-4 p-3"
+                  style={{
+                    background: "#ffffff",
+                    boxShadow: "0 2px 12px -2px rgba(15, 39, 68, 0.05)",
+                    border: "1px solid #E2E8F0",
+                  }}
+                >
+                  <div className="d-flex align-items-center justify-content-between mb-2">
+                    <span className="text-muted small fw-medium">Active Grade Bands</span>
+                    <div
+                      className="d-flex align-items-center justify-content-center rounded-3"
+                      style={{ width: 36, height: 36, background: "rgba(37, 99, 235, 0.12)", color: "#2563EB" }}
+                    >
+                      <i className="bi bi-sliders fs-6" />
+                    </div>
+                  </div>
+                  <h3 className="fw-bold mb-0 text-primary">{stats.totalBands}</h3>
+                  <span className="text-muted small mt-1">Configured score tiers</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Loading View */}
+            {loading ? (
+              <div className="card border-0 rounded-4 p-5 text-center bg-white shadow-sm my-4">
+                <Loader />
+                <p className="text-muted mt-3 mb-0">Loading section grading scales and presets...</p>
+              </div>
+            ) : sections.length === 0 ? (
+              /* Empty State */
+              <div className="card border-0 rounded-4 p-5 text-center bg-white shadow-sm my-4">
+                <div
+                  className="d-inline-flex align-items-center justify-content-center rounded-circle mb-3 mx-auto"
+                  style={{ width: 72, height: 72, background: "rgba(15, 39, 68, 0.06)", color: "#0F2744" }}
+                >
+                  <i className="bi bi-folder-x fs-2" />
+                </div>
+                <h4 className="fw-bold text-dark mb-2">No Academic Sections Found</h4>
+                <p className="text-muted mx-auto mb-4" style={{ maxWidth: 460 }}>
+                  You have not created any sections yet. Please go to Academics &gt; Sections to create sections like Primary, Junior Secondary, and Senior Secondary first.
+                </p>
+                <div>
+                  <a href="/sections" className="btn btn-primary rounded-pill px-4 py-2 fw-semibold">
+                    <i className="bi bi-plus-lg me-2" /> Go to Sections
+                  </a>
+                </div>
+              </div>
+            ) : (
+              /* Main Workspace */
+              <div className="row g-4">
+                {/* Left Column: Section Selector Tabs */}
+                <div className="col-lg-4 col-xl-3">
                   <div
-                    className="card border-0 rounded-4 shadow-sm"
+                    className="card border-0 rounded-4 shadow-sm overflow-hidden"
                     style={{ background: "#ffffff", border: "1px solid #E2E8F0" }}
                   >
-                    {/* Section Header */}
-                    <div className="p-4 border-bottom" style={{ background: "#FAFCFF" }}>
-                      <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-                        <div>
-                          <div className="d-flex align-items-center gap-2 mb-1">
-                            <h2 className="h4 fw-bold text-dark mb-0">{activeSection.name}</h2>
-                            <span
-                              className="badge rounded-pill px-3 py-1"
-                              style={{
-                                background: activeSection.uses_grading_scale ? "rgba(16, 185, 129, 0.12)" : "rgba(245, 158, 11, 0.15)",
-                                color: activeSection.uses_grading_scale ? "#059669" : "#B45309",
-                                fontSize: "0.75rem",
-                                fontWeight: 700,
-                              }}
-                            >
-                              {activeSection.uses_grading_scale ? "Letter Grading Active" : "No Letter Grading"}
-                            </span>
-                          </div>
-                          <p className="text-muted small mb-0">
-                            Configure how scores between 0% and 100% are converted into letter grades and remarks for this section.
-                          </p>
-                        </div>
+                    <div className="p-3 border-bottom" style={{ background: "#FAFCFF" }}>
+                      <div className="d-flex align-items-center justify-content-between mb-2">
+                        <span className="fw-bold text-dark small text-uppercase" style={{ letterSpacing: "0.05em" }}>
+                          School Sections
+                        </span>
+                        <span className="badge bg-light text-muted border rounded-pill">{sections.length}</span>
+                      </div>
 
-                        {/* Top Controls: Toggle & Presets */}
-                        <div className="d-flex flex-wrap align-items-center gap-2">
-                          <button
-                            type="button"
-                            className={`btn rounded-pill px-3 py-2 fw-semibold d-inline-flex align-items-center gap-2 ${
-                              activeSection.uses_grading_scale ? "btn-outline-danger" : "btn-outline-success"
-                            }`}
-                            style={{ fontSize: "0.85rem" }}
-                            onClick={() => handleToggleGrading(activeSection.id, activeSection.uses_grading_scale)}
-                            disabled={togglingSectionId === activeSection.id}
-                          >
-                            <i className={`bi ${activeSection.uses_grading_scale ? "bi-toggle-on text-success" : "bi-toggle-off text-muted"} fs-5`} />
-                            {activeSection.uses_grading_scale ? "Disable Letter Grading" : "Enable Letter Grading"}
-                          </button>
-
-                          <button
-                            type="button"
-                            className="btn btn-primary rounded-pill px-3 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm"
-                            style={{ fontSize: "0.85rem", background: "#0F2744", borderColor: "#0F2744" }}
-                            onClick={() => handleOpenPresetModal(activeSection.id)}
-                          >
-                            <i className="bi bi-magic" />
-                            Apply Standard Preset
-                          </button>
-                        </div>
+                      <div className="position-relative">
+                        <i
+                          className="bi bi-search position-absolute text-muted"
+                          style={{ top: "50%", left: 12, transform: "translateY(-50%)", fontSize: "0.85rem" }}
+                        />
+                        <input
+                          type="text"
+                          className="form-control form-control-sm rounded-pill ps-4"
+                          placeholder="Search section..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          style={{ fontSize: "0.85rem" }}
+                        />
                       </div>
                     </div>
 
-                    {/* Section Body */}
-                    <div className="p-4">
-                      {/* If Grading is DISABLED for this section */}
-                      {!activeSection.uses_grading_scale ? (
-                        <div
-                          className="rounded-4 p-4 text-center my-3"
-                          style={{
-                            background: "rgba(245, 158, 11, 0.06)",
-                            border: "1px dashed rgba(245, 158, 11, 0.4)",
-                          }}
-                        >
-                          <div
-                            className="d-inline-flex align-items-center justify-content-center rounded-circle mb-3"
-                            style={{ width: 56, height: 56, background: "rgba(245, 158, 11, 0.15)", color: "#D97706" }}
-                          >
-                            <i className="bi bi-shield-slash fs-4" />
-                          </div>
-                          <h5 className="fw-bold text-dark mb-2">Letter Grading is Disabled for "{activeSection.name}"</h5>
-                          <p className="text-muted small mx-auto mb-3" style={{ maxWidth: 540 }}>
-                            Students in this section (e.g. Nursery, Reception, Primary) will receive report cards that display their raw Continuous Assessment (CA) and Exam scores without any letter grades (A, B, C, D) or grade remarks.
-                          </p>
+                    <div className="list-group list-group-flush p-2" style={{ maxHeight: 520, overflowY: "auto" }}>
+                      {filteredSections.map((sec) => {
+                        const isActive = sec.id === activeTabSectionId;
+                        const isDirty = !!dirtySections[sec.id];
+                        const bandsCount = (workingScales[sec.id] || []).length;
+
+                        return (
                           <button
+                            key={sec.id}
                             type="button"
-                            className="btn btn-success rounded-pill px-4 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm"
-                            onClick={() => handleToggleGrading(activeSection.id, false)}
+                            className={`list-group-item list-group-item-action rounded-3 border-0 p-3 mb-1 text-start transition-all ${
+                              isActive ? "active-section-tab" : ""
+                            }`}
+                            onClick={() => setActiveTabSectionId(sec.id)}
+                            style={{
+                              background: isActive ? "linear-gradient(135deg, #0F2744 0%, #1E4976 100%)" : "transparent",
+                              color: isActive ? "#ffffff" : "#1E293B",
+                              border: isActive ? "none" : "1px solid transparent",
+                            }}
                           >
-                            <i className="bi bi-check2-circle" /> Enable Letter Grading for {activeSection.name}
-                          </button>
-                        </div>
-                      ) : (
-                        /* If Grading is ENABLED for this section */
-                        <>
-                          {/* Visual Score Coverage Bar */}
-                          <div className="mb-4 p-3 rounded-4" style={{ background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
-                            <div className="d-flex align-items-center justify-content-between mb-2">
-                              <span className="small fw-bold text-dark">
-                                Score Coverage Matrix (0% – 100%)
+                            <div className="d-flex align-items-center justify-content-between mb-1">
+                              <span className="fw-bold fs-6" style={{ color: isActive ? "#ffffff" : "#0F2744" }}>
+                                {sec.name}
                               </span>
-                              {!coverageAnalysis.isComplete ? (
-                                <span className="badge bg-danger rounded-pill px-2 py-1 small">
-                                  <i className="bi bi-exclamation-triangle-fill me-1" />
-                                  Incomplete Range Coverage ({coverageAnalysis.minScore}% – {coverageAnalysis.maxScore}%)
-                                </span>
-                              ) : (
-                                <span className="badge bg-success rounded-pill px-2 py-1 small">
-                                  <i className="bi bi-check-circle-fill me-1" /> Full 100% Score Range Covered
+                              {isDirty && (
+                                <span
+                                  className="badge rounded-pill"
+                                  style={{
+                                    background: isActive ? "#F59E0B" : "rgba(245, 158, 11, 0.15)",
+                                    color: isActive ? "#0F2744" : "#B45309",
+                                    fontSize: "0.65rem",
+                                  }}
+                                >
+                                  Unsaved
                                 </span>
                               )}
                             </div>
 
-                            {/* Color Bar */}
-                            <div className="progress" style={{ height: 20, borderRadius: 8, background: "#E2E8F0" }}>
-                              {activeBands.map((band, idx) => {
-                                const span = Math.max(0, band.max - band.min);
-                                return (
-                                  <div
-                                    key={idx}
-                                    className="progress-bar fw-bold text-white"
-                                    style={{
-                                      width: `${span}%`,
-                                      background: band.color || "#3B82F6",
-                                      fontSize: "0.75rem",
-                                    }}
-                                    title={`${band.grade}: ${band.min}% – ${band.max}% (${band.remark})`}
-                                  >
-                                    {span >= 8 ? band.grade : ""}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                            <div className="d-flex justify-content-between text-muted small mt-1 px-1" style={{ fontSize: "0.7rem" }}>
-                              <span>0%</span>
-                              <span>25%</span>
-                              <span>50%</span>
-                              <span>75%</span>
-                              <span>100%</span>
-                            </div>
-                          </div>
+                            <div className="d-flex align-items-center justify-content-between">
+                              <span
+                                className="badge rounded-pill small"
+                                style={{
+                                  background: sec.uses_grading_scale
+                                    ? isActive
+                                      ? "rgba(16, 185, 129, 0.25)"
+                                      : "rgba(16, 185, 129, 0.12)"
+                                    : isActive
+                                    ? "rgba(245, 158, 11, 0.25)"
+                                    : "rgba(100, 116, 139, 0.12)",
+                                  color: sec.uses_grading_scale
+                                    ? isActive
+                                      ? "#A7F3D0"
+                                      : "#059669"
+                                    : isActive
+                                    ? "#FDE68A"
+                                    : "#64748B",
+                                  fontSize: "0.7rem",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                <i className={`bi ${sec.uses_grading_scale ? "bi-check2-circle" : "bi-dash-circle"} me-1`} />
+                                {sec.uses_grading_scale ? "Grading Enabled" : "No Grades"}
+                              </span>
 
-                          {/* Grade Bands Table */}
-                          <div className="d-flex align-items-center justify-content-between mb-3">
-                            <div>
-                              <h5 className="fw-bold text-dark mb-0">Configured Grade Bands</h5>
-                              <span className="text-muted small">
-                                Sorted from highest score tier to lowest
+                              <span
+                                className="small"
+                                style={{ color: isActive ? "rgba(255,255,255,0.75)" : "#64748B", fontSize: "0.75rem" }}
+                              >
+                                {sec.uses_grading_scale ? `${bandsCount} bands` : "Raw marks"}
                               </span>
                             </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Quick Info Box */}
+                  <div
+                    className="card border-0 rounded-4 p-3 mt-3 shadow-sm"
+                    style={{ background: "#F1F5F9", border: "1px solid #E2E8F0" }}
+                  >
+                    <div className="d-flex align-items-center gap-2 mb-2 text-primary fw-semibold small">
+                      <i className="bi bi-info-circle-fill" />
+                      How Section Grading Works
+                    </div>
+                    <p className="text-muted small mb-0" style={{ lineHeight: 1.5, fontSize: "0.8rem" }}>
+                      When results are computed, GradeQuest matches each student to their section's grading rules. If a section is toggled off, letter grades (e.g. A1, B, C) are suppressed on the report card while showing raw CA & Exam marks.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Right Column: Active Section Detail & Scale Matrix */}
+                <div className="col-lg-8 col-xl-9">
+                  {activeSection && (
+                    <div
+                      className="card border-0 rounded-4 shadow-sm"
+                      style={{ background: "#ffffff", border: "1px solid #E2E8F0" }}
+                    >
+                      {/* Section Header */}
+                      <div className="p-4 border-bottom" style={{ background: "#FAFCFF" }}>
+                        <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+                          <div>
+                            <div className="d-flex align-items-center gap-2 mb-1">
+                              <h2 className="h4 fw-bold text-dark mb-0">{activeSection.name}</h2>
+                              <span
+                                className="badge rounded-pill px-3 py-1"
+                                style={{
+                                  background: activeSection.uses_grading_scale ? "rgba(16, 185, 129, 0.12)" : "rgba(245, 158, 11, 0.15)",
+                                  color: activeSection.uses_grading_scale ? "#059669" : "#B45309",
+                                  fontSize: "0.75rem",
+                                  fontWeight: 700,
+                                }}
+                              >
+                                {activeSection.uses_grading_scale ? "Letter Grading Active" : "No Letter Grading"}
+                              </span>
+                            </div>
+                            <p className="text-muted small mb-0">
+                              Configure how scores between 0% and 100% are converted into letter grades and remarks for this section.
+                            </p>
+                          </div>
+
+                          {/* Top Controls: Toggle & Presets */}
+                          <div className="d-flex flex-wrap align-items-center gap-2">
+                            <button
+                              type="button"
+                              className={`btn rounded-pill px-3 py-2 fw-semibold d-inline-flex align-items-center gap-2 ${
+                                activeSection.uses_grading_scale ? "btn-outline-danger" : "btn-outline-success"
+                              }`}
+                              style={{ fontSize: "0.85rem" }}
+                              onClick={() => handleToggleGrading(activeSection.id, activeSection.uses_grading_scale)}
+                              disabled={togglingSectionId === activeSection.id}
+                            >
+                              <i className={`bi ${activeSection.uses_grading_scale ? "bi-toggle-on text-success" : "bi-toggle-off text-muted"} fs-5`} />
+                              {activeSection.uses_grading_scale ? "Disable Letter Grading" : "Enable Letter Grading"}
+                            </button>
 
                             <button
                               type="button"
-                              className="btn btn-outline-primary btn-sm rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5"
-                              onClick={() => handleOpenBandModal(activeSection.id, null)}
+                              className="btn btn-primary rounded-pill px-3 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm"
+                              style={{ fontSize: "0.85rem", background: "#0F2744", borderColor: "#0F2744" }}
+                              onClick={() => handleOpenPresetModal(activeSection.id)}
                             >
-                              <i className="bi bi-plus-circle" /> Add Grade Band
+                              <i className="bi bi-magic" />
+                              Apply Standard Preset
                             </button>
                           </div>
+                        </div>
+                      </div>
 
-                          {activeBands.length === 0 ? (
-                            <div className="text-center py-5 border rounded-4 my-3 bg-light">
-                              <i className="bi bi-sliders text-muted fs-1 mb-2 d-block" />
-                              <h6 className="fw-bold text-dark mb-1">No Grade Bands Configured</h6>
-                              <p className="text-muted small mb-3">Click below to add grade bands or apply a standard preset template.</p>
-                              <div className="d-flex justify-content-center gap-2">
-                                <button
-                                  type="button"
-                                  className="btn btn-sm btn-primary rounded-pill px-3"
-                                  onClick={() => handleOpenBandModal(activeSection.id, null)}
-                                >
-                                  Add Custom Band
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn btn-sm btn-outline-dark rounded-pill px-3"
-                                  onClick={() => handleOpenPresetModal(activeSection.id)}
-                                >
-                                  Apply Preset
-                                </button>
+                      {/* Section Body */}
+                      <div className="p-4">
+                        {/* If Grading is DISABLED for this section */}
+                        {!activeSection.uses_grading_scale ? (
+                          <div
+                            className="rounded-4 p-4 text-center my-3"
+                            style={{
+                              background: "rgba(245, 158, 11, 0.06)",
+                              border: "1px dashed rgba(245, 158, 11, 0.4)",
+                            }}
+                          >
+                            <div
+                              className="d-inline-flex align-items-center justify-content-center rounded-circle mb-3"
+                              style={{ width: 56, height: 56, background: "rgba(245, 158, 11, 0.15)", color: "#D97706" }}
+                            >
+                              <i className="bi bi-shield-slash fs-4" />
+                            </div>
+                            <h5 className="fw-bold text-dark mb-2">Letter Grading is Disabled for "{activeSection.name}"</h5>
+                            <p className="text-muted small mx-auto mb-3" style={{ maxWidth: 540 }}>
+                              Students in this section (e.g. Nursery, Reception, Primary) will receive report cards that display their raw Continuous Assessment (CA) and Exam scores without any letter grades (A, B, C, D) or grade remarks.
+                            </p>
+                            <button
+                              type="button"
+                              className="btn btn-success rounded-pill px-4 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm"
+                              onClick={() => handleToggleGrading(activeSection.id, false)}
+                            >
+                              <i className="bi bi-check2-circle" /> Enable Letter Grading for {activeSection.name}
+                            </button>
+                          </div>
+                        ) : (
+                          /* If Grading is ENABLED for this section */
+                          <>
+                            {/* Visual Score Coverage Bar */}
+                            <div className="mb-4 p-3 rounded-4" style={{ background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
+                              <div className="d-flex align-items-center justify-content-between mb-2">
+                                <span className="small fw-bold text-dark">
+                                  Score Coverage Matrix (0% – 100%)
+                                </span>
+                                {!coverageAnalysis.isComplete ? (
+                                  <span className="badge bg-danger rounded-pill px-2 py-1 small">
+                                    <i className="bi bi-exclamation-triangle-fill me-1" />
+                                    Incomplete Range Coverage ({coverageAnalysis.minScore}% – {coverageAnalysis.maxScore}%)
+                                  </span>
+                                ) : (
+                                  <span className="badge bg-success rounded-pill px-2 py-1 small">
+                                    <i className="bi bi-check-circle-fill me-1" /> Full 100% Score Range Covered
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Color Bar */}
+                              <div className="progress" style={{ height: 20, borderRadius: 8, background: "#E2E8F0" }}>
+                                {activeBands.map((band, idx) => {
+                                  const span = Math.max(0, band.max - band.min);
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className="progress-bar fw-bold text-white"
+                                      style={{
+                                        width: `${span}%`,
+                                        background: band.color || "#3B82F6",
+                                        fontSize: "0.75rem",
+                                      }}
+                                      title={`${band.grade}: ${band.min}% – ${band.max}% (${band.remark})`}
+                                    >
+                                      {span >= 8 ? band.grade : ""}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              <div className="d-flex justify-content-between text-muted small mt-1 px-1" style={{ fontSize: "0.7rem" }}>
+                                <span>0%</span>
+                                <span>25%</span>
+                                <span>50%</span>
+                                <span>75%</span>
+                                <span>100%</span>
                               </div>
                             </div>
-                          ) : (
-                            <div className="table-responsive rounded-4 border overflow-hidden mb-4">
-                              <table className="table table-hover align-middle mb-0" style={{ fontSize: "0.875rem" }}>
-                                <thead style={{ background: "#F8FAFC", color: "#475569" }}>
-                                  <tr>
-                                    <th style={{ width: 80 }} className="ps-3">Grade</th>
-                                    <th>Score Range</th>
-                                    <th>Performance Remark</th>
-                                    <th style={{ width: 100 }}>GPA Point</th>
-                                    <th style={{ width: 100 }}>Badge Preview</th>
-                                    <th style={{ width: 120 }} className="text-end pe-3">Actions</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {activeBands.map((band, idx) => (
-                                    <tr key={idx}>
-                                      {/* Grade Letter */}
-                                      <td className="ps-3">
-                                        <span
-                                          className="badge rounded-pill fw-bold px-3 py-1.5"
-                                          style={{
-                                            background: band.color ? `${band.color}20` : "rgba(37,99,235,0.12)",
-                                            color: band.color || "#2563EB",
-                                            border: `1px solid ${band.color || "#2563EB"}40`,
-                                            fontSize: "0.85rem",
-                                          }}
-                                        >
-                                          {band.grade}
-                                        </span>
-                                      </td>
 
-                                      {/* Range */}
-                                      <td>
-                                        <span className="fw-semibold text-dark">
-                                          {band.min}% – {band.max}%
-                                        </span>
-                                      </td>
-
-                                      {/* Remark */}
-                                      <td>
-                                        <span className="text-secondary">{band.remark || "—"}</span>
-                                      </td>
-
-                                      {/* GPA */}
-                                      <td>
-                                        <span className="badge bg-light text-dark border">
-                                          {band.gpa_point !== null && band.gpa_point !== undefined ? `${band.gpa_point}` : "0.0"}
-                                        </span>
-                                      </td>
-
-                                      {/* Color Preview */}
-                                      <td>
-                                        <div className="d-flex align-items-center gap-2">
-                                          <div
-                                            className="rounded-circle shadow-sm"
-                                            style={{
-                                              width: 18,
-                                              height: 18,
-                                              background: band.color || "#3B82F6",
-                                              border: "2px solid #ffffff",
-                                            }}
-                                          />
-                                          <span className="text-muted" style={{ fontSize: "0.75rem" }}>
-                                            {band.color || "#3B82F6"}
-                                          </span>
-                                        </div>
-                                      </td>
-
-                                      {/* Actions */}
-                                      <td className="text-end pe-3">
-                                        <div className="btn-group btn-group-sm">
-                                          <button
-                                            type="button"
-                                            className="btn btn-outline-secondary"
-                                            title="Edit Band"
-                                            onClick={() => handleOpenBandModal(activeSection.id, idx)}
-                                          >
-                                            <i className="bi bi-pencil" />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            className="btn btn-outline-danger"
-                                            title="Delete Band"
-                                            onClick={() => handleDeleteBand(activeSection.id, idx)}
-                                          >
-                                            <i className="bi bi-trash" />
-                                          </button>
-                                        </div>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
-
-                          {/* Action Footer Bar */}
-                          <div className="d-flex flex-column flex-md-row align-items-center justify-content-between gap-3 pt-3 border-top">
-                            <div className="d-flex align-items-center gap-2">
-                              {dirtySections[activeSection.id] ? (
-                                <span className="badge bg-warning text-dark px-3 py-2 rounded-pill small">
-                                  <i className="bi bi-exclamation-circle-fill me-1" />
-                                  You have unsaved changes in this section
-                                </span>
-                              ) : (
+                            {/* Grade Bands Table */}
+                            <div className="d-flex align-items-center justify-content-between mb-3">
+                              <div>
+                                <h5 className="fw-bold text-dark mb-0">Configured Grade Bands</h5>
                                 <span className="text-muted small">
-                                  <i className="bi bi-check2-all text-success me-1" />
-                                  Grading scale is synced and saved
+                                  Sorted from highest score tier to lowest
                                 </span>
-                              )}
-                            </div>
-
-                            <div className="d-flex align-items-center gap-2">
-                              {dirtySections[activeSection.id] && (
-                                <button
-                                  type="button"
-                                  className="btn btn-outline-secondary rounded-pill px-3 py-2 fw-semibold"
-                                  style={{ fontSize: "0.85rem" }}
-                                  onClick={() => handleResetSection(activeSection.id)}
-                                  disabled={savingSectionId === activeSection.id}
-                                >
-                                  Revert Changes
-                                </button>
-                              )}
+                              </div>
 
                               <button
                                 type="button"
-                                className="btn btn-success rounded-pill px-4 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm"
-                                style={{ fontSize: "0.85rem" }}
-                                onClick={() => handleSaveSectionGrading(activeSection.id)}
-                                disabled={savingSectionId === activeSection.id}
+                                className="btn btn-outline-primary btn-sm rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5"
+                                onClick={() => handleOpenBandModal(activeSection.id, null)}
                               >
-                                {savingSectionId === activeSection.id ? (
-                                  <>
-                                    <span className="spinner-border spinner-border-sm" role="status" />
-                                    Saving...
-                                  </>
-                                ) : (
-                                  <>
-                                    <i className="bi bi-cloud-check-fill" /> Save Grading Scale
-                                  </>
-                                )}
+                                <i className="bi bi-plus-circle" /> Add Grade Band
                               </button>
                             </div>
-                          </div>
-                        </>
-                      )}
+
+                            {activeBands.length === 0 ? (
+                              <div className="text-center py-5 border rounded-4 my-3 bg-light">
+                                <i className="bi bi-sliders text-muted fs-1 mb-2 d-block" />
+                                <h6 className="fw-bold text-dark mb-1">No Grade Bands Configured</h6>
+                                <p className="text-muted small mb-3">Click below to add grade bands or apply a standard preset template.</p>
+                                <div className="d-flex justify-content-center gap-2">
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-primary rounded-pill px-3"
+                                    onClick={() => handleOpenBandModal(activeSection.id, null)}
+                                  >
+                                    Add Custom Band
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-outline-dark rounded-pill px-3"
+                                    onClick={() => handleOpenPresetModal(activeSection.id)}
+                                  >
+                                    Apply Preset
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="table-responsive rounded-4 border overflow-hidden mb-4">
+                                <table className="table table-hover align-middle mb-0" style={{ fontSize: "0.875rem" }}>
+                                  <thead style={{ background: "#F8FAFC", color: "#475569" }}>
+                                    <tr>
+                                      <th style={{ width: 80 }} className="ps-3">Grade</th>
+                                      <th>Score Range</th>
+                                      <th>Performance Remark</th>
+                                      <th style={{ width: 100 }}>GPA Point</th>
+                                      <th style={{ width: 100 }}>Badge Preview</th>
+                                      <th style={{ width: 120 }} className="text-end pe-3">Actions</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {activeBands.map((band, idx) => (
+                                      <tr key={idx}>
+                                        {/* Grade Letter */}
+                                        <td className="ps-3">
+                                          <span
+                                            className="badge rounded-pill fw-bold px-3 py-1.5"
+                                            style={{
+                                              background: band.color ? `${band.color}20` : "rgba(37,99,235,0.12)",
+                                              color: band.color || "#2563EB",
+                                              border: `1px solid ${band.color || "#2563EB"}40`,
+                                              fontSize: "0.85rem",
+                                            }}
+                                          >
+                                            {band.grade}
+                                          </span>
+                                        </td>
+
+                                        {/* Range */}
+                                        <td>
+                                          <span className="fw-semibold text-dark">
+                                            {band.min}% – {band.max}%
+                                          </span>
+                                        </td>
+
+                                        {/* Remark */}
+                                        <td>
+                                          <span className="text-secondary">{band.remark || "—"}</span>
+                                        </td>
+
+                                        {/* GPA */}
+                                        <td>
+                                          <span className="badge bg-light text-dark border">
+                                            {band.gpa_point !== null && band.gpa_point !== undefined ? `${band.gpa_point}` : "0.0"}
+                                          </span>
+                                        </td>
+
+                                        {/* Color Preview */}
+                                        <td>
+                                          <div className="d-flex align-items-center gap-2">
+                                            <div
+                                              className="rounded-circle shadow-sm"
+                                              style={{
+                                                width: 18,
+                                                height: 18,
+                                                background: band.color || "#3B82F6",
+                                                border: "2px solid #ffffff",
+                                              }}
+                                            />
+                                            <span className="text-muted" style={{ fontSize: "0.75rem" }}>
+                                              {band.color || "#3B82F6"}
+                                            </span>
+                                          </div>
+                                        </td>
+
+                                        {/* Actions */}
+                                        <td className="text-end pe-3">
+                                          <div className="btn-group btn-group-sm">
+                                            <button
+                                              type="button"
+                                              className="btn btn-outline-secondary"
+                                              title="Edit Band"
+                                              onClick={() => handleOpenBandModal(activeSection.id, idx)}
+                                            >
+                                              <i className="bi bi-pencil" />
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="btn btn-outline-danger"
+                                              title="Delete Band"
+                                              onClick={() => handleDeleteBand(activeSection.id, idx)}
+                                            >
+                                              <i className="bi bi-trash" />
+                                            </button>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+
+                            {/* Action Footer Bar */}
+                            <div className="d-flex flex-column flex-md-row align-items-center justify-content-between gap-3 pt-3 border-top">
+                              <div className="d-flex align-items-center gap-2">
+                                {dirtySections[activeSection.id] ? (
+                                  <span className="badge bg-warning text-dark px-3 py-2 rounded-pill small">
+                                    <i className="bi bi-exclamation-circle-fill me-1" />
+                                    You have unsaved changes in this section
+                                  </span>
+                                ) : (
+                                  <span className="text-muted small">
+                                    <i className="bi bi-check2-all text-success me-1" />
+                                    Grading scale is synced and saved
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="d-flex align-items-center gap-2">
+                                {dirtySections[activeSection.id] && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline-secondary rounded-pill px-3 py-2 fw-semibold"
+                                    style={{ fontSize: "0.85rem" }}
+                                    onClick={() => handleResetSection(activeSection.id)}
+                                    disabled={savingSectionId === activeSection.id}
+                                  >
+                                    Revert Changes
+                                  </button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  className="btn btn-success rounded-pill px-4 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm"
+                                  style={{ fontSize: "0.85rem" }}
+                                  onClick={() => handleSaveSectionGrading(activeSection.id)}
+                                  disabled={savingSectionId === activeSection.id}
+                                >
+                                  {savingSectionId === activeSection.id ? (
+                                    <>
+                                      <span className="spinner-border spinner-border-sm" role="status" />
+                                      Saving...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <i className="bi bi-cloud-check-fill" /> Save Grading Scale
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
-          )}
-        </main>
+            )}
+          </main>
+        </div>
       </div>
 
       <Footer />
@@ -1389,6 +1425,6 @@ export default function GradingScalePage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
