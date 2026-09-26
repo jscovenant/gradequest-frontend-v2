@@ -113,6 +113,7 @@ export default function BillingPage() {
   } | null>(null);
 
   const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -1816,141 +1817,200 @@ export default function BillingPage() {
               </div>
             </div>
 
-            {/* ===== PAYMENT & SETTLEMENT HISTORY ===== */}
-            <div className="db-panel">
-              <div className="db-panel-head">
-                <div>
-                  <p className="db-panel-title">Payment &amp; Clearance History</p>
-                  <p className="db-panel-sub">Review past school fee clearance settlements, wallet top-ups, and bank transfers.</p>
+            {/* ===== PAYMENT & SETTLEMENT HISTORY (COLLAPSIBLE) ===== */}
+            <div className="db-panel" style={{ transition: "all 0.2s ease" }}>
+              <div
+                className="db-panel-head"
+                style={{ cursor: "pointer", userSelect: "none" }}
+                onClick={() => setHistoryOpen((prev) => !prev)}
+              >
+                <div className="d-flex align-items-center gap-2">
+                  <div
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 10,
+                      background: "rgba(15, 39, 68, 0.06)",
+                      color: "#0F2744",
+                      display: "grid",
+                      placeItems: "center",
+                      fontSize: 16,
+                    }}
+                  >
+                    <i className="bi bi-receipt-cutoff" />
+                  </div>
+                  <div>
+                    <div className="d-flex align-items-center gap-2">
+                      <p className="db-panel-title mb-0">Payment &amp; Clearance History</p>
+                      <span className="badge" style={{ background: "#F1F5F9", color: "#475569", fontSize: 11, fontWeight: 700 }}>
+                        {payments.length} record{payments.length !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                    <p className="db-panel-sub mb-0">Review past school fee clearance settlements, receipts, and Paystack transactions.</p>
+                  </div>
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                  <div className="db-search">
-                    <i className="bi bi-search" style={{ color: "#94a3b8" }} />
-                    <input
-                      placeholder="Search by reference, status, channel…"
-                      value={q}
-                      onChange={(e) => setQ(e.target.value)}
-                    />
+                <div className="d-flex align-items-center gap-2">
+                  <button
+                    type="button"
+                    className="db-refresh-btn"
+                    style={{
+                      background: historyOpen ? "#F1F5F9" : "#FFFFFF",
+                      borderColor: "#CBD5E1",
+                      fontWeight: 700,
+                      fontSize: 12.5,
+                      padding: "7px 14px",
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setHistoryOpen((prev) => !prev);
+                    }}
+                  >
+                    {historyOpen ? (
+                      <>
+                        <i className="bi bi-chevron-up me-1" /> Collapse History
+                      </>
+                    ) : (
+                      <>
+                        <i className="bi bi-chevron-down me-1" /> View History ({payments.length})
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {historyOpen && (
+                <>
+                  <div style={{ padding: "14px 20px", background: "#F8FAFC", borderTop: "1px solid #E2E8F0", borderBottom: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <div className="db-search" style={{ maxWidth: 360 }}>
+                      <i className="bi bi-search" style={{ color: "#94a3b8" }} />
+                      <input
+                        placeholder="Search by reference, status, channel…"
+                        value={q}
+                        onChange={(e) => setQ(e.target.value)}
+                      />
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                      <select
+                        className="form-select"
+                        style={{ width: 130, borderRadius: 10, borderColor: "#E2E8F0", fontSize: 12.5 }}
+                        value={pageSize}
+                        onChange={(e) => setPageSize(Number(e.target.value))}
+                      >
+                        {[5, 10, 20, 50].map((n) => (
+                          <option key={n} value={n}>
+                            {n} / page
+                          </option>
+                        ))}
+                      </select>
+
+                      <button className="db-refresh-btn" onClick={() => loadBillingData(true)} disabled={loading}>
+                        <i className="bi bi-arrow-clockwise" />
+                        Refresh
+                      </button>
+                    </div>
                   </div>
 
-                  <select
-                    className="form-select"
-                    style={{ width: 130, borderRadius: 10, borderColor: "#E2E8F0", fontSize: 12.5 }}
-                    value={pageSize}
-                    onChange={(e) => setPageSize(Number(e.target.value))}
-                  >
-                    {[5, 10, 20, 50].map((n) => (
-                      <option key={n} value={n}>
-                        {n} / page
-                      </option>
-                    ))}
-                  </select>
+                  <div style={{ overflowX: "auto" }}>
+                    <table className="db-table">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Description / Plan</th>
+                          <th>Amount</th>
+                          <th>Channel</th>
+                          <th>Reference</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
 
-                  <button className="db-refresh-btn" onClick={() => loadBillingData(true)} disabled={loading}>
-                    <i className="bi bi-arrow-clockwise" />
-                    Refresh
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ overflowX: "auto" }}>
-                <table className="db-table">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Description / Plan</th>
-                      <th>Amount</th>
-                      <th>Channel</th>
-                      <th>Reference</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {pagedPayments.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>
-                          <div style={{ fontWeight: 800, color: "#1e293b" }}>No payment records found</div>
-                          <div style={{ fontSize: 12.5, marginTop: 4 }}>Completed settlements will appear here.</div>
-                        </td>
-                      </tr>
-                    ) : (
-                      pagedPayments.map((p) => {
-                        const t = badgeTone(p.status);
-                        return (
-                          <tr key={p.id}>
-                            <td className="db-muted">{fmtDate(p.created_at || p.starts_at)}</td>
-                            <td>
-                              <div className="db-strong">{p.plan?.name || "Fee Clearance"}</div>
-                              {p.card_type && (
-                                <div className="db-muted" style={{ fontSize: 11.5 }}>
-                                  {p.card_type} •••• {p.last4 || "" }
-                                </div>
-                              )}
-                            </td>
-                            <td className="db-strong">{fmtNaira(Number(p.amount || 0))}</td>
-                            <td style={{ textTransform: "capitalize" }}>{p.channel || "Online Transfer"}</td>
-                            <td>
-                              <code style={{ fontSize: 12, color: "#0F2744" }}>{p.reference}</code>
-                            </td>
-                            <td>
-                              <span className="db-pill" style={{ background: t.bg, color: t.fg }}>
-                                {t.text}
-                              </span>
+                      <tbody>
+                        {pagedPayments.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>
+                              <div style={{ fontWeight: 800, color: "#1e293b" }}>No payment records found</div>
+                              <div style={{ fontSize: 12.5, marginTop: 4 }}>Completed settlements will appear here.</div>
                             </td>
                           </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                        ) : (
+                          pagedPayments.map((p) => {
+                            const t = badgeTone(p.status);
+                            return (
+                              <tr key={p.id}>
+                                <td className="db-muted">{fmtDate(p.created_at || p.starts_at)}</td>
+                                <td>
+                                  <div className="db-strong">{p.plan?.name || "Fee Clearance"}</div>
+                                  {p.card_type && (
+                                    <div className="db-muted" style={{ fontSize: 11.5 }}>
+                                      {p.card_type} •••• {p.last4 || "" }
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="db-strong">{fmtNaira(Number(p.amount || 0))}</td>
+                                <td style={{ textTransform: "capitalize" }}>{p.channel || "Online Transfer"}</td>
+                                <td>
+                                  <code style={{ fontSize: 12, color: "#0F2744" }}>{p.reference}</code>
+                                </td>
+                                <td>
+                                  <span className="db-pill" style={{ background: t.bg, color: t.fg }}>
+                                    {t.text}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
 
-              {/* History Pagination */}
-              <div style={{ padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", borderTop: "1px solid #E2E8F0" }}>
-                <div className="db-muted" style={{ fontSize: 12.5 }}>
-                  Showing <b>{totalItems === 0 ? 0 : (safePage - 1) * pageSize + 1}</b>–<b>{Math.min(safePage * pageSize, totalItems)}</b> of <b>{totalItems}</b>
-                  <span className="ms-2">•</span>
-                  <span className="ms-2">Total Paid: <b>{fmtNaira(quickTotals.totalPaid)}</b></span>
-                </div>
+                  {/* History Pagination */}
+                  <div style={{ padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", borderTop: "1px solid #E2E8F0" }}>
+                    <div className="db-muted" style={{ fontSize: 12.5 }}>
+                      Showing <b>{totalItems === 0 ? 0 : (safePage - 1) * pageSize + 1}</b>–<b>{Math.min(safePage * pageSize, totalItems)}</b> of <b>{totalItems}</b>
+                      <span className="ms-2">•</span>
+                      <span className="ms-2">Total Paid: <b>{fmtNaira(quickTotals.totalPaid)}</b></span>
+                    </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <button
-                    className="db-refresh-btn"
-                    disabled={safePage <= 1}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  >
-                    <i className="bi bi-chevron-left" /> Prev
-                  </button>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <button
+                        className="db-refresh-btn"
+                        disabled={safePage <= 1}
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      >
+                        <i className="bi bi-chevron-left" /> Prev
+                      </button>
 
-                  {pageNumbers.map((n) => (
-                    <button
-                      key={n}
-                      className="db-refresh-btn"
-                      onClick={() => setPage(n)}
-                      style={{
-                        background: n === safePage ? "#D97706" : undefined,
-                        color: n === safePage ? "#FFFFFF" : undefined,
-                        borderColor: n === safePage ? "#D97706" : undefined,
-                        fontWeight: n === safePage ? 800 : 500,
-                        minWidth: 36,
-                        justifyContent: "center",
-                      }}
-                    >
-                      {n}
-                    </button>
-                  ))}
+                      {pageNumbers.map((n) => (
+                        <button
+                          key={n}
+                          className="db-refresh-btn"
+                          onClick={() => setPage(n)}
+                          style={{
+                            background: n === safePage ? "#D97706" : undefined,
+                            color: n === safePage ? "#FFFFFF" : undefined,
+                            borderColor: n === safePage ? "#D97706" : undefined,
+                            fontWeight: n === safePage ? 800 : 500,
+                            minWidth: 36,
+                            justifyContent: "center",
+                          }}
+                        >
+                          {n}
+                        </button>
+                      ))}
 
-                  <button
-                    className="db-refresh-btn"
-                    disabled={safePage >= totalPages}
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  >
-                    Next <i className="bi bi-chevron-right" />
-                  </button>
-                </div>
-              </div>
+                      <button
+                        className="db-refresh-btn"
+                        disabled={safePage >= totalPages}
+                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      >
+                        Next <i className="bi bi-chevron-right" />
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="mt-auto">
