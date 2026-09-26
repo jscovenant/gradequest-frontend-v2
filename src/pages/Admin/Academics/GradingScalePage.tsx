@@ -462,6 +462,104 @@ export default function GradingScalePage() {
         .transition-all {
           transition: all 0.2s ease-in-out;
         }
+
+        /* Fixed Centered Modal Styles */
+        .db-modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          width: 100vw;
+          height: 100vh;
+          background: rgba(15, 39, 68, 0.68);
+          backdrop-filter: blur(8px);
+          z-index: 99999;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+          overflow-y: auto;
+        }
+
+        .db-modal-box {
+          background: #ffffff;
+          border-radius: 20px;
+          width: 100%;
+          max-width: 580px;
+          max-height: calc(100vh - 48px);
+          display: flex;
+          flex-direction: column;
+          box-shadow: 0 25px 60px -15px rgba(15, 39, 68, 0.45);
+          overflow: hidden;
+          margin: auto;
+          animation: dbModalPop 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+          border: 1px solid rgba(255, 255, 255, 0.25);
+          position: relative;
+        }
+
+        .db-modal-box-lg {
+          max-width: 780px;
+        }
+
+        @keyframes dbModalPop {
+          0% { transform: scale(0.95) translateY(12px); opacity: 0; }
+          100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+
+        .db-modal-header {
+          background: linear-gradient(135deg, #0F2744 0%, #1E4976 100%);
+          color: #ffffff;
+          padding: 18px 24px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          flex-shrink: 0;
+        }
+
+        .db-modal-header h5 {
+          margin: 0;
+          font-size: 1.05rem;
+          font-weight: 700;
+        }
+
+        .db-modal-body {
+          padding: 24px;
+          overflow-y: auto;
+          max-height: calc(85vh - 130px);
+        }
+
+        .db-modal-footer {
+          padding: 16px 24px;
+          background: #F8FAFC;
+          border-top: 1px solid #E2E8F0;
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 12px;
+          flex-shrink: 0;
+        }
+
+        .db-modal-close {
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          border: 1px solid rgba(255, 255, 255, 0.25);
+          background: rgba(255, 255, 255, 0.1);
+          color: #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          font-size: 0.9rem;
+          transition: all 0.15s ease;
+        }
+
+        .db-modal-close:hover {
+          background: rgba(255, 255, 255, 0.25);
+          transform: scale(1.05);
+        }
       `}</style>
 
       <PageTitle title="Grading Scales & Evaluation System | SchoolProfit" />
@@ -1121,306 +1219,318 @@ export default function GradingScalePage() {
       <Footer />
 
       {/* =========================================================
-          MODAL: ADD / EDIT GRADE BAND
+          MODAL: ADD / EDIT GRADE BAND (Fixed Viewport Center)
       ========================================================= */}
       {bandModalOpen && (
-        <div className="modal show d-block" tabIndex={-1} style={{ background: "rgba(15, 39, 68, 0.6)", backdropFilter: "blur(4px)" }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden">
-              <form onSubmit={handleSaveBandModal}>
-                <div className="modal-header border-bottom p-3" style={{ background: "#0F2744", color: "#ffffff" }}>
-                  <h5 className="modal-title fw-bold fs-6">
-                    <i className="bi bi-sliders me-2" />
-                    {editingBandIndex !== null ? "Edit Grade Band" : "Add New Grade Band"}
-                  </h5>
-                  <button
-                    type="button"
-                    className="btn-close btn-close-white"
-                    onClick={() => setBandModalOpen(false)}
-                  />
-                </div>
+        <div
+          className="db-modal-overlay"
+          onMouseDown={() => setBandModalOpen(false)}
+        >
+          <div
+            className="db-modal-box"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <form onSubmit={handleSaveBandModal} style={{ display: "flex", flexDirection: "column", height: "100%", margin: 0 }}>
+              <div className="db-modal-header">
+                <h5 className="d-flex align-items-center gap-2">
+                  <i className="bi bi-sliders" />
+                  {editingBandIndex !== null ? "Edit Grade Band" : "Add New Grade Band"}
+                </h5>
+                <button
+                  type="button"
+                  className="db-modal-close"
+                  onClick={() => setBandModalOpen(false)}
+                >
+                  ✕
+                </button>
+              </div>
 
-                <div className="modal-body p-4">
-                  <div className="row g-3">
-                    {/* Grade Code */}
-                    <div className="col-12">
-                      <label className="form-label fw-semibold small text-dark">
-                        Grade Code / Letter <span className="text-danger">*</span>
-                      </label>
+              <div className="db-modal-body">
+                <div className="row g-3">
+                  {/* Grade Code */}
+                  <div className="col-12">
+                    <label className="form-label fw-semibold small text-dark">
+                      Grade Code / Letter <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control rounded-3"
+                      placeholder="e.g. A, A1, B2, Distinction"
+                      value={bandForm.grade}
+                      onChange={(e) => setBandForm({ ...bandForm, grade: e.target.value })}
+                      required
+                      autoFocus
+                    />
+                    <div className="form-text">The letter or designation printed on report cards.</div>
+                  </div>
+
+                  {/* Min and Max Score */}
+                  <div className="col-6">
+                    <label className="form-label fw-semibold small text-dark">
+                      Minimum Score (%) <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      className="form-control rounded-3"
+                      value={bandForm.min}
+                      onChange={(e) => setBandForm({ ...bandForm, min: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="col-6">
+                    <label className="form-label fw-semibold small text-dark">
+                      Maximum Score (%) <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      className="form-control rounded-3"
+                      value={bandForm.max}
+                      onChange={(e) => setBandForm({ ...bandForm, max: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  {/* Remark */}
+                  <div className="col-12">
+                    <label className="form-label fw-semibold small text-dark">
+                      Performance Remark
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control rounded-3"
+                      placeholder="e.g. Excellent, Very Good, Credit, Pass"
+                      value={bandForm.remark}
+                      onChange={(e) => setBandForm({ ...bandForm, remark: e.target.value })}
+                    />
+                  </div>
+
+                  {/* GPA Point */}
+                  <div className="col-6">
+                    <label className="form-label fw-semibold small text-dark">
+                      GPA Points (Optional)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="10"
+                      className="form-control rounded-3"
+                      placeholder="e.g. 5.0, 4.0"
+                      value={bandForm.gpa_point}
+                      onChange={(e) => setBandForm({ ...bandForm, gpa_point: e.target.value })}
+                    />
+                  </div>
+
+                  {/* Color Swatch */}
+                  <div className="col-6">
+                    <label className="form-label fw-semibold small text-dark">
+                      Badge Color
+                    </label>
+                    <div className="d-flex align-items-center gap-2">
                       <input
-                        type="text"
-                        className="form-control rounded-3"
-                        placeholder="e.g. A, A1, B2, Distinction"
-                        value={bandForm.grade}
-                        onChange={(e) => setBandForm({ ...bandForm, grade: e.target.value })}
-                        required
-                        autoFocus
+                        type="color"
+                        className="form-control form-control-color rounded-3 p-1"
+                        style={{ width: 44, height: 38 }}
+                        value={bandForm.color}
+                        onChange={(e) => setBandForm({ ...bandForm, color: e.target.value })}
                       />
-                      <div className="form-text">The letter or designation printed on report cards.</div>
+                      <span className="text-muted small font-monospace">{bandForm.color}</span>
                     </div>
+                  </div>
 
-                    {/* Min and Max Score */}
-                    <div className="col-6">
-                      <label className="form-label fw-semibold small text-dark">
-                        Minimum Score (%) <span className="text-danger">*</span>
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="100"
-                        className="form-control rounded-3"
-                        value={bandForm.min}
-                        onChange={(e) => setBandForm({ ...bandForm, min: e.target.value })}
-                        required
-                      />
-                    </div>
-
-                    <div className="col-6">
-                      <label className="form-label fw-semibold small text-dark">
-                        Maximum Score (%) <span className="text-danger">*</span>
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="100"
-                        className="form-control rounded-3"
-                        value={bandForm.max}
-                        onChange={(e) => setBandForm({ ...bandForm, max: e.target.value })}
-                        required
-                      />
-                    </div>
-
-                    {/* Remark */}
-                    <div className="col-12">
-                      <label className="form-label fw-semibold small text-dark">
-                        Performance Remark
-                      </label>
-                      <input
-                        type="text"
-                        className="form-control rounded-3"
-                        placeholder="e.g. Excellent, Very Good, Credit, Pass"
-                        value={bandForm.remark}
-                        onChange={(e) => setBandForm({ ...bandForm, remark: e.target.value })}
-                      />
-                    </div>
-
-                    {/* GPA Point */}
-                    <div className="col-6">
-                      <label className="form-label fw-semibold small text-dark">
-                        GPA Points (Optional)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        max="10"
-                        className="form-control rounded-3"
-                        placeholder="e.g. 5.0, 4.0"
-                        value={bandForm.gpa_point}
-                        onChange={(e) => setBandForm({ ...bandForm, gpa_point: e.target.value })}
-                      />
-                    </div>
-
-                    {/* Color Swatch */}
-                    <div className="col-6">
-                      <label className="form-label fw-semibold small text-dark">
-                        Badge Color
-                      </label>
-                      <div className="d-flex align-items-center gap-2">
-                        <input
-                          type="color"
-                          className="form-control form-control-color rounded-3 p-1"
-                          style={{ width: 44, height: 38 }}
-                          value={bandForm.color}
-                          onChange={(e) => setBandForm({ ...bandForm, color: e.target.value })}
+                  {/* Quick Swatches */}
+                  <div className="col-12">
+                    <label className="form-label fw-semibold small text-muted">Quick Palette Swatches</label>
+                    <div className="d-flex flex-wrap gap-2">
+                      {COLOR_SWATCHES.map((sw, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          className="rounded-circle border-0 shadow-sm"
+                          style={{
+                            width: 24,
+                            height: 24,
+                            background: sw.hex,
+                            outline: bandForm.color.toLowerCase() === sw.hex.toLowerCase() ? "2px solid #0F2744" : "none",
+                            outlineOffset: 2,
+                          }}
+                          title={sw.label}
+                          onClick={() => setBandForm({ ...bandForm, color: sw.hex })}
                         />
-                        <span className="text-muted small font-monospace">{bandForm.color}</span>
-                      </div>
-                    </div>
-
-                    {/* Quick Swatches */}
-                    <div className="col-12">
-                      <label className="form-label fw-semibold small text-muted">Quick Palette Swatches</label>
-                      <div className="d-flex flex-wrap gap-2">
-                        {COLOR_SWATCHES.map((sw, i) => (
-                          <button
-                            key={i}
-                            type="button"
-                            className="rounded-circle border-0 shadow-sm"
-                            style={{
-                              width: 24,
-                              height: 24,
-                              background: sw.hex,
-                              outline: bandForm.color.toLowerCase() === sw.hex.toLowerCase() ? "2px solid #0F2744" : "none",
-                              outlineOffset: 2,
-                            }}
-                            title={sw.label}
-                            onClick={() => setBandForm({ ...bandForm, color: sw.hex })}
-                          />
-                        ))}
-                      </div>
+                      ))}
                     </div>
                   </div>
                 </div>
+              </div>
 
-                <div className="modal-footer border-top p-3 bg-light">
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary rounded-pill px-4"
-                    onClick={() => setBandModalOpen(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn btn-primary rounded-pill px-4 fw-semibold"
-                    style={{ background: "#0F2744", borderColor: "#0F2744" }}
-                  >
-                    {editingBandIndex !== null ? "Update Band" : "Add Band"}
-                  </button>
-                </div>
-              </form>
-            </div>
+              <div className="db-modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary rounded-pill px-4"
+                  onClick={() => setBandModalOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary rounded-pill px-4 fw-semibold"
+                  style={{ background: "#0F2744", borderColor: "#0F2744" }}
+                >
+                  {editingBandIndex !== null ? "Update Band" : "Add Band"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
       {/* =========================================================
-          MODAL: APPLY PRESET TEMPLATE
+          MODAL: APPLY PRESET TEMPLATE (Fixed Viewport Center)
       ========================================================= */}
       {presetModalOpen && (
-        <div className="modal show d-block" tabIndex={-1} style={{ background: "rgba(15, 39, 68, 0.6)", backdropFilter: "blur(4px)" }}>
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content border-0 rounded-4 shadow-lg overflow-hidden">
-              <div className="modal-header border-bottom p-3" style={{ background: "#0F2744", color: "#ffffff" }}>
-                <h5 className="modal-title fw-bold fs-6">
-                  <i className="bi bi-magic me-2" />
-                  Apply Standard Grading Preset
-                </h5>
-                <button
-                  type="button"
-                  className="btn-close btn-close-white"
-                  onClick={() => setPresetModalOpen(false)}
-                />
-              </div>
+        <div
+          className="db-modal-overlay"
+          onMouseDown={() => setPresetModalOpen(false)}
+        >
+          <div
+            className="db-modal-box db-modal-box-lg"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="db-modal-header">
+              <h5 className="d-flex align-items-center gap-2">
+                <i className="bi bi-magic" />
+                Apply Standard Grading Preset
+              </h5>
+              <button
+                type="button"
+                className="db-modal-close"
+                onClick={() => setPresetModalOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
 
-              <div className="modal-body p-4">
-                <p className="text-muted small mb-4">
-                  Select a standardized grading scale to automatically populate the grade bands for this section.
-                  You can further customize thresholds, remarks, and colors after applying.
-                </p>
+            <div className="db-modal-body">
+              <p className="text-muted small mb-4">
+                Select a standardized grading scale to automatically populate the grade bands for this section.
+                You can further customize thresholds, remarks, and colors after applying.
+              </p>
 
-                <div className="row g-3 mb-4">
-                  {Object.entries(presets).map(([key, preset]) => {
-                    const isSelected = selectedPresetKey === key;
-                    return (
-                      <div key={key} className="col-md-6">
-                        <div
-                          className={`card h-100 rounded-4 p-3 border-2 cursor-pointer transition-all ${
-                            isSelected ? "border-primary shadow-sm bg-primary-subtle" : "border-light bg-light"
-                          }`}
-                          style={{
-                            cursor: "pointer",
-                            borderColor: isSelected ? "#2563EB" : "#E2E8F0",
-                            background: isSelected ? "rgba(37, 99, 235, 0.05)" : "#FAFAFA",
-                          }}
-                          onClick={() => setSelectedPresetKey(key)}
-                        >
-                          <div className="d-flex align-items-center justify-content-between mb-2">
-                            <h6 className="fw-bold text-dark mb-0">{preset.name}</h6>
-                            <input
-                              type="radio"
-                              name="presetOption"
-                              checked={isSelected}
-                              onChange={() => setSelectedPresetKey(key)}
-                              className="form-check-input"
-                            />
-                          </div>
-                          <p className="text-muted small mb-2">{preset.description}</p>
-                          <div className="d-flex flex-wrap gap-1">
-                            {preset.scales.slice(0, 6).map((sc, idx) => (
-                              <span
-                                key={idx}
-                                className="badge rounded-pill"
-                                style={{
-                                  background: sc.color ? `${sc.color}20` : "#E2E8F0",
-                                  color: sc.color || "#0F2744",
-                                  fontSize: "0.65rem",
-                                }}
-                              >
-                                {sc.grade} ({sc.min}+)
-                              </span>
-                            ))}
-                            {preset.scales.length > 6 && (
-                              <span className="badge bg-light text-muted border rounded-pill" style={{ fontSize: "0.65rem" }}>
-                                +{preset.scales.length - 6} more
-                              </span>
-                            )}
-                          </div>
+              <div className="row g-3 mb-4">
+                {Object.entries(presets).map(([key, preset]) => {
+                  const isSelected = selectedPresetKey === key;
+                  return (
+                    <div key={key} className="col-md-6">
+                      <div
+                        className={`card h-100 rounded-4 p-3 border-2 cursor-pointer transition-all ${
+                          isSelected ? "border-primary shadow-sm bg-primary-subtle" : "border-light bg-light"
+                        }`}
+                        style={{
+                          cursor: "pointer",
+                          borderColor: isSelected ? "#2563EB" : "#E2E8F0",
+                          background: isSelected ? "rgba(37, 99, 235, 0.05)" : "#FAFAFA",
+                        }}
+                        onClick={() => setSelectedPresetKey(key)}
+                      >
+                        <div className="d-flex align-items-center justify-content-between mb-2">
+                          <h6 className="fw-bold text-dark mb-0">{preset.name}</h6>
+                          <input
+                            type="radio"
+                            name="presetOption"
+                            checked={isSelected}
+                            onChange={() => setSelectedPresetKey(key)}
+                            className="form-check-input"
+                          />
+                        </div>
+                        <p className="text-muted small mb-2">{preset.description}</p>
+                        <div className="d-flex flex-wrap gap-1">
+                          {preset.scales.slice(0, 6).map((sc, idx) => (
+                            <span
+                              key={idx}
+                              className="badge rounded-pill"
+                              style={{
+                                background: sc.color ? `${sc.color}20` : "#E2E8F0",
+                                color: sc.color || "#0F2744",
+                                fontSize: "0.65rem",
+                              }}
+                            >
+                              {sc.grade} ({sc.min}+)
+                            </span>
+                          ))}
+                          {preset.scales.length > 6 && (
+                            <span className="badge bg-light text-muted border rounded-pill" style={{ fontSize: "0.65rem" }}>
+                              +{preset.scales.length - 6} more
+                            </span>
+                          )}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-
-                {/* Selected Preset Preview */}
-                {selectedPresetKey && presets[selectedPresetKey] && (
-                  <div className="p-3 rounded-4 bg-white border">
-                    <h6 className="fw-bold text-dark mb-2">
-                      Preview: {presets[selectedPresetKey].name} ({presets[selectedPresetKey].scales.length} tiers)
-                    </h6>
-                    <div className="table-responsive" style={{ maxHeight: 200, overflowY: "auto" }}>
-                      <table className="table table-sm table-bordered mb-0" style={{ fontSize: "0.8rem" }}>
-                        <thead className="table-light">
-                          <tr>
-                            <th>Grade</th>
-                            <th>Min Score</th>
-                            <th>Max Score</th>
-                            <th>Remark</th>
-                            <th>GPA</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {presets[selectedPresetKey].scales.map((s, idx) => (
-                            <tr key={idx}>
-                              <td>
-                                <span className="fw-bold" style={{ color: s.color || "#0F2744" }}>
-                                  {s.grade}
-                                </span>
-                              </td>
-                              <td>{s.min}%</td>
-                              <td>{s.max}%</td>
-                              <td>{s.remark}</td>
-                              <td>{s.gpa_point ?? "—"}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
                     </div>
-                  </div>
-                )}
+                  );
+                })}
               </div>
 
-              <div className="modal-footer border-top p-3 bg-light">
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary rounded-pill px-4"
-                  onClick={() => setPresetModalOpen(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary rounded-pill px-4 fw-semibold"
-                  style={{ background: "#0F2744", borderColor: "#0F2744" }}
-                  onClick={handleApplyPreset}
-                  disabled={savingSectionId !== null}
-                >
-                  {savingSectionId !== null ? "Applying..." : "Apply This Preset"}
-                </button>
-              </div>
+              {/* Selected Preset Preview */}
+              {selectedPresetKey && presets[selectedPresetKey] && (
+                <div className="p-3 rounded-4 bg-white border">
+                  <h6 className="fw-bold text-dark mb-2">
+                    Preview: {presets[selectedPresetKey].name} ({presets[selectedPresetKey].scales.length} tiers)
+                  </h6>
+                  <div className="table-responsive" style={{ maxHeight: 200, overflowY: "auto" }}>
+                    <table className="table table-sm table-bordered mb-0" style={{ fontSize: "0.8rem" }}>
+                      <thead className="table-light">
+                        <tr>
+                          <th>Grade</th>
+                          <th>Min Score</th>
+                          <th>Max Score</th>
+                          <th>Remark</th>
+                          <th>GPA</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {presets[selectedPresetKey].scales.map((s, idx) => (
+                          <tr key={idx}>
+                            <td>
+                              <span className="fw-bold" style={{ color: s.color || "#0F2744" }}>
+                                {s.grade}
+                              </span>
+                            </td>
+                            <td>{s.min}%</td>
+                            <td>{s.max}%</td>
+                            <td>{s.remark}</td>
+                            <td>{s.gpa_point ?? "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="db-modal-footer">
+              <button
+                type="button"
+                className="btn btn-outline-secondary rounded-pill px-4"
+                onClick={() => setPresetModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary rounded-pill px-4 fw-semibold"
+                style={{ background: "#0F2744", borderColor: "#0F2744" }}
+                onClick={handleApplyPreset}
+                disabled={savingSectionId !== null}
+              >
+                {savingSectionId !== null ? "Applying..." : "Apply This Preset"}
+              </button>
             </div>
           </div>
         </div>
