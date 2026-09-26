@@ -10,6 +10,7 @@ import Loader from "../../../components/ui/dashboardLoader";
 import { useToast } from "../../../contexts/ToastContext";
 import { useNavigate } from "react-router-dom";
 import PageTitle from "../../../components/PageTitle";
+import { getUser } from "../../../utils/token";
 
 /**
  * StudentsPage.tsx — wired to Bootstrap Sass variables
@@ -32,6 +33,13 @@ import PageTitle from "../../../components/PageTitle";
  */
 
 /* ========================= TYPES ========================= */
+interface ClassLevel {
+  id: number;
+  name: string;
+  section?: { id: number; name: string };
+  students_count?: number;
+}
+
 interface Student {
   id: number; firstname: string; surname: string; third_name?: string;
   reg_no: string; level?: { id: number; name: string };
@@ -156,10 +164,17 @@ export default function StudentsPage() {
   const navigate = useNavigate();
   const { showSuccess, showError, showWarning } = useToast();
 
+  const currentUser = useMemo(() => getUser(), []);
+  const isTeacher = (currentUser?.role || "").toLowerCase() === "teacher";
+  const isAdmin = !isTeacher;
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   /* List */
   const [students, setStudents]     = useState<Student[]>([]);
+  const [levels, setLevels]         = useState<ClassLevel[]>([]);
+  const [selectedLevelId, setSelectedLevelId] = useState<number | "all">("all");
+  const [classSearch, setClassSearch] = useState("");
   const [search, setSearch]         = useState("");
   const [page, setPage]             = useState(1);
   const [perPage]                   = useState(8);
@@ -205,12 +220,8 @@ export default function StudentsPage() {
 
   /*withdraw student */
   const [withdrawingStudent, setWithdrawingStudent] = useState<Student | null>(null);
-const [confirmWithdrawText, setConfirmWithdrawText] = useState("");
-const [processingWithdraw, setProcessingWithdraw] = useState(false);
-
-
-
-
+  const [confirmWithdrawText, setConfirmWithdrawText] = useState("");
+  const [processingWithdraw, setProcessingWithdraw] = useState(false);
 
   /* Ratings */
   const [affectiveDomains, setAffectiveDomains]     = useState<any[]>([]);
@@ -231,14 +242,42 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
     return "Good evening";
   };
 
+  /* ─── Filtered Classes for Admin Cards ─── */
+  const filteredLevels = useMemo(() => {
+    if (!classSearch.trim()) return levels;
+    const q = classSearch.toLowerCase();
+    return levels.filter(
+      (l) =>
+        l.name.toLowerCase().includes(q) ||
+        (l.section?.name && l.section.name.toLowerCase().includes(q))
+    );
+  }, [levels, classSearch]);
+
+  const totalClassStudents = useMemo(
+    () => levels.reduce((sum, l) => sum + (l.students_count || 0), 0),
+    [levels]
+  );
+
   /* ─── Fetch ─── */
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      const res = await authApi.get("/all-students", { params: { page, perPage, search, student_status: studentStatusFilter } });
+      const params: any = {
+        page,
+        perPage,
+        search,
+        student_status: studentStatusFilter,
+      };
+      if (selectedLevelId !== "all") {
+        params.class_id = selectedLevelId;
+      }
+      const res = await authApi.get("/all-students", { params });
       const d = res.data.students;
       setStudents(d?.data || d || []);
       setTotalPages(d?.last_page || 1);
+      if (res.data.levels) {
+        setLevels(res.data.levels);
+      }
       setStatusCounts({
         active: Number(res.data.status_counts?.active ?? 0),
         alumni: Number(res.data.status_counts?.alumni ?? 0),
@@ -248,7 +287,7 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
     } catch (err: any) { showError(err?.response?.data?.message ?? "Failed to load students"); }
     finally { setLoading(false); }
   };
-  useEffect(() => { fetchStudents(); }, [page, search, studentStatusFilter]);
+  useEffect(() => { fetchStudents(); }, [page, search, studentStatusFilter, selectedLevelId]);
 
   const downloadStudentTemplate = async (format: "xlsx" | "csv") => {
     setDownloadingTemplate(format);
@@ -707,6 +746,248 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
         .db-import-preview-table th, .db-import-preview-table td { padding:8px 10px; font-size:12px; border-bottom:1px solid rgba(0,0,0,.05); white-space:nowrap; }
         .db-import-preview-table th { color:#9a8a7a; background:var(--sp-light); text-transform:uppercase; letter-spacing:.08em; font-size:10px; }
 
+        /* ── Class Cards Hub (Admin Only) ── */
+        .db-classes-panel {
+          background: #fff;
+          border: 1px solid var(--sp-border);
+          border-radius: var(--sp-radius);
+          padding: 22px 24px;
+          margin-bottom: 24px;
+          box-shadow: 0 4px 20px -4px rgba(15, 39, 68, 0.05);
+        }
+        .db-classes-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 18px;
+          gap: 16px;
+          flex-wrap: wrap;
+        }
+        .db-classes-title-wrap {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .db-classes-icon {
+          width: 38px;
+          height: 38px;
+          border-radius: 10px;
+          background: rgba(15, 39, 68, 0.08);
+          color: var(--sp-dark);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .db-classes-title {
+          font-family: 'Playfair Display', serif;
+          font-size: 16.5px;
+          font-weight: 700;
+          color: var(--sp-dark);
+          margin: 0 0 2px;
+        }
+        .db-classes-sub {
+          font-size: 12px;
+          color: #8b7b6b;
+          margin: 0;
+        }
+        .db-classes-search {
+          min-width: 200px;
+          background: var(--sp-light);
+          border: 1px solid var(--sp-border);
+          border-radius: 8px;
+          padding: 7px 12px 7px 32px;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 12px;
+          color: var(--sp-dark);
+          outline: none;
+          transition: border-color .2s, box-shadow .2s;
+        }
+        .db-classes-search:focus {
+          border-color: var(--sp-accent-border);
+          background: #fff;
+          box-shadow: 0 0 0 2px var(--sp-accent-dim);
+        }
+        .db-class-cards-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+          gap: 14px;
+        }
+        .db-class-card {
+          background: #fff;
+          border: 1.5px solid var(--sp-border);
+          border-radius: 12px;
+          padding: 16px;
+          cursor: pointer;
+          transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          position: relative;
+          overflow: hidden;
+          text-align: left;
+          user-select: none;
+        }
+        .db-class-card:hover {
+          transform: translateY(-2px);
+          border-color: rgba(217, 119, 6, 0.45);
+          box-shadow: 0 8px 20px -4px rgba(15, 39, 68, 0.08);
+        }
+        .db-class-card--active {
+          background: linear-gradient(145deg, #ffffff 0%, rgba(217, 119, 6, 0.07) 100%);
+          border-color: #d97706 !important;
+          box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.2), 0 8px 24px -4px rgba(217, 119, 6, 0.15) !important;
+        }
+        .db-class-card--all {
+          background: linear-gradient(145deg, #ffffff 0%, rgba(15, 39, 68, 0.03) 100%);
+        }
+        .db-class-card--all.db-class-card--active {
+          background: linear-gradient(145deg, #0F2744 0%, #1E3A8A 100%) !important;
+          border-color: #0F2744 !important;
+          box-shadow: 0 8px 24px -4px rgba(15, 39, 68, 0.25) !important;
+        }
+        .db-class-card--all.db-class-card--active .db-class-card-name,
+        .db-class-card--all.db-class-card--active .db-class-card-count-val,
+        .db-class-card--all.db-class-card--active .db-class-card-section {
+          color: #fff !important;
+        }
+        .db-class-card--all.db-class-card--active .db-class-card-icon {
+          background: rgba(255, 255, 255, 0.15) !important;
+          color: #FBBF24 !important;
+        }
+        .db-class-card--all.db-class-card--active .db-class-card-count-lbl {
+          color: rgba(255, 255, 255, 0.7) !important;
+        }
+        .db-class-card--all.db-class-card--active .db-class-card-cta {
+          color: #FBBF24 !important;
+        }
+        .db-class-card-top {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 8px;
+          margin-bottom: 12px;
+        }
+        .db-class-card-icon {
+          width: 34px;
+          height: 34px;
+          border-radius: 8px;
+          background: rgba(15, 39, 68, 0.06);
+          color: var(--sp-dark);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 15px;
+          flex-shrink: 0;
+          transition: all .2s;
+        }
+        .db-class-card:hover .db-class-card-icon {
+          background: var(--sp-accent-dim);
+          color: #b45309;
+        }
+        .db-class-card-badge {
+          font-size: 10.5px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          padding: 3px 8px;
+          border-radius: 999px;
+          background: rgba(217, 119, 6, 0.12);
+          color: #b45309;
+          border: 1px solid rgba(217, 119, 6, 0.25);
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+        }
+        .db-class-card-name {
+          font-family: 'DM Sans', sans-serif;
+          font-size: 14.5px;
+          font-weight: 700;
+          color: var(--sp-dark);
+          line-height: 1.25;
+          margin: 0 0 3px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .db-class-card-section {
+          font-size: 11.5px;
+          color: #8b7b6b;
+          margin: 0;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .db-class-card-bottom {
+          display: flex;
+          align-items: flex-end;
+          justify-content: space-between;
+          margin-top: 14px;
+          padding-top: 10px;
+          border-top: 1px dashed rgba(0, 0, 0, 0.06);
+        }
+        .db-class-card-count {
+          display: flex;
+          flex-direction: column;
+        }
+        .db-class-card-count-val {
+          font-family: 'Playfair Display', serif;
+          font-size: 18px;
+          font-weight: 700;
+          color: var(--sp-dark);
+          line-height: 1;
+        }
+        .db-class-card-count-lbl {
+          font-size: 11px;
+          color: #9a8a7a;
+          margin-top: 2px;
+        }
+        .db-class-card-cta {
+          font-size: 11.5px;
+          font-weight: 600;
+          color: #d97706;
+          display: flex;
+          align-items: center;
+          gap: 3px;
+        }
+        .db-active-filter-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 10px 18px;
+          margin: 14px 24px 0;
+          background: rgba(217, 119, 6, 0.08);
+          border: 1px solid rgba(217, 119, 6, 0.25);
+          border-radius: 10px;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+        .db-active-filter-text {
+          font-size: 13px;
+          color: #92400e;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .db-active-filter-clear {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 4px 10px;
+          font-size: 12px;
+          font-weight: 600;
+          background: #fff;
+          color: #b45309;
+          border: 1px solid rgba(217, 119, 6, 0.3);
+          border-radius: 6px;
+          cursor: pointer;
+          transition: all .2s;
+        }
+        .db-active-filter-clear:hover {
+          background: #b45309;
+          color: #fff;
+        }
+
         /* ── Table ── */
         .db-table { width:100%; border-collapse:collapse; }
         .db-table th { padding:10px 16px; font-size:11px; font-weight:500; letter-spacing:.1em; text-transform:uppercase; color:#9a8a7a; background:var(--sp-light); border-bottom:1px solid rgba(0,0,0,0.06); text-align:left; white-space:nowrap; }
@@ -982,15 +1263,19 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
                     <span className="db-session-dot" />
                     Students Registry
                   </div>
-                  <h1 className="db-greeting">{getGreeting()}, <em>Admin.</em></h1>
+                  <h1 className="db-greeting">{getGreeting()}, <em>{currentUser?.firstname || currentUser?.name || (isTeacher ? "Teacher" : "Admin")}.</em></h1>
                   <p className="db-hero-sub">
-                    Search, view full profiles, edit details, manage ratings, and decrypt credentials where needed.
+                    {isAdmin
+                      ? "Browse classes, filter rosters, view full profiles, edit details, manage ratings, and decrypt credentials."
+                      : "View your assigned student roster, check profiles, and inspect performance records."}
                   </p>
                   <div className="d-flex flex-wrap gap-2">
-                    <button className="db-btn-gold" onClick={() => navigate("/students/register")}>
-                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="3" stroke="currentColor" strokeWidth="1.4"/><path d="M2 15c0-3.314 2.686-6 6-6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M13 10v4M11 12h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-                      Add Student
-                    </button>
+                    {isAdmin && (
+                      <button className="db-btn-gold" onClick={() => navigate("/students/register")}>
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="3" stroke="currentColor" strokeWidth="1.4"/><path d="M2 15c0-3.314 2.686-6 6-6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M13 10v4M11 12h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                        Add Student
+                      </button>
+                    )}
                     <button className="db-btn-outline" onClick={fetchStudents} disabled={loading}>
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
                         style={{ animation: loading ? "spSpin .8s linear infinite" : "none" }}>
@@ -1056,6 +1341,132 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
               ))}
             </div>
 
+            {/* ── Admin Only: Class Cards Hub ── */}
+            {isAdmin && (
+              <div className="db-classes-panel">
+                <div className="db-classes-head">
+                  <div className="db-classes-title-wrap">
+                    <div className="db-classes-icon">
+                      <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                        <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V4z" stroke="currentColor" strokeWidth="1.5"/>
+                        <path d="M7 18h6M10 15v3M7 8h6M7 11h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="db-classes-title">Classes & Arms Hub</h3>
+                      <p className="db-classes-sub">
+                        Click any class card to view its student roster below. ({levels.length} {levels.length === 1 ? "class" : "classes"} registered)
+                      </p>
+                    </div>
+                  </div>
+
+                  {levels.length > 4 && (
+                    <div className="position-relative">
+                      <span className="position-absolute" style={{ left: 10, top: "50%", transform: "translateY(-50%)", color: "#9a8a7a", display: "flex", alignItems: "center", pointerEvents: "none" }}>
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.4"/><path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                      </span>
+                      <input
+                        className="db-classes-search"
+                        placeholder="Search class…"
+                        value={classSearch}
+                        onChange={(e) => setClassSearch(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="db-class-cards-grid">
+                  {/* "All Classes" Card */}
+                  <div
+                    className={`db-class-card db-class-card--all ${selectedLevelId === "all" ? "db-class-card--active" : ""}`}
+                    onClick={() => {
+                      setSelectedLevelId("all");
+                      setPage(1);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <div>
+                      <div className="db-class-card-top">
+                        <div className="db-class-card-icon">
+                          🌟
+                        </div>
+                        {selectedLevelId === "all" && (
+                          <span className="db-class-card-badge">
+                            <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            All Classes
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="db-class-card-name">All Students</h4>
+                      <p className="db-class-card-section">Complete School Register</p>
+                    </div>
+                    <div className="db-class-card-bottom">
+                      <div className="db-class-card-count">
+                        <span className="db-class-card-count-val">{statusCounts.active || totalClassStudents || 0}</span>
+                        <span className="db-class-card-count-lbl">Total Active</span>
+                      </div>
+                      <span className="db-class-card-cta">
+                        {selectedLevelId === "all" ? "Selected" : "View All →"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Individual Class Cards */}
+                  {filteredLevels.map((lvl) => {
+                    const isSelected = selectedLevelId === lvl.id;
+                    const count = lvl.students_count ?? 0;
+                    return (
+                      <div
+                        key={lvl.id}
+                        className={`db-class-card ${isSelected ? "db-class-card--active" : ""}`}
+                        onClick={() => {
+                          setSelectedLevelId(isSelected ? "all" : lvl.id);
+                          setPage(1);
+                        }}
+                        role="button"
+                        tabIndex={0}
+                      >
+                        <div>
+                          <div className="db-class-card-top">
+                            <div className="db-class-card-icon">
+                              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M2 3a1 1 0 011-1h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3z" stroke="currentColor" strokeWidth="1.3"/>
+                                <path d="M5 6h6M5 9h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                              </svg>
+                            </div>
+                            {isSelected ? (
+                              <span className="db-class-card-badge">
+                                <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                Active Class
+                              </span>
+                            ) : (
+                              lvl.section?.name && (
+                                <span style={{ fontSize: 10.5, fontWeight: 500, color: "#9a8a7a", background: "var(--sp-light)", padding: "2px 6px", borderRadius: 4, border: "1px solid var(--sp-border)" }}>
+                                  {lvl.section.name}
+                                </span>
+                              )
+                            )}
+                          </div>
+                          <h4 className="db-class-card-name" title={lvl.name}>{lvl.name}</h4>
+                          <p className="db-class-card-section">{lvl.section?.name ? `${lvl.section.name} Arm` : "Class Section"}</p>
+                        </div>
+                        <div className="db-class-card-bottom">
+                          <div className="db-class-card-count">
+                            <span className="db-class-card-count-val">{count}</span>
+                            <span className="db-class-card-count-lbl">{count === 1 ? "Student" : "Students"}</span>
+                          </div>
+                          <span className="db-class-card-cta">
+                            {isSelected ? "Selected ✓" : "View Roster →"}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* ── Directory panel ── */}
             <div className="db-panel">
               <div className="db-panel-head">
@@ -1066,7 +1477,9 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
                   </div>
                   <div>
                     <p className="db-panel-title">Student Directory</p>
-                    <p className="db-panel-sub">Search by name or registration number.</p>
+                    <p className="db-panel-sub">
+                      {isTeacher ? "Your assigned students roster." : "Search by name or registration number."}
+                    </p>
                   </div>
                 </div>
 
@@ -1102,16 +1515,47 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
                     </svg>
                     Refresh
                   </button>
-                  <button className="db-sm-btn" onClick={() => setShowImportPanel(v => !v)}>
-                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 4l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 10v2h10v-2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    {showImportPanel ? "Close Import" : "Import Students"}
-                  </button>
-                  <button className="db-sm-btn db-sm-btn-primary" onClick={() => navigate("/students/register")}>
-                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>
-                    Add Student
-                  </button>
+                  {isAdmin && (
+                    <>
+                      <button className="db-sm-btn" onClick={() => setShowImportPanel(v => !v)}>
+                        <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 4l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 10v2h10v-2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        {showImportPanel ? "Close Import" : "Import Students"}
+                      </button>
+                      <button className="db-sm-btn db-sm-btn-primary" onClick={() => navigate("/students/register")}>
+                        <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>
+                        Add Student
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
+
+              {/* Active Class Filter Bar (Admin Only) */}
+              {isAdmin && selectedLevelId !== "all" && (
+                <div className="db-active-filter-bar">
+                  <div className="db-active-filter-text">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                      <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.4"/>
+                      <path d="M8 5v4M8 11.5v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                    </svg>
+                    <span>
+                      Filtered by Class: <strong>{levels.find((l) => l.id === selectedLevelId)?.name || `Class #${selectedLevelId}`}</strong>
+                      {` (${levels.find((l) => l.id === selectedLevelId)?.students_count ?? students.length} students)`}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="db-active-filter-clear"
+                    onClick={() => {
+                      setSelectedLevelId("all");
+                      setPage(1);
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+                    Clear Class Filter
+                  </button>
+                </div>
+              )}
 
               <div className="db-filter-tabs">
                 {[
@@ -1286,29 +1730,33 @@ const [processingWithdraw, setProcessingWithdraw] = useState(false);
                                   <circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.4"/>
                                 </svg>
                               </button>
-                              <button
-                                className="db-action-btn db-action-btn--withdraw"
-                                onClick={() => { setWithdrawingStudent(s); setConfirmWithdrawText(""); }}
-                                title={`Withdraw Student: ${fullName(s)}`}
-                                aria-label="Withdraw Student"
-                              >
-                                <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                                  <circle cx="6" cy="5" r="3" stroke="currentColor" strokeWidth="1.3"/>
-                                  <path d="M1 14c0-2.8 2.2-5 5-5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                                  <path d="M11 10l4 4M15 10l-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                                </svg>
-                              </button>
-                              <select
-                                className="db-status-select"
-                                value={["active", "alumni", "graduate"].includes(lifecycle) ? lifecycle : "active"}
-                                disabled={updatingLifecycleId === s.id}
-                                onChange={(e) => updateStudentLifecycle(s, e.target.value as "active" | "alumni" | "graduate")}
-                                title="Change student lifecycle status"
-                              >
-                                <option value="active">Active</option>
-                                <option value="alumni">Alumni</option>
-                                <option value="graduate">Graduate</option>
-                              </select>
+                              {isAdmin && (
+                                <>
+                                  <button
+                                    className="db-action-btn db-action-btn--withdraw"
+                                    onClick={() => { setWithdrawingStudent(s); setConfirmWithdrawText(""); }}
+                                    title={`Withdraw Student: ${fullName(s)}`}
+                                    aria-label="Withdraw Student"
+                                  >
+                                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                                      <circle cx="6" cy="5" r="3" stroke="currentColor" strokeWidth="1.3"/>
+                                      <path d="M1 14c0-2.8 2.2-5 5-5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                                      <path d="M11 10l4 4M15 10l-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                                    </svg>
+                                  </button>
+                                  <select
+                                    className="db-status-select"
+                                    value={["active", "alumni", "graduate"].includes(lifecycle) ? lifecycle : "active"}
+                                    disabled={updatingLifecycleId === s.id}
+                                    onChange={(e) => updateStudentLifecycle(s, e.target.value as "active" | "alumni" | "graduate")}
+                                    title="Change student lifecycle status"
+                                  >
+                                    <option value="active">Active</option>
+                                    <option value="alumni">Alumni</option>
+                                    <option value="graduate">Graduate</option>
+                                  </select>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>
