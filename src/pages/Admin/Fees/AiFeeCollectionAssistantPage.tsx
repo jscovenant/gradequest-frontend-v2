@@ -167,16 +167,16 @@ export default function AiFeeCollectionAssistantPage() {
         .fee-ai-main {
           background: #F8FAFC;
           min-height: 100vh;
-          padding: 24px 28px 0;
+          padding: 20px 24px 32px;
           overflow-x: hidden;
           font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
         }
         .fee-ai-hero {
           background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
           color: #fff;
-          border-radius: 18px;
-          padding: 32px 36px;
-          margin-bottom: 24px;
+          border-radius: 16px;
+          padding: 18px 24px;
+          margin-bottom: 18px;
           position: relative;
           overflow: hidden;
           box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
@@ -195,8 +195,8 @@ export default function AiFeeCollectionAssistantPage() {
         .fee-ai-kicker {
           display: inline-flex;
           align-items: center;
-          gap: 7px;
-          font-size: 11.5px;
+          gap: 6px;
+          font-size: 11px;
           font-weight: 700;
           letter-spacing: 0.04em;
           text-transform: uppercase;
@@ -204,20 +204,21 @@ export default function AiFeeCollectionAssistantPage() {
           background: rgba(217, 119, 6, 0.20);
           border: 1px solid rgba(217, 119, 6, 0.35);
           border-radius: 100px;
-          padding: 4px 12px;
-          margin-bottom: 12px;
+          padding: 3px 10px;
+          margin-bottom: 6px;
         }
         .fee-ai-title {
           font-weight: 800;
-          font-size: 26px;
-          margin: 6px 0 8px;
+          font-size: 20px;
+          margin: 0 0 4px;
           color: #fff;
+          line-height: 1.25;
         }
         .fee-ai-sub {
           max-width: 800px;
           color: #CBD5E1;
-          font-size: 13.5px;
-          line-height: 1.6;
+          font-size: 12.5px;
+          line-height: 1.45;
           margin: 0;
         }
         .fee-ai-grid {
