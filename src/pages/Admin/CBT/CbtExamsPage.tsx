@@ -58,6 +58,9 @@ type CbtSchedule = {
 type SchoolClass = {
   id: number;
   name: string;
+  section_id?: number | null;
+  department_id?: number | null;
+  section?: { id: number; name: string } | null;
 };
 
 type SchoolSection = {
@@ -73,9 +76,14 @@ type Department = {
 type Subject = {
   id: number;
   name: string;
+  subject_id?: string | null;
   department_id?: number | null;
   section_id?: number | null;
   class_id?: number | null;
+  section_name?: string | null;
+  department_name?: string | null;
+  section?: { id: number; name: string } | null;
+  department?: { id: number; name: string } | null;
 };
 
 const normalizeSubjectName = (name: string | undefined | null) => String(name || "").trim().toLowerCase();
@@ -94,11 +102,24 @@ const preferGeneralSubjects = (items: Subject[]) => {
       return Number(a.id || 0) - Number(b.id || 0);
     })
     .forEach((subject) => {
-      const key = normalizeSubjectName(subject.name);
+      const key = `${normalizeSubjectName(subject.name)}__${subject.section_id || 0}`;
       if (key && !chosen.has(key)) chosen.set(key, subject);
     });
 
   return Array.from(chosen.values()).sort((a, b) => a.name.localeCompare(b.name));
+};
+
+const getSubjectLabel = (subject: Subject) => {
+  const meta: string[] = [];
+  const secName = subject.section_name || subject.section?.name;
+  const deptName = subject.department_name || subject.department?.name;
+  if (secName) meta.push(secName);
+  if (deptName) meta.push(deptName);
+
+  if (meta.length > 0) {
+    return `${subject.name} (${meta.join(" - ")})`;
+  }
+  return subject.name;
 };
 
 type CbtOption = {
@@ -353,18 +374,45 @@ export default function CbtExamsPage() {
     const selectedDepartment = values.department_id ? Number(values.department_id) : null;
     const selectedSection = values.section_id ? Number(values.section_id) : null;
     const selectedClass = values.class_id ? Number(values.class_id) : null;
+    const currentSubjectId = values.subject_id ? Number(values.subject_id) : null;
 
-    return preferGeneralSubjects(subjects.filter((subject) => {
-      const subjectDepartment = Number(subject.department_id || 0);
-      if (selectedDepartment && subjectDepartment > 0 && subjectDepartment !== selectedDepartment) return false;
-      if (selectedSection && subject.section_id && Number(subject.section_id) !== selectedSection) return false;
-      if (selectedClass && subject.class_id && Number(subject.class_id) !== selectedClass) return false;
+    const classObj = selectedClass ? classes.find((c) => Number(c.id) === selectedClass) : null;
+    const classSectionId = classObj?.section_id ? Number(classObj.section_id) : null;
+    const effectiveSectionId = selectedSection || classSectionId;
+
+    const filtered = subjects.filter((subject) => {
+      if (currentSubjectId && subject.id === currentSubjectId) return true;
+
+      const subjectDepartment = subject.department_id ? Number(subject.department_id) : null;
+      const subjectSection = subject.section_id ? Number(subject.section_id) : null;
+      const subjectClass = subject.class_id ? Number(subject.class_id) : null;
+
+      // 1. Department filter:
+      // If a department is selected: match subjects for that department OR general subjects (subjectDepartment == null)
+      if (selectedDepartment && subjectDepartment && subjectDepartment !== selectedDepartment) {
+        return false;
+      }
+
+      // 2. Section filter:
+      // If effectiveSectionId is selected: match subjects for that section OR general section subjects (subjectSection == null)
+      if (effectiveSectionId && subjectSection && subjectSection !== effectiveSectionId) {
+        return false;
+      }
+
+      // 3. Class filter:
+      // If selectedClass is selected: match subjects assigned specifically to this class OR subjects for all classes in section (subjectClass == null or 0)
+      if (selectedClass && subjectClass && subjectClass !== 0 && subjectClass !== selectedClass) {
+        return false;
+      }
+
       return true;
-    }));
+    });
+
+    return preferGeneralSubjects(filtered);
   };
 
-  const createSubjects = useMemo(() => visibleSubjectsFor(form), [subjects, form.department_id, form.section_id, form.class_id]);
-  const settingsSubjects = useMemo(() => visibleSubjectsFor(settingsForm), [subjects, settingsForm.department_id, settingsForm.section_id, settingsForm.class_id]);
+  const createSubjects = useMemo(() => visibleSubjectsFor(form), [subjects, form.department_id, form.section_id, form.class_id, form.subject_id, classes]);
+  const settingsSubjects = useMemo(() => visibleSubjectsFor(settingsForm), [subjects, settingsForm.department_id, settingsForm.section_id, settingsForm.class_id, settingsForm.subject_id, classes]);
 
   const examPayload = (values: typeof emptyExam) => ({
     ...values,
@@ -378,23 +426,37 @@ export default function CbtExamsPage() {
   async function load() {
     setLoading(true);
     try {
-      const [examRes, classRes, sectionRes, departmentRes] = await Promise.all([
+      const [examRes, classRes, sectionRes, departmentRes, subjectRes] = await Promise.all([
         authApi.get("/cbt/exams"),
         authApi.get("/levels"),
         authApi.get("/sections"),
         authApi.get("/departments"),
+        authApi.get("/subjects/list").catch(() => authApi.get("/subjects")),
       ]);
       const departmentList = readList<Department>(departmentRes.data);
-      const subjectResponses = await Promise.all(
-        departmentList.map((department) =>
-          authApi.get(`/departments/${department.id}/subjects`).catch(() => ({ data: [] }))
-        )
-      );
-      const subjectMap = new Map<number, Subject>();
-      subjectResponses.forEach((response) => {
-        readList<Subject>(response.data).forEach((subject) => {
-          subjectMap.set(subject.id, { ...subject, department_id: subject.department_id ?? null });
-        });
+      const sectionList = readList<SchoolSection>(sectionRes.data);
+      const classList = Array.isArray(classRes.data) ? classRes.data : [];
+      const rawSubjects = readList<any>(subjectRes.data);
+
+      const sectionMap = new Map<number, string>(sectionList.map((s) => [s.id, s.name]));
+      const deptMap = new Map<number, string>(departmentList.map((d) => [d.id, d.name]));
+
+      const allSubjects: Subject[] = rawSubjects.map((s: any) => {
+        const secId = s.section_id ? Number(s.section_id) : null;
+        const deptId = s.department_id ? Number(s.department_id) : null;
+        const clsId = s.class_id ? Number(s.class_id) : null;
+        return {
+          id: Number(s.id),
+          name: String(s.name || ""),
+          subject_id: s.subject_id || null,
+          department_id: deptId,
+          section_id: secId,
+          class_id: clsId,
+          section_name: s.section_name || s.section?.name || (secId ? sectionMap.get(secId) : null) || null,
+          department_name: s.department_name || s.department?.name || (deptId ? deptMap.get(deptId) : null) || null,
+          section: s.section || (secId ? { id: secId, name: sectionMap.get(secId) || "" } : null),
+          department: s.department || (deptId ? { id: deptId, name: deptMap.get(deptId) || "" } : null),
+        };
       });
 
       const user = getUser();
@@ -405,21 +467,40 @@ export default function CbtExamsPage() {
         try {
           const tsRes = await authApi.get("/teacher-subjects");
           const assignments = readList<any>(tsRes.data);
-          const teacherSubjects = assignments
+          const teacherSubjectMap = new Map<number, Subject>();
+          assignments
             .filter((a: any) => Number(a.teacher_id) === Number(user?.id))
-            .map((a: any) => a.subject)
-            .filter(Boolean);
-          finalSubjects = preferGeneralSubjects(teacherSubjects);
+            .forEach((a: any) => {
+              if (a.subject?.id) {
+                const sub = a.subject;
+                const secId = sub.section_id ? Number(sub.section_id) : null;
+                const deptId = sub.department_id ? Number(sub.department_id) : null;
+                const clsId = sub.class_id ? Number(sub.class_id) : null;
+                teacherSubjectMap.set(Number(sub.id), {
+                  id: Number(sub.id),
+                  name: String(sub.name || ""),
+                  subject_id: sub.subject_id || null,
+                  department_id: deptId,
+                  section_id: secId,
+                  class_id: clsId,
+                  section_name: sub.section_name || sub.section?.name || (secId ? sectionMap.get(secId) : null) || null,
+                  department_name: sub.department_name || sub.department?.name || (deptId ? deptMap.get(deptId) : null) || null,
+                  section: sub.section || (secId ? { id: secId, name: sectionMap.get(secId) || "" } : null),
+                  department: sub.department || (deptId ? { id: deptId, name: deptMap.get(deptId) || "" } : null),
+                });
+              }
+            });
+          finalSubjects = teacherSubjectMap.size > 0 ? Array.from(teacherSubjectMap.values()) : allSubjects;
         } catch {
-          finalSubjects = preferGeneralSubjects(Array.from(subjectMap.values()));
+          finalSubjects = allSubjects;
         }
       } else {
-        finalSubjects = preferGeneralSubjects(Array.from(subjectMap.values()));
+        finalSubjects = allSubjects;
       }
 
       setExams(Array.isArray(examRes.data?.exams?.data) ? examRes.data.exams.data : []);
-      setClasses(Array.isArray(classRes.data) ? classRes.data : []);
-      setSections(readList<SchoolSection>(sectionRes.data));
+      setClasses(classList);
+      setSections(sectionList);
       setDepartments(departmentList);
       setSubjects(finalSubjects);
       authApi.get("/admin/ai/credits").then((r) => setAiCreditSummary(r.data?.data || null)).catch(() => undefined);
@@ -1386,7 +1467,20 @@ export default function CbtExamsPage() {
                       </div>
                       <div className="cbt-field">
                         <label className="cbt-label">Class</label>
-                        <select className="cbt-select" value={form.class_id} onChange={(e) => setForm((p) => ({ ...p, class_id: e.target.value }))}>
+                        <select
+                          className="cbt-select"
+                          value={form.class_id}
+                          onChange={(e) => {
+                            const nextClassId = e.target.value;
+                            const cls = classes.find((c) => String(c.id) === nextClassId);
+                            setForm((p) => ({
+                              ...p,
+                              class_id: nextClassId,
+                              section_id: cls?.section_id ? String(cls.section_id) : (nextClassId ? p.section_id : ""),
+                              subject_id: "",
+                            }));
+                          }}
+                        >
                           <option value="">All classes</option>
                           {classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                         </select>
@@ -1409,7 +1503,11 @@ export default function CbtExamsPage() {
                         <label className="cbt-label">Subject</label>
                         <select className="cbt-select" value={form.subject_id} onChange={(e) => setForm((p) => ({ ...p, subject_id: e.target.value }))}>
                           <option value="">Select subject</option>
-                          {createSubjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                          {createSubjects.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {getSubjectLabel(item)}
+                            </option>
+                          ))}
                         </select>
                       </div>
                       <div className="cbt-field">
@@ -1851,21 +1949,34 @@ export default function CbtExamsPage() {
                         </div>
                         <div className="cbt-field">
                           <label className="cbt-label">Class</label>
-                          <select className="cbt-select" value={settingsForm.class_id} disabled={!examDetail || selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, class_id: e.target.value }))}>
+                          <select
+                            className="cbt-select"
+                            value={settingsForm.class_id}
+                            disabled={!examDetail || selectedIsPublished}
+                            onChange={(e) => {
+                              const nextClassId = e.target.value;
+                              const cls = classes.find((c) => String(c.id) === nextClassId);
+                              setSettingsForm((p) => ({
+                                ...p,
+                                class_id: nextClassId,
+                                section_id: cls?.section_id ? String(cls.section_id) : (nextClassId ? p.section_id : ""),
+                              }));
+                            }}
+                          >
                             <option value="">All classes</option>
                             {classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                           </select>
                         </div>
                         <div className="cbt-field">
                           <label className="cbt-label">Section</label>
-                          <select className="cbt-select" value={settingsForm.section_id} disabled={!examDetail || selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, section_id: e.target.value, subject_id: "" }))}>
+                          <select className="cbt-select" value={settingsForm.section_id} disabled={!examDetail || selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, section_id: e.target.value }))}>
                             <option value="">All sections</option>
                             {sections.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                           </select>
                         </div>
                         <div className="cbt-field">
                           <label className="cbt-label">Department</label>
-                          <select className="cbt-select" value={settingsForm.department_id} disabled={!examDetail || selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, department_id: e.target.value, subject_id: "" }))}>
+                          <select className="cbt-select" value={settingsForm.department_id} disabled={!examDetail || selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, department_id: e.target.value }))}>
                             <option value="">General Department / Common Subjects</option>
                             {departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                           </select>
@@ -1874,7 +1985,11 @@ export default function CbtExamsPage() {
                           <label className="cbt-label">Subject</label>
                           <select className="cbt-select" value={settingsForm.subject_id} disabled={!examDetail || selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, subject_id: e.target.value }))}>
                             <option value="">Select subject</option>
-                            {settingsSubjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                            {settingsSubjects.map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {getSubjectLabel(item)}
+                              </option>
+                            ))}
                           </select>
                         </div>
                         <div className="cbt-field">
@@ -2024,7 +2139,20 @@ export default function CbtExamsPage() {
                 </div>
                 <div className="cbt-field">
                   <label className="cbt-label">Class</label>
-                  <select className="cbt-select" value={form.class_id} onChange={(e) => setForm((p) => ({ ...p, class_id: e.target.value }))}>
+                  <select
+                    className="cbt-select"
+                    value={form.class_id}
+                    onChange={(e) => {
+                      const nextClassId = e.target.value;
+                      const cls = classes.find((c) => String(c.id) === nextClassId);
+                      setForm((p) => ({
+                        ...p,
+                        class_id: nextClassId,
+                        section_id: cls?.section_id ? String(cls.section_id) : (nextClassId ? p.section_id : ""),
+                        subject_id: "",
+                      }));
+                    }}
+                  >
                     <option value="">All classes</option>
                     {classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                   </select>
@@ -2047,7 +2175,11 @@ export default function CbtExamsPage() {
                   <label className="cbt-label">Subject</label>
                   <select className="cbt-select" value={form.subject_id} onChange={(e) => setForm((p) => ({ ...p, subject_id: e.target.value }))}>
                     <option value="">Select subject</option>
-                    {createSubjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                    {createSubjects.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {getSubjectLabel(item)}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="cbt-field">
@@ -2118,10 +2250,10 @@ export default function CbtExamsPage() {
               <div className="cbt-section-label">Basics</div>
               <div className="cbt-form-grid">
                 <div className="cbt-field cbt-field-full"><label className="cbt-label">Exam title</label><input className="cbt-input" value={settingsForm.title} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, title: e.target.value }))} required /></div>
-                <div className="cbt-field"><label className="cbt-label">Class</label><select className="cbt-select" value={settingsForm.class_id} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, class_id: e.target.value }))}><option value="">All classes</option>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
-                <div className="cbt-field"><label className="cbt-label">Section</label><select className="cbt-select" value={settingsForm.section_id} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, section_id: e.target.value, subject_id: "" }))}><option value="">All sections</option>{sections.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
-                <div className="cbt-field"><label className="cbt-label">Department</label><select className="cbt-select" value={settingsForm.department_id} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, department_id: e.target.value, subject_id: "" }))}><option value="">General Department / Common Subjects</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
-                <div className="cbt-field"><label className="cbt-label">Subject</label><select className="cbt-select" value={settingsForm.subject_id} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, subject_id: e.target.value }))}><option value="">{settingsForm.department_id ? "Select subject" : "Select general subject"}</option>{settingsSubjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
+                <div className="cbt-field"><label className="cbt-label">Class</label><select className="cbt-select" value={settingsForm.class_id} disabled={selectedIsPublished} onChange={(e) => { const nextClassId = e.target.value; const cls = classes.find((c) => String(c.id) === nextClassId); setSettingsForm((p) => ({ ...p, class_id: nextClassId, section_id: cls?.section_id ? String(cls.section_id) : (nextClassId ? p.section_id : "") })); }}><option value="">All classes</option>{classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
+                <div className="cbt-field"><label className="cbt-label">Section</label><select className="cbt-select" value={settingsForm.section_id} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, section_id: e.target.value }))}><option value="">All sections</option>{sections.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
+                <div className="cbt-field"><label className="cbt-label">Department</label><select className="cbt-select" value={settingsForm.department_id} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, department_id: e.target.value }))}><option value="">General Department / Common Subjects</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
+                <div className="cbt-field"><label className="cbt-label">Subject</label><select className="cbt-select" value={settingsForm.subject_id} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, subject_id: e.target.value }))}><option value="">Select subject</option>{settingsSubjects.map((item) => <option key={item.id} value={item.id}>{getSubjectLabel(item)}</option>)}</select></div>
                 <div className="cbt-field"><label className="cbt-label">Mode</label><select className="cbt-select" value={settingsForm.delivery_mode} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, delivery_mode: e.target.value as any }))}><option value="online">Online</option><option value="offline">Offline/LAN</option><option value="hybrid">Online and Offline</option></select></div>
                 <div className="cbt-field"><label className="cbt-label">Duration</label><input className="cbt-input" type="number" min={1} value={settingsForm.duration_minutes} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, duration_minutes: Number(e.target.value) }))} /></div>
               </div>
