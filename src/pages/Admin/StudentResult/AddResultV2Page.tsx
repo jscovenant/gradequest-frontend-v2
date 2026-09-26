@@ -496,11 +496,37 @@ export default function AddResultV2Page() {
       setSubjects(subjs);
       if (st.level?.id) setSelectedClassId(st.level.id);
 
-      if (data.term) setTerm(data.term);
-      if (data.session) setSession(data.session);
+      const targetTerm = data.term || term;
+      const targetSession = data.session || session;
+      if (targetTerm) setTerm(targetTerm);
+      if (targetSession) setSession(targetSession);
       setDepartment(st.department?.name || data.student?.department?.name || "");
 
-      // init scores
+      // Check if batch is already resolved or existing
+      let resolvedBatchId = data.batch_id || batchId;
+
+      if (!resolvedBatchId && st.school_id && st.level?.id && targetTerm && targetSession) {
+        try {
+          const batchRes = await authApi.post("/result-batches/resolve", {
+            school_id: st.school_id,
+            class_id: st.level.id,
+            term: targetTerm,
+            session: targetSession,
+          });
+          resolvedBatchId = batchRes.data?.batch?.id;
+        } catch {
+          // ignore
+        }
+      }
+
+      if (resolvedBatchId) {
+        setBatchId(resolvedBatchId);
+        await loadStudentInBatch(resolvedBatchId, st.id);
+        showSuccess(`Loaded saved result for ${st.firstname} ${st.surname} ✅`);
+        return;
+      }
+
+      // If no batch exists yet, initialize fresh score state
       const init: ScoresState = {};
       for (const s of subjs) {
         init[s.name] = { subject_id: s.id, ca: {}, exam: undefined, total: undefined, grade: "", remark: "" };
@@ -520,27 +546,6 @@ export default function AddResultV2Page() {
         }));
       } else {
         setAutoAttendance(null);
-      }
-
-      // Automatically resolve batch for this student's class
-      if (st.school_id && st.level?.id && (data.term || term) && (data.session || session)) {
-        try {
-          const batchRes = await authApi.post("/result-batches/resolve", {
-            school_id: st.school_id,
-            class_id: st.level.id,
-            term: data.term || term,
-            session: data.session || session,
-          });
-          if (batchRes.data?.batch?.id) {
-            setBatchId(batchRes.data.batch.id);
-            const formRes = await authApi.get(`/result-batches/${batchRes.data.batch.id}/students/${st.id}/result-form`);
-            setReportColumnPolicy(formRes.data?.report_column_policy ?? null);
-            setSchoolTerms(formRes.data?.terms ?? []);
-            setCarryPreview(formRes.data?.carry_over_preview ?? {});
-          }
-        } catch {
-          // ignore
-        }
       }
 
       setStep(2);
