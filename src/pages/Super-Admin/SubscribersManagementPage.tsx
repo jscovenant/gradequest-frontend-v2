@@ -352,15 +352,12 @@ export default function SubscribersManagementPage() {
         }
       `}</style>
 
-      <div className="container-fluid position-relative bg-white d-flex p-0">
-        <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-
-        <div className="content flex-grow-1 d-flex flex-column min-vh-100">
-          <TopNav setSidebarOpen={setSidebarOpen} />
-
-          {loading && <Loader message="Loading registered schools..." />}
-
-          <main className="container-fluid px-3 px-md-4 py-4 flex-grow-1">
+      <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title="Registered Schools & Subscribers" />
+      <div className="container-fluid">
+        <div className="row">
+          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+          <main className="col-md-9 col-lg-10 ms-auto db-main p-3 p-md-4 d-flex flex-column min-vh-100">
+            {loading && <Loader message="Loading registered schools..." />}
             {/* HERO HEADER */}
             <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
               <div>

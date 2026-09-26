@@ -514,12 +514,10 @@ export default function BillingPolicyPage() {
         .bp-flag { font-size: 11px; font-weight: 700; color: #b91c1c; background: #fee2e2; border-radius: 999px; padding: 2px 8px; display: inline-block; margin: 2px 4px 0 0; }
       `}</style>
 
-      <div className="container-fluid position-relative bg-white d-flex p-0">
-        <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-
-        <div className="content flex-grow-1 d-flex flex-column min-vh-100">
-          <TopNav setSidebarOpen={setSidebarOpen} />
-
+      <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title="Billing Policy" />
+      <div className="container-fluid">
+        <div className="row">
+          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
           <main className="col-md-9 col-lg-10 ms-auto db-main bp-main">
             {(loading || saving) && <Loader message={saving ? "Saving billing policy..." : "Loading billing policy..."} />}
 
