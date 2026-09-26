@@ -792,7 +792,7 @@ function App() {
                     <Route
                       path="/store/pos"
                       element={
-                        <RequireAuth roles={["Admin", "Bursar", "Super-Admin", "Platform-Staff", "Teacher"]}>
+                        <RequireAuth roles={["Admin", "Bursar"]}>
                           <StorePosPage />
                         </RequireAuth>
                       }
@@ -800,7 +800,7 @@ function App() {
                     <Route
                       path="/store/inventory"
                       element={
-                        <RequireAuth roles={["Admin", "Bursar", "Super-Admin", "Platform-Staff", "Teacher"]}>
+                        <RequireAuth roles={["Admin", "Bursar"]}>
                           <StoreInventoryPage />
                         </RequireAuth>
                       }
@@ -808,7 +808,7 @@ function App() {
                     <Route
                       path="/store/categories"
                       element={
-                        <RequireAuth roles={["Admin", "Bursar", "Super-Admin", "Platform-Staff", "Teacher"]}>
+                        <RequireAuth roles={["Admin", "Bursar"]}>
                           <StoreCategoriesPage />
                         </RequireAuth>
                       }
@@ -816,7 +816,7 @@ function App() {
                     <Route
                       path="/store/sales"
                       element={
-                        <RequireAuth roles={["Admin", "Bursar", "Super-Admin", "Platform-Staff", "Teacher"]}>
+                        <RequireAuth roles={["Admin", "Bursar"]}>
                           <StoreSalesPage />
                         </RequireAuth>
                       }

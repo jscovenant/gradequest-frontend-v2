@@ -343,7 +343,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       label: "Store & POS",
       icon: "cart3",
       collapseId: "storeMenu",
-      roles: ["Admin", "Bursar", "Super-Admin", "Platform-Staff", "Teacher"],
+      roles: ["Admin", "Bursar"],
       children: [
         { label: "Point of Sale (POS)", href: "/store/pos" },
         { label: "Inventory & Stock", href: "/store/inventory" },
