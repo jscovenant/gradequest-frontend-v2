@@ -305,6 +305,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
         { label: "Sessions & Terms", href: "/academics/calendar" },
         { label: "Departments", href: "/departments" },
         { label: "Sections", href: "/sections" },
+        { label: "Grading Scale", href: "/grading-scale" },
       ],
       roles: ["Admin"],
     },

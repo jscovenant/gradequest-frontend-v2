@@ -70,6 +70,7 @@ const LevelsPage = lazyWithRetry(() => import("./pages/Admin/Level/LevelsPage"))
 const SubjectsPage = lazyWithRetry(() => import("./pages/Admin/Subjects/SubjectsPage"));
 const DepartmentPage = lazyWithRetry(() => import("./pages/Admin/Academics/DepartmentPage"));
 const SectionsPage = lazyWithRetry(() => import("./pages/Admin/Academics/SectionsPage"));
+const GradingScalePage = lazyWithRetry(() => import("./pages/Admin/Academics/GradingScalePage"));
 
 const StorePosPage = lazyWithRetry(() => import("./pages/Admin/Store/StorePosPage"));
 const StoreInventoryPage = lazyWithRetry(() => import("./pages/Admin/Store/StoreInventoryPage"));
@@ -760,6 +761,28 @@ function App() {
               <RequireAuth roles={["Admin"]}>
                 <OnboardingGuard>
                   <SectionsPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/grading-scale"
+            element={
+              <RequireAuth roles={["Admin"]}>
+                <OnboardingGuard>
+                  <GradingScalePage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/academics/grading-scale"
+            element={
+              <RequireAuth roles={["Admin"]}>
+                <OnboardingGuard>
+                  <GradingScalePage />
                 </OnboardingGuard>
               </RequireAuth>
             }
