@@ -877,7 +877,7 @@ export default function GradingScalePage() {
                       How Section Grading Works
                     </div>
                     <p className="text-muted small mb-0" style={{ lineHeight: 1.5, fontSize: "0.8rem" }}>
-                      When results are computed, GradeQuest matches each student to their section's grading rules. If a section is toggled off, letter grades (e.g. A1, B, C) are suppressed on the report card while showing raw CA & Exam marks.
+                      When results are computed, SchoolProfit matches each student to their section's grading rules. If a section is toggled off, letter grades (e.g. A1, B, C) are suppressed on the report card while showing raw CA & Exam marks.
                     </p>
                   </div>
                 </div>
