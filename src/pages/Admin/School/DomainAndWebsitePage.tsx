@@ -136,9 +136,53 @@ export default function DomainAndWebsitePage() {
     { name: "Charcoal Platinum", primary: "#18181B", secondary: "#64748B", accent: "#3B82F6" },
   ];
 
+  const [retryingOrderId, setRetryingOrderId] = useState<number | null>(null);
+
   useEffect(() => {
-    fetchInitialData();
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("reference");
+    if (ref) {
+      setActiveTab("domain");
+      verifyDomainOrder(ref);
+    } else {
+      fetchInitialData();
+    }
   }, []);
+
+  const verifyDomainOrder = async (reference: string) => {
+    setLoading(true);
+    try {
+      const res = await authApi.get(`/admin/domain-orders/verify/${reference}`);
+      if (res.data.status) {
+        showSuccess?.(res.data.message || "Domain payment confirmed and configured!");
+      } else {
+        showWarning?.(res.data.message || "Domain order verification pending.");
+      }
+    } catch (err: any) {
+      showError?.(err?.response?.data?.message || "Failed to verify domain payment.");
+    } finally {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      fetchInitialData();
+    }
+  };
+
+  const handleRetryProvision = async (orderId: number) => {
+    setRetryingOrderId(orderId);
+    try {
+      showInfo?.("Triggering domain registration with Whogohost...");
+      const res = await authApi.post(`/admin/domain-orders/${orderId}/retry-provision`);
+      if (res.data.status) {
+        showSuccess?.(res.data.message || "Domain registration action completed!");
+        fetchInitialData();
+      } else {
+        showError?.(res.data.message || "Provisioning attempt failed.");
+      }
+    } catch (err: any) {
+      showError?.(err?.response?.data?.message || "Failed to communicate with domain registrar.");
+    } finally {
+      setRetryingOrderId(null);
+    }
+  };
 
   const fetchInitialData = async () => {
     setLoading(true);
@@ -1789,126 +1833,267 @@ export default function DomainAndWebsitePage() {
             {/* TAB 11: CUSTOM DOMAIN & DNS */}
             {/* ══════════════════════════════════════════════════════════ */}
             {activeTab === "domain" && (
-              <div className="row g-4">
-                <div className="col-12 col-lg-8">
-                  {/* Search Card */}
-                  <div className="db-panel">
-                    <div className="db-panel-head">
+              <div className="d-flex flex-column gap-4">
+                {/* Active Custom Domain Showcase */}
+                {domainStatus?.school?.custom_domain && (
+                  <div className="db-panel" style={{ border: "2px solid #10B981" }}>
+                    <div className="db-panel-head bg-success bg-opacity-10">
                       <div>
-                        <h4 className="db-panel-title">Search & Register a Custom Domain</h4>
-                        <p className="db-panel-sub">Get your official school web address (e.g. yourschool.com.ng) with instant Paystack checkout & SSL.</p>
-                      </div>
-                      <span className="db-pill bg-light text-dark border">
-                        <i className="bi bi-credit-card me-1 text-success"></i> Paystack Powered
-                      </span>
-                    </div>
-
-                    <div className="p-4">
-                      <form onSubmit={handleSearchDomain} className="mb-4">
-                        <label className="form-label fw-bold small text-dark">Enter your desired school domain name:</label>
-                        <div className="input-group">
-                          <span className="input-group-text bg-white"><i className="bi bi-search text-muted"></i></span>
-                          <input
-                            type="text"
-                            className="form-control form-control-lg"
-                            placeholder="e.g. kingscollege or greatacademy"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                          />
-                          <button className="btn btn-warning px-4 fw-bold" type="submit" disabled={searchingDomain}>
-                            {searchingDomain ? "Checking..." : "Search Availability"}
-                          </button>
+                        <div className="badge bg-success mb-1">
+                          <i className="bi bi-shield-check me-1"></i> Live & Active
                         </div>
-                      </form>
-
-                      {/* Suggestions List */}
-                      {domainSuggestions.length > 0 && (
-                        <div className="mt-4">
-                          <h6 className="fw-bold mb-3 text-dark">Available Domain Options:</h6>
-                          <div className="d-flex flex-column gap-3">
-                            {domainSuggestions.map((item, idx) => (
-                              <div
-                                key={idx}
-                                className="p-3 border rounded-3 d-flex flex-wrap align-items-center justify-content-between gap-3 bg-white shadow-sm"
-                                style={{ borderColor: item.popular ? "#D97706" : "#E2E8F0" }}
-                              >
-                                <div>
-                                  <div className="d-flex align-items-center gap-2">
-                                    <span className="fs-5 fw-bold text-dark">{item.domain}</span>
-                                    {item.popular && <span className="badge bg-warning text-dark small">Recommended</span>}
-                                    <span className="badge bg-success bg-opacity-10 text-success small">Available</span>
-                                  </div>
-                                  <div className="text-muted small mt-1">{item.label} • Includes free SSL & hosting</div>
-                                </div>
-
-                                <div className="d-flex align-items-center gap-3">
-                                  <div className="text-end">
-                                    <div className="fs-5 fw-bold text-dark">₦{Number(item.price).toLocaleString()}</div>
-                                    <div className="text-muted small">/ year</div>
-                                  </div>
-                                  <button
-                                    className="btn btn-warning fw-bold px-3 py-2"
-                                    onClick={() => handlePurchaseDomain(item)}
-                                    disabled={purchasingDomain === item.domain}
-                                  >
-                                    {purchasingDomain === item.domain ? "Processing..." : "Buy via Paystack"}
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
+                        <h4 className="db-panel-title text-success">
+                          Active School Domain: {domainStatus.school.custom_domain}
+                        </h4>
+                        <p className="db-panel-sub text-dark">
+                          Your custom school domain is live, secured with automated Let's Encrypt SSL, and fully configured.
+                        </p>
+                      </div>
+                      <a
+                        href={`https://${domainStatus.school.custom_domain}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-success fw-bold text-white px-3"
+                      >
+                        <i className="bi bi-box-arrow-up-right me-1"></i> Visit Live Portal
+                      </a>
+                    </div>
+                    <div className="p-4">
+                      <div className="row g-3">
+                        <div className="col-12 col-md-4">
+                          <div className="p-3 bg-light rounded-3 border">
+                            <div className="small text-muted fw-bold">Primary Domain:</div>
+                            <div className="fs-6 fw-bold text-dark">{domainStatus.school.custom_domain}</div>
                           </div>
                         </div>
-                      )}
+                        <div className="col-12 col-md-4">
+                          <div className="p-3 bg-light rounded-3 border">
+                            <div className="small text-muted fw-bold">SSL Certificate:</div>
+                            <div className="fs-6 fw-bold text-success">
+                              <i className="bi bi-lock-fill me-1"></i> HTTPS Enabled (Active)
+                            </div>
+                          </div>
+                        </div>
+                        <div className="col-12 col-md-4">
+                          <div className="p-3 bg-light rounded-3 border">
+                            <div className="small text-muted fw-bold">Nameservers:</div>
+                            <div className="small text-dark font-monospace">ns1.schoolprofit.ng, ns2.schoolprofit.ng</div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
+                )}
 
-                  {/* Connect Existing Domain */}
+                {/* Domain Orders & Provisioning Log */}
+                {domainStatus?.orders && domainStatus.orders.length > 0 && (
                   <div className="db-panel">
                     <div className="db-panel-head">
                       <div>
-                        <h4 className="db-panel-title">Already Own a Domain?</h4>
-                        <p className="db-panel-sub">Connect a domain you already registered elsewhere (Namecheap, GoDaddy, Whogohost).</p>
+                        <h4 className="db-panel-title">
+                          <i className="bi bi-clock-history me-1 text-primary"></i> Domain Purchase & Provisioning Log
+                        </h4>
+                        <p className="db-panel-sub">Track real-time registrar status and renewal schedules for your domains.</p>
                       </div>
                     </div>
-                    <div className="p-4">
-                      <form onSubmit={handleConnectExisting} className="d-flex gap-2">
-                        <input
-                          type="text"
-                          className="form-control"
-                          placeholder="e.g. www.yourschool.com"
-                          value={existingDomainInput}
-                          onChange={(e) => setExistingDomainInput(e.target.value)}
-                        />
-                        <button className="btn btn-outline-dark fw-bold text-nowrap" type="submit" disabled={connectingExisting}>
-                          {connectingExisting ? "Connecting..." : "Connect Domain"}
-                        </button>
-                      </form>
+                    <div className="p-0 table-responsive">
+                      <table className="table table-hover align-middle mb-0">
+                        <thead className="table-light small text-uppercase">
+                          <tr>
+                            <th className="ps-4">Domain Name</th>
+                            <th>Term</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            <th className="pe-4 text-end">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {domainStatus.orders.map((ord: any) => (
+                            <tr key={ord.id}>
+                              <td className="ps-4 fw-bold text-dark">
+                                {ord.domain_name}
+                                {ord.registrar_name && (
+                                  <div className="text-muted small fw-normal">
+                                    Registrar: <span className="badge bg-secondary bg-opacity-25 text-dark">{ord.registrar_name}</span>
+                                  </div>
+                                )}
+                              </td>
+                              <td>{ord.duration_years} Year{ord.duration_years > 1 ? "s" : ""}</td>
+                              <td className="fw-bold">₦{Number(ord.amount).toLocaleString()}</td>
+                              <td>
+                                {ord.status === "active" && (
+                                  <span className="badge bg-success">Active & Registered ✓</span>
+                                )}
+                                {ord.status === "provisioning_pending" && (
+                                  <span className="badge bg-warning text-dark">
+                                    <i className="bi bi-hourglass-split me-1"></i> Provisioning Queued
+                                  </span>
+                                )}
+                                {ord.status === "pending_payment" && (
+                                  <span className="badge bg-secondary">Pending Payment</span>
+                                )}
+                                {ord.status === "failed" && (
+                                  <span className="badge bg-danger">Registration Failed</span>
+                                )}
+                              </td>
+                              <td className="small text-muted">
+                                {ord.created_at ? new Date(ord.created_at).toLocaleDateString() : "-"}
+                              </td>
+                              <td className="pe-4 text-end">
+                                {ord.status === "provisioning_pending" || ord.status === "failed" ? (
+                                  <button
+                                    className="btn btn-warning btn-sm fw-bold"
+                                    onClick={() => handleRetryProvision(ord.id)}
+                                    disabled={retryingOrderId === ord.id}
+                                  >
+                                    {retryingOrderId === ord.id ? "Registering..." : "Retry Provision"}
+                                  </button>
+                                ) : (
+                                  <span className="text-muted small">Managed</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
-                </div>
+                )}
 
-                {/* Right Column: DNS Setup */}
-                <div className="col-12 col-lg-4">
-                  <div className="db-panel">
-                    <div className="db-panel-head">
-                      <div>
-                        <h4 className="db-panel-title">DNS Setup Records</h4>
-                        <p className="db-panel-sub">Point these records in your DNS manager.</p>
+                <div className="row g-4">
+                  <div className="col-12 col-lg-8">
+                    {/* Search & Register Card */}
+                    <div className="db-panel">
+                      <div className="db-panel-head">
+                        <div>
+                          <h4 className="db-panel-title">Search & Register a Custom Domain</h4>
+                          <p className="db-panel-sub">
+                            Get your official school web address (e.g. yourschool.com.ng, .sch.ng, .ng, .com) with instant Paystack checkout & automated Whogohost setup.
+                          </p>
+                        </div>
+                        <span className="db-pill bg-light text-dark border">
+                          <i className="bi bi-credit-card me-1 text-success"></i> Paystack Powered
+                        </span>
+                      </div>
+
+                      <div className="p-4">
+                        <form onSubmit={handleSearchDomain} className="mb-4">
+                          <label className="form-label fw-bold small text-dark">Enter your desired school domain name:</label>
+                          <div className="input-group">
+                            <span className="input-group-text bg-white"><i className="bi bi-search text-muted"></i></span>
+                            <input
+                              type="text"
+                              className="form-control form-control-lg"
+                              placeholder="e.g. kingscollege or greatacademy"
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                            <button className="btn btn-warning px-4 fw-bold" type="submit" disabled={searchingDomain}>
+                              {searchingDomain ? "Checking Registrar..." : "Search Availability"}
+                            </button>
+                          </div>
+                        </form>
+
+                        {/* Suggestions List */}
+                        {domainSuggestions.length > 0 && (
+                          <div className="mt-4">
+                            <h6 className="fw-bold mb-3 text-dark">Registrar Availability & Pricing:</h6>
+                            <div className="d-flex flex-column gap-3">
+                              {domainSuggestions.map((item, idx) => (
+                                <div
+                                  key={idx}
+                                  className="p-3 border rounded-3 d-flex flex-wrap align-items-center justify-content-between gap-3 bg-white shadow-sm"
+                                  style={{ borderColor: item.popular ? "#D97706" : "#E2E8F0" }}
+                                >
+                                  <div>
+                                    <div className="d-flex align-items-center gap-2">
+                                      <span className="fs-5 fw-bold text-dark">{item.domain}</span>
+                                      {item.popular && <span className="badge bg-warning text-dark small">Recommended</span>}
+                                      {item.available ? (
+                                        <span className="badge bg-success bg-opacity-10 text-success small">Available ✓</span>
+                                      ) : (
+                                        <span className="badge bg-danger bg-opacity-10 text-danger small">Taken / Registered</span>
+                                      )}
+                                    </div>
+                                    <div className="text-muted small mt-1">{item.label} • Includes free automated SSL & cloud routing</div>
+                                  </div>
+
+                                  <div className="d-flex align-items-center gap-3">
+                                    <div className="text-end">
+                                      <div className="fs-5 fw-bold text-dark">₦{Number(item.price).toLocaleString()}</div>
+                                      <div className="text-muted small">/ year</div>
+                                    </div>
+                                    {item.available ? (
+                                      <button
+                                        className="btn btn-warning fw-bold px-3 py-2"
+                                        onClick={() => handlePurchaseDomain(item)}
+                                        disabled={purchasingDomain === item.domain}
+                                      >
+                                        {purchasingDomain === item.domain ? "Initializing..." : "Buy via Paystack"}
+                                      </button>
+                                    ) : (
+                                      <button className="btn btn-secondary btn-sm" disabled>
+                                        Unavailable
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <div className="p-4 small">
-                      <p className="text-muted">If connecting an existing domain, configure these two DNS records in your domain control panel:</p>
-                      <div className="p-3 bg-light rounded-3 mb-3 border">
-                        <div className="fw-bold text-dark">Record 1 (Root Domain):</div>
-                        <div className="text-muted mt-1">Type: <code>A</code></div>
-                        <div className="text-muted">Host: <code>@</code></div>
-                        <div className="text-dark fw-bold">Value: <code>18.133.82.13</code></div>
+
+                    {/* Connect Existing Domain */}
+                    <div className="db-panel">
+                      <div className="db-panel-head">
+                        <div>
+                          <h4 className="db-panel-title">Already Own a Domain?</h4>
+                          <p className="db-panel-sub">Connect a domain you already purchased from Whogohost, Namecheap, or GoDaddy.</p>
+                        </div>
                       </div>
-                      <div className="p-3 bg-light rounded-3 border">
-                        <div className="fw-bold text-dark">Record 2 (Subdomain):</div>
-                        <div className="text-muted mt-1">Type: <code>CNAME</code></div>
-                        <div className="text-muted">Host: <code>www</code></div>
-                        <div className="text-dark fw-bold">Value: <code>portal.schoolprofit.ng</code></div>
+                      <div className="p-4">
+                        <form onSubmit={handleConnectExisting} className="d-flex gap-2">
+                          <input
+                            type="text"
+                            className="form-control"
+                            placeholder="e.g. www.yourschool.sch.ng"
+                            value={existingDomainInput}
+                            onChange={(e) => setExistingDomainInput(e.target.value)}
+                          />
+                          <button className="btn btn-outline-dark fw-bold text-nowrap" type="submit" disabled={connectingExisting}>
+                            {connectingExisting ? "Connecting..." : "Connect Domain"}
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: DNS Setup */}
+                  <div className="col-12 col-lg-4">
+                    <div className="db-panel">
+                      <div className="db-panel-head">
+                        <div>
+                          <h4 className="db-panel-title">DNS Setup Records</h4>
+                          <p className="db-panel-sub">Point these records in your DNS manager.</p>
+                        </div>
+                      </div>
+                      <div className="p-4 small">
+                        <p className="text-muted">If connecting an external domain, configure these two DNS records in your domain control panel:</p>
+                        <div className="p-3 bg-light rounded-3 mb-3 border">
+                          <div className="fw-bold text-dark">Record 1 (Root Domain):</div>
+                          <div className="text-muted mt-1">Type: <code>A</code></div>
+                          <div className="text-muted">Host: <code>@</code></div>
+                          <div className="text-dark fw-bold">Value: <code>18.133.82.13</code></div>
+                        </div>
+                        <div className="p-3 bg-light rounded-3 border">
+                          <div className="fw-bold text-dark">Record 2 (Subdomain / Portal):</div>
+                          <div className="text-muted mt-1">Type: <code>CNAME</code></div>
+                          <div className="text-muted">Host: <code>www</code> (or <code>portal</code>)</div>
+                          <div className="text-dark fw-bold">Value: <code>portal.schoolprofit.ng</code></div>
+                        </div>
                       </div>
                     </div>
                   </div>
