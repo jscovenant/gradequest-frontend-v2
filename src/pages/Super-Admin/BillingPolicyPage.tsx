@@ -49,6 +49,7 @@ type Policy = {
   default_bank_charge_amount?: number | string;
   promo_target_tier?: string;
   promo_discount_percent?: number | string;
+  domain_pricing?: Record<string, { price: number | string; label?: string }>;
 };
 
 type School = { id: number; school_name?: string | null };
@@ -165,6 +166,13 @@ const defaultPolicy: Policy = {
   promo_claims_count: 0,
   sales_partner_term_1_commission_rate: 30,
   sales_partner_retention_commission_rate: 12,
+  domain_pricing: {
+    ".com.ng": { price: 35000, label: ".com.ng (Nigeria Commercial/Standard)" },
+    ".sch.ng": { price: 35000, label: ".sch.ng (Official Academic)" },
+    ".ng": { price: 45000, label: ".ng (Direct National Pride)" },
+    ".com": { price: 50000, label: ".com (Global Commercial)" },
+    ".org": { price: 55000, label: ".org (Global Organization)" },
+  },
 };
 
 function fmtDate(value?: string | null) {
@@ -295,6 +303,7 @@ export default function BillingPolicyPage() {
         promo_starts_at: policy.promo_starts_at || null,
         promo_ends_at: policy.promo_ends_at || null,
         promo_max_claims: policy.promo_max_claims ? Number(policy.promo_max_claims) : null,
+        domain_pricing: policy.domain_pricing || defaultPolicy.domain_pricing,
       };
       const res = await authApi.put("/superadmin/billing-policy", payload);
       setPolicy({ ...defaultPolicy, ...(res.data.policy || {}) });
@@ -526,12 +535,20 @@ export default function BillingPolicyPage() {
           <main className="col-md-9 col-lg-10 ms-auto db-main bp-main">
             {(loading || saving) && <Loader message={saving ? "Saving billing policy..." : "Loading billing policy..."} />}
 
-            <section className="bp-hero">
-              <div className="bp-kicker">SchoolProfit Revenue & Platform Policy</div>
-              <h1 className="bp-title">Platform Billing & Tier Policy</h1>
-              <p className="bp-sub">
-                Configure per-student edition tier prices, free welcome AI & WhatsApp starter packs, standard bank processing charges, sales partner commissions, and temporary access grants.
-              </p>
+            <section className="bp-hero d-flex justify-content-between align-items-center flex-wrap gap-3">
+              <div>
+                <div className="bp-kicker">SchoolProfit Revenue & Platform Policy</div>
+                <h1 className="bp-title">Platform Billing & Tier Policy</h1>
+                <p className="bp-sub">
+                  Configure per-student edition tier prices, custom domain selling rates, welcome AI & WhatsApp starter packs, standard bank processing charges, and commissions.
+                </p>
+              </div>
+              <div>
+                <button className="bp-btn" onClick={savePolicy} disabled={saving} style={{ padding: "10px 20px", fontSize: 14 }}>
+                  <i className="bi bi-check2-circle fs-5" />
+                  {saving ? "Saving Policy..." : "Save Platform Policies"}
+                </button>
+              </div>
             </section>
 
             <div className="bp-grid">
@@ -742,14 +759,85 @@ export default function BillingPolicyPage() {
                   </div>
                 </section>
 
-                {/* 4. Inactivity & Dormant Term Waiver Card */}
+                {/* 4. Managed Custom Domain Registration & Hosting Retail Pricing */}
+                <section className="bp-card" style={{ border: "2px solid #2563EB", boxShadow: "0 10px 25px rgba(37, 99, 235, 0.08)" }}>
+                  <div className="bp-card-pad">
+                    <div className="bp-card-head">
+                      <div>
+                        <div className="bp-card-title" style={{ color: "#1E3A8A", display: "flex", alignItems: "center", gap: 8 }}>
+                          <i className="bi bi-globe2" style={{ color: "#2563EB" }} />
+                          4. Custom Domain Registration & Managed Hosting Retail Pricing
+                        </div>
+                        <div className="bp-muted">
+                          Dynamically set the annual price (₦ / year) charged to schools when purchasing custom domains on SchoolProfit. Whogohost wholesale fees are automatically deducted from your reseller wallet upon school payment.
+                        </div>
+                      </div>
+                      <span className="bp-pill" style={{ background: "rgba(37, 99, 235, 0.12)", color: "#1D4ED8", fontWeight: 800 }}>
+                        <i className="bi bi-shield-lock-fill me-1" /> Whogohost Automated
+                      </span>
+                    </div>
+
+                    <div className="row g-3">
+                      {[
+                        { tld: ".com.ng", wholesale: "~₦2,500 - ₦3,500", name: "Nigeria Standard / Commercial (.com.ng)", defaultPrice: 35000 },
+                        { tld: ".sch.ng", wholesale: "~₦2,500 - ₦3,500", name: "Official Academic Nigeria (.sch.ng)", defaultPrice: 35000 },
+                        { tld: ".ng", wholesale: "~₦12,000 - ₦15,000", name: "Direct National Pride (.ng)", defaultPrice: 45000 },
+                        { tld: ".com", wholesale: "~₦18,000 - ₦22,000", name: "Global Commercial (.com)", defaultPrice: 50000 },
+                        { tld: ".org", wholesale: "~₦20,000 - ₦25,000", name: "Global Non-Profit / NGO (.org)", defaultPrice: 55000 },
+                      ].map((item) => {
+                        const currentPrice = Number(policy.domain_pricing?.[item.tld]?.price ?? item.defaultPrice);
+                        return (
+                          <div key={item.tld} className="col-12 col-md-6 col-lg-4">
+                            <div className="p-3 rounded-3 border bg-light h-100 d-flex flex-column justify-content-between">
+                              <div>
+                                <div className="d-flex justify-content-between align-items-center mb-1">
+                                  <span className="badge bg-primary fs-6">{item.tld}</span>
+                                  <span className="text-muted small">Cost: {item.wholesale}</span>
+                                </div>
+                                <div className="small fw-bold text-dark mb-2">{item.name}</div>
+                              </div>
+                              <div>
+                                <label className="form-label small fw-bold text-muted mb-1">Retail Selling Price (₦ / year):</label>
+                                <div className="input-group">
+                                  <span className="input-group-text bg-white fw-bold">₦</span>
+                                  <input
+                                    type="number"
+                                    className="form-control fw-bold text-primary"
+                                    min={0}
+                                    step={1000}
+                                    value={currentPrice}
+                                    onChange={(e) => {
+                                      const val = Number(e.target.value);
+                                      setPolicy((p) => ({
+                                        ...p,
+                                        domain_pricing: {
+                                          ...(p.domain_pricing || {}),
+                                          [item.tld]: {
+                                            price: val,
+                                            label: p.domain_pricing?.[item.tld]?.label || item.name,
+                                          },
+                                        },
+                                      }));
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </section>
+
+                {/* 5. Inactivity & Dormant Term Waiver Card */}
                 <section className="bp-card" style={{ border: "1.5px solid #cbd5e1" }}>
                   <div className="bp-card-pad">
                     <div className="bp-card-head">
                       <div>
                         <div className="bp-card-title" style={{ fontSize: 16, display: "flex", alignItems: "center", gap: 8 }}>
                           <i className="bi bi-clock-history text-primary" />
-                          4. School Inactivity Audit & Dormant Term Waiver
+                          5. School Inactivity Audit & Dormant Term Waiver
                         </div>
                         <div className="bp-muted">
                           Audit past academic terms for schools that onboarded or switched sessions but did not use the platform. If zero scores and zero CBT exams were recorded, waive past term invoices and student blocks so they start fresh on their active session.
