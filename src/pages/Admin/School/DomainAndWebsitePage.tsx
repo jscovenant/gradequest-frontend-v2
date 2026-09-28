@@ -53,6 +53,8 @@ export default function DomainAndWebsitePage() {
   const [domainStatus, setDomainStatus] = useState<any>(null);
   const [existingDomainInput, setExistingDomainInput] = useState("");
   const [connectingExisting, setConnectingExisting] = useState(false);
+  const [removingDomain, setRemovingDomain] = useState(false);
+  const [showRemoveConfirmModal, setShowRemoveConfirmModal] = useState(false);
   const [purchasingDomain, setPurchasingDomain] = useState<string | null>(null);
 
   // Core values new tag input
@@ -192,6 +194,9 @@ export default function DomainAndWebsitePage() {
         const domainRes = await authApi.get("/admin/domain-orders/status");
         if (domainRes.data.status) {
           setDomainStatus(domainRes.data);
+          if (domainRes.data?.school?.custom_domain) {
+            setExistingDomainInput(domainRes.data.school.custom_domain);
+          }
         }
       } catch (e) {
         console.warn("Domain status endpoint notice:", e);
@@ -318,6 +323,33 @@ export default function DomainAndWebsitePage() {
       showError?.(err?.response?.data?.message || "Failed to connect domain.");
     } finally {
       setConnectingExisting(false);
+    }
+  };
+
+  const handleRemoveDomain = async () => {
+    setRemovingDomain(true);
+    try {
+      const res = await authApi.post("/admin/domain-orders/remove");
+      if (res.data.status) {
+        showSuccess?.(res.data.message || "Custom domain removed successfully.");
+        setExistingDomainInput("");
+        setDomainStatus((prev: any) => ({
+          ...prev,
+          school: {
+            ...(prev?.school || {}),
+            custom_domain: null,
+          },
+          active_domain: null,
+        }));
+        setShowRemoveConfirmModal(false);
+        fetchInitialData();
+      } else {
+        showError?.(res.data.message || "Failed to remove custom domain.");
+      }
+    } catch (err: any) {
+      showError?.(err?.response?.data?.message || "Failed to remove custom domain.");
+    } finally {
+      setRemovingDomain(false);
     }
   };
 
@@ -1849,14 +1881,24 @@ export default function DomainAndWebsitePage() {
                           Your custom school domain is live, secured with automated Let's Encrypt SSL, and fully configured.
                         </p>
                       </div>
-                      <a
-                        href={`https://${domainStatus.school.custom_domain}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn btn-success fw-bold text-white px-3"
-                      >
-                        <i className="bi bi-box-arrow-up-right me-1"></i> Visit Live Portal
-                      </a>
+                      <div className="d-flex align-items-center gap-2 flex-wrap">
+                        <a
+                          href={`https://${domainStatus.school.custom_domain}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-success fw-bold text-white px-3"
+                        >
+                          <i className="bi bi-box-arrow-up-right me-1"></i> Visit Live Portal
+                        </a>
+                        <button
+                          type="button"
+                          className="btn btn-outline-danger fw-bold px-3"
+                          onClick={() => setShowRemoveConfirmModal(true)}
+                          disabled={removingDomain}
+                        >
+                          <i className="bi bi-trash3 me-1"></i> Disconnect Domain
+                        </button>
+                      </div>
                     </div>
                     <div className="p-4">
                       <div className="row g-3">
@@ -2050,21 +2092,90 @@ export default function DomainAndWebsitePage() {
                     <div className="db-panel">
                       <div className="db-panel-head">
                         <div>
-                          <h4 className="db-panel-title">Already Own a Domain?</h4>
-                          <p className="db-panel-sub">Connect a domain you already purchased from Whogohost, Namecheap, or GoDaddy.</p>
+                          <h4 className="db-panel-title">
+                            <i className="bi bi-link-45deg me-1 text-primary"></i> Connect Existing Custom Domain
+                          </h4>
+                          <p className="db-panel-sub">
+                            Link a domain you already registered from Whogohost, GoDaddy, Namecheap, or any registrar.
+                          </p>
                         </div>
+                        {domainStatus?.school?.custom_domain && (
+                          <span className="badge bg-success bg-opacity-10 text-success px-3 py-2 border border-success border-opacity-25">
+                            <i className="bi bi-check-circle-fill me-1"></i> Connected
+                          </span>
+                        )}
                       </div>
                       <div className="p-4">
+                        {domainStatus?.school?.custom_domain && (
+                          <div
+                            className="p-3 mb-4 rounded-3 border d-flex flex-wrap align-items-center justify-content-between gap-3"
+                            style={{ background: "rgba(16, 185, 129, 0.06)", borderColor: "rgba(16, 185, 129, 0.25)" }}
+                          >
+                            <div className="d-flex align-items-center gap-3">
+                              <div
+                                style={{
+                                  width: 40,
+                                  height: 40,
+                                  borderRadius: "50%",
+                                  background: "#10B981",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  color: "#fff",
+                                  fontSize: 18,
+                                }}
+                              >
+                                <i className="bi bi-globe"></i>
+                              </div>
+                              <div>
+                                <div className="small text-muted fw-bold text-uppercase" style={{ fontSize: 11 }}>
+                                  Active Registered Domain
+                                </div>
+                                <div className="fs-5 fw-bold text-dark font-monospace">
+                                  {domainStatus.school.custom_domain}
+                                </div>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              className="btn btn-outline-danger btn-sm fw-bold px-3 py-2 d-inline-flex align-items-center gap-2"
+                              onClick={() => setShowRemoveConfirmModal(true)}
+                              disabled={removingDomain}
+                            >
+                              <i className="bi bi-trash3"></i>
+                              {removingDomain ? "Disconnecting..." : "Remove / Disconnect Domain"}
+                            </button>
+                          </div>
+                        )}
+
+                        <label className="form-label fw-bold small text-dark">
+                          {domainStatus?.school?.custom_domain
+                            ? "Switch or replace with another domain:"
+                            : "Enter your custom domain name:"}
+                        </label>
                         <form onSubmit={handleConnectExisting} className="d-flex gap-2">
-                          <input
-                            type="text"
-                            className="form-control"
-                            placeholder="e.g. www.yourschool.sch.ng"
-                            value={existingDomainInput}
-                            onChange={(e) => setExistingDomainInput(e.target.value)}
-                          />
-                          <button className="btn btn-outline-dark fw-bold text-nowrap" type="submit" disabled={connectingExisting}>
-                            {connectingExisting ? "Connecting..." : "Connect Domain"}
+                          <div className="input-group">
+                            <span className="input-group-text bg-white"><i className="bi bi-globe2 text-muted"></i></span>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="e.g. www.yourschool.sch.ng or portal.yourschool.com"
+                              value={existingDomainInput}
+                              onChange={(e) => setExistingDomainInput(e.target.value)}
+                            />
+                          </div>
+                          <button className="btn btn-primary fw-bold text-nowrap px-3" type="submit" disabled={connectingExisting}>
+                            {connectingExisting ? (
+                              <>
+                                <span className="spinner-border spinner-border-sm me-2" />
+                                Connecting...
+                              </>
+                            ) : domainStatus?.school?.custom_domain ? (
+                              "Update Domain"
+                            ) : (
+                              "Connect Domain"
+                            )}
                           </button>
                         </form>
                       </div>
@@ -2125,6 +2236,67 @@ export default function DomainAndWebsitePage() {
           </main>
         </div>
       </div>
+
+      {/* Remove Custom Domain Confirmation Modal */}
+      {showRemoveConfirmModal && (
+        <div
+          className="modal fade show d-block"
+          tabIndex={-1}
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.6)", zIndex: 1060 }}
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 shadow-lg" style={{ borderRadius: 16, overflow: "hidden" }}>
+              <div className="modal-header bg-danger text-white border-0 py-3">
+                <h5 className="modal-title fw-bold d-flex align-items-center gap-2 mb-0">
+                  <i className="bi bi-exclamation-triangle-fill"></i> Disconnect Custom Domain?
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white"
+                  onClick={() => setShowRemoveConfirmModal(false)}
+                  disabled={removingDomain}
+                ></button>
+              </div>
+              <div className="modal-body p-4">
+                <p className="text-dark mb-3 fs-6">
+                  Are you sure you want to disconnect <strong>{domainStatus?.school?.custom_domain}</strong> from your school?
+                </p>
+                <div className="p-3 bg-light rounded-3 border small text-muted">
+                  <i className="bi bi-info-circle me-1 text-primary"></i> After disconnecting, your school website and portal will instantly fallback to your free default subdomain (<code>{domainStatus?.school?.subdomain ? `${domainStatus.school.subdomain}.schoolprofit.ng` : "your default link"}</code>).
+                </div>
+              </div>
+              <div className="modal-footer bg-light border-0 py-3 d-flex justify-content-end gap-2">
+                <button
+                  type="button"
+                  className="btn btn-secondary fw-bold px-3"
+                  onClick={() => setShowRemoveConfirmModal(false)}
+                  disabled={removingDomain}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger fw-bold px-4 d-inline-flex align-items-center gap-2"
+                  onClick={handleRemoveDomain}
+                  disabled={removingDomain}
+                >
+                  {removingDomain ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm" />
+                      Disconnecting...
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-trash3"></i> Yes, Disconnect Domain
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Footer />
     </>
   );
