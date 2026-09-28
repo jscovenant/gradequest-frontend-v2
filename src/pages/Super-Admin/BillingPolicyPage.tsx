@@ -827,6 +827,58 @@ export default function BillingPolicyPage() {
                         );
                       })}
                     </div>
+
+                    {/* One-Time Existing Domain Setup Fee */}
+                    <div className="mt-4 p-3 rounded-3 border" style={{ background: "rgba(37, 99, 235, 0.04)", borderColor: "rgba(37, 99, 235, 0.25)" }}>
+                      <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                        <div>
+                          <div className="fw-bold text-dark d-flex align-items-center gap-2">
+                            <i className="bi bi-link-45deg text-primary fs-5" />
+                            Existing Custom Domain Connection / Setup Processing Fee (₦)
+                          </div>
+                          <div className="text-muted small">
+                            One-time fee charged via Paystack when a school connects an existing domain registered externally (e.g. GoDaddy, Namecheap). If a school removes and connects another domain later, they are charged for that new domain connection.
+                          </div>
+                        </div>
+                        <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-3 py-2 fw-bold">
+                          One-Time Processing Fee
+                        </span>
+                      </div>
+
+                      <div className="row g-2 align-items-center mt-2">
+                        <div className="col-12 col-md-5">
+                          <div className="input-group">
+                            <span className="input-group-text bg-white fw-bold">₦</span>
+                            <input
+                              type="number"
+                              className="form-control fw-bold text-primary"
+                              min={0}
+                              step={500}
+                              value={Number(policy.domain_pricing?.setup_fee?.price ?? policy.domain_pricing?.setup_fee ?? 10000)}
+                              onChange={(e) => {
+                                const val = Number(e.target.value);
+                                setPolicy((p) => ({
+                                  ...p,
+                                  domain_pricing: {
+                                    ...(p.domain_pricing || {}),
+                                    setup_fee: {
+                                      price: val,
+                                      label: "Existing Custom Domain Setup & DNS Processing Fee",
+                                    },
+                                  },
+                                }));
+                              }}
+                            />
+                            <span className="input-group-text bg-light small text-muted">one-time / domain</span>
+                          </div>
+                        </div>
+                        <div className="col-12 col-md-7">
+                          <span className="text-muted small">
+                            Set to <code>0</code> if you want to allow schools to connect existing domains for free without Paystack checkout.
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </section>
 

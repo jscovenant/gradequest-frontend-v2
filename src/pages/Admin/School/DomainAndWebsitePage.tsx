@@ -52,7 +52,10 @@ export default function DomainAndWebsitePage() {
   const [domainSuggestions, setDomainSuggestions] = useState<DomainPricingTier[]>([]);
   const [domainStatus, setDomainStatus] = useState<any>(null);
   const [existingDomainInput, setExistingDomainInput] = useState("");
+  const [setupChoice, setSetupChoice] = useState<"subdomain" | "full_website">("subdomain");
   const [connectingExisting, setConnectingExisting] = useState(false);
+  const [verifyingDns, setVerifyingDns] = useState(false);
+  const [dnsVerificationResult, setDnsVerificationResult] = useState<any>(null);
   const [removingDomain, setRemovingDomain] = useState(false);
   const [showRemoveConfirmModal, setShowRemoveConfirmModal] = useState(false);
   const [purchasingDomain, setPurchasingDomain] = useState<string | null>(null);
@@ -309,7 +312,7 @@ export default function DomainAndWebsitePage() {
   const handleConnectExisting = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!existingDomainInput.trim()) {
-      showWarning?.("Please enter your existing domain.");
+      showWarning?.("Please enter your custom domain name.");
       return;
     }
 
@@ -317,15 +320,47 @@ export default function DomainAndWebsitePage() {
     try {
       const res = await authApi.post("/admin/domain-orders/connect-existing", {
         domain: existingDomainInput.trim(),
+        setup_type: setupChoice,
       });
+
       if (res.data.status) {
-        showSuccess?.("Domain registered! Please configure DNS records.");
-        fetchInitialData();
+        if (res.data.requires_payment && res.data.authorization_url) {
+          showInfo?.("Redirecting to Paystack for custom domain setup fee checkout...");
+          window.location.href = res.data.authorization_url;
+        } else {
+          showSuccess?.(res.data.message || "Domain registered! Please configure DNS records.");
+          fetchInitialData();
+        }
+      } else {
+        showError?.(res.data.message || "Failed to connect domain.");
       }
     } catch (err: any) {
       showError?.(err?.response?.data?.message || "Failed to connect domain.");
     } finally {
       setConnectingExisting(false);
+    }
+  };
+
+  const handleVerifyDns = async () => {
+    setVerifyingDns(true);
+    setDnsVerificationResult(null);
+    try {
+      showInfo?.("Checking domain DNS records for propagation...");
+      const res = await authApi.post("/admin/domain-orders/verify-dns", {
+        domain: existingDomainInput.trim() || domainStatus?.school?.custom_domain || domainStatus?.active_domain?.domain,
+      });
+
+      setDnsVerificationResult(res.data);
+      if (res.data.status && res.data.verified) {
+        showSuccess?.(res.data.message || "DNS verified! Your domain is active and routed to SchoolProfit.");
+        fetchInitialData();
+      } else {
+        showWarning?.(res.data.message || "DNS records not detected yet. DNS changes can take 5-15 minutes to propagate.");
+      }
+    } catch (err: any) {
+      showError?.(err?.response?.data?.message || "DNS verification check failed.");
+    } finally {
+      setVerifyingDns(false);
     }
   };
 
@@ -2146,66 +2181,221 @@ export default function DomainAndWebsitePage() {
                             <i className="bi bi-link-45deg me-1 text-primary"></i> Connect Existing Custom Domain
                           </h4>
                           <p className="db-panel-sub">
-                            Link a domain you already registered from Whogohost, GoDaddy, Namecheap, or any registrar.
+                            Link a domain you already registered from Whogohost, GoDaddy, Namecheap, Cloudflare, or any external registrar.
                           </p>
                         </div>
                         {activeRegisteredDomain && (
                           <span className="badge bg-success bg-opacity-10 text-success px-3 py-2 border border-success border-opacity-25">
-                            <i className="bi bi-check-circle-fill me-1"></i> Active
+                            <i className="bi bi-check-circle-fill me-1"></i> {domainStatus?.school?.custom_domain ? "Active & Connected" : "Configured"}
                           </span>
                         )}
                       </div>
                       <div className="p-4">
-                        {/* Active Registered Domain Banner & Remove Button */}
+                        {/* Active Registered Domain Banner & Verification Controls */}
                         {activeRegisteredDomain && (
                           <div
-                            className="p-3 mb-4 rounded-3 border d-flex flex-wrap align-items-center justify-content-between gap-3"
+                            className="p-3 mb-4 rounded-3 border"
                             style={{ background: "rgba(16, 185, 129, 0.08)", borderColor: "rgba(16, 185, 129, 0.3)" }}
                           >
-                            <div className="d-flex align-items-center gap-3">
-                              <div
-                                style={{
-                                  width: 44,
-                                  height: 44,
-                                  borderRadius: 12,
-                                  background: "#10B981",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  color: "#fff",
-                                  fontSize: 22,
-                                  boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
-                                }}
-                              >
-                                <i className="bi bi-shield-check"></i>
-                              </div>
-                              <div>
-                                <div className="d-flex align-items-center gap-2">
-                                  <span className="badge bg-success text-white" style={{ fontSize: 10 }}>
-                                    ACTIVE REGISTERED DOMAIN
-                                  </span>
-                                  <span className="text-muted small">Live on your school portal</span>
+                            <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+                              <div className="d-flex align-items-center gap-3">
+                                <div
+                                  style={{
+                                    width: 44,
+                                    height: 44,
+                                    borderRadius: 12,
+                                    background: "#10B981",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    color: "#fff",
+                                    fontSize: 22,
+                                    boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
+                                  }}
+                                >
+                                  <i className="bi bi-shield-check"></i>
                                 </div>
-                                <div className="fs-5 fw-bold text-dark font-monospace mt-1">
-                                  {activeRegisteredDomain}
+                                <div>
+                                  <div className="d-flex align-items-center gap-2">
+                                    <span className="badge bg-success text-white" style={{ fontSize: 10 }}>
+                                      REGISTERED SCHOOL DOMAIN
+                                    </span>
+                                    <span className="text-muted small">Configured for your school portal</span>
+                                  </div>
+                                  <div className="fs-5 fw-bold text-dark font-monospace mt-1">
+                                    {activeRegisteredDomain}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="d-flex align-items-center gap-2 flex-wrap">
+                                <button
+                                  type="button"
+                                  className="btn btn-primary btn-sm fw-bold px-3 py-2 d-inline-flex align-items-center gap-2"
+                                  onClick={handleVerifyDns}
+                                  disabled={verifyingDns}
+                                >
+                                  {verifyingDns ? (
+                                    <>
+                                      <span className="spinner-border spinner-border-sm" />
+                                      Checking DNS...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <i className="bi bi-arrow-repeat"></i> Verify DNS Records
+                                    </>
+                                  )}
+                                </button>
+                                <a
+                                  href={`https://${activeRegisteredDomain}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="btn btn-outline-success btn-sm fw-bold px-3 py-2"
+                                >
+                                  <i className="bi bi-box-arrow-up-right me-1"></i> Visit
+                                </a>
+                                <button
+                                  type="button"
+                                  className="btn btn-outline-danger btn-sm fw-bold px-3 py-2 d-inline-flex align-items-center gap-2"
+                                  onClick={() => setShowRemoveConfirmModal(true)}
+                                  disabled={removingDomain}
+                                >
+                                  <i className="bi bi-trash3-fill"></i>
+                                  {removingDomain ? "Disconnecting..." : "Remove"}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Live DNS Verification Feedback */}
+                            {dnsVerificationResult && (
+                              <div
+                                className={`p-3 rounded-3 border small ${
+                                  dnsVerificationResult.verified
+                                    ? "bg-success bg-opacity-10 text-success border-success border-opacity-25"
+                                    : "bg-warning bg-opacity-10 text-dark border-warning border-opacity-50"
+                                }`}
+                              >
+                                <div className="fw-bold d-flex align-items-center gap-2 mb-1">
+                                  <i
+                                    className={`bi ${
+                                      dnsVerificationResult.verified ? "bi-check-circle-fill text-success" : "bi-exclamation-triangle-fill text-warning"
+                                    } fs-6`}
+                                  />
+                                  {dnsVerificationResult.verified ? "DNS Propagation Confirmed!" : "DNS Propagation In Progress"}
+                                </div>
+                                <div>{dnsVerificationResult.message}</div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Step 1: Two Clear Setup Choices */}
+                        <div className="mb-4">
+                          <label className="form-label fw-bold small text-dark mb-2">
+                            Select How You Want to Connect Your Domain:
+                          </label>
+                          <div className="row g-3">
+                            <div className="col-12 col-md-6">
+                              <div
+                                className={`p-3 rounded-3 border h-100 cursor-pointer transition-all ${
+                                  setupChoice === "subdomain"
+                                    ? "border-primary bg-primary bg-opacity-10 shadow-sm"
+                                    : "bg-light border-light-subtle"
+                                }`}
+                                style={{ cursor: "pointer", border: setupChoice === "subdomain" ? "2px solid #2563EB" : "1.5px solid #E2E8F0" }}
+                                onClick={() => setSetupChoice("subdomain")}
+                              >
+                                <div className="d-flex align-items-start gap-3">
+                                  <input
+                                    type="radio"
+                                    name="domainSetupChoice"
+                                    className="form-check-input mt-1"
+                                    checked={setupChoice === "subdomain"}
+                                    onChange={() => setSetupChoice("subdomain")}
+                                  />
+                                  <div>
+                                    <div className="fw-bold text-dark d-flex align-items-center gap-2">
+                                      <i className="bi bi-browser-edge text-primary" />
+                                      Choice 1: Dedicated Portal Subdomain Only
+                                    </div>
+                                    <span className="badge bg-primary text-white my-1" style={{ fontSize: 10 }}>
+                                      RECOMMENDED FOR EXISTING WEBSITES
+                                    </span>
+                                    <p className="text-muted small mb-1" style={{ lineHeight: 1.4 }}>
+                                      Keep your existing WordPress/Webflow website <strong>100% untouched</strong>. Connect SchoolProfit strictly for logins, student report cards, CBT, and fee payments.
+                                    </p>
+                                    <div className="small font-monospace text-primary fw-bold">
+                                      e.g. portal.yourschool.com or app.yourschool.sch.ng
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
                             </div>
 
-                            <button
-                              type="button"
-                              className="btn btn-outline-danger fw-bold px-3 py-2 d-inline-flex align-items-center gap-2"
-                              onClick={() => setShowRemoveConfirmModal(true)}
-                              disabled={removingDomain}
-                            >
-                              <i className="bi bi-trash3-fill"></i>
-                              {removingDomain ? "Disconnecting..." : "Remove / Disconnect Domain"}
-                            </button>
+                            <div className="col-12 col-md-6">
+                              <div
+                                className={`p-3 rounded-3 border h-100 cursor-pointer transition-all ${
+                                  setupChoice === "full_website"
+                                    ? "border-primary bg-primary bg-opacity-10 shadow-sm"
+                                    : "bg-light border-light-subtle"
+                                }`}
+                                style={{ cursor: "pointer", border: setupChoice === "full_website" ? "2px solid #2563EB" : "1.5px solid #E2E8F0" }}
+                                onClick={() => setSetupChoice("full_website")}
+                              >
+                                <div className="d-flex align-items-start gap-3">
+                                  <input
+                                    type="radio"
+                                    name="domainSetupChoice"
+                                    className="form-check-input mt-1"
+                                    checked={setupChoice === "full_website"}
+                                    onChange={() => setSetupChoice("full_website")}
+                                  />
+                                  <div>
+                                    <div className="fw-bold text-dark d-flex align-items-center gap-2">
+                                      <i className="bi bi-window-fullscreen text-success" />
+                                      Choice 2: Complete School Website + Portal
+                                    </div>
+                                    <span className="badge bg-secondary text-white my-1" style={{ fontSize: 10 }}>
+                                      FULL SCHOOLPROFIT HOSTING
+                                    </span>
+                                    <p className="text-muted small mb-1" style={{ lineHeight: 1.4 }}>
+                                      SchoolProfit powers your school's full public homepage, online admissions form, principal desk, photo gallery, <strong>AND</strong> portal.
+                                    </p>
+                                    <div className="small font-monospace text-success fw-bold">
+                                      e.g. www.yourschool.sch.ng or yourschool.com
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Setup Fee Notice */}
+                        {Number(domainStatus?.setup_fee ?? 10000) > 0 && (
+                          <div
+                            className="p-3 mb-3 rounded-3 border d-flex align-items-center justify-content-between flex-wrap gap-2"
+                            style={{ background: "rgba(217, 119, 6, 0.07)", borderColor: "rgba(217, 119, 6, 0.25)" }}
+                          >
+                            <div className="d-flex align-items-center gap-2">
+                              <i className="bi bi-credit-card-2-front text-warning fs-5" />
+                              <div>
+                                <span className="fw-bold text-dark small">One-Time Domain Setup & DNS Routing Fee: </span>
+                                <span className="fw-bold text-primary">₦{Number(domainStatus?.setup_fee ?? 10000).toLocaleString()}</span>
+                                <span className="text-muted small d-block" style={{ fontSize: 11.5 }}>
+                                  One-time fee processed via Paystack. If you remove and connect another domain later, the fee applies to the new domain.
+                                </span>
+                              </div>
+                            </div>
+                            <span className="badge bg-warning text-dark fw-bold">Paystack Checkout</span>
                           </div>
                         )}
 
+                        {/* Domain Input Form */}
                         <label className="form-label fw-bold small text-dark mb-1">
-                          Enter your custom domain name:
+                          {setupChoice === "subdomain"
+                            ? "Enter your dedicated portal subdomain:"
+                            : "Enter your full school domain name:"}
                         </label>
                         <form onSubmit={handleConnectExisting} className="d-flex flex-wrap gap-2">
                           <div className="input-group" style={{ flex: "1 1 260px" }}>
@@ -2215,7 +2405,11 @@ export default function DomainAndWebsitePage() {
                             <input
                               type="text"
                               className="form-control"
-                              placeholder="e.g. www.yourschool.sch.ng or portal.yourschool.com"
+                              placeholder={
+                                setupChoice === "subdomain"
+                                  ? "e.g. portal.yourschool.com or app.yourschool.sch.ng"
+                                  : "e.g. www.yourschool.sch.ng or yourschool.com"
+                              }
                               value={existingDomainInput}
                               onChange={(e) => setExistingDomainInput(e.target.value)}
                             />
@@ -2229,8 +2423,10 @@ export default function DomainAndWebsitePage() {
                             {connectingExisting ? (
                               <>
                                 <span className="spinner-border spinner-border-sm me-2" />
-                                Connecting...
+                                Processing...
                               </>
+                            ) : Number(domainStatus?.setup_fee ?? 10000) > 0 ? (
+                              `Pay ₦${Number(domainStatus?.setup_fee ?? 10000).toLocaleString()} & Connect`
                             ) : activeRegisteredDomain ? (
                               "Update Domain"
                             ) : (
@@ -2245,39 +2441,73 @@ export default function DomainAndWebsitePage() {
                               onClick={() => setShowRemoveConfirmModal(true)}
                               disabled={removingDomain}
                             >
-                              <i className="bi bi-trash3 me-1"></i> Remove
+                              <i className="bi bi-trash3 me-1"></i> Disconnect
                             </button>
                           )}
                         </form>
                         <div className="text-muted small mt-2">
-                          e.g. <code>www.yourschool.sch.ng</code> or <code>portal.yourschool.com</code>
+                          {setupChoice === "subdomain" ? (
+                            <>Recommended: <code>portal.yourschool.com</code>, <code>app.yourschool.sch.ng</code>, or <code>portal.yourschool.edu.ng</code></>
+                          ) : (
+                            <>Recommended: <code>www.yourschool.sch.ng</code> or <code>yourschool.com.ng</code></>
+                          )}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Right Column: DNS Setup */}
+                  {/* Right Column: Dynamic DNS Setup */}
                   <div className="col-12 col-lg-4">
                     <div className="db-panel">
                       <div className="db-panel-head">
                         <div>
-                          <h4 className="db-panel-title">DNS Setup Records</h4>
-                          <p className="db-panel-sub">Point these records in your DNS manager.</p>
+                          <h4 className="db-panel-title">
+                            <i className="bi bi-hdd-network text-primary"></i> DNS Setup Records
+                          </h4>
+                          <p className="db-panel-sub">Add these in your domain control panel (GoDaddy, Namecheap, cPanel).</p>
                         </div>
                       </div>
                       <div className="p-4 small">
-                        <p className="text-muted">If connecting an external domain, configure these two DNS records in your domain control panel:</p>
-                        <div className="p-3 bg-light rounded-3 mb-3 border">
-                          <div className="fw-bold text-dark">Record 1 (Root Domain):</div>
-                          <div className="text-muted mt-1">Type: <code>A</code></div>
-                          <div className="text-muted">Host: <code>@</code></div>
-                          <div className="text-dark fw-bold">Value: <code>18.133.82.13</code></div>
-                        </div>
-                        <div className="p-3 bg-light rounded-3 border">
-                          <div className="fw-bold text-dark">Record 2 (Subdomain / Portal):</div>
-                          <div className="text-muted mt-1">Type: <code>CNAME</code></div>
-                          <div className="text-muted">Host: <code>www</code> (or <code>portal</code>)</div>
-                          <div className="text-dark fw-bold">Value: <code>portal.schoolprofit.ng</code></div>
+                        {setupChoice === "subdomain" ? (
+                          <>
+                            <div className="alert alert-info py-2 px-3 small mb-3">
+                              <strong>Zero Website Interruption:</strong> Since you are connecting a subdomain, your main website remains completely untouched!
+                            </div>
+                            <div className="p-3 bg-light rounded-3 border mb-3">
+                              <div className="fw-bold text-primary mb-1">Required Subdomain CNAME Record:</div>
+                              <div className="text-muted">Type: <span className="badge bg-dark">CNAME</span></div>
+                              <div className="text-muted mt-1">
+                                Host / Name: <code>{existingDomainInput ? existingDomainInput.split(".")[0] : "portal"}</code>
+                              </div>
+                              <div className="text-dark fw-bold mt-1">
+                                Target / Value: <code className="text-primary">portal.schoolprofit.ng</code>
+                              </div>
+                              <div className="text-muted small mt-1">TTL: <code>Auto / 300s</code></div>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-muted mb-2">Configure these two records to point your entire website & portal to SchoolProfit:</p>
+                            <div className="p-3 bg-light rounded-3 mb-2 border">
+                              <div className="fw-bold text-dark">Record 1 (Root Domain):</div>
+                              <div className="text-muted mt-1">Type: <span className="badge bg-dark">A</span></div>
+                              <div className="text-muted">Host: <code>@</code></div>
+                              <div className="text-dark fw-bold mt-1">Value: <code>18.133.82.13</code></div>
+                            </div>
+                            <div className="p-3 bg-light rounded-3 border mb-3">
+                              <div className="fw-bold text-dark">Record 2 (WWW / Subdomain):</div>
+                              <div className="text-muted mt-1">Type: <span className="badge bg-dark">CNAME</span></div>
+                              <div className="text-muted">Host: <code>www</code></div>
+                              <div className="text-dark fw-bold mt-1">Value: <code className="text-primary">portal.schoolprofit.ng</code></div>
+                            </div>
+                          </>
+                        )}
+
+                        <div className="p-3 rounded-3 border bg-white shadow-sm text-muted">
+                          <div className="fw-bold text-dark small mb-1">
+                            <i className="bi bi-clock-history me-1 text-warning"></i> Propagation Time
+                          </div>
+                          DNS changes typically take <strong>5 to 15 minutes</strong>. Once saved, click <strong>"Verify DNS Records"</strong> to activate.
                         </div>
                       </div>
                     </div>
