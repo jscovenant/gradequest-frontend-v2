@@ -98,31 +98,6 @@ export default function SettingsPage() {
     },
   });
 
-  type DomainRecord = {
-  id: number;
-  domain: string;
-  status: "pending" | "verified" | "active" | "disabled" | "rejected";
-  verification_token: string | null;
-  verified_at: string | null;
-  ownership_verified_at?: string | null;
-  routing_verified_at?: string | null;
-  activated_at?: string | null;
-  last_checked_at?: string | null;
-  last_error?: string | null;
-};
-
-type DomainInstructions = {
-  ownership: { type: "TXT"; host: string; value: string };
-  routing: { type: "CNAME"; host: string; value: string };
-  portal_url: string;
-};
-
-// Add these to your component state
-const [domainRecord, setDomainRecord] = useState<DomainRecord | null>(null);
-const [domainInput,  setDomainInput]  = useState("");
-const [domainBusy,   setDomainBusy]   = useState(false);
-const [domainInstructions, setDomainInstructions] = useState<DomainInstructions | null>(null);
-
   const [school, setSchool] = useState<SchoolSettings>({
     schoolName: "",
     address: "",
@@ -190,17 +165,10 @@ const [domainInstructions, setDomainInstructions] = useState<DomainInstructions 
   useEffect(() => {
     setLoading(true);
 
-    Promise.all([
-      authApi.get<SettingsResponse>("/get-settings"),
-      authApi.get<{ data: DomainRecord | null; instructions: DomainInstructions | null }>("/settings/domain").catch(() => ({ data: { data: null, instructions: null } })),
-    ])
-      .then(([settingsRes, domainRes]) => {
+    authApi
+      .get<SettingsResponse>("/get-settings")
+      .then((settingsRes) => {
         mapSettingsFromResponse(settingsRes.data);
-
-        const dr = domainRes.data?.data ?? null;
-        setDomainRecord(dr);
-        setDomainInput(dr?.domain ?? "");
-        setDomainInstructions(domainRes.data?.instructions ?? null);
       })
       .catch((err: any) => {
         console.error(err);
@@ -327,77 +295,7 @@ const [domainInstructions, setDomainInstructions] = useState<DomainInstructions 
   };
 
 
-  const registerDomain = async () => {
-  if (!domainInput.trim()) return;
-  setDomainBusy(true);
-  try {
-    const res = await authApi.post<{ data: DomainRecord; instructions: DomainInstructions }>("/settings/domain", {
-      domain: domainInput.trim(),
-    });
-    setDomainRecord(res.data.data);
-    setDomainInstructions(res.data.instructions);
-    showSuccess?.("Domain registered. Add the TXT and CNAME records shown below.");
-  } catch (err: any) {
-    const { msg } = parseBackendError(err);
-    showError?.(msg);
-  } finally {
-    setDomainBusy(false);
-  }
-};
 
-const verifyDomain = async () => {
-  if (!domainRecord) return;
-  setDomainBusy(true);
-  try {
-    const res = await authApi.post<{ data: DomainRecord; instructions: DomainInstructions }>("/settings/domain/verify", {
-      domain_id: domainRecord.id,
-    });
-    setDomainRecord(res.data.data);
-    setDomainInstructions(res.data.instructions);
-    showSuccess?.("Ownership verified. Activate the portal after the CNAME has propagated.");
-  } catch (err: any) {
-    const { msg } = parseBackendError(err);
-    showError?.(msg);
-  } finally {
-    setDomainBusy(false);
-  }
-};
-
-const activateDomain = async () => {
-  if (!domainRecord) return;
-  setDomainBusy(true);
-  try {
-    const res = await authApi.post<{ data: DomainRecord; instructions: DomainInstructions }>("/settings/domain/activate", {
-      domain_id: domainRecord.id,
-    });
-    setDomainRecord(res.data.data);
-    setDomainInstructions(res.data.instructions);
-    showSuccess?.("Domain activated. Redirecting to the school portal login.");
-    window.location.assign(`${res.data.instructions.portal_url.replace(/\/+$/, "")}/login`);
-  } catch (err: any) {
-    const { msg } = parseBackendError(err);
-    showError?.(msg);
-  } finally {
-    setDomainBusy(false);
-  }
-};
-
-const removeDomain = async () => {
-  if (!domainRecord) return;
-  setDomainBusy(true);
-  try {
-    await authApi.delete(`/settings/domain/${domainRecord.id}`);
-    setDomainRecord(null);
-    setDomainInput("");
-    setDomainInstructions(null);
-    showSuccess?.("Domain removed.");
-  } catch (err: any) {
-    const { msg } = parseBackendError(err);
-    showError?.(msg);
-  } finally {
-    setDomainBusy(false);
-  }
-};
 
   const refreshSettings = async () => {
     setLoading(true);
@@ -779,175 +677,74 @@ const removeDomain = async () => {
                           />
                         </div>
 
-                                      <div className="col-12">
-                  <label className="form-label fw-semibold small mb-1">Custom domain</label>
-
-                  {/* Status pill */}
-                  {domainRecord && (
-                    <div style={{ marginBottom: 8 }}>
-                      <span
-                        className="db-pill"
-                        style={{
-                          background:
-                            domainRecord.status === "active" ? "rgba(34,197,94,0.14)"
-                            : ["pending", "verified"].includes(domainRecord.status) ? "rgba(245,158,11,0.14)"
-                            : "rgba(239,68,68,0.14)",
-                          color:
-                            domainRecord.status === "active" ? "#16a34a"
-                            : ["pending", "verified"].includes(domainRecord.status) ? "#d97706"
-                            : "#dc2626",
-                        }}
-                      >
-                        <i className={`bi bi-${
-                          domainRecord.status === "active" ? "shield-check"
-                          : ["pending", "verified"].includes(domainRecord.status) ? "hourglass-split"
-                          : "x-circle"
-                        } me-1`} />
-                        {domainRecord.status.charAt(0).toUpperCase() + domainRecord.status.slice(1)}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Input + register button */}
-                  <div className="input-group">
-                    <span className="input-group-text">
-                      <i className="bi bi-globe2" />
-                    </span>
-                    <input
-                      className="form-control"
-                      value={domainInput}
-                      onChange={(e) => setDomainInput(e.target.value)}
-                      placeholder="e.g. portal.yourschool.com"
-                      disabled={domainBusy || !!domainRecord}
-                    />
-                    {!domainRecord ? (
-                      <button
-                        type="button"
-                        className="btn btn-outline-secondary"
-                        onClick={registerDomain}
-                        disabled={domainBusy || !domainInput.trim()}
-                      >
-                        {domainBusy ? <span className="spinner-border spinner-border-sm" /> : "Register"}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="btn btn-outline-danger"
-                        onClick={removeDomain}
-                        disabled={domainBusy}
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-
-                  {/* TXT record instructions — shown when pending */}
-                  {domainRecord && domainRecord.status !== "active" && domainInstructions && (
-                    <div
-                      style={{
-                        marginTop: 12,
-                        padding: "12px 14px",
-                        background: "rgba(245,158,11,0.06)",
-                        border: "1px solid rgba(245,158,11,0.20)",
-                        borderRadius: 12,
-                        fontSize: 12.5,
-                      }}
-                    >
-                      <div style={{ fontWeight: 700, marginBottom: 8, color: "#92400e" }}>
-                        <i className="bi bi-info-circle me-1" />
-                        Add both DNS records at your domain registrar:
-                      </div>
-
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        {[
-                          { label: "TXT host", value: domainInstructions.ownership.host },
-                          { label: "TXT value", value: domainInstructions.ownership.value },
-                          { label: "CNAME host", value: domainInstructions.routing.host },
-                          { label: "CNAME value", value: domainInstructions.routing.value },
-                        ].map(({ label, value }) => (
+                        <div className="col-12">
                           <div
-                            key={label}
                             style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 10,
-                              background: "#fff",
-                              border: "1px solid rgba(0,0,0,0.07)",
-                              borderRadius: 8,
-                              padding: "6px 10px",
+                              background: "linear-gradient(135deg, rgba(201,168,76,0.08) 0%, rgba(99,102,241,0.05) 100%)",
+                              border: "1px solid rgba(201,168,76,0.25)",
+                              borderRadius: 14,
+                              padding: "16px 20px",
+                              marginTop: 4,
                             }}
                           >
-                            <span style={{ width: 86, fontSize: 10, color: "#9a8a7a", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                              {label}
-                            </span>
-                            <code style={{ flex: 1, fontSize: 12, wordBreak: "break-all", color: "#1a1a2e" }}>
-                              {value}
-                            </code>
-                            <button
-                              type="button"
-                              className="db-refresh-btn"
-                              style={{ padding: "3px 8px", fontSize: 11 }}
-                              onClick={() => navigator.clipboard.writeText(value)}
-                            >
-                              <i className="bi bi-copy" />
-                            </button>
+                            <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                              <div className="d-flex align-items-start gap-3">
+                                <div
+                                  style={{
+                                    width: 42,
+                                    height: 42,
+                                    borderRadius: 10,
+                                    background: "#161b26",
+                                    border: "1px solid rgba(201,168,76,0.3)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    color: "#e8c97a",
+                                    fontSize: 20,
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  <i className="bi bi-globe2" />
+                                </div>
+                                <div>
+                                  <div style={{ fontWeight: 700, fontSize: 14, color: "#1e293b", marginBottom: 2 }}>
+                                    Custom Domain & Public Website
+                                  </div>
+                                  <div style={{ fontSize: 12.5, color: "#64748b", maxWidth: 520 }}>
+                                    {school.customDomain ? (
+                                      <span>
+                                        Connected domain: <strong className="text-dark">{school.customDomain}</strong>. Manage DNS, automated registration, and your public school website in the dedicated hub.
+                                      </span>
+                                    ) : (
+                                      <span>
+                                        Search and buy official domains (<code style={{ color: "#c9a84c" }}>.sch.ng</code>, <code style={{ color: "#c9a84c" }}>.com.ng</code>, <code style={{ color: "#c9a84c" }}>.ng</code>, <code style={{ color: "#c9a84c" }}>.com</code>), link an existing domain, and customize your school website.
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <Link
+                                to="/admin/school/domain-and-website"
+                                className="db-btn-gold"
+                                style={{
+                                  textDecoration: "none",
+                                  padding: "8px 18px",
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  borderRadius: 10,
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                  boxShadow: "0 2px 8px rgba(201,168,76,0.25)",
+                                }}
+                              >
+                                <span>Manage Domain & Website</span>
+                                <i className="bi bi-arrow-right" />
+                              </Link>
+                            </div>
                           </div>
-                        ))}
-                      </div>
-
-                      {domainRecord.status === "pending" ? <button
-                        type="button"
-                        className="db-btn-gold"
-                        style={{ marginTop: 12, width: "100%", justifyContent: "center", borderRadius: 10 }}
-                        onClick={verifyDomain}
-                        disabled={domainBusy}
-                      >
-                        {domainBusy
-                          ? <><span className="spinner-border spinner-border-sm me-2" />Verifying…</>
-                          : <><i className="bi bi-patch-check me-1" />Verify domain</>
-                        }
-                      </button> : <button
-                        type="button"
-                        className="db-btn-gold"
-                        style={{ marginTop: 12, width: "100%", justifyContent: "center", borderRadius: 10 }}
-                        onClick={activateDomain}
-                        disabled={domainBusy}
-                      >
-                        {domainBusy
-                          ? <><span className="spinner-border spinner-border-sm me-2" />Checking routing…</>
-                          : <><i className="bi bi-globe-check me-1" />Activate portal domain</>
-                        }
-                      </button>}
-                    </div>
-                  )}
-
-                  {/* Success state */}
-                  {domainRecord?.status === "active" && (
-                    <div
-                      style={{
-                        marginTop: 8,
-                        padding: "10px 12px",
-                        background: "rgba(34,197,94,0.06)",
-                        border: "1px solid rgba(34,197,94,0.18)",
-                        borderRadius: 10,
-                        fontSize: 12.5,
-                        color: "#166534",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                      }}
-                    >
-                      <i className="bi bi-shield-check" />
-                      <span>
-                        <strong>{domainRecord.domain}</strong> is active. Users can now open the SchoolProfit portal through this domain.
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="db-muted" style={{ fontSize: 12, marginTop: 6 }}>
-                    Domain verification uses a DNS TXT record. Changes may take up to 24–48 hrs to propagate.
-                  </div>
-                </div>
+                        </div>
                       </div>
                     </div>
                   </div>
