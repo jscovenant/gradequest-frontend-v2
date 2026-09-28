@@ -285,7 +285,7 @@ function App() {
           <Route
             path="/admin/school/domain-and-website"
             element={
-              <RequireAuth roles={["Admin"]}>
+              <RequireAuth roles={["Admin", "Super-Admin", "Platform-Staff"]}>
                 <OnboardingGuard>
                   <DomainAndWebsitePage />
                 </OnboardingGuard>
@@ -295,7 +295,7 @@ function App() {
           <Route
             path="/admin/domain"
             element={
-              <RequireAuth roles={["Admin"]}>
+              <RequireAuth roles={["Admin", "Super-Admin", "Platform-Staff"]}>
                 <OnboardingGuard>
                   <DomainAndWebsitePage />
                 </OnboardingGuard>

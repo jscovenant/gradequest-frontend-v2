@@ -56,12 +56,10 @@ export default function DomainAndWebsitePage() {
   const [removingDomain, setRemovingDomain] = useState(false);
   const [showRemoveConfirmModal, setShowRemoveConfirmModal] = useState(false);
   const [purchasingDomain, setPurchasingDomain] = useState<string | null>(null);
-
-  // Active registered domain resolver
-  const activeRegisteredDomain = domainStatus?.school?.custom_domain || domainStatus?.active_domain?.domain || schoolMeta?.custom_domain || null;
-
-  // Core values new tag input
+  const [schoolMeta, setSchoolMeta] = useState<any>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>("");
   const [newValueTag, setNewValueTag] = useState("");
+  const [retryingOrderId, setRetryingOrderId] = useState<number | null>(null);
 
   // Website Settings state
   const [website, setWebsite] = useState<any>({
@@ -128,8 +126,12 @@ export default function DomainAndWebsitePage() {
     contact_phone: "",
   });
 
-  const [schoolMeta, setSchoolMeta] = useState<any>(null);
-  const [previewUrl, setPreviewUrl] = useState<string>("");
+  // Active registered domain resolver (safe: evaluated after states are declared)
+  const activeRegisteredDomain =
+    domainStatus?.school?.custom_domain ||
+    domainStatus?.active_domain?.domain ||
+    schoolMeta?.custom_domain ||
+    null;
 
   // Color preset options
   const colorPresets = [
@@ -140,8 +142,6 @@ export default function DomainAndWebsitePage() {
     { name: "Imperial Purple & Amber", primary: "#4C1D95", secondary: "#8B5CF6", accent: "#F59E0B" },
     { name: "Charcoal Platinum", primary: "#18181B", secondary: "#64748B", accent: "#3B82F6" },
   ];
-
-  const [retryingOrderId, setRetryingOrderId] = useState<number | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
