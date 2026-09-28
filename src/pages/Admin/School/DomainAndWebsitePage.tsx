@@ -36,7 +36,7 @@ export default function DomainAndWebsitePage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "domain" | "branding" | "hero" | "pillars" | "programs" | "facilities" | "gallery" | "principal" | "testimonials_faq" | "contact" | "admissions"
-  >("branding");
+  >("domain");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState<string | null>(null);
@@ -628,38 +628,38 @@ export default function DomainAndWebsitePage() {
 
             {/* TOP NAVIGATION TABS */}
             <div className="db-tabs-bar">
+              <button className={`db-tab-item ${activeTab === "domain" ? "active" : ""}`} onClick={() => setActiveTab("domain")}>
+                <i className="bi bi-globe"></i> 1. Custom Domain & DNS
+              </button>
               <button className={`db-tab-item ${activeTab === "branding" ? "active" : ""}`} onClick={() => setActiveTab("branding")}>
-                <i className="bi bi-palette"></i> 1. Brand & Colors
+                <i className="bi bi-palette"></i> 2. Brand & Colors
               </button>
               <button className={`db-tab-item ${activeTab === "hero" ? "active" : ""}`} onClick={() => setActiveTab("hero")}>
-                <i className="bi bi-megaphone"></i> 2. Hero & Announcement
+                <i className="bi bi-megaphone"></i> 3. Hero & Announcement
               </button>
               <button className={`db-tab-item ${activeTab === "pillars" ? "active" : ""}`} onClick={() => setActiveTab("pillars")}>
-                <i className="bi bi-bank"></i> 3. Mission, Vision & Pillars
+                <i className="bi bi-bank"></i> 4. Mission, Vision & Pillars
               </button>
               <button className={`db-tab-item ${activeTab === "programs" ? "active" : ""}`} onClick={() => setActiveTab("programs")}>
-                <i className="bi bi-mortarboard"></i> 4. Academic Programs ({(website.programs || []).length})
+                <i className="bi bi-mortarboard"></i> 5. Academic Programs ({(website.programs || []).length})
               </button>
               <button className={`db-tab-item ${activeTab === "facilities" ? "active" : ""}`} onClick={() => setActiveTab("facilities")}>
-                <i className="bi bi-building"></i> 5. Campus Facilities ({(website.facilities || []).length})
+                <i className="bi bi-building"></i> 6. Campus Facilities ({(website.facilities || []).length})
               </button>
               <button className={`db-tab-item ${activeTab === "gallery" ? "active" : ""}`} onClick={() => setActiveTab("gallery")}>
-                <i className="bi bi-images"></i> 6. Photo Gallery ({(website.gallery || []).length})
+                <i className="bi bi-images"></i> 7. Photo Gallery ({(website.gallery || []).length})
               </button>
               <button className={`db-tab-item ${activeTab === "principal" ? "active" : ""}`} onClick={() => setActiveTab("principal")}>
-                <i className="bi bi-person-lines-fill"></i> 7. Principal's Desk
+                <i className="bi bi-person-lines-fill"></i> 8. Principal's Desk
               </button>
               <button className={`db-tab-item ${activeTab === "testimonials_faq" ? "active" : ""}`} onClick={() => setActiveTab("testimonials_faq")}>
-                <i className="bi bi-chat-heart"></i> 8. Reviews & FAQs
+                <i className="bi bi-chat-heart"></i> 9. Reviews & FAQs
               </button>
               <button className={`db-tab-item ${activeTab === "contact" ? "active" : ""}`} onClick={() => setActiveTab("contact")}>
-                <i className="bi bi-telephone"></i> 9. Contact & Socials
+                <i className="bi bi-telephone"></i> 10. Contact & Socials
               </button>
               <button className={`db-tab-item ${activeTab === "admissions" ? "active" : ""}`} onClick={() => setActiveTab("admissions")}>
-                <i className="bi bi-clipboard-check"></i> 10. Admission Fee & Settings
-              </button>
-              <button className={`db-tab-item ${activeTab === "domain" ? "active" : ""}`} onClick={() => setActiveTab("domain")}>
-                <i className="bi bi-globe"></i> 11. Custom Domain & DNS
+                <i className="bi bi-clipboard-check"></i> 11. Admission Fee & Settings
               </button>
             </div>
 
@@ -2020,8 +2020,55 @@ export default function DomainAndWebsitePage() {
                       </div>
 
                       <div className="p-4">
+                        {domainStatus?.school?.custom_domain && (
+                          <div
+                            className="p-3 mb-4 rounded-3 border d-flex flex-wrap align-items-center justify-content-between gap-3"
+                            style={{ background: "rgba(16, 185, 129, 0.06)", borderColor: "rgba(16, 185, 129, 0.25)" }}
+                          >
+                            <div className="d-flex align-items-center gap-3">
+                              <div
+                                style={{
+                                  width: 38,
+                                  height: 38,
+                                  borderRadius: "50%",
+                                  background: "#10B981",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  color: "#fff",
+                                  fontSize: 16,
+                                }}
+                              >
+                                <i className="bi bi-shield-check"></i>
+                              </div>
+                              <div>
+                                <div className="small text-muted fw-bold text-uppercase" style={{ fontSize: 11 }}>
+                                  Active Registered Domain
+                                </div>
+                                <div className="fs-6 fw-bold text-dark font-monospace">
+                                  {domainStatus.school.custom_domain}
+                                </div>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              className="btn btn-outline-danger btn-sm fw-bold px-3 py-1 d-inline-flex align-items-center gap-2"
+                              onClick={() => setShowRemoveConfirmModal(true)}
+                              disabled={removingDomain}
+                            >
+                              <i className="bi bi-trash3"></i>
+                              {removingDomain ? "Disconnecting..." : "Remove / Disconnect"}
+                            </button>
+                          </div>
+                        )}
+
                         <form onSubmit={handleSearchDomain} className="mb-4">
-                          <label className="form-label fw-bold small text-dark">Enter your desired school domain name:</label>
+                          <label className="form-label fw-bold small text-dark">
+                            {domainStatus?.school?.custom_domain
+                              ? "Search for another custom domain to register:"
+                              : "Enter your desired school domain name:"}
+                          </label>
                           <div className="input-group">
                             <span className="input-group-text bg-white"><i className="bi bi-search text-muted"></i></span>
                             <input
