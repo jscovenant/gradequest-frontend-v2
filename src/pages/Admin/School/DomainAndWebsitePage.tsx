@@ -57,6 +57,9 @@ export default function DomainAndWebsitePage() {
   const [showRemoveConfirmModal, setShowRemoveConfirmModal] = useState(false);
   const [purchasingDomain, setPurchasingDomain] = useState<string | null>(null);
 
+  // Active registered domain resolver
+  const activeRegisteredDomain = domainStatus?.school?.custom_domain || domainStatus?.active_domain?.domain || schoolMeta?.custom_domain || null;
+
   // Core values new tag input
   const [newValueTag, setNewValueTag] = useState("");
 
@@ -2135,7 +2138,7 @@ export default function DomainAndWebsitePage() {
                       </div>
                     </div>
 
-                    {/* Connect Existing Domain */}
+                    {/* Connect Existing Custom Domain */}
                     <div className="db-panel">
                       <div className="db-panel-head">
                         <div>
@@ -2146,64 +2149,69 @@ export default function DomainAndWebsitePage() {
                             Link a domain you already registered from Whogohost, GoDaddy, Namecheap, or any registrar.
                           </p>
                         </div>
-                        {domainStatus?.school?.custom_domain && (
+                        {activeRegisteredDomain && (
                           <span className="badge bg-success bg-opacity-10 text-success px-3 py-2 border border-success border-opacity-25">
-                            <i className="bi bi-check-circle-fill me-1"></i> Connected
+                            <i className="bi bi-check-circle-fill me-1"></i> Active
                           </span>
                         )}
                       </div>
                       <div className="p-4">
-                        {domainStatus?.school?.custom_domain && (
+                        {/* Active Registered Domain Banner & Remove Button */}
+                        {activeRegisteredDomain && (
                           <div
                             className="p-3 mb-4 rounded-3 border d-flex flex-wrap align-items-center justify-content-between gap-3"
-                            style={{ background: "rgba(16, 185, 129, 0.06)", borderColor: "rgba(16, 185, 129, 0.25)" }}
+                            style={{ background: "rgba(16, 185, 129, 0.08)", borderColor: "rgba(16, 185, 129, 0.3)" }}
                           >
                             <div className="d-flex align-items-center gap-3">
                               <div
                                 style={{
-                                  width: 40,
-                                  height: 40,
-                                  borderRadius: "50%",
+                                  width: 44,
+                                  height: 44,
+                                  borderRadius: 12,
                                   background: "#10B981",
                                   display: "flex",
                                   alignItems: "center",
                                   justifyContent: "center",
                                   color: "#fff",
-                                  fontSize: 18,
+                                  fontSize: 22,
+                                  boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
                                 }}
                               >
-                                <i className="bi bi-globe"></i>
+                                <i className="bi bi-shield-check"></i>
                               </div>
                               <div>
-                                <div className="small text-muted fw-bold text-uppercase" style={{ fontSize: 11 }}>
-                                  Active Registered Domain
+                                <div className="d-flex align-items-center gap-2">
+                                  <span className="badge bg-success text-white" style={{ fontSize: 10 }}>
+                                    ACTIVE REGISTERED DOMAIN
+                                  </span>
+                                  <span className="text-muted small">Live on your school portal</span>
                                 </div>
-                                <div className="fs-5 fw-bold text-dark font-monospace">
-                                  {domainStatus.school.custom_domain}
+                                <div className="fs-5 fw-bold text-dark font-monospace mt-1">
+                                  {activeRegisteredDomain}
                                 </div>
                               </div>
                             </div>
 
                             <button
                               type="button"
-                              className="btn btn-outline-danger btn-sm fw-bold px-3 py-2 d-inline-flex align-items-center gap-2"
+                              className="btn btn-outline-danger fw-bold px-3 py-2 d-inline-flex align-items-center gap-2"
                               onClick={() => setShowRemoveConfirmModal(true)}
                               disabled={removingDomain}
                             >
-                              <i className="bi bi-trash3"></i>
+                              <i className="bi bi-trash3-fill"></i>
                               {removingDomain ? "Disconnecting..." : "Remove / Disconnect Domain"}
                             </button>
                           </div>
                         )}
 
-                        <label className="form-label fw-bold small text-dark">
-                          {domainStatus?.school?.custom_domain
-                            ? "Switch or replace with another domain:"
-                            : "Enter your custom domain name:"}
+                        <label className="form-label fw-bold small text-dark mb-1">
+                          Enter your custom domain name:
                         </label>
-                        <form onSubmit={handleConnectExisting} className="d-flex gap-2">
-                          <div className="input-group">
-                            <span className="input-group-text bg-white"><i className="bi bi-globe2 text-muted"></i></span>
+                        <form onSubmit={handleConnectExisting} className="d-flex flex-wrap gap-2">
+                          <div className="input-group" style={{ flex: "1 1 260px" }}>
+                            <span className="input-group-text bg-white">
+                              <i className="bi bi-globe2 text-muted"></i>
+                            </span>
                             <input
                               type="text"
                               className="form-control"
@@ -2212,19 +2220,38 @@ export default function DomainAndWebsitePage() {
                               onChange={(e) => setExistingDomainInput(e.target.value)}
                             />
                           </div>
-                          <button className="btn btn-primary fw-bold text-nowrap px-3" type="submit" disabled={connectingExisting}>
+
+                          <button
+                            className="btn btn-primary fw-bold text-nowrap px-4"
+                            type="submit"
+                            disabled={connectingExisting || !existingDomainInput.trim()}
+                          >
                             {connectingExisting ? (
                               <>
                                 <span className="spinner-border spinner-border-sm me-2" />
                                 Connecting...
                               </>
-                            ) : domainStatus?.school?.custom_domain ? (
+                            ) : activeRegisteredDomain ? (
                               "Update Domain"
                             ) : (
                               "Connect Domain"
                             )}
                           </button>
+
+                          {activeRegisteredDomain && (
+                            <button
+                              type="button"
+                              className="btn btn-outline-danger fw-bold text-nowrap px-3"
+                              onClick={() => setShowRemoveConfirmModal(true)}
+                              disabled={removingDomain}
+                            >
+                              <i className="bi bi-trash3 me-1"></i> Remove
+                            </button>
+                          )}
                         </form>
+                        <div className="text-muted small mt-2">
+                          e.g. <code>www.yourschool.sch.ng</code> or <code>portal.yourschool.com</code>
+                        </div>
                       </div>
                     </div>
                   </div>
