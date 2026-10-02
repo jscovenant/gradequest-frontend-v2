@@ -118,6 +118,7 @@ function getErrorMessage(err: any): string {
 
 function naira(n: number | null | undefined) {
   const v = Number(n ?? 0);
+  if (!Number.isFinite(v)) return "₦0";
   return v.toLocaleString("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 });
 }
 
@@ -322,7 +323,12 @@ export default function FeeMethodsPage() {
         term_id: tId,
       });
 
-      const ft: FeeType[] = Array.isArray(res.data?.fee_types) ? res.data.fee_types : [];
+      const rawFt = Array.isArray(res.data?.fee_types) ? res.data.fee_types : [];
+      const ft: FeeType[] = rawFt.map((f: any) => ({
+        ...f,
+        id: Number(f.id),
+        amount: Number(f.amount) || 0,
+      }));
       setFeeTypes(ft);
 
       // Pre-select all fee types by default
@@ -358,7 +364,12 @@ export default function FeeMethodsPage() {
         term_id: tId,
       });
 
-      const ft: FeeType[] = Array.isArray(res.data?.fee_types) ? res.data.fee_types : [];
+      const rawFt = Array.isArray(res.data?.fee_types) ? res.data.fee_types : [];
+      const ft: FeeType[] = rawFt.map((f: any) => ({
+        ...f,
+        id: Number(f.id),
+        amount: Number(f.amount) || 0,
+      }));
       setFeeTypes(ft);
 
       // Preselect all fee types by default
@@ -423,7 +434,11 @@ export default function FeeMethodsPage() {
   const feePerStudent = useMemo(() => {
     if (!feeTypes.length) return 0;
     const map = new Map<number, FeeType>(feeTypes.map((f) => [f.id, f]));
-    return selectedFeeIds.reduce((sum, id) => sum + (map.get(id)?.amount ?? 0), 0);
+    return selectedFeeIds.reduce((sum, id) => {
+      const raw = map.get(id)?.amount;
+      const val = Number(raw ?? 0);
+      return sum + (Number.isFinite(val) ? val : 0);
+    }, 0);
   }, [selectedFeeIds, feeTypes]);
 
   function toggleFee(id: number) {
@@ -479,7 +494,9 @@ export default function FeeMethodsPage() {
   }
 
   const totalClassBill = useMemo(() => {
-    return selectedStudentIdsList.length * feePerStudent;
+    const count = selectedStudentIdsList.length;
+    const perStudent = Number(feePerStudent) || 0;
+    return count * perStudent;
   }, [selectedStudentIdsList.length, feePerStudent]);
 
   /* =========================
