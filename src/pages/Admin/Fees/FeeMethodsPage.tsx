@@ -851,17 +851,19 @@ export default function FeeMethodsPage() {
         }
 
         /* GRID LAYOUTS */
-        .fa-class-grid {
+        .fa-class-top-row {
           display: grid;
-          grid-template-columns: 360px 380px minmax(0, 1fr);
-          gap: 18px;
-          align-items: start;
+          grid-template-columns: 1fr 1fr;
+          gap: 20px;
+          margin-bottom: 20px;
+          align-items: stretch;
         }
-        @media(max-width: 1200px) {
-          .fa-class-grid { grid-template-columns: 1fr 1fr; }
+        @media(max-width: 900px) {
+          .fa-class-top-row { grid-template-columns: 1fr; gap: 16px; }
         }
-        @media(max-width: 820px) {
-          .fa-class-grid { grid-template-columns: 1fr; }
+
+        .fa-class-bottom-row {
+          width: 100%;
         }
 
         .fa-ind-grid {
@@ -972,23 +974,29 @@ export default function FeeMethodsPage() {
         .fa-fee-amount { font-size: 13.5px; font-weight: 800; color: #0F2744; }
 
         /* Student Roster in Class Mode */
-        .fa-roster-wrap {
-          max-height: 480px;
+        .fa-roster-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 10px;
+          max-height: 440px;
           overflow-y: auto;
           border: 1px solid #E2E8F0;
           border-radius: 12px;
+          background: #FAFAFC;
+          padding: 12px;
         }
         .fa-roster-item {
           display: flex;
           align-items: center;
           justify-content: space-between;
           padding: 10px 14px;
-          border-bottom: 1px solid #F1F5F9;
-          transition: background 0.15s;
+          border: 1px solid #E2E8F0;
+          border-radius: 10px;
+          background: #fff;
+          transition: all 0.15s;
         }
-        .fa-roster-item:last-child { border-bottom: none; }
-        .fa-roster-item:hover { background: #F8FAFC; }
-        .fa-roster-item.checked { background: #F0FDF4; }
+        .fa-roster-item:hover { background: #F8FAFC; border-color: #CBD5E1; }
+        .fa-roster-item.checked { background: #F0FDF4; border-color: #86EFAC; }
 
         /* Sticky Summary Bar */
         .fa-bill-summary {
@@ -1236,7 +1244,8 @@ export default function FeeMethodsPage() {
                     </div>
                   )}
 
-                  <div className="fa-class-grid">
+                  {/* ROW 1: CARDS 1 & 2 */}
+                  <div className="fa-class-top-row">
                     {/* STEP 1: CLASS & PERIOD */}
                     <div className="fa-card">
                       <div className="fa-card-head">
@@ -1400,8 +1409,10 @@ export default function FeeMethodsPage() {
                         )}
                       </div>
                     </div>
+                  </div>
 
-                    {/* STEP 3: CLASS ROSTER & COLLECTIVE ASSIGN */}
+                  {/* ROW 2: STEP 3 (CLASS ROSTER & COLLECTIVE ASSIGN) */}
+                  <div className="fa-class-bottom-row">
                     <div className="fa-card">
                       <div className="fa-card-head">
                         <div className="fa-card-title">
@@ -1449,7 +1460,7 @@ export default function FeeMethodsPage() {
                             </div>
 
                             {/* Roster list */}
-                            <div className="fa-roster-wrap">
+                            <div className="fa-roster-grid">
                               {filteredEnrolledStudents.length === 0 ? (
                                 <div className="text-center py-3 text-muted small">
                                   No student matched your filter.
