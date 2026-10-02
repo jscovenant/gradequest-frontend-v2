@@ -324,9 +324,9 @@ export default function AddResultV2Page() {
     if (!classId) return;
     setLoadingStudents(true);
     try {
-      let bId = targetBatchId || batchId;
+      let bId = targetBatchId || null;
 
-      // If batchId is not known yet, resolve or fetch
+      // If batchId is not known yet, resolve or fetch specifically for this class
       if (!bId && term && session) {
         try {
           const resolveRes = await authApi.post("/result-batches/resolve", {
@@ -334,7 +334,7 @@ export default function AddResultV2Page() {
             term,
             session,
           });
-          bId = resolveRes.data?.batch?.id;
+          bId = resolveRes.data?.batch?.id || null;
           if (bId) setBatchId(bId);
         } catch {
           // ignore
@@ -502,8 +502,8 @@ export default function AddResultV2Page() {
       if (targetSession) setSession(targetSession);
       setDepartment(st.department?.name || data.student?.department?.name || "");
 
-      // Check if batch is already resolved or existing
-      let resolvedBatchId = data.batch_id || batchId;
+      // Check if batch is already resolved or existing for THIS student's class
+      let resolvedBatchId = data.batch_id || null;
 
       if (!resolvedBatchId && st.school_id && st.level?.id && targetTerm && targetSession) {
         try {
@@ -513,7 +513,7 @@ export default function AddResultV2Page() {
             term: targetTerm,
             session: targetSession,
           });
-          resolvedBatchId = batchRes.data?.batch?.id;
+          resolvedBatchId = batchRes.data?.batch?.id || null;
         } catch {
           // ignore
         }
@@ -522,6 +522,10 @@ export default function AddResultV2Page() {
       if (resolvedBatchId) {
         setBatchId(resolvedBatchId);
         await loadStudentInBatch(resolvedBatchId, st.id);
+        navigate(
+          `/students/results/add?class_id=${st.level?.id || ""}&term=${encodeURIComponent(targetTerm)}&session=${encodeURIComponent(targetSession)}`,
+          { replace: true }
+        );
         showSuccess(`Loaded saved result for ${st.firstname} ${st.surname} ✅`);
         return;
       }
@@ -785,7 +789,7 @@ export default function AddResultV2Page() {
     if (!student) return showWarning("Please select a student first.");
 
     let activeBatchId = batchId;
-    if (!activeBatchId) {
+    if (!activeBatchId || (student.level?.id && selectedClassId && Number(student.level.id) !== Number(selectedClassId))) {
       if (!student.school_id || !student.level?.id || !term || !session) {
         return showWarning("Active term/session is required to save results.");
       }
