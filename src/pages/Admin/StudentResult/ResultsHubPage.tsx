@@ -178,10 +178,10 @@ export default function ResultsHubPage() {
     e.preventDefault();
     const q = studentSearchText.trim();
     if (!q) {
-      showInfo("Please enter a student name or registration number.");
+      navigate(`/results/student-editor?term=${encodeURIComponent(selectedTerm)}&session=${encodeURIComponent(selectedSession)}`);
       return;
     }
-    navigate(`/results/student-editor?search=${encodeURIComponent(q)}&term=${encodeURIComponent(selectedTerm)}&session=${encodeURIComponent(selectedSession)}`);
+    navigate(`/results/student-editor?reg_no=${encodeURIComponent(q)}&term=${encodeURIComponent(selectedTerm)}&session=${encodeURIComponent(selectedSession)}`);
   };
 
   // Quick score entry jump
@@ -787,25 +787,30 @@ export default function ResultsHubPage() {
                       Search any student, preview their personalized report sheet, make one-off corrections, print PDF, or share via WhatsApp.
                     </p>
 
-                    {/* Quick Student Search */}
-                    <form onSubmit={handleQuickStudentSearch} className="gq-rh-quick-search">
+                    {/* Single Unified Student Search & Open */}
+                    <form onSubmit={handleQuickStudentSearch} className="gq-rh-quick-search" style={{ marginTop: 12 }}>
                       <input
-                        placeholder="Search student or Reg No..."
+                        placeholder="Enter student name or Reg No..."
                         value={studentSearchText}
                         onChange={(e) => setStudentSearchText(e.target.value)}
                       />
-                      <button type="submit">Open</button>
+                      <button
+                        type="submit"
+                        style={{
+                          background: "#D97706",
+                          color: "#fff",
+                          fontWeight: 700,
+                          padding: "8px 14px",
+                          borderRadius: 8,
+                          border: "none",
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {studentSearchText.trim() ? "Open Result →" : "Open Editor →"}
+                      </button>
                     </form>
                   </div>
-
-                  <button
-                    className="gq-rh-btn-action gq-rh-btn-amber"
-                    style={{ marginTop: 12 }}
-                    onClick={() => navigate("/results/student-editor")}
-                    type="button"
-                  >
-                    Open Student Editor →
-                  </button>
                 </div>
               </div>
             </div>

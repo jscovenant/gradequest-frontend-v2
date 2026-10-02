@@ -22,6 +22,23 @@ type StudentSearchItem = {
   level_id?: number | null;
 };
 
+type EnrolledStudent = {
+  id: number;
+  firstname: string;
+  surname: string;
+  reg_no: string;
+  level_id?: number | null;
+  section_id?: number | null;
+};
+
+type ClassWithStudents = {
+  id: number;
+  name: string;
+  section_id?: number | null;
+  section?: { id: number; name: string } | null;
+  students?: EnrolledStudent[];
+};
+
 type FeeStatus = "paid" | "partial" | "unpaid";
 
 type StudentFeeDetails = {
@@ -49,7 +66,7 @@ type StudentFeeDetails = {
 };
 
 type Option = { id: number; name: string };
-type FeeType = { id: number; name: string; amount: number };
+type FeeType = { id: number; name: string; amount: number; section_id?: number | null };
 
 /* =========================
    PAYSTACK INLINE
@@ -113,33 +130,44 @@ export default function FeeMethodsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loadingPage, setLoadingPage] = useState(true);
 
+  // Active Assignment Mode: 'class' (collective) or 'individual' (optional)
+  const [mode, setMode] = useState<"class" | "individual">("class");
+
   // Dropdown options
   const [sections, setSections] = useState<Option[]>([]);
   const [sessions, setSessions] = useState<Option[]>([]);
   const [terms, setTerms] = useState<Option[]>([]);
+  const [classesWithStudents, setClassesWithStudents] = useState<ClassWithStudents[]>([]);
   const [loadingMeta, setLoadingMeta] = useState(true);
 
-  // Student search
+  // Common Academic Period
+  const [sessionId, setSessionId] = useState<number | "">("");
+  const [termId, setTermId] = useState<number | "">("");
+  const [sectionId, setSectionId] = useState<number | "">("");
+
+  // ================= CLASS BULK MODE STATE =================
+  const [selectedClassId, setSelectedClassId] = useState<number | "">("");
+  const [selectedStudentIds, setSelectedStudentIds] = useState<Record<number, boolean>>({});
+  const [classStudentFilter, setClassStudentFilter] = useState("");
+  const [assigningClassFees, setAssigningClassFees] = useState(false);
+  const [classAssignResult, setClassAssignResult] = useState<string | null>(null);
+
+  // ================= INDIVIDUAL MODE STATE =================
   const [regNo, setRegNo] = useState("");
   const [searchingStudent, setSearchingStudent] = useState(false);
   const [studentPick, setStudentPick] = useState<StudentSearchItem | null>(null);
 
-  // Fee context
-  const [sectionId, setSectionId] = useState<number | "">("");
-  const [sessionId, setSessionId] = useState<number | "">("");
-  const [termId, setTermId] = useState<number | "">("");
-
-  // Fee types to assign
+  // ================= FEE TYPES SELECTION =================
   const [feeTypes, setFeeTypes] = useState<FeeType[]>([]);
   const [loadingFeeTypes, setLoadingFeeTypes] = useState(false);
   const [selectedFeeTypeIds, setSelectedFeeTypeIds] = useState<Record<number, boolean>>({});
 
-  // Student fee details & ledger
+  // ================= STUDENT LEDGER STATE =================
   const [details, setDetails] = useState<StudentFeeDetails | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
-  // Online collection modal
+  // ================= ONLINE PAYMENT MODAL =================
   const [collectTarget, setCollectTarget] = useState<{ id: number; label: string; balance: number } | null>(null);
   const [collectAmount, setCollectAmount] = useState("");
   const [collectEmail, setCollectEmail] = useState("");
@@ -152,7 +180,7 @@ export default function FeeMethodsPage() {
   }, []);
 
   /* =========================
-     LOAD METADATA
+     LOAD METADATA & CLASSES
   ========================= */
   useEffect(() => {
     let mounted = true;
@@ -160,18 +188,21 @@ export default function FeeMethodsPage() {
     async function fetchMetadata() {
       try {
         setLoadingMeta(true);
-        const [secRes, sesRes, termRes] = await Promise.all([
-          authApi.get("/sections"),
-          authApi.get("/facademic-sessions"),
-          authApi.get("/fterms"),
+        const [secRes, sesRes, termRes, classRes] = await Promise.all([
+          authApi.get("/sections").catch(() => ({ data: [] })),
+          authApi.get("/facademic-sessions").catch(() => ({ data: [] })),
+          authApi.get("/fterms").catch(() => ({ data: [] })),
+          authApi.get("/fees/classes-with-students").catch(() => ({ data: { classes: [] } })),
         ]);
 
         if (!mounted) return;
 
+        // Sections
         const rawSec = secRes.data?.data ?? secRes.data ?? [];
         const secArr: Option[] = Array.isArray(rawSec) ? rawSec.map((s: any) => ({ id: s.id, name: s.name })) : [];
         setSections(secArr);
 
+        // Sessions
         const rawSes = sesRes.data?.data ?? sesRes.data ?? [];
         const sesArr: Option[] = (Array.isArray(rawSes) ? rawSes : []).map((s: any) => ({
           id: s.id,
@@ -182,6 +213,7 @@ export default function FeeMethodsPage() {
           setSessionId(sesArr[0].id);
         }
 
+        // Terms
         const rawTerms = termRes.data?.data ?? termRes.data ?? [];
         const termArr: Option[] = (Array.isArray(rawTerms) ? rawTerms : []).map((t: any) => ({
           id: t.id,
@@ -190,6 +222,26 @@ export default function FeeMethodsPage() {
         setTerms(termArr);
         if (termArr.length > 0 && !termId) {
           setTermId(termArr[0].id);
+        }
+
+        // Classes with students
+        const rawClasses = classRes.data?.classes ?? classRes.data?.data ?? classRes.data ?? [];
+        const classArr: ClassWithStudents[] = Array.isArray(rawClasses) ? rawClasses : [];
+        setClassesWithStudents(classArr);
+
+        // Auto select first class if available
+        if (classArr.length > 0 && !selectedClassId) {
+          const first = classArr[0];
+          setSelectedClassId(first.id);
+          if (first.section_id) {
+            setSectionId(first.section_id);
+          }
+          // Preselect all students in first class
+          const preSelected: Record<number, boolean> = {};
+          first.students?.forEach((st) => {
+            preSelected[st.id] = true;
+          });
+          setSelectedStudentIds(preSelected);
         }
       } catch (e: any) {
         console.error(e);
@@ -206,7 +258,123 @@ export default function FeeMethodsPage() {
   }, []);
 
   /* =========================
-     STUDENT SEARCH
+     CURRENT SELECTED CLASS
+  ========================= */
+  const activeClassObj = useMemo(() => {
+    if (!selectedClassId) return null;
+    return classesWithStudents.find((c) => c.id === Number(selectedClassId)) || null;
+  }, [selectedClassId, classesWithStudents]);
+
+  // When class changes, update section & preselect its students
+  function handleClassChange(newClassId: number | "") {
+    setSelectedClassId(newClassId);
+    setClassAssignResult(null);
+
+    if (!newClassId) {
+      setSelectedStudentIds({});
+      setFeeTypes([]);
+      return;
+    }
+
+    const found = classesWithStudents.find((c) => c.id === Number(newClassId));
+    if (found) {
+      if (found.section_id) {
+        setSectionId(found.section_id);
+      }
+      // Preselect all enrolled students
+      const preSelected: Record<number, boolean> = {};
+      found.students?.forEach((st) => {
+        preSelected[st.id] = true;
+      });
+      setSelectedStudentIds(preSelected);
+
+      // Trigger fee type fetch
+      if (sessionId && termId) {
+        void fetchFeeTypesForClass(found.id, found.section_id, Number(sessionId), Number(termId));
+      }
+    }
+  }
+
+  /* =========================
+     AUTO FETCH FEE TYPES (CLASS MODE)
+  ========================= */
+  useEffect(() => {
+    if (mode === "class" && selectedClassId && sessionId && termId) {
+      const found = classesWithStudents.find((c) => c.id === Number(selectedClassId));
+      void fetchFeeTypesForClass(
+        Number(selectedClassId),
+        found?.section_id || (sectionId ? Number(sectionId) : undefined),
+        Number(sessionId),
+        Number(termId)
+      );
+    }
+  }, [mode, selectedClassId, sectionId, sessionId, termId]);
+
+  async function fetchFeeTypesForClass(cId: number, secId: number | undefined, sesId: number, tId: number) {
+    try {
+      setLoadingFeeTypes(true);
+      setSelectedFeeTypeIds({});
+
+      const res = await authApi.post("/fees/fetch-types", {
+        class_id: cId,
+        section_id: secId || undefined,
+        session_id: sesId,
+        term_id: tId,
+      });
+
+      const ft: FeeType[] = Array.isArray(res.data?.fee_types) ? res.data.fee_types : [];
+      setFeeTypes(ft);
+
+      // Pre-select all fee types by default
+      const allChecked: Record<number, boolean> = {};
+      ft.forEach((f) => (allChecked[f.id] = true));
+      setSelectedFeeTypeIds(allChecked);
+    } catch (e: any) {
+      console.error(e);
+      setFeeTypes([]);
+    } finally {
+      setLoadingFeeTypes(false);
+    }
+  }
+
+  /* =========================
+     AUTO FETCH FEE TYPES (INDIVIDUAL MODE)
+  ========================= */
+  useEffect(() => {
+    if (mode === "individual" && studentPick?.id && sectionId && sessionId && termId) {
+      void fetchFeeTypesForStudent(studentPick.id, Number(sectionId), Number(sessionId), Number(termId));
+    }
+  }, [mode, studentPick?.id, sectionId, sessionId, termId]);
+
+  async function fetchFeeTypesForStudent(sId: number, secId: number, sesId: number, tId: number) {
+    try {
+      setLoadingFeeTypes(true);
+      setSelectedFeeTypeIds({});
+
+      const res = await authApi.post("/fees/fetch-types", {
+        student_id: sId,
+        section_id: secId,
+        session_id: sesId,
+        term_id: tId,
+      });
+
+      const ft: FeeType[] = Array.isArray(res.data?.fee_types) ? res.data.fee_types : [];
+      setFeeTypes(ft);
+
+      // Preselect all fee types by default
+      const allChecked: Record<number, boolean> = {};
+      ft.forEach((f) => (allChecked[f.id] = true));
+      setSelectedFeeTypeIds(allChecked);
+    } catch (e: any) {
+      console.error(e);
+      setFeeTypes([]);
+    } finally {
+      setLoadingFeeTypes(false);
+    }
+  }
+
+  /* =========================
+     STUDENT SEARCH (INDIVIDUAL MODE)
   ========================= */
   async function searchStudentByReg() {
     const q = regNo.trim();
@@ -245,45 +413,14 @@ export default function FeeMethodsPage() {
   }
 
   /* =========================
-     AUTO FETCH FEE TYPES
-  ========================= */
-  useEffect(() => {
-    if (studentPick?.id && sectionId && sessionId && termId) {
-      void fetchFeeTypesForStudent(studentPick.id, Number(sectionId), Number(sessionId), Number(termId));
-    }
-  }, [studentPick?.id, sectionId, sessionId, termId]);
-
-  async function fetchFeeTypesForStudent(sId: number, secId: number, sesId: number, tId: number) {
-    try {
-      setLoadingFeeTypes(true);
-      setSelectedFeeTypeIds({});
-
-      const res = await authApi.post("/fees/fetch-types", {
-        student_id: sId,
-        section_id: secId,
-        session_id: sesId,
-        term_id: tId,
-      });
-
-      const ft: FeeType[] = Array.isArray(res.data?.fee_types) ? res.data.fee_types : [];
-      setFeeTypes(ft);
-    } catch (e: any) {
-      console.error(e);
-      setFeeTypes([]);
-    } finally {
-      setLoadingFeeTypes(false);
-    }
-  }
-
-  /* =========================
-     ASSIGN FEES
+     FEE CHECKLIST CALCULATIONS
   ========================= */
   const selectedFeeIds = useMemo(
     () => Object.entries(selectedFeeTypeIds).filter(([_, v]) => v).map(([k]) => Number(k)),
     [selectedFeeTypeIds]
   );
 
-  const totalSelectedAmount = useMemo(() => {
+  const feePerStudent = useMemo(() => {
     if (!feeTypes.length) return 0;
     const map = new Map<number, FeeType>(feeTypes.map((f) => [f.id, f]));
     return selectedFeeIds.reduce((sum, id) => sum + (map.get(id)?.amount ?? 0), 0);
@@ -303,7 +440,85 @@ export default function FeeMethodsPage() {
     setSelectedFeeTypeIds({});
   }
 
-  async function assignFees() {
+  /* =========================
+     CLASS ROSTER SELECTION
+  ========================= */
+  const enrolledStudents = useMemo(() => {
+    return activeClassObj?.students ?? [];
+  }, [activeClassObj]);
+
+  const filteredEnrolledStudents = useMemo(() => {
+    const q = classStudentFilter.trim().toLowerCase();
+    if (!q) return enrolledStudents;
+    return enrolledStudents.filter(
+      (s) =>
+        s.firstname.toLowerCase().includes(q) ||
+        s.surname.toLowerCase().includes(q) ||
+        (s.reg_no ?? "").toLowerCase().includes(q)
+    );
+  }, [enrolledStudents, classStudentFilter]);
+
+  const selectedStudentIdsList = useMemo(() => {
+    return Object.entries(selectedStudentIds)
+      .filter(([_, v]) => v)
+      .map(([k]) => Number(k));
+  }, [selectedStudentIds]);
+
+  function toggleStudent(id: number) {
+    setSelectedStudentIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function selectAllStudents() {
+    const next: Record<number, boolean> = {};
+    enrolledStudents.forEach((s) => (next[s.id] = true));
+    setSelectedStudentIds(next);
+  }
+
+  function deselectAllStudents() {
+    setSelectedStudentIds({});
+  }
+
+  const totalClassBill = useMemo(() => {
+    return selectedStudentIdsList.length * feePerStudent;
+  }, [selectedStudentIdsList.length, feePerStudent]);
+
+  /* =========================
+     BULK ASSIGN FEES TO CLASS
+  ========================= */
+  async function assignFeesToClass() {
+    if (!selectedClassId) return showError("Please select a class first.");
+    if (!sessionId || !termId) return showError("Please select both Session and Term.");
+    if (selectedFeeIds.length === 0) return showError("Please select at least one fee type to assign.");
+    if (selectedStudentIdsList.length === 0) return showError("Please select at least one student in the class.");
+
+    try {
+      setAssigningClassFees(true);
+      setClassAssignResult(null);
+
+      const res = await authApi.post("/fees/class-assign", {
+        class_id: Number(selectedClassId),
+        section_id: sectionId ? Number(sectionId) : undefined,
+        session_id: Number(sessionId),
+        term_id: Number(termId),
+        fee_type_ids: selectedFeeIds,
+        student_ids: selectedStudentIdsList,
+      });
+
+      const message = res.data?.message ?? "Class fees assigned successfully.";
+      setClassAssignResult(message);
+      showSuccess(message);
+    } catch (e: any) {
+      console.error(e);
+      showError(getErrorMessage(e) || "Failed to assign fees to class.");
+    } finally {
+      setAssigningClassFees(false);
+    }
+  }
+
+  /* =========================
+     ASSIGN FEES TO INDIVIDUAL
+  ========================= */
+  async function assignIndividualFees() {
     if (!studentPick?.id) return showError("Please search and select a student first.");
     if (!sectionId || !sessionId || !termId) return showError("Please select Section, Session, and Term.");
     if (selectedFeeIds.length === 0) return showError("Select at least one fee type to assign.");
@@ -370,6 +585,21 @@ export default function FeeMethodsPage() {
     } finally {
       setBusyKey(null);
     }
+  }
+
+  // Quick switch from Class roster to Individual Ledger
+  function inspectStudentLedger(st: EnrolledStudent) {
+    setStudentPick({
+      id: st.id,
+      firstname: st.firstname,
+      surname: st.surname,
+      reg_no: st.reg_no,
+      level_id: st.level_id,
+      section_id: st.section_id,
+    });
+    setRegNo(st.reg_no);
+    setMode("individual");
+    void loadStudentFeeDetailsDirect(st.reg_no);
   }
 
   /* =========================
@@ -480,18 +710,18 @@ export default function FeeMethodsPage() {
         @media(max-width: 767.98px) {
           .fa-main { padding: calc(var(--gq-topnav-height, 66px) + 12px) 12px 36px; }
         }
-        .fa-shell { max-width: 1280px; margin: 0 auto; width: 100%; }
+        .fa-shell { max-width: 1320px; margin: 0 auto; width: 100%; }
         
         /* Hero Banner */
         .fa-hero {
           background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
           border-radius: 18px;
-          padding: 28px 32px;
+          padding: 26px 30px;
           color: #fff;
           position: relative;
           overflow: hidden;
           box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
-          margin-bottom: 22px;
+          margin-bottom: 20px;
         }
         @media(max-width: 767.98px) {
           .fa-hero { padding: 20px 16px; border-radius: 14px; }
@@ -503,12 +733,12 @@ export default function FeeMethodsPage() {
           width: 280px;
           height: 280px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(217, 119, 6, 0.15) 0%, transparent 65%);
+          background: radial-gradient(circle, rgba(217, 119, 6, 0.18) 0%, transparent 65%);
           pointer-events: none;
         }
-        .fa-hero h1 { font-size: 24px; font-weight: 800; margin: 0 0 6px; color: #fff; }
+        .fa-hero h1 { font-size: 23px; font-weight: 800; margin: 0 0 6px; color: #fff; }
         @media(max-width: 767.98px) { .fa-hero h1 { font-size: 19px; } }
-        .fa-hero p { margin: 0; color: #CBD5E1; font-size: 13.5px; max-width: 680px; line-height: 1.55; }
+        .fa-hero p { margin: 0; color: #CBD5E1; font-size: 13.5px; max-width: 720px; line-height: 1.55; }
         .fa-badge {
           display: inline-flex;
           align-items: center;
@@ -530,7 +760,7 @@ export default function FeeMethodsPage() {
           color: #fff;
           font-weight: 700;
           font-size: 13px;
-          padding: 8px 16px;
+          padding: 8px 18px;
           border-radius: 10px;
           border: none;
           text-decoration: none;
@@ -557,15 +787,91 @@ export default function FeeMethodsPage() {
         }
         .fa-btn-soft:hover { background: rgba(255, 255, 255, 0.20); color: #fff; }
 
-        /* Main Workspace Grid */
-        .fa-grid {
+        /* MODE SWITCHER TABS */
+        .fa-mode-tabs {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+          margin-bottom: 22px;
+        }
+        @media(max-width: 767.98px) {
+          .fa-mode-tabs { grid-template-columns: 1fr; }
+        }
+        .fa-mode-tab {
+          background: #fff;
+          border: 2px solid #E2E8F0;
+          border-radius: 14px;
+          padding: 14px 18px;
+          text-align: left;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          position: relative;
+          transition: all 0.2s ease;
+        }
+        .fa-mode-tab:hover {
+          border-color: #CBD5E1;
+          box-shadow: 0 4px 12px rgba(15, 39, 68, 0.05);
+        }
+        .fa-mode-tab.active {
+          border-color: #D97706;
+          background: #FFFDF7;
+          box-shadow: 0 6px 18px rgba(217, 119, 6, 0.10);
+        }
+        .fa-mode-icon {
+          font-size: 26px;
+          line-height: 1;
+          flex-shrink: 0;
+        }
+        .fa-mode-tab strong {
+          display: block;
+          font-size: 14.5px;
+          font-weight: 800;
+          color: #0F2744;
+        }
+        .fa-mode-tab small {
+          display: block;
+          font-size: 12px;
+          color: #64748B;
+          margin-top: 2px;
+        }
+        .fa-mode-badge {
+          position: absolute;
+          top: 10px;
+          right: 12px;
+          background: #D97706;
+          color: #fff;
+          font-size: 10px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          padding: 3px 8px;
+          border-radius: 100px;
+        }
+
+        /* GRID LAYOUTS */
+        .fa-class-grid {
+          display: grid;
+          grid-template-columns: 360px 380px minmax(0, 1fr);
+          gap: 18px;
+          align-items: start;
+        }
+        @media(max-width: 1200px) {
+          .fa-class-grid { grid-template-columns: 1fr 1fr; }
+        }
+        @media(max-width: 820px) {
+          .fa-class-grid { grid-template-columns: 1fr; }
+        }
+
+        .fa-ind-grid {
           display: grid;
           grid-template-columns: 460px minmax(0, 1fr);
           gap: 20px;
           align-items: start;
         }
         @media(max-width: 1024px) {
-          .fa-grid { grid-template-columns: 1fr; }
+          .fa-ind-grid { grid-template-columns: 1fr; }
         }
 
         /* Panels */
@@ -578,7 +884,7 @@ export default function FeeMethodsPage() {
           margin-bottom: 18px;
         }
         .fa-card-head {
-          padding: 16px 20px;
+          padding: 15px 18px;
           border-bottom: 1px solid #F1F5F9;
           display: flex;
           align-items: center;
@@ -587,7 +893,7 @@ export default function FeeMethodsPage() {
           background: #fff;
         }
         .fa-card-title {
-          font-size: 15px;
+          font-size: 14.5px;
           font-weight: 800;
           color: #0F2744;
           margin: 0;
@@ -595,7 +901,7 @@ export default function FeeMethodsPage() {
           align-items: center;
           gap: 8px;
         }
-        .fa-card-body { padding: 18px 20px; }
+        .fa-card-body { padding: 18px; }
         @media(max-width: 767.98px) {
           .fa-card-body { padding: 14px 14px; }
         }
@@ -643,6 +949,63 @@ export default function FeeMethodsPage() {
           box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.12);
         }
 
+        /* Fee Checklist */
+        .fa-fee-item {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 10px 12px;
+          border: 1px solid #E2E8F0;
+          border-radius: 10px;
+          margin-bottom: 8px;
+          background: #fff;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .fa-fee-item:hover { border-color: #CBD5E1; background: #F8FAFC; }
+        .fa-fee-item.selected {
+          border-color: #D97706;
+          background: #FFFBEB;
+        }
+        .fa-fee-info strong { display: block; font-size: 13.5px; color: #0F2744; }
+        .fa-fee-info span { font-size: 11.5px; color: #64748B; }
+        .fa-fee-amount { font-size: 13.5px; font-weight: 800; color: #0F2744; }
+
+        /* Student Roster in Class Mode */
+        .fa-roster-wrap {
+          max-height: 480px;
+          overflow-y: auto;
+          border: 1px solid #E2E8F0;
+          border-radius: 12px;
+        }
+        .fa-roster-item {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 10px 14px;
+          border-bottom: 1px solid #F1F5F9;
+          transition: background 0.15s;
+        }
+        .fa-roster-item:last-child { border-bottom: none; }
+        .fa-roster-item:hover { background: #F8FAFC; }
+        .fa-roster-item.checked { background: #F0FDF4; }
+
+        /* Sticky Summary Bar */
+        .fa-bill-summary {
+          background: linear-gradient(135deg, #0F2744 0%, #1E3A8A 100%);
+          border-radius: 14px;
+          color: #fff;
+          padding: 16px 20px;
+          margin-top: 14px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          flex-wrap: wrap;
+        }
+        .fa-bill-stat span { display: block; font-size: 11px; text-transform: uppercase; color: #94A3B8; font-weight: 700; }
+        .fa-bill-stat strong { display: block; font-size: 20px; font-weight: 800; color: #FBBF24; }
+
         /* Student Identity Card */
         .fa-student-card {
           background: linear-gradient(135deg, #F8FAFC 0%, #EEF2F6 100%);
@@ -668,28 +1031,6 @@ export default function FeeMethodsPage() {
         }
         .fa-student-info h4 { font-size: 14.5px; font-weight: 800; margin: 0 0 2px; color: #0F2744; }
         .fa-student-info p { font-size: 12px; color: #64748B; margin: 0; }
-
-        /* Fee Checklist */
-        .fa-fee-item {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 11px 14px;
-          border: 1px solid #E2E8F0;
-          border-radius: 10px;
-          margin-bottom: 8px;
-          background: #fff;
-          cursor: pointer;
-          transition: all 0.15s;
-        }
-        .fa-fee-item:hover { border-color: #CBD5E1; background: #F8FAFC; }
-        .fa-fee-item.selected {
-          border-color: #D97706;
-          background: #FFFBEB;
-        }
-        .fa-fee-info strong { display: block; font-size: 13.5px; color: #0F2744; }
-        .fa-fee-info span { font-size: 12px; color: #64748B; }
-        .fa-fee-amount { font-size: 14px; font-weight: 800; color: #0F2744; }
 
         /* Ledger Summary Tiles */
         .fa-stat-grid {
@@ -821,7 +1162,7 @@ export default function FeeMethodsPage() {
       <div className="container-fluid">
         <div className="row">
           <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-          
+
           <main className="col-md-9 col-lg-10 ms-auto db-main fa-main">
             {loadingPage && <Loader message="Loading Fee Management..." />}
 
@@ -835,7 +1176,7 @@ export default function FeeMethodsPage() {
                   </span>
                   <h1>Fee Assignments & Allocations</h1>
                   <p>
-                    Assign termly tuition, levies, and school fees to students, inspect live financial ledgers, and collect instant payments.
+                    Assign termly tuition and levies collectively to an entire class in one click, or search an individual student to inspect ledgers and collect payments.
                   </p>
                   <div className="fa-hero-actions">
                     <Link to="/fees/structure" className="fa-btn-soft">
@@ -848,72 +1189,86 @@ export default function FeeMethodsPage() {
                 </div>
               </section>
 
-              {/* Workspace Grid */}
-              <div className="fa-grid">
-                {/* LEFT: Assignment Studio */}
-                <div>
-                  {/* Step 1: Student Lookup */}
-                  <div className="fa-card">
-                    <div className="fa-card-head">
-                      <div className="fa-card-title">
-                        <span className="fa-step-badge">1</span> Student Lookup
-                      </div>
-                      {studentPick && (
-                        <button
-                          className="btn btn-sm btn-link text-muted p-0 text-decoration-none"
-                          onClick={() => {
-                            setStudentPick(null);
-                            setDetails(null);
-                            setRegNo("");
-                          }}
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                    <div className="fa-card-body">
-                      <label className="fa-label">Admission / Reg Number</label>
-                      <div className="d-flex gap-2">
-                        <input
-                          className="fa-input"
-                          placeholder="e.g. GQ/2026/001"
-                          value={regNo}
-                          onChange={(e) => setRegNo(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && searchStudentByReg()}
-                        />
-                        <button
-                          className="fa-btn-gold"
-                          onClick={searchStudentByReg}
-                          disabled={searchingStudent || !regNo.trim()}
-                        >
-                          {searchingStudent ? "Finding..." : "Find"}
-                        </button>
-                      </div>
-
-                      {studentPick && (
-                        <div className="fa-student-card">
-                          <div className="fa-student-avatar">
-                            {studentPick.firstname?.charAt(0) || "S"}
-                          </div>
-                          <div className="fa-student-info">
-                            <h4>{studentPick.firstname} {studentPick.surname}</h4>
-                            <p>Reg No: <strong>{studentPick.reg_no}</strong></p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+              {/* MODE SELECTOR TABS */}
+              <div className="fa-mode-tabs">
+                <button
+                  type="button"
+                  className={`fa-mode-tab ${mode === "class" ? "active" : ""}`}
+                  onClick={() => setMode("class")}
+                >
+                  <span className="fa-mode-icon">👥</span>
+                  <div>
+                    <strong>Collective Class Assignment (Fast)</strong>
+                    <small>Assign termly fees to all or selected students in a class at once</small>
                   </div>
+                  {mode === "class" && <span className="fa-mode-badge">Active</span>}
+                </button>
 
-                  {/* Step 2: Academic Period & Section */}
-                  <div className="fa-card">
-                    <div className="fa-card-head">
-                      <div className="fa-card-title">
-                        <span className="fa-step-badge">2</span> Billing Period
+                <button
+                  type="button"
+                  className={`fa-mode-tab ${mode === "individual" ? "active" : ""}`}
+                  onClick={() => setMode("individual")}
+                >
+                  <span className="fa-mode-icon">👤</span>
+                  <div>
+                    <strong>Individual Student Assignment & Ledger (Optional)</strong>
+                    <small>Search specific student, assign fees, inspect ledger, or collect payments</small>
+                  </div>
+                  {mode === "individual" && <span className="fa-mode-badge">Active</span>}
+                </button>
+              </div>
+
+              {/* =========================================================
+                  MODE 1: COLLECTIVE CLASS ASSIGNMENT
+                  ========================================================= */}
+              {mode === "class" && (
+                <div>
+                  {classAssignResult && (
+                    <div className="alert alert-success d-flex align-items-center justify-content-between mb-3 rounded-3 shadow-sm py-3 px-4">
+                      <div>
+                        <strong>✅ Success:</strong> {classAssignResult}
                       </div>
+                      <button
+                        type="button"
+                        className="btn-close"
+                        onClick={() => setClassAssignResult(null)}
+                      />
                     </div>
-                    <div className="fa-card-body">
-                      <div className="row g-2">
-                        <div className="col-12 col-sm-6">
+                  )}
+
+                  <div className="fa-class-grid">
+                    {/* STEP 1: CLASS & PERIOD */}
+                    <div className="fa-card">
+                      <div className="fa-card-head">
+                        <div className="fa-card-title">
+                          <span className="fa-step-badge">1</span> Target Class & Period
+                        </div>
+                      </div>
+                      <div className="fa-card-body">
+                        {/* Class Dropdown */}
+                        <div className="mb-3">
+                          <label className="fa-label">Select Class</label>
+                          <select
+                            className="fa-select"
+                            value={selectedClassId}
+                            onChange={(e) => handleClassChange(e.target.value ? Number(e.target.value) : "")}
+                          >
+                            <option value="">-- Choose Class --</option>
+                            {classesWithStudents.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name} ({c.students?.length ?? 0} students)
+                              </option>
+                            ))}
+                          </select>
+                          {activeClassObj?.section?.name && (
+                            <small className="text-muted d-block mt-1">
+                              Section: <strong className="text-dark">{activeClassObj.section.name}</strong>
+                            </small>
+                          )}
+                        </div>
+
+                        {/* Session */}
+                        <div className="mb-3">
                           <label className="fa-label">Academic Session</label>
                           <select
                             className="fa-select"
@@ -922,12 +1277,16 @@ export default function FeeMethodsPage() {
                           >
                             <option value="">Select Session</option>
                             {sessions.map((s) => (
-                              <option key={s.id} value={s.id}>{s.name}</option>
+                              <option key={s.id} value={s.id}>
+                                {s.name}
+                              </option>
                             ))}
                           </select>
                         </div>
-                        <div className="col-12 col-sm-6">
-                          <label className="fa-label">Term</label>
+
+                        {/* Term */}
+                        <div className="mb-3">
+                          <label className="fa-label">Academic Term</label>
                           <select
                             className="fa-select"
                             value={termId}
@@ -935,231 +1294,605 @@ export default function FeeMethodsPage() {
                           >
                             <option value="">Select Term</option>
                             {terms.map((t) => (
-                              <option key={t.id} value={t.id}>{t.name}</option>
+                              <option key={t.id} value={t.id}>
+                                {t.name}
+                              </option>
                             ))}
                           </select>
                         </div>
-                        <div className="col-12">
-                          <label className="fa-label">Class Section</label>
-                          <select
-                            className="fa-select"
-                            value={sectionId}
-                            onChange={(e) => setSectionId(e.target.value ? Number(e.target.value) : "")}
-                          >
-                            <option value="">Select Section / Class</option>
-                            {sections.map((s) => (
-                              <option key={s.id} value={s.id}>{s.name}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
 
-                  {/* Step 3: Applicable Fee Types Checklist */}
-                  <div className="fa-card">
-                    <div className="fa-card-head">
-                      <div className="fa-card-title">
-                        <span className="fa-step-badge">3</span> Select & Assign Fees
-                      </div>
-                      {feeTypes.length > 0 && (
-                        <div className="d-flex gap-2">
-                          <button className="btn btn-sm btn-outline-secondary py-0 px-2" onClick={selectAllFees}>
-                            All
-                          </button>
-                          <button className="btn btn-sm btn-outline-secondary py-0 px-2" onClick={clearFeeSelection}>
-                            None
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <div className="fa-card-body">
-                      {loadingFeeTypes ? (
-                        <div className="text-center py-4 text-muted">
-                          <div className="spinner-border spinner-border-sm me-2" /> Loading fee types...
-                        </div>
-                      ) : !studentPick ? (
-                        <div className="text-center py-4 text-muted" style={{ fontSize: 13 }}>
-                          Search and select a student above to view applicable fee types.
-                        </div>
-                      ) : feeTypes.length === 0 ? (
-                        <div className="text-center py-4 text-muted" style={{ fontSize: 13 }}>
-                          No fee types configured for this section and period.
-                        </div>
-                      ) : (
-                        <div>
-                          {feeTypes.map((f) => {
-                            const isSelected = !!selectedFeeTypeIds[f.id];
-                            return (
-                              <div
-                                key={f.id}
-                                className={`fa-fee-item ${isSelected ? "selected" : ""}`}
-                                onClick={() => toggleFee(f.id)}
-                              >
-                                <div className="d-flex align-items-center gap-2">
-                                  <input
-                                    type="checkbox"
-                                    className="form-check-input mt-0"
-                                    checked={isSelected}
-                                    onChange={() => toggleFee(f.id)}
-                                  />
-                                  <div className="fa-fee-info">
-                                    <strong>{f.name}</strong>
-                                  </div>
-                                </div>
-                                <div className="fa-fee-amount">{naira(f.amount)}</div>
-                              </div>
-                            );
-                          })}
-
-                          {selectedFeeIds.length > 0 && (
-                            <div className="mt-3 p-3 bg-light rounded-3 d-flex justify-content-between align-items-center">
-                              <div>
-                                <small className="text-muted d-block">Selected {selectedFeeIds.length} fee(s)</small>
-                                <strong className="text-primary fs-6">{naira(totalSelectedAmount)}</strong>
-                              </div>
-                              <button
-                                className="fa-btn-gold"
-                                onClick={assignFees}
-                                disabled={busyKey === "fees:assign"}
-                              >
-                                {busyKey === "fees:assign" ? "Assigning..." : "Assign to Student"}
-                              </button>
+                        {/* Class Summary Box */}
+                        {activeClassObj && (
+                          <div className="p-3 bg-light rounded-3 mt-3 border">
+                            <div className="d-flex justify-content-between align-items-center mb-1">
+                              <span className="small text-muted">Enrolled Students:</span>
+                              <strong className="text-dark">{enrolledStudents.length}</strong>
                             </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* RIGHT: Live Student Fee Ledger */}
-                <div>
-                  <div className="fa-card">
-                    <div className="fa-card-head">
-                      <div className="fa-card-title">
-                        <i className="bi bi-journal-check text-primary" /> Student Financial Ledger
-                      </div>
-                      {details?.student && (
-                        <span className="badge bg-light text-dark border">
-                          {details.student.class || details.student.section || "Student"}
-                        </span>
-                      )}
-                    </div>
-                    <div className="fa-card-body">
-                      {loadingDetails ? (
-                        <div className="text-center py-5 text-muted">
-                          <div className="spinner-border spinner-border-sm me-2" /> Loading student ledger...
-                        </div>
-                      ) : !details ? (
-                        <div className="text-center py-5 text-muted">
-                          <i className="bi bi-search display-6 d-block mb-2 text-secondary opacity-50" />
-                          <h6 className="fw-bold text-dark">No Student Selected</h6>
-                          <p className="small text-muted mb-0">Search a student by registration number on the left to inspect their fees and payments.</p>
-                        </div>
-                      ) : (
-                        <div>
-                          {/* Top 3 Summary Tiles */}
-                          <div className="fa-stat-grid">
-                            <div className="fa-stat-tile">
-                              <span>Total Assigned</span>
-                              <strong>{naira(ledgerTotals.totalAmount)}</strong>
-                            </div>
-                            <div className="fa-stat-tile paid">
-                              <span>Total Paid</span>
-                              <strong>{naira(ledgerTotals.totalPaid)}</strong>
-                            </div>
-                            <div className="fa-stat-tile bal">
-                              <span>Outstanding</span>
-                              <strong>{naira(ledgerTotals.totalBal)}</strong>
+                            <div className="d-flex justify-content-between align-items-center">
+                              <span className="small text-muted">Selected to Bill:</span>
+                              <strong className="text-primary">{selectedStudentIdsList.length}</strong>
                             </div>
                           </div>
+                        )}
+                      </div>
+                    </div>
 
-                          {/* Progress Bar */}
-                          <div className="mb-4">
-                            <div className="d-flex justify-content-between small text-muted mb-1 font-monospace">
-                              <span>Payment Progress</span>
-                              <span>{ledgerTotals.percent}%</span>
+                    {/* STEP 2: FEE TYPES CHECKLIST */}
+                    <div className="fa-card">
+                      <div className="fa-card-head">
+                        <div className="fa-card-title">
+                          <span className="fa-step-badge">2</span> Applicable Fee Types
+                        </div>
+                        {feeTypes.length > 0 && (
+                          <div className="d-flex gap-2">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-secondary py-0 px-2"
+                              onClick={selectAllFees}
+                            >
+                              All
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-secondary py-0 px-2"
+                              onClick={clearFeeSelection}
+                            >
+                              None
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <div className="fa-card-body">
+                        {loadingFeeTypes ? (
+                          <div className="text-center py-4 text-muted">
+                            <div className="spinner-border spinner-border-sm me-2" />
+                            Loading fee types...
+                          </div>
+                        ) : !selectedClassId ? (
+                          <div className="text-center py-4 text-muted" style={{ fontSize: 13 }}>
+                            Select a class on the left to see available fee items.
+                          </div>
+                        ) : feeTypes.length === 0 ? (
+                          <div className="text-center py-4 text-muted" style={{ fontSize: 13 }}>
+                            <p className="mb-2">No fee types configured for this class section and period.</p>
+                            <Link to="/fees/structure" className="btn btn-sm btn-outline-primary">
+                              Configure Fee Structures →
+                            </Link>
+                          </div>
+                        ) : (
+                          <div>
+                            <div style={{ maxHeight: 340, overflowY: "auto", paddingRight: 4 }}>
+                              {feeTypes.map((f) => {
+                                const isSelected = !!selectedFeeTypeIds[f.id];
+                                return (
+                                  <div
+                                    key={f.id}
+                                    className={`fa-fee-item ${isSelected ? "selected" : ""}`}
+                                    onClick={() => toggleFee(f.id)}
+                                  >
+                                    <div className="d-flex align-items-center gap-2">
+                                      <input
+                                        type="checkbox"
+                                        className="form-check-input mt-0"
+                                        checked={isSelected}
+                                        onChange={() => toggleFee(f.id)}
+                                      />
+                                      <div className="fa-fee-info">
+                                        <strong>{f.name}</strong>
+                                      </div>
+                                    </div>
+                                    <div className="fa-fee-amount">{naira(f.amount)}</div>
+                                  </div>
+                                );
+                              })}
                             </div>
-                            <div className="progress" style={{ height: 8, borderRadius: 4 }}>
-                              <div
-                                className={`progress-bar ${ledgerTotals.percent === 100 ? "bg-success" : "bg-warning"}`}
-                                style={{ width: `${ledgerTotals.percent}%` }}
+
+                            <div className="mt-3 p-3 bg-light rounded-3 d-flex justify-content-between align-items-center border">
+                              <div>
+                                <small className="text-muted d-block">Fee per Student</small>
+                                <strong className="text-primary fs-6">{naira(feePerStudent)}</strong>
+                              </div>
+                              <span className="badge bg-secondary">
+                                {selectedFeeIds.length} item(s)
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* STEP 3: CLASS ROSTER & COLLECTIVE ASSIGN */}
+                    <div className="fa-card">
+                      <div className="fa-card-head">
+                        <div className="fa-card-title">
+                          <span className="fa-step-badge">3</span> Class Roster ({enrolledStudents.length})
+                        </div>
+                        {enrolledStudents.length > 0 && (
+                          <div className="d-flex gap-2">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-secondary py-0 px-2"
+                              onClick={selectAllStudents}
+                            >
+                              All
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-secondary py-0 px-2"
+                              onClick={deselectAllStudents}
+                            >
+                              None
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <div className="fa-card-body">
+                        {!selectedClassId ? (
+                          <div className="text-center py-4 text-muted" style={{ fontSize: 13 }}>
+                            Please select a class to view its student roster.
+                          </div>
+                        ) : enrolledStudents.length === 0 ? (
+                          <div className="text-center py-4 text-muted" style={{ fontSize: 13 }}>
+                            No active students found in this class.
+                          </div>
+                        ) : (
+                          <div>
+                            {/* Search Filter in Roster */}
+                            <div className="mb-2">
+                              <input
+                                className="fa-input"
+                                style={{ padding: "7px 11px", fontSize: 12.5 }}
+                                placeholder="Filter by name or Reg No..."
+                                value={classStudentFilter}
+                                onChange={(e) => setClassStudentFilter(e.target.value)}
                               />
                             </div>
-                          </div>
 
-                          {/* Assigned Fee Table */}
-                          <h6 className="fw-bold text-dark mb-2">Assigned Fee Items</h6>
-                          {details.fees.length === 0 ? (
-                            <div className="p-4 bg-light rounded-3 text-center text-muted small">
-                              No fees assigned for this student yet. Use Step 3 to assign fees.
-                            </div>
-                          ) : (
-                            <div className="fa-table-wrap">
-                              <table className="fa-table">
-                                <thead>
-                                  <tr>
-                                    <th>Fee Item</th>
-                                    <th>Total</th>
-                                    <th>Paid</th>
-                                    <th>Balance</th>
-                                    <th>Status</th>
-                                    <th className="text-end">Actions</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {details.fees.map((f) => (
-                                    <tr key={f.id}>
-                                      <td>
-                                        <strong>{f.fee_type?.name || `Fee #${f.fee_type_id}`}</strong>
-                                        <div className="small text-muted">{f.session?.name} • {f.term?.name}</div>
-                                      </td>
-                                      <td>{naira(f.total_amount)}</td>
-                                      <td className="text-success fw-bold">{naira(f.amount_paid)}</td>
-                                      <td className={f.balance > 0 ? "text-danger fw-bold" : "text-muted"}>
-                                        {naira(f.balance)}
-                                      </td>
-                                      <td>
-                                        <span className={`fa-pill fa-pill-${f.status || (f.balance === 0 ? "paid" : "unpaid")}`}>
-                                          {f.status || (f.balance === 0 ? "paid" : "unpaid")}
-                                        </span>
-                                      </td>
-                                      <td className="text-end">
-                                        <div className="d-inline-flex gap-2">
-                                          {f.balance > 0 && (
-                                            <button
-                                              className="fa-action-btn pay"
-                                              onClick={() => openCollectModal(f)}
-                                              title="Collect payment online via Paystack"
-                                            >
-                                              <i className="bi bi-credit-card" /> Pay
-                                            </button>
-                                          )}
-                                          {f.amount_paid === 0 && (
-                                            <button
-                                              className="fa-action-btn del"
-                                              onClick={() => removeAssignedFee(f.id)}
-                                              disabled={busyKey === `fees:remove:${f.id}`}
-                                              title="Remove assigned fee"
-                                            >
-                                              <i className="bi bi-trash" />
-                                            </button>
-                                          )}
+                            {/* Roster list */}
+                            <div className="fa-roster-wrap">
+                              {filteredEnrolledStudents.length === 0 ? (
+                                <div className="text-center py-3 text-muted small">
+                                  No student matched your filter.
+                                </div>
+                              ) : (
+                                filteredEnrolledStudents.map((st) => {
+                                  const isChecked = !!selectedStudentIds[st.id];
+                                  return (
+                                    <div
+                                      key={st.id}
+                                      className={`fa-roster-item ${isChecked ? "checked" : ""}`}
+                                    >
+                                      <label
+                                        className="d-flex align-items-center gap-2 m-0 cursor-pointer flex-grow-1"
+                                        style={{ cursor: "pointer" }}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          className="form-check-input mt-0"
+                                          checked={isChecked}
+                                          onChange={() => toggleStudent(st.id)}
+                                        />
+                                        <div>
+                                          <strong style={{ fontSize: 13, color: "#0F2744" }}>
+                                            {st.firstname} {st.surname}
+                                          </strong>
+                                          <div style={{ fontSize: 11.5, color: "#64748B" }}>
+                                            Reg: {st.reg_no || `#${st.id}`}
+                                          </div>
                                         </div>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                                      </label>
+
+                                      <button
+                                        type="button"
+                                        className="fa-action-btn"
+                                        style={{ fontSize: 11, padding: "4px 8px" }}
+                                        onClick={() => inspectStudentLedger(st)}
+                                        title="View this student's individual ledger"
+                                      >
+                                        Ledger ↗
+                                      </button>
+                                    </div>
+                                  );
+                                })
+                              )}
                             </div>
-                          )}
-                        </div>
-                      )}
+
+                            {/* Collective Billing Summary Banner */}
+                            <div className="fa-bill-summary">
+                              <div className="fa-bill-stat">
+                                <span>Billed Students</span>
+                                <strong>{selectedStudentIdsList.length}</strong>
+                              </div>
+                              <div className="fa-bill-stat">
+                                <span>Total Projected Bill</span>
+                                <strong>{naira(totalClassBill)}</strong>
+                              </div>
+                            </div>
+
+                            {/* Big Submit Button */}
+                            <div className="mt-3 d-grid">
+                              <button
+                                type="button"
+                                className="fa-btn-gold justify-content-center py-2 fs-6"
+                                onClick={assignFeesToClass}
+                                disabled={
+                                  assigningClassFees ||
+                                  selectedStudentIdsList.length === 0 ||
+                                  selectedFeeIds.length === 0
+                                }
+                              >
+                                {assigningClassFees ? (
+                                  <>
+                                    <span className="spinner-border spinner-border-sm me-2" />
+                                    Assigning to Class...
+                                  </>
+                                ) : (
+                                  <>
+                                    ⚡ Assign Fees to Class ({selectedStudentIdsList.length} Students • {naira(totalClassBill)})
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
+
+              {/* =========================================================
+                  MODE 2: INDIVIDUAL STUDENT ASSIGNMENT & LEDGER
+                  ========================================================= */}
+              {mode === "individual" && (
+                <div className="fa-ind-grid">
+                  {/* LEFT: Assignment Studio */}
+                  <div>
+                    {/* Step 1: Student Lookup */}
+                    <div className="fa-card">
+                      <div className="fa-card-head">
+                        <div className="fa-card-title">
+                          <span className="fa-step-badge">1</span> Student Lookup
+                        </div>
+                        {studentPick && (
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-link text-muted p-0 text-decoration-none"
+                            onClick={() => {
+                              setStudentPick(null);
+                              setDetails(null);
+                              setRegNo("");
+                            }}
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                      <div className="fa-card-body">
+                        <label className="fa-label">Admission / Reg Number</label>
+                        <div className="d-flex gap-2">
+                          <input
+                            className="fa-input"
+                            placeholder="e.g. GQ/2026/001"
+                            value={regNo}
+                            onChange={(e) => setRegNo(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && searchStudentByReg()}
+                          />
+                          <button
+                            type="button"
+                            className="fa-btn-gold"
+                            onClick={searchStudentByReg}
+                            disabled={searchingStudent || !regNo.trim()}
+                          >
+                            {searchingStudent ? "Finding..." : "Find"}
+                          </button>
+                        </div>
+
+                        {studentPick && (
+                          <div className="fa-student-card">
+                            <div className="fa-student-avatar">
+                              {studentPick.firstname?.charAt(0) || "S"}
+                            </div>
+                            <div className="fa-student-info">
+                              <h4>
+                                {studentPick.firstname} {studentPick.surname}
+                              </h4>
+                              <p>
+                                Reg No: <strong>{studentPick.reg_no}</strong>
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Step 2: Academic Period & Section */}
+                    <div className="fa-card">
+                      <div className="fa-card-head">
+                        <div className="fa-card-title">
+                          <span className="fa-step-badge">2</span> Billing Period & Section
+                        </div>
+                      </div>
+                      <div className="fa-card-body">
+                        <div className="row g-2">
+                          <div className="col-12 col-sm-6">
+                            <label className="fa-label">Academic Session</label>
+                            <select
+                              className="fa-select"
+                              value={sessionId}
+                              onChange={(e) => setSessionId(e.target.value ? Number(e.target.value) : "")}
+                            >
+                              <option value="">Select Session</option>
+                              {sessions.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="col-12 col-sm-6">
+                            <label className="fa-label">Term</label>
+                            <select
+                              className="fa-select"
+                              value={termId}
+                              onChange={(e) => setTermId(e.target.value ? Number(e.target.value) : "")}
+                            >
+                              <option value="">Select Term</option>
+                              {terms.map((t) => (
+                                <option key={t.id} value={t.id}>
+                                  {t.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="col-12">
+                            <label className="fa-label">Class Section</label>
+                            <select
+                              className="fa-select"
+                              value={sectionId}
+                              onChange={(e) => setSectionId(e.target.value ? Number(e.target.value) : "")}
+                            >
+                              <option value="">Select Section / Class</option>
+                              {sections.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Step 3: Applicable Fee Types Checklist */}
+                    <div className="fa-card">
+                      <div className="fa-card-head">
+                        <div className="fa-card-title">
+                          <span className="fa-step-badge">3</span> Select & Assign Fees
+                        </div>
+                        {feeTypes.length > 0 && (
+                          <div className="d-flex gap-2">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-secondary py-0 px-2"
+                              onClick={selectAllFees}
+                            >
+                              All
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-secondary py-0 px-2"
+                              onClick={clearFeeSelection}
+                            >
+                              None
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <div className="fa-card-body">
+                        {loadingFeeTypes ? (
+                          <div className="text-center py-4 text-muted">
+                            <div className="spinner-border spinner-border-sm me-2" />
+                            Loading fee types...
+                          </div>
+                        ) : !studentPick ? (
+                          <div className="text-center py-4 text-muted" style={{ fontSize: 13 }}>
+                            Search and select a student above to view applicable fee types.
+                          </div>
+                        ) : feeTypes.length === 0 ? (
+                          <div className="text-center py-4 text-muted" style={{ fontSize: 13 }}>
+                            No fee types configured for this section and period.
+                          </div>
+                        ) : (
+                          <div>
+                            {feeTypes.map((f) => {
+                              const isSelected = !!selectedFeeTypeIds[f.id];
+                              return (
+                                <div
+                                  key={f.id}
+                                  className={`fa-fee-item ${isSelected ? "selected" : ""}`}
+                                  onClick={() => toggleFee(f.id)}
+                                >
+                                  <div className="d-flex align-items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      className="form-check-input mt-0"
+                                      checked={isSelected}
+                                      onChange={() => toggleFee(f.id)}
+                                    />
+                                    <div className="fa-fee-info">
+                                      <strong>{f.name}</strong>
+                                    </div>
+                                  </div>
+                                  <div className="fa-fee-amount">{naira(f.amount)}</div>
+                                </div>
+                              );
+                            })}
+
+                            {selectedFeeIds.length > 0 && (
+                              <div className="mt-3 p-3 bg-light rounded-3 d-flex justify-content-between align-items-center border">
+                                <div>
+                                  <small className="text-muted d-block">
+                                    Selected {selectedFeeIds.length} fee(s)
+                                  </small>
+                                  <strong className="text-primary fs-6">{naira(feePerStudent)}</strong>
+                                </div>
+                                <button
+                                  type="button"
+                                  className="fa-btn-gold"
+                                  onClick={assignIndividualFees}
+                                  disabled={busyKey === "fees:assign"}
+                                >
+                                  {busyKey === "fees:assign" ? "Assigning..." : "Assign to Student"}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* RIGHT: Live Student Fee Ledger */}
+                  <div>
+                    <div className="fa-card">
+                      <div className="fa-card-head">
+                        <div className="fa-card-title">
+                          <i className="bi bi-journal-check text-primary" /> Student Financial Ledger
+                        </div>
+                        {details?.student && (
+                          <span className="badge bg-light text-dark border">
+                            {details.student.class || details.student.section || "Student"}
+                          </span>
+                        )}
+                      </div>
+                      <div className="fa-card-body">
+                        {loadingDetails ? (
+                          <div className="text-center py-5 text-muted">
+                            <div className="spinner-border spinner-border-sm me-2" /> Loading student ledger...
+                          </div>
+                        ) : !details ? (
+                          <div className="text-center py-5 text-muted">
+                            <i className="bi bi-search display-6 d-block mb-2 text-secondary opacity-50" />
+                            <h6 className="fw-bold text-dark">No Student Selected</h6>
+                            <p className="small text-muted mb-0">
+                              Search a student by registration number on the left to inspect their fees and payments.
+                            </p>
+                          </div>
+                        ) : (
+                          <div>
+                            {/* Top 3 Summary Tiles */}
+                            <div className="fa-stat-grid">
+                              <div className="fa-stat-tile">
+                                <span>Total Assigned</span>
+                                <strong>{naira(ledgerTotals.totalAmount)}</strong>
+                              </div>
+                              <div className="fa-stat-tile paid">
+                                <span>Total Paid</span>
+                                <strong>{naira(ledgerTotals.totalPaid)}</strong>
+                              </div>
+                              <div className="fa-stat-tile bal">
+                                <span>Outstanding</span>
+                                <strong>{naira(ledgerTotals.totalBal)}</strong>
+                              </div>
+                            </div>
+
+                            {/* Progress Bar */}
+                            <div className="mb-4">
+                              <div className="d-flex justify-content-between small text-muted mb-1 font-monospace">
+                                <span>Payment Progress</span>
+                                <span>{ledgerTotals.percent}%</span>
+                              </div>
+                              <div className="progress" style={{ height: 8, borderRadius: 4 }}>
+                                <div
+                                  className={`progress-bar ${
+                                    ledgerTotals.percent === 100 ? "bg-success" : "bg-warning"
+                                  }`}
+                                  style={{ width: `${ledgerTotals.percent}%` }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Assigned Fee Table */}
+                            <h6 className="fw-bold text-dark mb-2">Assigned Fee Items</h6>
+                            {details.fees.length === 0 ? (
+                              <div className="p-4 bg-light rounded-3 text-center text-muted small">
+                                No fees assigned for this student yet. Use Step 3 to assign fees.
+                              </div>
+                            ) : (
+                              <div className="fa-table-wrap">
+                                <table className="fa-table">
+                                  <thead>
+                                    <tr>
+                                      <th>Fee Item</th>
+                                      <th>Total</th>
+                                      <th>Paid</th>
+                                      <th>Balance</th>
+                                      <th>Status</th>
+                                      <th className="text-end">Actions</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {details.fees.map((f) => (
+                                      <tr key={f.id}>
+                                        <td>
+                                          <strong>{f.fee_type?.name || `Fee #${f.fee_type_id}`}</strong>
+                                          <div className="small text-muted">
+                                            {f.session?.name} • {f.term?.name}
+                                          </div>
+                                        </td>
+                                        <td>{naira(f.total_amount)}</td>
+                                        <td className="text-success fw-bold">{naira(f.amount_paid)}</td>
+                                        <td className={f.balance > 0 ? "text-danger fw-bold" : "text-muted"}>
+                                          {naira(f.balance)}
+                                        </td>
+                                        <td>
+                                          <span
+                                            className={`fa-pill fa-pill-${
+                                              f.status || (f.balance === 0 ? "paid" : "unpaid")
+                                            }`}
+                                          >
+                                            {f.status || (f.balance === 0 ? "paid" : "unpaid")}
+                                          </span>
+                                        </td>
+                                        <td className="text-end">
+                                          <div className="d-inline-flex gap-2">
+                                            {f.balance > 0 && (
+                                              <button
+                                                type="button"
+                                                className="fa-action-btn pay"
+                                                onClick={() => openCollectModal(f)}
+                                                title="Collect payment online via Paystack"
+                                              >
+                                                <i className="bi bi-credit-card" /> Pay
+                                              </button>
+                                            )}
+                                            {f.amount_paid === 0 && (
+                                              <button
+                                                type="button"
+                                                className="fa-action-btn del"
+                                                onClick={() => removeAssignedFee(f.id)}
+                                                disabled={busyKey === `fees:remove:${f.id}`}
+                                                title="Remove assigned fee"
+                                              >
+                                                <i className="bi bi-trash" />
+                                              </button>
+                                            )}
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <Footer />
@@ -1173,7 +1906,12 @@ export default function FeeMethodsPage() {
           <div className="fa-modal" onClick={(e) => e.stopPropagation()}>
             <div className="fa-modal-head">
               <h3>Collect Fee Payment</h3>
-              <button className="btn-close" onClick={closeCollectModal} disabled={collecting} />
+              <button
+                type="button"
+                className="btn-close"
+                onClick={closeCollectModal}
+                disabled={collecting}
+              />
             </div>
             <div className="fa-modal-body">
               <div className="p-3 bg-light rounded-3 mb-3">
@@ -1186,9 +1924,7 @@ export default function FeeMethodsPage() {
               </div>
 
               {collectError && (
-                <div className="alert alert-danger py-2 small mb-3">
-                  {collectError}
-                </div>
+                <div className="alert alert-danger py-2 small mb-3">{collectError}</div>
               )}
 
               <div className="mb-3">
@@ -1217,6 +1953,7 @@ export default function FeeMethodsPage() {
 
               <div className="d-grid">
                 <button
+                  type="button"
                   className="fa-btn-gold justify-content-center py-2 fs-6"
                   onClick={handleCollectPayment}
                   disabled={collecting}

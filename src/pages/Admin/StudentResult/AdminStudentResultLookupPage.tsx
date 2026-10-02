@@ -226,7 +226,7 @@ export default function AdminStudentResultLookupPage() {
   // Read URL query params on load or preload initial dropdowns
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const qReg = params.get("reg_no");
+    const qReg = params.get("reg_no") || params.get("search") || params.get("q");
     const qSession = params.get("session");
     const qTerm = params.get("term");
     const qClass = params.get("class_id");
