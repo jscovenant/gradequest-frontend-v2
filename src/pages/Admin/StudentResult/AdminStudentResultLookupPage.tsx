@@ -109,8 +109,28 @@ interface ResultTemplateSetting {
     show_signature?: boolean;
     show_student_photo?: boolean;
     show_watermark?: boolean;
+    custom_report_layout?: {
+      enabled?: boolean;
+      blocks?: Array<{
+        id: string;
+        label: string;
+        type: string;
+        width?: "full" | "half";
+        visible?: boolean;
+      }>;
+    };
   };
 }
+
+const mixHexWithWhite = (color: string, whitePercent = 82) => {
+  const hex = (color || "").replace("#", "");
+  if (hex.length !== 6) return "#f8fafc";
+  const ratio = Math.max(0, Math.min(100, whitePercent)) / 100;
+  const r = Math.round(parseInt(hex.substring(0, 2), 16) * (1 - ratio) + 255 * ratio);
+  const g = Math.round(parseInt(hex.substring(2, 4), 16) * (1 - ratio) + 255 * ratio);
+  const b = Math.round(parseInt(hex.substring(4, 6), 16) * (1 - ratio) + 255 * ratio);
+  return `rgb(${r}, ${g}, ${b})`;
+};
 
 const SCORE_TYPES = [
   { label: "10 / 10 / 10 / 10 / 60 (4 CAs + Exam)", value: "10/10/10/10/60", caCount: 4, caMax: 10, examMax: 60 },
@@ -178,6 +198,8 @@ export default function AdminStudentResultLookupPage() {
     background_color: "#ffffff",
   });
   const [resultTemplate, setResultTemplate] = useState<ResultTemplateSetting | null>(null);
+  const [resultClassName, setResultClassName] = useState<string>("");
+  const [previewTemplateOverride, setPreviewTemplateOverride] = useState<string>("");
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
 
   const [sessions, setSessions] = useState<OptionItem[]>([]);
@@ -249,6 +271,14 @@ export default function AdminStudentResultLookupPage() {
           if (data.current_session) setSelectedSession((prev) => prev || data.current_session);
           if (data.current_term) setSelectedTerm((prev) => prev || data.current_term);
           if (data.current_class_id) setSelectedClassId((prev) => prev || data.current_class_id);
+          if (data.class_name) setResultClassName(data.class_name);
+          if (data.result_template) {
+            setResultTemplate(data.result_template);
+            if (data.result_template.template_key) {
+              setPreviewTemplateOverride((prev) => prev || data.result_template.template_key);
+            }
+          }
+          if (data.school_info) setSchoolInfo(data.school_info);
         })
         .catch(() => undefined);
     }
@@ -291,11 +321,19 @@ export default function AdminStudentResultLookupPage() {
 
       const resolvedSession = data.current_session || sess || (data.sessions?.[0]?.name ?? "2025/2026");
       const resolvedTerm = data.current_term || t || (data.terms?.[0]?.name ?? "First Term");
-      const resolvedClassId = data.current_class_id || c || st.level_id || (data.classes?.[0]?.id ?? "");
+      const resolvedClassId = data.current_class_id || (data.average?.class_id ? Number(data.average.class_id) : "") || c || st.level_id || (data.classes?.[0]?.id ?? "");
 
       setSelectedSession(resolvedSession);
       setSelectedTerm(resolvedTerm);
       setSelectedClassId(resolvedClassId);
+
+      const resolvedCName =
+        data.class_name ||
+        data.average?.class?.name ||
+        (data.classes || classes).find((cl: any) => String(cl.id) === String(resolvedClassId))?.name ||
+        st.level?.name ||
+        "";
+      setResultClassName(resolvedCName);
 
       if (data.score_type) {
         setScoreType(data.score_type);
@@ -423,6 +461,9 @@ export default function AdminStudentResultLookupPage() {
       }
       if (data.result_template) {
         setResultTemplate(data.result_template);
+        if (data.result_template.template_key) {
+          setPreviewTemplateOverride(data.result_template.template_key);
+        }
       }
       if (data.student_photo_base64) {
         setStudentPhotoBase64(data.student_photo_base64);
@@ -668,6 +709,17 @@ export default function AdminStudentResultLookupPage() {
       setSaving(false);
     }
   };
+
+  // Resolved class name prioritizing filtered class or result record
+  const activeClassName = useMemo(() => {
+    return (
+      classes.find((c) => String(c.id) === String(selectedClassId))?.name ||
+      resultClassName ||
+      (summary as any)?.class_name ||
+      student?.level?.name ||
+      "General"
+    );
+  }, [classes, selectedClassId, resultClassName, summary, student]);
 
   return (
     <div className="admin-result-editor-layout">
@@ -1169,7 +1221,7 @@ export default function AdminStudentResultLookupPage() {
                           {student.firstname} {student.surname} {student.othername || ""}
                         </h3>
                         <span className="badge bg-primary-subtle text-primary fw-bold text-uppercase px-2 py-1">
-                          {student.level?.name || "General"}
+                          {activeClassName}
                         </span>
                       </div>
                       <div className="d-flex align-items-center gap-3 text-muted text-sm mt-1">
@@ -1556,761 +1608,1079 @@ export default function AdminStudentResultLookupPage() {
                 )}
 
                 {/* ════ TAB 2: OFFICIAL RESULT PREVIEW ════ */}
-                {activeTab === "preview" && (
-                  <div className="re-preview-container">
-                    {/* Top Action Bar */}
-                    <div className="d-flex align-items-center justify-content-between mb-4 p-3 bg-white rounded-4 border shadow-sm flex-wrap gap-3 d-print-none">
-                      <div>
-                        <h4 className="fs-6 fw-bold text-dark m-0">Official Student Terminal Assessment Report</h4>
-                        <span className="text-muted text-xs">Formatted to match official school report card layout</span>
-                      </div>
-                      <div className="d-flex gap-2 flex-wrap">
-                        <button
-                          type="button"
-                          className="btn btn-outline-primary btn-sm rounded-pill px-3 fw-bold"
-                          onClick={() => {
-                            const params = new URLSearchParams({
-                              school_id: String(student.school_id),
-                              class_id: String(selectedClassId || student.level_id || ""),
-                              student_id: String(student.id),
-                              term: selectedTerm,
-                              session: selectedSession,
-                            });
-                            window.open(`/results/show-result?${params.toString()}`, "_blank");
-                          }}
-                        >
-                          <i className="bi bi-box-arrow-up-right me-1" /> Open in Full ShowResult Page
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm rounded-pill px-3 fw-bold"
-                          onClick={() => window.print()}
-                        >
-                          <i className="bi bi-printer-fill me-1" /> Print
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-sm rounded-pill px-4 fw-bold"
-                          disabled={downloadingPdf}
-                          onClick={handleDownloadPdf}
-                        >
-                          {downloadingPdf ? (
-                            <>
-                              <span className="spinner-border spinner-border-sm me-1" /> Generating PDF...
-                            </>
-                          ) : (
-                            <>
-                              <i className="bi bi-file-earmark-pdf-fill me-1" /> Download Official PDF
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
+                {/* ════ TAB 2: OFFICIAL RESULT PREVIEW ════ */}
+                {activeTab === "preview" && (() => {
+                  const activeTemplateKey = previewTemplateOverride || resultTemplate?.template_key || "classic_academic";
+                  const isModern = activeTemplateKey === "modern_scholar";
+                  const isPremium = activeTemplateKey === "premium_letterhead";
+                  const isCustom = activeTemplateKey === "custom_builder";
 
-                    {/* Official Result Sheet matching ShowResult */}
+                  const themePrimary = resultTemplate?.primary_color || schoolInfo.primary_color || "#0d47a1";
+                  const themeSecondary = resultTemplate?.secondary_color || schoolInfo.secondary_color || "#ffc107";
+                  const themeBg = resultTemplate?.background_color || schoolInfo.background_color || "#ffffff";
+                  const resultFont = resultTemplate?.font_family || "Arial, sans-serif";
+                  const headerTextColor = getTextColor(themePrimary);
+
+                  const displayOptions = {
+                    show_position: resultTemplate?.display_options?.show_position ?? true,
+                    show_grade: resultTemplate?.display_options?.show_grade ?? true,
+                    show_remarks: resultTemplate?.display_options?.show_remarks ?? true,
+                    show_attendance: resultTemplate?.display_options?.show_attendance ?? true,
+                    show_domains: resultTemplate?.display_options?.show_domains ?? true,
+                    show_qr_code: resultTemplate?.display_options?.show_qr_code ?? true,
+                    show_signature: resultTemplate?.display_options?.show_signature ?? true,
+                    show_student_photo: resultTemplate?.display_options?.show_student_photo ?? true,
+                    show_watermark: resultTemplate?.display_options?.show_watermark ?? true,
+                    custom_report_layout: resultTemplate?.display_options?.custom_report_layout,
+                  };
+
+                  const customBlocks = displayOptions.custom_report_layout?.blocks || [
+                    { id: "student_info", type: "student_info", label: "Student Information", width: "full", visible: true },
+                    { id: "scores_table", type: "scores_table", label: "Subject Scores", width: "full", visible: true },
+                    { id: "performance_chart", type: "performance_chart", label: "Performance Chart", width: "half", visible: true },
+                    { id: "domains", type: "domains", label: "Affective and Psychomotor", width: "half", visible: true },
+                    { id: "comments", type: "comments", label: "Comments and Remarks", width: "full", visible: true },
+                    { id: "signature", type: "signature", label: "Signature and QR Code", width: "full", visible: true },
+                  ];
+
+                  const topPerformanceRows = [...rows]
+                    .map((r) => ({
+                      name: r.subject_name,
+                      total: Math.max(0, Math.min(100, Number(r.total || 0))),
+                    }))
+                    .filter((r) => r.total > 0)
+                    .sort((a, b) => b.total - a.total)
+                    .slice(0, 6);
+
+                  const chartColors = ["#2563eb", "#16a34a", "#f59e0b", "#dc2626", "#7c3aed", "#0891b2"];
+                  const analyticColors = ["#0f766e", "#9333ea", "#ea580c", "#0284c7"];
+
+                  const gradeCounts: Record<string, number> = {};
+                  rows.forEach((r) => {
+                    const g = r.grade?.charAt(0) || "F";
+                    gradeCounts[g] = (gradeCounts[g] || 0) + 1;
+                  });
+
+                  const totalMarks = rows.reduce((acc, r) => acc + Number(r.total || 0), 0);
+                  const attendanceDays = Number(summary.no_present) || 0;
+                  const totalDays = Number(summary.school_open) || 1;
+                  const attendancePercent = Math.min(100, Math.round((attendanceDays / Math.max(totalDays, 1)) * 100));
+
+                  const templateNames: Record<string, string> = {
+                    classic_academic: "Classic Academic",
+                    modern_scholar: "Modern Scholar",
+                    premium_letterhead: "Premium Letterhead",
+                    custom_builder: "Custom Builder",
+                  };
+
+                  const studentInfoItems: Array<[string, any]> = [
+                    ["Name", `${student.surname} ${student.firstname} ${student.othername || ""}`.trim()],
+                    ["Admission No", student.reg_no],
+                    ["Class", activeClassName],
+                    ["Session", selectedSession],
+                    ["Gender", student.gender || (student as any).sex || "N/A"],
+                    ["Term", selectedTerm],
+                    ["Class Size", summary.class_size || "N/A"],
+                    ...(displayOptions.show_position &&
+                    summary.position &&
+                    String(summary.position).trim() !== "" &&
+                    String(summary.position).trim().toLowerCase() !== "n/a" &&
+                    String(summary.position).trim() !== "-" &&
+                    String(summary.position).trim().toLowerCase() !== "recorded"
+                      ? [["Position", summary.position] as [string, any]]
+                      : []),
+                    ...(displayOptions.show_attendance
+                      ? [
+                          ["Times School Opened", summary.school_open || 0] as [string, any],
+                          ["Times Present", summary.no_present || 0] as [string, any],
+                          ["Times Absent", summary.no_absent || 0] as [string, any],
+                        ]
+                      : []),
+                    ["Resumption Date", summary.resumption_date || "To Be Announced"],
+                  ];
+
+                  const renderStudentInfo = () => (
                     <div
-                      id="admin-result-sheet"
                       style={{
-                        width: "min(780px, 100%)",
-                        margin: "auto",
-                        padding: "20px",
-                        background: schoolInfo.background_color || "#ffffff",
-                        fontFamily: resultTemplate?.font_family || "Arial, sans-serif",
-                        fontSize: "12px",
-                        border: `3px solid ${schoolInfo.primary_color || "#0d47a1"}`,
-                        borderRadius: "8px",
-                        boxSizing: "border-box",
-                        position: "relative",
-                        overflow: "visible",
-                        color: "#111827",
-                        boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+                        display: "grid",
+                        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                        gap: 6,
+                        marginTop: 10,
+                        fontSize: "11.5px",
                       }}
                     >
-                      {/* Watermark */}
-                      {schoolInfo.logo && (
+                      {studentInfoItems.map(([label, val]) => (
                         <div
+                          key={label}
                           style={{
-                            position: "absolute",
-                            top: 0,
-                            left: 0,
-                            width: "100%",
-                            height: "100%",
-                            backgroundImage: `url(${schoolInfo.logo})`,
-                            backgroundRepeat: "repeat",
-                            backgroundSize: "150px 150px",
-                            opacity: 0.04,
-                            transform: "rotate(-30deg)",
-                            zIndex: 0,
-                            pointerEvents: "none",
-                          }}
-                        />
-                      )}
-
-                      <div style={{ position: "relative", zIndex: 1 }}>
-                        {/* HEADER */}
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "90px 1fr 90px",
-                            gap: "12px",
-                            alignItems: "center",
-                            borderBottom: `2px solid ${schoolInfo.primary_color || "#0d47a1"}`,
-                            paddingBottom: "10px",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            padding: "5px 8px",
+                            background: isModern ? mixHexWithWhite(themeSecondary, 84) : "#f8fafc",
+                            border: `1px solid ${hexToRgba(themePrimary, isModern ? 0.35 : 0.2)}`,
+                            borderLeft: isModern ? `4px solid ${themePrimary}` : undefined,
+                            borderRadius: isModern ? "8px" : "4px",
                           }}
                         >
-                          <img
-                            src={schoolInfo.logo || "https://via.placeholder.com/90x90.png?text=Logo"}
-                            alt="School Logo"
-                            onError={(e) => {
-                              (e.target as any).src = "https://via.placeholder.com/90x90.png?text=Logo";
-                            }}
+                          <strong style={{ color: themePrimary }}>{label}:</strong>
+                          <span style={{ fontWeight: 600 }}>{val}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+
+                  const renderScoresTable = () => (
+                    <div style={{ marginTop: 12 }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
+                        <thead>
+                          <tr>
+                            <th
+                              style={{
+                                border: `1px solid ${themePrimary}`,
+                                padding: "6px 4px",
+                                textAlign: "center",
+                                background: themePrimary,
+                                color: headerTextColor,
+                                width: "30px",
+                              }}
+                            >
+                              #
+                            </th>
+                            <th
+                              style={{
+                                border: `1px solid ${themePrimary}`,
+                                padding: "6px 8px",
+                                textAlign: "left",
+                                background: themePrimary,
+                                color: headerTextColor,
+                              }}
+                            >
+                              Subject
+                            </th>
+                            {Array.from({ length: activeScoreConfig.caCount }).map((_, caIdx) => (
+                              <th
+                                key={caIdx}
+                                style={{
+                                  border: `1px solid ${themePrimary}`,
+                                  padding: "6px 4px",
+                                  textAlign: "center",
+                                  background: themePrimary,
+                                  color: headerTextColor,
+                                  width: "65px",
+                                }}
+                              >
+                                CA {caIdx + 1} ({activeScoreConfig.caMax})
+                              </th>
+                            ))}
+                            <th
+                              style={{
+                                border: `1px solid ${themePrimary}`,
+                                padding: "6px 4px",
+                                textAlign: "center",
+                                background: themePrimary,
+                                color: headerTextColor,
+                                width: "65px",
+                              }}
+                            >
+                              Exam ({activeScoreConfig.examMax})
+                            </th>
+                            <th
+                              style={{
+                                border: `1px solid ${themePrimary}`,
+                                padding: "6px 4px",
+                                textAlign: "center",
+                                background: themePrimary,
+                                color: headerTextColor,
+                                width: "65px",
+                              }}
+                            >
+                              Total (100)
+                            </th>
+                            {displayOptions.show_grade && (
+                              <th
+                                style={{
+                                  border: `1px solid ${themePrimary}`,
+                                  padding: "6px 4px",
+                                  textAlign: "center",
+                                  background: themePrimary,
+                                  color: headerTextColor,
+                                  width: "55px",
+                                }}
+                              >
+                                Grade
+                              </th>
+                            )}
+                            {displayOptions.show_remarks && (
+                              <th
+                                style={{
+                                  border: `1px solid ${themePrimary}`,
+                                  padding: "6px 8px",
+                                  textAlign: "left",
+                                  background: themePrimary,
+                                  color: headerTextColor,
+                                  width: "100px",
+                                }}
+                              >
+                                Remark
+                              </th>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((r, i) => {
+                            const caKeys = Array.from({ length: activeScoreConfig.caCount }).map(
+                              (_, caIdx) => `ca${caIdx + 1}`
+                            );
+                            const examVal = r.exam === "" ? 0 : Number(r.exam);
+                            return (
+                              <tr key={i} style={{ background: i % 2 === 0 ? "#ffffff" : isModern ? mixHexWithWhite(themeSecondary, 94) : "#f8fafc" }}>
+                                <td
+                                  style={{
+                                    border: `1px solid ${hexToRgba(themePrimary, 0.25)}`,
+                                    padding: "6px 4px",
+                                    textAlign: "center",
+                                    fontWeight: "bold",
+                                    color: "#64748B",
+                                  }}
+                                >
+                                  {i + 1}
+                                </td>
+                                <td
+                                  style={{
+                                    border: `1px solid ${hexToRgba(themePrimary, 0.25)}`,
+                                    padding: "6px 8px",
+                                    textAlign: "left",
+                                    fontWeight: "bold",
+                                    color: "#0F2744",
+                                  }}
+                                >
+                                  {r.subject_name}
+                                </td>
+                                {caKeys.map((k, caIdx) => (
+                                  <td
+                                    key={k}
+                                    style={{
+                                      border: `1px solid ${hexToRgba(themePrimary, 0.25)}`,
+                                      padding: "6px 4px",
+                                      textAlign: "center",
+                                    }}
+                                  >
+                                    {r.ca?.[k] !== undefined && r.ca?.[k] !== null && r.ca?.[k] !== ""
+                                      ? r.ca[k]
+                                      : caIdx === 0
+                                      ? r.ca?.["ca0"] ?? r.ca?.["0"] ?? "-"
+                                      : "-"}
+                                  </td>
+                                ))}
+                                <td
+                                  style={{
+                                    border: `1px solid ${hexToRgba(themePrimary, 0.25)}`,
+                                    padding: "6px 4px",
+                                    textAlign: "center",
+                                  }}
+                                >
+                                  {examVal}
+                                </td>
+                                <td
+                                  style={{
+                                    border: `1px solid ${hexToRgba(themePrimary, 0.25)}`,
+                                    padding: "6px 4px",
+                                    textAlign: "center",
+                                    fontWeight: "bold",
+                                    color: "#0F2744",
+                                  }}
+                                >
+                                  {r.total}
+                                </td>
+                                {displayOptions.show_grade && (
+                                  <td
+                                    style={{
+                                      border: `1px solid ${hexToRgba(themePrimary, 0.25)}`,
+                                      padding: "6px 4px",
+                                      textAlign: "center",
+                                      fontWeight: "bold",
+                                    }}
+                                  >
+                                    <span className={`re-grade-tag re-grade-${r.grade?.charAt(0) || "F"}`}>
+                                      {r.grade}
+                                    </span>
+                                  </td>
+                                )}
+                                {displayOptions.show_remarks && (
+                                  <td
+                                    style={{
+                                      border: `1px solid ${hexToRgba(themePrimary, 0.25)}`,
+                                      padding: "6px 8px",
+                                      textAlign: "left",
+                                      fontSize: "10.5px",
+                                    }}
+                                  >
+                                    {r.remark}
+                                  </td>
+                                )}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+
+                      {/* Summary Scorecard / Badges */}
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "8px",
+                          flexWrap: "wrap",
+                          marginTop: "10px",
+                          justifyContent: isPremium ? "center" : "flex-start",
+                        }}
+                      >
+                        <span
+                          style={{
+                            background: isModern ? mixHexWithWhite(themeSecondary, 80) : themeSecondary,
+                            border: `1px solid ${themePrimary}`,
+                            borderRadius: isModern ? "999px" : "6px",
+                            padding: "5px 11px",
+                            fontSize: "11px",
+                            fontWeight: 800,
+                            color: getTextColor(themeSecondary),
+                          }}
+                        >
+                          Total Marks: {totalMarks}
+                        </span>
+                        <span
+                          style={{
+                            background: isModern ? mixHexWithWhite(themeSecondary, 80) : themeSecondary,
+                            border: `1px solid ${themePrimary}`,
+                            borderRadius: isModern ? "999px" : "6px",
+                            padding: "5px 11px",
+                            fontSize: "11px",
+                            fontWeight: 800,
+                            color: getTextColor(themeSecondary),
+                          }}
+                        >
+                          Average: {summary.total_average}%
+                        </span>
+                        {displayOptions.show_grade && (
+                          <span
                             style={{
-                              width: "90px",
-                              height: "90px",
-                              borderRadius: "6px",
-                              objectFit: "cover",
-                              border: `2px solid ${schoolInfo.secondary_color || "#ffc107"}`,
+                              background: isModern ? mixHexWithWhite(themeSecondary, 80) : themeSecondary,
+                              border: `1px solid ${themePrimary}`,
+                              borderRadius: isModern ? "999px" : "6px",
+                              padding: "5px 11px",
+                              fontSize: "11px",
+                              fontWeight: 800,
+                              color: getTextColor(themeSecondary),
                             }}
-                          />
-
-                          <div style={{ flex: 1, textAlign: "center" }}>
-                            <h1
+                          >
+                            Overall Grade: {summary.total_grade || getGradeAndRemark(Number(summary.total_average) || 0).grade}
+                          </span>
+                        )}
+                        {displayOptions.show_position &&
+                          summary.position &&
+                          String(summary.position).trim() !== "" &&
+                          String(summary.position).trim().toLowerCase() !== "n/a" &&
+                          String(summary.position).trim() !== "-" &&
+                          String(summary.position).trim().toLowerCase() !== "recorded" && (
+                            <span
                               style={{
-                                margin: 0,
-                                fontSize: "20px",
-                                fontWeight: "bold",
-                                color: schoolInfo.primary_color || "#0d47a1",
-                              }}
-                            >
-                              {schoolInfo.name}
-                            </h1>
-                            <p style={{ margin: "3px 0", fontSize: "12px" }}>{schoolInfo.address}</p>
-                            <p style={{ margin: "3px 0", fontSize: "12px" }}>Tel: {schoolInfo.phone}</p>
-
-                            <h2
-                              style={{
-                                margin: "6px 0",
-                                fontSize: "15px",
-                                textTransform: "uppercase",
-                                background: schoolInfo.primary_color || "#0d47a1",
-                                color: getTextColor(schoolInfo.primary_color || "#0d47a1"),
-                                padding: "6px 12px",
-                                borderRadius: "6px",
-                                textAlign: "center",
-                                letterSpacing: "1px",
-                                border: `1px solid ${schoolInfo.secondary_color || "#ffc107"}`,
-                                fontWeight: 700,
-                              }}
-                            >
-                              {selectedTerm} REPORT SHEET &bull; {selectedSession}
-                            </h2>
-                          </div>
-
-                          {studentPhotoBase64 || student.photo ? (
-                            <img
-                              src={studentPhotoBase64 || `/uploads/users/${student.photo}`}
-                              alt="student photo"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.onerror = null;
-                                target.style.display = "none";
-                              }}
-                              style={{
-                                width: "90px",
-                                height: "90px",
-                                borderRadius: "6px",
-                                objectFit: "cover",
-                                border: `2px solid ${schoolInfo.secondary_color || "#ffc107"}`,
-                              }}
-                            />
-                          ) : (
-                            <div
-                              style={{
-                                width: "90px",
-                                height: "90px",
-                                border: `2px dashed ${schoolInfo.primary_color || "#0d47a1"}`,
-                                borderRadius: "6px",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
+                                background: isModern ? mixHexWithWhite(themeSecondary, 80) : themeSecondary,
+                                border: `1px solid ${themePrimary}`,
+                                borderRadius: isModern ? "999px" : "6px",
+                                padding: "5px 11px",
                                 fontSize: "11px",
-                                color: "#666",
-                                textAlign: "center",
+                                fontWeight: 800,
+                                color: getTextColor(themeSecondary),
                               }}
                             >
-                              Student Photo
-                            </div>
+                              Position: {summary.position}
+                            </span>
                           )}
-                        </div>
-
-                        {/* STUDENT INFO MATRIX */}
-                        <div
+                        <span
                           style={{
-                            display: "grid",
-                            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                            gap: 6,
-                            marginTop: 10,
-                            fontSize: "11.5px",
+                            background: isModern ? mixHexWithWhite(themeSecondary, 80) : themeSecondary,
+                            border: `1px solid ${themePrimary}`,
+                            borderRadius: isModern ? "999px" : "6px",
+                            padding: "5px 11px",
+                            fontSize: "11px",
+                            fontWeight: 800,
+                            color: getTextColor(themeSecondary),
                           }}
                         >
-                          {[
-                            ["Name", `${student.surname} ${student.firstname} ${student.othername || ""}`.trim()],
-                            ["Admission No", student.reg_no],
-                            [
-                              "Class",
-                              student.level?.name ||
-                                classes.find((c) => String(c.id) === String(selectedClassId))?.name ||
-                                "SS2",
-                            ],
-                            ["Session", selectedSession],
-                            ["Gender", student.gender || "N/A"],
-                            ["Term", selectedTerm],
-                            ["Class Size", summary.class_size || "N/A"],
-                            ...(summary.position &&
-                            String(summary.position).trim() !== "" &&
-                            String(summary.position).trim().toLowerCase() !== "n/a" &&
-                            String(summary.position).trim() !== "-" &&
-                            String(summary.position).trim().toLowerCase() !== "recorded"
-                              ? [["Position", summary.position]]
-                              : []),
-                            ["Times School Opened", summary.school_open || 0],
-                            ["Times Present", summary.no_present || 0],
-                            ["Times Absent", summary.no_absent || 0],
-                            ["Resumption Date", summary.resumption_date || "To Be Announced"],
-                          ].map(([label, val]) => (
-                            <div
-                              key={label}
-                              style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                padding: "4px 8px",
-                                background: "#f8fafc",
-                                border: `1px solid ${hexToRgba(schoolInfo.primary_color || "#0d47a1", 0.2)}`,
-                                borderRadius: "4px",
-                              }}
-                            >
-                              <strong style={{ color: schoolInfo.primary_color || "#0d47a1" }}>{label}:</strong>
-                              <span style={{ fontWeight: 600 }}>{val}</span>
-                            </div>
-                          ))}
-                        </div>
+                          Status: {summary.general_remark || (Number(summary.total_average) >= 50 ? "Promoted with Credit" : "Passed")}
+                        </span>
+                      </div>
+                    </div>
+                  );
 
-                        {/* ACADEMIC SCORES TABLE */}
-                        <div style={{ marginTop: 12 }}>
-                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11.5px" }}>
+                  const renderPerformanceAnalytics = () => (
+                    <div style={{ display: "grid", gap: 10, marginTop: isModern ? 0 : 12 }}>
+                      {/* Top Subjects Progress Bars */}
+                      <div
+                        style={{
+                          border: `1px solid ${hexToRgba(themePrimary, 0.35)}`,
+                          borderRadius: "10px",
+                          padding: "10px",
+                          background: isModern ? "#ffffff" : "rgba(255,255,255,0.7)",
+                        }}
+                      >
+                        <h4
+                          style={{
+                            margin: "0 0 8px",
+                            color: themePrimary,
+                            fontSize: "11.5px",
+                            textTransform: "uppercase",
+                            fontWeight: 800,
+                            borderLeft: `4px solid ${themePrimary}`,
+                            paddingLeft: "6px",
+                            letterSpacing: "0.5px",
+                          }}
+                        >
+                          Subject Performance
+                        </h4>
+                        {topPerformanceRows.map((row, idx) => (
+                          <div
+                            key={row.name}
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "105px 1fr 36px",
+                              gap: 6,
+                              alignItems: "center",
+                              margin: "5px 0",
+                              fontSize: "10.5px",
+                            }}
+                          >
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {row.name}
+                            </span>
+                            <span style={{ height: 7, borderRadius: 999, background: "rgba(15,23,42,0.08)", overflow: "hidden" }}>
+                              <span
+                                style={{
+                                  display: "block",
+                                  height: "100%",
+                                  width: `${row.total}%`,
+                                  background: chartColors[idx % chartColors.length],
+                                  borderRadius: 999,
+                                }}
+                              />
+                            </span>
+                            <b style={{ textAlign: "right", color: "#0F2744" }}>{row.total}%</b>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Result Grade & Attendance Analytics */}
+                      <div
+                        style={{
+                          border: `1px solid ${hexToRgba(themePrimary, 0.35)}`,
+                          borderRadius: "10px",
+                          padding: "10px",
+                          background: isModern ? "#ffffff" : "rgba(255,255,255,0.7)",
+                        }}
+                      >
+                        <h4
+                          style={{
+                            margin: "0 0 8px",
+                            color: themePrimary,
+                            fontSize: "11.5px",
+                            textTransform: "uppercase",
+                            fontWeight: 800,
+                            borderLeft: `4px solid ${themePrimary}`,
+                            paddingLeft: "6px",
+                            letterSpacing: "0.5px",
+                          }}
+                        >
+                          Result Analytics
+                        </h4>
+                        {[
+                          ...Object.entries(gradeCounts)
+                            .filter(([g]) => g !== "N/A")
+                            .sort(([a], [b]) => a.localeCompare(b))
+                            .map(([g, c]) => [`${g} grades`, c, Math.round((c / Math.max(rows.length, 1)) * 100)] as const),
+                          ...(displayOptions.show_attendance
+                            ? [[`Attendance`, `${attendancePercent}%`, attendancePercent] as const]
+                            : []),
+                        ].map(([label, val, percent], idx) => (
+                          <div
+                            key={label}
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "85px 1fr 36px",
+                              gap: 6,
+                              alignItems: "center",
+                              margin: "5px 0",
+                              fontSize: "10.5px",
+                            }}
+                          >
+                            <span>{label}</span>
+                            <span style={{ height: 7, borderRadius: 999, background: "rgba(15,23,42,0.08)", overflow: "hidden" }}>
+                              <span
+                                style={{
+                                  display: "block",
+                                  height: "100%",
+                                  width: `${Math.max(0, Math.min(100, Number(percent) || 0))}%`,
+                                  background: analyticColors[idx % analyticColors.length],
+                                  borderRadius: 999,
+                                }}
+                              />
+                            </span>
+                            <b style={{ textAlign: "right", color: "#0F2744" }}>{val}</b>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+
+                  const renderDomains = () => {
+                    if (!displayOptions.show_domains) return null;
+                    return (
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: isModern ? "1fr" : "1fr 1fr",
+                          gap: 10,
+                          marginTop: 12,
+                        }}
+                      >
+                        {/* Affective */}
+                        <div>
+                          <div
+                            style={{
+                              fontSize: "11px",
+                              fontWeight: 700,
+                              color: themePrimary,
+                              textTransform: "uppercase",
+                              marginBottom: 4,
+                            }}
+                          >
+                            Affective Domain Traits
+                          </div>
+                          <table
+                            style={{
+                              width: "100%",
+                              borderCollapse: "collapse",
+                              border: `1px solid ${themePrimary}`,
+                              fontSize: "10.5px",
+                            }}
+                          >
                             <thead>
                               <tr>
                                 <th
                                   style={{
-                                    border: `1px solid ${schoolInfo.primary_color || "#0d47a1"}`,
-                                    padding: "6px 4px",
-                                    textAlign: "center",
-                                    background: schoolInfo.primary_color || "#0d47a1",
-                                    color: getTextColor(schoolInfo.primary_color || "#0d47a1"),
-                                    width: "30px",
-                                  }}
-                                >
-                                  #
-                                </th>
-                                <th
-                                  style={{
-                                    border: `1px solid ${schoolInfo.primary_color || "#0d47a1"}`,
-                                    padding: "6px 8px",
+                                    background: themePrimary,
+                                    color: headerTextColor,
+                                    padding: "4px 6px",
                                     textAlign: "left",
-                                    background: schoolInfo.primary_color || "#0d47a1",
-                                    color: getTextColor(schoolInfo.primary_color || "#0d47a1"),
                                   }}
                                 >
-                                  Subject
+                                  Trait / Attribute
                                 </th>
-                                {Array.from({ length: activeScoreConfig.caCount }).map((_, caIdx) => (
-                                  <th
-                                    key={caIdx}
-                                    style={{
-                                      border: `1px solid ${schoolInfo.primary_color || "#0d47a1"}`,
-                                      padding: "6px 4px",
-                                      textAlign: "center",
-                                      background: schoolInfo.primary_color || "#0d47a1",
-                                      color: getTextColor(schoolInfo.primary_color || "#0d47a1"),
-                                      width: "65px",
-                                    }}
-                                  >
-                                    CA {caIdx + 1} ({activeScoreConfig.caMax})
-                                  </th>
-                                ))}
                                 <th
                                   style={{
-                                    border: `1px solid ${schoolInfo.primary_color || "#0d47a1"}`,
-                                    padding: "6px 4px",
+                                    background: themePrimary,
+                                    color: headerTextColor,
+                                    padding: "4px",
+                                    width: "60px",
                                     textAlign: "center",
-                                    background: schoolInfo.primary_color || "#0d47a1",
-                                    color: getTextColor(schoolInfo.primary_color || "#0d47a1"),
-                                    width: "65px",
                                   }}
                                 >
-                                  Exam ({activeScoreConfig.examMax})
-                                </th>
-                                <th
-                                  style={{
-                                    border: `1px solid ${schoolInfo.primary_color || "#0d47a1"}`,
-                                    padding: "6px 4px",
-                                    textAlign: "center",
-                                    background: schoolInfo.primary_color || "#0d47a1",
-                                    color: getTextColor(schoolInfo.primary_color || "#0d47a1"),
-                                    width: "65px",
-                                  }}
-                                >
-                                  Total (100)
-                                </th>
-                                <th
-                                  style={{
-                                    border: `1px solid ${schoolInfo.primary_color || "#0d47a1"}`,
-                                    padding: "6px 4px",
-                                    textAlign: "center",
-                                    background: schoolInfo.primary_color || "#0d47a1",
-                                    color: getTextColor(schoolInfo.primary_color || "#0d47a1"),
-                                    width: "55px",
-                                  }}
-                                >
-                                  Grade
-                                </th>
-                                <th
-                                  style={{
-                                    border: `1px solid ${schoolInfo.primary_color || "#0d47a1"}`,
-                                    padding: "6px 8px",
-                                    textAlign: "left",
-                                    background: schoolInfo.primary_color || "#0d47a1",
-                                    color: getTextColor(schoolInfo.primary_color || "#0d47a1"),
-                                  }}
-                                >
-                                  Remark
+                                  Score (1-5)
                                 </th>
                               </tr>
                             </thead>
                             <tbody>
-                              {rows.map((r, i) => {
-                                const caKeys = Array.from({ length: activeScoreConfig.caCount }).map(
-                                  (_, caIdx) => `ca${caIdx + 1}`
-                                );
-                                const examVal = r.exam === "" ? 0 : Number(r.exam);
-                                return (
-                                  <tr key={i} style={{ background: i % 2 === 0 ? "#ffffff" : "#f8fafc" }}>
-                                    <td
-                                      style={{
-                                        border: `1px solid ${hexToRgba(schoolInfo.primary_color || "#0d47a1", 0.3)}`,
-                                        padding: "6px 4px",
-                                        textAlign: "center",
-                                        fontWeight: "bold",
-                                        color: "#64748B",
-                                      }}
-                                    >
-                                      {i + 1}
-                                    </td>
-                                    <td
-                                      style={{
-                                        border: `1px solid ${hexToRgba(schoolInfo.primary_color || "#0d47a1", 0.3)}`,
-                                        padding: "6px 8px",
-                                        textAlign: "left",
-                                        fontWeight: "bold",
-                                        color: "#0F2744",
-                                      }}
-                                    >
-                                      {r.subject_name}
-                                    </td>
-                                    {caKeys.map((k, caIdx) => (
-                                      <td
-                                        key={k}
-                                        style={{
-                                          border: `1px solid ${hexToRgba(schoolInfo.primary_color || "#0d47a1", 0.3)}`,
-                                          padding: "6px 4px",
-                                          textAlign: "center",
-                                        }}
-                                      >
-                                        {r.ca?.[k] !== undefined && r.ca?.[k] !== null && r.ca?.[k] !== ""
-                                          ? r.ca[k]
-                                          : caIdx === 0
-                                          ? r.ca?.["ca0"] ?? r.ca?.["0"] ?? "-"
-                                          : "-"}
-                                      </td>
-                                    ))}
-                                    <td
-                                      style={{
-                                        border: `1px solid ${hexToRgba(schoolInfo.primary_color || "#0d47a1", 0.3)}`,
-                                        padding: "6px 4px",
-                                        textAlign: "center",
-                                      }}
-                                    >
-                                      {examVal}
-                                    </td>
-                                    <td
-                                      style={{
-                                        border: `1px solid ${hexToRgba(schoolInfo.primary_color || "#0d47a1", 0.3)}`,
-                                        padding: "6px 4px",
-                                        textAlign: "center",
-                                        fontWeight: "bold",
-                                        color: "#0F2744",
-                                      }}
-                                    >
-                                      {r.total}
-                                    </td>
-                                    <td
-                                      style={{
-                                        border: `1px solid ${hexToRgba(schoolInfo.primary_color || "#0d47a1", 0.3)}`,
-                                        padding: "6px 4px",
-                                        textAlign: "center",
-                                        fontWeight: "bold",
-                                      }}
-                                    >
-                                      <span className={`re-grade-tag re-grade-${r.grade?.charAt(0) || "F"}`}>
-                                        {r.grade}
-                                      </span>
-                                    </td>
-                                    <td
-                                      style={{
-                                        border: `1px solid ${hexToRgba(schoolInfo.primary_color || "#0d47a1", 0.3)}`,
-                                        padding: "6px 8px",
-                                        textAlign: "left",
-                                      }}
-                                    >
-                                      {r.remark}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
+                              {[
+                                ["Punctuality", ratings.punctuality],
+                                ["Attendance", ratings.attendance],
+                                ["Neatness", ratings.neatness],
+                                ["Politeness", ratings.politeness],
+                                ["Honesty", ratings.honesty],
+                              ].map(([lbl, val], idx) => (
+                                <tr key={idx} style={{ background: idx % 2 === 0 ? "#fff" : "#f8fafc" }}>
+                                  <td style={{ border: `1px solid ${hexToRgba(themePrimary, 0.25)}`, padding: "3px 6px" }}>
+                                    {lbl}
+                                  </td>
+                                  <td
+                                    style={{
+                                      border: `1px solid ${hexToRgba(themePrimary, 0.25)}`,
+                                      padding: "3px",
+                                      fontWeight: "bold",
+                                      textAlign: "center",
+                                    }}
+                                  >
+                                    {val}
+                                  </td>
+                                </tr>
+                              ))}
                             </tbody>
                           </table>
                         </div>
 
-                        {/* SUMMARY SCORECARD */}
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns:
-                              summary.position &&
-                              String(summary.position).trim() !== "" &&
-                              String(summary.position).trim().toLowerCase() !== "n/a" &&
-                              String(summary.position).trim() !== "-" &&
-                              String(summary.position).trim().toLowerCase() !== "recorded"
-                                ? "repeat(4, 1fr)"
-                                : "repeat(3, 1fr)",
-                            gap: 8,
-                            marginTop: 12,
-                            textAlign: "center",
-                          }}
-                        >
+                        {/* Psychomotor */}
+                        <div>
                           <div
                             style={{
-                              padding: "8px",
-                              background: "#f8fafc",
-                              border: `1px solid ${hexToRgba(schoolInfo.primary_color || "#0d47a1", 0.3)}`,
-                              borderRadius: "6px",
+                              fontSize: "11px",
+                              fontWeight: 700,
+                              color: themePrimary,
+                              textTransform: "uppercase",
+                              marginBottom: 4,
                             }}
                           >
-                            <div style={{ fontSize: "10px", color: "#64748B", fontWeight: 700, textTransform: "uppercase" }}>
-                              Total Marks
-                            </div>
-                            <div style={{ fontSize: "16px", fontWeight: 800, color: schoolInfo.primary_color || "#0d47a1" }}>
-                              {rows.reduce((acc, r) => acc + Number(r.total || 0), 0)}
-                            </div>
+                            Psychomotor & Skills
                           </div>
-                          <div
+                          <table
                             style={{
-                              padding: "8px",
-                              background: "#f8fafc",
-                              border: `1px solid ${hexToRgba(schoolInfo.primary_color || "#0d47a1", 0.3)}`,
-                              borderRadius: "6px",
+                              width: "100%",
+                              borderCollapse: "collapse",
+                              border: `1px solid ${themePrimary}`,
+                              fontSize: "10.5px",
                             }}
                           >
-                            <div style={{ fontSize: "10px", color: "#64748B", fontWeight: 700, textTransform: "uppercase" }}>
-                              Overall Average
-                            </div>
-                            <div style={{ fontSize: "16px", fontWeight: 800, color: "#16A34A" }}>
-                              {summary.total_average}%
-                            </div>
-                          </div>
-                          <div
-                            style={{
-                              padding: "8px",
-                              background: "#f8fafc",
-                              border: `1px solid ${hexToRgba(schoolInfo.primary_color || "#0d47a1", 0.3)}`,
-                              borderRadius: "6px",
-                            }}
-                          >
-                            <div style={{ fontSize: "10px", color: "#64748B", fontWeight: 700, textTransform: "uppercase" }}>
-                              Overall Grade
-                            </div>
-                            <div style={{ fontSize: "16px", fontWeight: 800, color: schoolInfo.primary_color || "#0d47a1" }}>
-                              {summary.total_grade || getGradeAndRemark(Number(summary.total_average) || 0).grade}
-                            </div>
-                          </div>
-                          {summary.position &&
-                            String(summary.position).trim() !== "" &&
-                            String(summary.position).trim().toLowerCase() !== "n/a" &&
-                            String(summary.position).trim() !== "-" &&
-                            String(summary.position).trim().toLowerCase() !== "recorded" && (
-                              <div
-                                style={{
-                                  padding: "8px",
-                                  background: "#f8fafc",
-                                  border: `1px solid ${hexToRgba(schoolInfo.primary_color || "#0d47a1", 0.3)}`,
-                                  borderRadius: "6px",
-                                }}
-                              >
-                                <div style={{ fontSize: "10px", color: "#64748B", fontWeight: 700, textTransform: "uppercase" }}>
-                                  Class Position
-                                </div>
-                                <div style={{ fontSize: "16px", fontWeight: 800, color: schoolInfo.primary_color || "#0d47a1" }}>
-                                  {summary.position}
-                                </div>
-                              </div>
-                            )}
-                        </div>
-
-                        {/* DOMAINS & RATINGS */}
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
-                          {/* Affective Domains */}
-                          <div>
-                            <div
-                              style={{
-                                fontSize: "11px",
-                                fontWeight: 700,
-                                color: schoolInfo.primary_color || "#0d47a1",
-                                textTransform: "uppercase",
-                                marginBottom: 4,
-                              }}
-                            >
-                              Affective Domain Traits
-                            </div>
-                            <table
-                              style={{
-                                width: "100%",
-                                borderCollapse: "collapse",
-                                border: `1px solid ${schoolInfo.primary_color || "#0d47a1"}`,
-                                fontSize: "11px",
-                              }}
-                            >
-                              <thead>
-                                <tr>
-                                  <th
+                            <thead>
+                              <tr>
+                                <th
+                                  style={{
+                                    background: themePrimary,
+                                    color: headerTextColor,
+                                    padding: "4px 6px",
+                                    textAlign: "left",
+                                  }}
+                                >
+                                  Skill / Domain
+                                </th>
+                                <th
+                                  style={{
+                                    background: themePrimary,
+                                    color: headerTextColor,
+                                    padding: "4px",
+                                    width: "60px",
+                                    textAlign: "center",
+                                  }}
+                                >
+                                  Score (1-5)
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {[
+                                ["Sports & Athletics", ratings.sports],
+                                ["Handicrafts & Arts", ratings.crafts],
+                                ["Music & Performance", ratings.music],
+                                ["Handwriting", ratings.handwriting],
+                                ["Leadership Ability", ratings.leadership],
+                              ].map(([lbl, val], idx) => (
+                                <tr key={idx} style={{ background: idx % 2 === 0 ? "#fff" : "#f8fafc" }}>
+                                  <td style={{ border: `1px solid ${hexToRgba(themePrimary, 0.25)}`, padding: "3px 6px" }}>
+                                    {lbl}
+                                  </td>
+                                  <td
                                     style={{
-                                      background: schoolInfo.primary_color || "#0d47a1",
-                                      color: getTextColor(schoolInfo.primary_color || "#0d47a1"),
-                                      fontSize: "10.5px",
-                                      padding: "4px",
-                                      textAlign: "left",
-                                    }}
-                                  >
-                                    Trait / Attribute
-                                  </th>
-                                  <th
-                                    style={{
-                                      background: schoolInfo.primary_color || "#0d47a1",
-                                      color: getTextColor(schoolInfo.primary_color || "#0d47a1"),
-                                      fontSize: "10.5px",
-                                      padding: "4px",
-                                      width: "70px",
+                                      border: `1px solid ${hexToRgba(themePrimary, 0.25)}`,
+                                      padding: "3px",
+                                      fontWeight: "bold",
                                       textAlign: "center",
                                     }}
                                   >
-                                    Score (1-5)
-                                  </th>
+                                    {val}
+                                  </td>
                                 </tr>
-                              </thead>
-                              <tbody>
-                                {[
-                                  ["Punctuality", ratings.punctuality],
-                                  ["Attendance", ratings.attendance],
-                                  ["Neatness", ratings.neatness],
-                                  ["Politeness", ratings.politeness],
-                                  ["Honesty", ratings.honesty],
-                                ].map(([label, val], idx) => (
-                                  <tr key={idx} style={{ background: idx % 2 === 0 ? "#fff" : "#f8fafc" }}>
-                                    <td
-                                      style={{
-                                        border: `1px solid ${hexToRgba(schoolInfo.primary_color || "#0d47a1", 0.3)}`,
-                                        textAlign: "left",
-                                        padding: "3px 6px",
-                                      }}
-                                    >
-                                      {label}
-                                    </td>
-                                    <td
-                                      style={{
-                                        border: `1px solid ${hexToRgba(schoolInfo.primary_color || "#0d47a1", 0.3)}`,
-                                        padding: "3px",
-                                        fontWeight: "bold",
-                                        textAlign: "center",
-                                      }}
-                                    >
-                                      {val}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-
-                          {/* Psychomotor Domains */}
-                          <div>
-                            <div
-                              style={{
-                                fontSize: "11px",
-                                fontWeight: 700,
-                                color: schoolInfo.primary_color || "#0d47a1",
-                                textTransform: "uppercase",
-                                marginBottom: 4,
-                              }}
-                            >
-                              Psychomotor & Skills
-                            </div>
-                            <table
-                              style={{
-                                width: "100%",
-                                borderCollapse: "collapse",
-                                border: `1px solid ${schoolInfo.primary_color || "#0d47a1"}`,
-                                fontSize: "11px",
-                              }}
-                            >
-                              <thead>
-                                <tr>
-                                  <th
-                                    style={{
-                                      background: schoolInfo.primary_color || "#0d47a1",
-                                      color: getTextColor(schoolInfo.primary_color || "#0d47a1"),
-                                      fontSize: "10.5px",
-                                      padding: "4px",
-                                      textAlign: "left",
-                                    }}
-                                  >
-                                    Skill / Domain
-                                  </th>
-                                  <th
-                                    style={{
-                                      background: schoolInfo.primary_color || "#0d47a1",
-                                      color: getTextColor(schoolInfo.primary_color || "#0d47a1"),
-                                      fontSize: "10.5px",
-                                      padding: "4px",
-                                      width: "70px",
-                                      textAlign: "center",
-                                    }}
-                                  >
-                                    Score (1-5)
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {[
-                                  ["Sports & Athletics", ratings.sports],
-                                  ["Handicrafts & Arts", ratings.crafts],
-                                  ["Music & Performance", ratings.music],
-                                  ["Handwriting", ratings.handwriting],
-                                  ["Leadership Ability", ratings.leadership],
-                                ].map(([label, val], idx) => (
-                                  <tr key={idx} style={{ background: idx % 2 === 0 ? "#fff" : "#f8fafc" }}>
-                                    <td
-                                      style={{
-                                        border: `1px solid ${hexToRgba(schoolInfo.primary_color || "#0d47a1", 0.3)}`,
-                                        textAlign: "left",
-                                        padding: "3px 6px",
-                                      }}
-                                    >
-                                      {label}
-                                    </td>
-                                    <td
-                                      style={{
-                                        border: `1px solid ${hexToRgba(schoolInfo.primary_color || "#0d47a1", 0.3)}`,
-                                        padding: "3px",
-                                        fontWeight: "bold",
-                                        textAlign: "center",
-                                      }}
-                                    >
-                                      {val}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
+                      </div>
+                    );
+                  };
 
-                        {/* AUTHENTICATION & SIGNATURES */}
-                        <div
-                          style={{
-                            marginTop: 12,
-                            border: `1px solid ${hexToRgba(schoolInfo.primary_color || "#0d47a1", 0.3)}`,
-                            borderRadius: "6px",
-                            padding: "10px",
-                            background: "#f8fafc",
-                          }}
-                        >
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 90px", gap: 12, alignItems: "center" }}>
-                            <div>
-                              <div style={{ marginBottom: "6px", fontSize: "11.5px" }}>
-                                <strong>Class Teacher's Remark:</strong>{" "}
-                                <span style={{ color: "#334155" }}>
-                                  {summary.class_teacher_comment || "Commendable effort this term."}
-                                </span>
-                              </div>
-                              <div style={{ marginBottom: "6px", fontSize: "11.5px" }}>
-                                <strong>Principal's Remark:</strong>{" "}
-                                <span style={{ color: "#334155" }}>
-                                  {summary.principal_comment || "Good academic progress recorded."}
-                                </span>
-                              </div>
-                              <div style={{ fontSize: "11px", color: "#64748B" }}>
-                                <strong>Next Term Resumption:</strong>{" "}
-                                {summary.resumption_date || "To be communicated"} &bull;{" "}
-                                <strong>General Remark:</strong> {summary.general_remark || "Promoted with Credit"}
-                              </div>
-                            </div>
+                  const renderRemarks = () => {
+                    if (!displayOptions.show_remarks) return null;
+                    return (
+                      <div
+                        style={{
+                          marginTop: 12,
+                          border: `1px solid ${hexToRgba(themePrimary, 0.3)}`,
+                          borderRadius: isModern ? "10px" : "6px",
+                          padding: "10px",
+                          background: isModern ? mixHexWithWhite(themeSecondary, 92) : "#f8fafc",
+                          fontSize: "11px",
+                        }}
+                      >
+                        <div style={{ marginBottom: "5px" }}>
+                          <strong style={{ color: themePrimary }}>Class Teacher's Remark:</strong>{" "}
+                          <span style={{ color: "#334155" }}>
+                            {summary.class_teacher_comment || "Commendable effort and academic focus displayed this term."}
+                          </span>
+                        </div>
+                        <div style={{ marginBottom: "5px" }}>
+                          <strong style={{ color: themePrimary }}>Principal's Remark:</strong>{" "}
+                          <span style={{ color: "#334155" }}>
+                            {summary.principal_comment || "Good academic progress recorded. Keep up the high standard."}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: "10.5px", color: "#64748B" }}>
+                          <strong>Next Term Resumption:</strong>{" "}
+                          {summary.resumption_date || "To be communicated"} &bull;{" "}
+                          <strong>General Standing:</strong> {summary.general_remark || (Number(summary.total_average) >= 50 ? "Promoted with Credit" : "Passed")}
+                        </div>
+                      </div>
+                    );
+                  };
 
-                            <div style={{ textAlign: "center" }}>
-                              {qrDataUrl && (
-                                <img
-                                  src={qrDataUrl}
-                                  alt="QR Verification"
-                                  style={{ width: "70px", height: "70px", margin: "auto", display: "block" }}
-                                />
-                              )}
-                              <div style={{ fontSize: "8.5px", color: "#64748B", marginTop: "2px", fontWeight: 700 }}>
-                                VERIFIED SEAL
-                              </div>
-                            </div>
-                          </div>
-
-                          {schoolInfo.principal_signature && (
-                            <div
-                              style={{
-                                display: "flex",
-                                justifyContent: "flex-end",
-                                marginTop: "8px",
-                                borderTop: "1px dashed #cbd5e1",
-                                paddingTop: "6px",
-                              }}
-                            >
+                  const renderSignature = () => {
+                    if (!displayOptions.show_signature && !displayOptions.show_qr_code) return null;
+                    return (
+                      <div
+                        style={{
+                          marginTop: 14,
+                          borderTop: isPremium ? `2px solid ${hexToRgba(themePrimary, 0.5)}` : `1px dashed ${hexToRgba(themePrimary, 0.3)}`,
+                          paddingTop: "10px",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          flexWrap: "wrap",
+                          gap: 12,
+                        }}
+                      >
+                        {displayOptions.show_signature && (schoolInfo.principal_signature || (schoolInfo as any)?.stamp) ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                            {schoolInfo.principal_signature ? (
                               <div style={{ textAlign: "center" }}>
                                 <img
                                   src={schoolInfo.principal_signature}
                                   alt="Principal Signature"
-                                  style={{ height: "35px", display: "block", margin: "auto" }}
+                                  style={{ height: "40px", objectFit: "contain", display: "block", margin: "auto" }}
                                 />
-                                <div
-                                  style={{
-                                    fontSize: "10px",
-                                    fontWeight: 700,
-                                    color: schoolInfo.primary_color || "#0d47a1",
-                                  }}
-                                >
-                                  Principal's Authorized Stamp
+                                <div style={{ fontSize: "10px", fontWeight: 700, color: themePrimary }}>
+                                  Principal's Authorized Signature
                                 </div>
                               </div>
+                            ) : null}
+                            {(schoolInfo as any)?.stamp ? (
+                              <img
+                                src={(schoolInfo as any).stamp}
+                                alt="School Stamp"
+                                style={{ width: 55, height: 55, objectFit: "contain", transform: "rotate(-8deg)" }}
+                              />
+                            ) : null}
+                          </div>
+                        ) : <div />}
+
+                        {displayOptions.show_qr_code ? (
+                          <div style={{ textAlign: "center" }}>
+                            <img
+                              src={qrDataUrl || "/media/result/default-qrcode.svg"}
+                              alt="QR Verification"
+                              style={{ width: "65px", height: "65px", margin: "auto", display: "block" }}
+                            />
+                            <div style={{ fontSize: "8.5px", color: themePrimary, marginTop: "2px", fontWeight: 800 }}>
+                              VERIFIED OFFICIAL RESULT
                             </div>
+                          </div>
+                        ) : <div />}
+                      </div>
+                    );
+                  };
+
+                  return (
+                    <div className="re-preview-container">
+                      {/* Top Action Bar */}
+                      <div className="d-flex align-items-center justify-content-between mb-4 p-3 bg-white rounded-4 border shadow-sm flex-wrap gap-3 d-print-none">
+                        <div>
+                          <div className="d-flex align-items-center gap-2 flex-wrap">
+                            <h4 className="fs-6 fw-bold text-dark m-0">Official Student Terminal Assessment Report</h4>
+                            <span className="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">
+                              <i className="bi bi-palette-fill me-1" /> Template: {templateNames[activeTemplateKey] || "Classic Academic"}
+                            </span>
+                            <span className="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1">
+                              <i className="bi bi-mortarboard-fill me-1" /> Class: {activeClassName}
+                            </span>
+                          </div>
+                          <span className="text-muted text-xs mt-1 d-block">
+                            Faithfully rendered using the school's selected template and styling settings
+                          </span>
+                        </div>
+
+                        <div className="d-flex align-items-center gap-2 flex-wrap">
+                          {/* Quick Template Switcher Dropdown */}
+                          <div className="d-flex align-items-center gap-2">
+                            <label className="text-xs fw-bold text-muted text-uppercase text-nowrap">Template:</label>
+                            <select
+                              className="form-select form-select-sm fw-bold border-secondary-subtle"
+                              style={{ width: "auto" }}
+                              value={activeTemplateKey}
+                              onChange={(e) => setPreviewTemplateOverride(e.target.value)}
+                            >
+                              <option value="classic_academic">Classic Academic</option>
+                              <option value="modern_scholar">Modern Scholar</option>
+                              <option value="premium_letterhead">Premium Letterhead</option>
+                              <option value="custom_builder">Custom Builder</option>
+                            </select>
+                          </div>
+
+                          <button
+                            type="button"
+                            className="btn btn-outline-primary btn-sm rounded-pill px-3 fw-bold"
+                            onClick={() => {
+                              const params = new URLSearchParams({
+                                school_id: String(student.school_id),
+                                class_id: String(selectedClassId || student.level_id || ""),
+                                student_id: String(student.id),
+                                term: selectedTerm,
+                                session: selectedSession,
+                              });
+                              window.open(`/results/show-result?${params.toString()}`, "_blank");
+                            }}
+                          >
+                            <i className="bi bi-box-arrow-up-right me-1" /> Open in Full ShowResult Page
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm rounded-pill px-3 fw-bold"
+                            onClick={() => window.print()}
+                          >
+                            <i className="bi bi-printer-fill me-1" /> Print
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm rounded-pill px-4 fw-bold"
+                            disabled={downloadingPdf}
+                            onClick={handleDownloadPdf}
+                          >
+                            {downloadingPdf ? (
+                              <>
+                                <span className="spinner-border spinner-border-sm me-1" /> Generating PDF...
+                              </>
+                            ) : (
+                              <>
+                                <i className="bi bi-file-earmark-pdf-fill me-1" /> Download Official PDF
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Official Result Sheet Container */}
+                      <div
+                        id="admin-result-sheet"
+                        style={{
+                          width: "min(780px, 100%)",
+                          margin: "auto",
+                          padding: isModern ? "24px" : isPremium ? "22px" : "20px",
+                          background: themeBg,
+                          fontFamily: resultFont,
+                          fontSize: "12px",
+                          border: isModern
+                            ? "none"
+                            : isPremium
+                            ? `1px solid ${hexToRgba(themePrimary, 0.35)}`
+                            : `3px solid ${themePrimary}`,
+                          borderTop: isPremium ? `10px solid ${themePrimary}` : undefined,
+                          borderRadius: isModern ? "22px" : "8px",
+                          boxSizing: "border-box",
+                          position: "relative",
+                          overflow: "visible",
+                          color: "#111827",
+                          boxShadow: isModern
+                            ? `inset 0 0 0 2px ${hexToRgba(themePrimary, 0.35)}, 0 16px 40px rgba(15,23,42,0.08)`
+                            : isPremium
+                            ? "0 16px 40px rgba(15,23,42,0.08)"
+                            : "0 10px 30px rgba(0,0,0,0.08)",
+                        }}
+                      >
+                        {/* Watermark */}
+                        {displayOptions.show_watermark && schoolInfo.logo && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              top: 0,
+                              left: 0,
+                              width: "100%",
+                              height: "100%",
+                              backgroundImage: `url(${schoolInfo.logo})`,
+                              backgroundRepeat: "repeat",
+                              backgroundSize: "150px 150px",
+                              opacity: 0.045,
+                              transform: "rotate(-30deg)",
+                              zIndex: 0,
+                              pointerEvents: "none",
+                            }}
+                          />
+                        )}
+
+                        <div style={{ position: "relative", zIndex: 1 }}>
+                          {/* HEADER */}
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: displayOptions.show_student_photo ? "90px 1fr 90px" : "90px 1fr",
+                              gap: "12px",
+                              alignItems: "center",
+                              borderBottom: isPremium ? `2px solid ${themePrimary}` : `2px solid ${themePrimary}`,
+                              paddingBottom: "10px",
+                            }}
+                          >
+                            <img
+                              src={schoolInfo.logo || "https://via.placeholder.com/90x90.png?text=Logo"}
+                              alt="School Logo"
+                              onError={(e) => {
+                                (e.target as any).src = "https://via.placeholder.com/90x90.png?text=Logo";
+                              }}
+                              style={{
+                                width: "90px",
+                                height: "90px",
+                                borderRadius: isModern ? "14px" : "6px",
+                                objectFit: "cover",
+                                border: `2px solid ${themeSecondary}`,
+                              }}
+                            />
+
+                            <div style={{ flex: 1, textAlign: "center" }}>
+                              <h1
+                                style={{
+                                  margin: 0,
+                                  fontSize: isPremium ? "22px" : "20px",
+                                  fontWeight: "bold",
+                                  color: themePrimary,
+                                  letterSpacing: isPremium ? "0.5px" : undefined,
+                                }}
+                              >
+                                {schoolInfo.name}
+                              </h1>
+                              <p style={{ margin: "3px 0", fontSize: "12px" }}>{schoolInfo.address}</p>
+                              <p style={{ margin: "3px 0", fontSize: "12px" }}>Tel: {schoolInfo.phone}</p>
+
+                              <h2
+                                style={{
+                                  margin: isModern ? "8px 0 0" : "6px 0",
+                                  fontSize: isModern ? "14px" : "15px",
+                                  textTransform: "uppercase",
+                                  background: themePrimary,
+                                  color: headerTextColor,
+                                  padding: isModern ? "7px 18px" : "6px 12px",
+                                  borderRadius: isModern ? "999px" : isPremium ? "4px" : "6px",
+                                  textAlign: "center",
+                                  letterSpacing: isPremium ? "1.5px" : "1px",
+                                  border: `1px solid ${themeSecondary}`,
+                                  fontWeight: 700,
+                                  display: isModern ? "inline-block" : "block",
+                                }}
+                              >
+                                {selectedTerm} REPORT SHEET &bull; {selectedSession}
+                              </h2>
+                            </div>
+
+                            {displayOptions.show_student_photo && (
+                              studentPhotoBase64 || student.photo ? (
+                                <img
+                                  src={studentPhotoBase64 || `/uploads/users/${student.photo}`}
+                                  alt="student photo"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.onerror = null;
+                                    target.style.display = "none";
+                                  }}
+                                  style={{
+                                    width: "90px",
+                                    height: "90px",
+                                    borderRadius: isModern ? "14px" : "6px",
+                                    objectFit: "cover",
+                                    border: `2px solid ${themeSecondary}`,
+                                  }}
+                                />
+                              ) : (
+                                <div
+                                  style={{
+                                    width: "90px",
+                                    height: "90px",
+                                    border: `2px dashed ${themePrimary}`,
+                                    borderRadius: isModern ? "14px" : "6px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontSize: "11px",
+                                    color: "#666",
+                                    textAlign: "center",
+                                  }}
+                                >
+                                  Student Photo
+                                </div>
+                              )
+                            )}
+                          </div>
+
+                          {/* BODY CONTENT BY TEMPLATE */}
+                          {isModern ? (
+                            /* MODERN SCHOLAR: 2-COLUMN SPLIT LAYOUT */
+                            <>
+                              {renderStudentInfo()}
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: "minmax(0, 1.28fr) minmax(240px, .72fr)",
+                                  gap: 12,
+                                  alignItems: "start",
+                                  marginTop: 10,
+                                }}
+                              >
+                                <div>
+                                  {renderScoresTable()}
+                                </div>
+                                <div>
+                                  {renderPerformanceAnalytics()}
+                                  {renderDomains()}
+                                </div>
+                              </div>
+                              {renderRemarks()}
+                              {renderSignature()}
+                            </>
+                          ) : isCustom ? (
+                            /* CUSTOM BUILDER: ORDERED BLOCKS */
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10, marginTop: 10 }}>
+                              {customBlocks
+                                .filter((b) => b.visible !== false)
+                                .map((block) => (
+                                  <div
+                                    key={block.id}
+                                    style={{
+                                      gridColumn: block.width === "half" ? "span 1" : "1 / -1",
+                                      minWidth: 0,
+                                    }}
+                                  >
+                                    {block.type === "student_info" && renderStudentInfo()}
+                                    {block.type === "scores_table" && renderScoresTable()}
+                                    {block.type === "performance_chart" && renderPerformanceAnalytics()}
+                                    {block.type === "domains" && renderDomains()}
+                                    {block.type === "comments" && renderRemarks()}
+                                    {block.type === "signature" && renderSignature()}
+                                  </div>
+                                ))}
+                            </div>
+                          ) : isPremium ? (
+                            /* PREMIUM LETTERHEAD: FORMAL CERTIFICATE STYLE */
+                            <>
+                              {renderStudentInfo()}
+                              <div style={{ borderTop: `1px solid ${hexToRgba(themePrimary, 0.35)}`, marginTop: 10, paddingTop: 4 }}>
+                                {renderScoresTable()}
+                                {renderDomains()}
+                                {renderRemarks()}
+                                {renderSignature()}
+                              </div>
+                            </>
+                          ) : (
+                            /* CLASSIC ACADEMIC: TRADITIONAL COMPREHENSIVE REPORT CARD */
+                            <>
+                              {renderStudentInfo()}
+                              {renderScoresTable()}
+                              {renderDomains()}
+                              {renderRemarks()}
+                              {renderSignature()}
+                            </>
                           )}
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </>
             ) : (
               /* Empty Search Guide */
