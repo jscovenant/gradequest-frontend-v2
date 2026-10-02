@@ -307,6 +307,34 @@ function AcademicAlertSection({ alerts, loading, error, counts, onRefresh, alert
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const user = getUser();
+  const userRole = (user?.normalized_role || user?.role || "").toLowerCase().replace(/[\s-]/g, "_");
+  const isPrincipal = userRole === "principal" || userRole === "head_teacher" || userRole === "headteacher";
+  const isOperator = userRole === "operator" || userRole === "registrar" || userRole === "secretary";
+
+  const dashboardActions = useMemo(() => {
+    if (isPrincipal) {
+      return [
+        { label: "Search & Edit Result", desc: "Lookup student by Reg No", color: "#D97706", bg: "rgba(217, 119, 6, 0.12)", path: "/results/student-editor", icon: <i className="bi bi-pencil-square" /> },
+        { label: "Register Student", desc: "Enroll a new student", color: "#10B981", bg: "rgba(16, 185, 129, 0.12)", path: "/students/register", icon: <i className="bi bi-person-plus-fill" /> },
+        { label: "Upload Results", desc: "Record continuous assessment", color: "#D97706", bg: "rgba(217, 119, 6, 0.12)", path: "/students/results/add", icon: <i className="bi bi-cloud-arrow-up-fill" /> },
+        { label: "Generate PINs", desc: "Create result scratch cards", color: "#2563EB", bg: "rgba(37, 99, 235, 0.12)", path: "/results/pins", icon: <i className="bi bi-key-fill" /> },
+        { label: "Staff Attendance Logs", desc: "Teacher duty & attendance logs", color: "#EF4444", bg: "rgba(239, 68, 68, 0.12)", path: "/attendance/logs", icon: <i className="bi bi-calendar-check-fill" /> },
+        { label: "Master Broadsheet", desc: "Class & subject sheets", color: "#6366F1", bg: "rgba(99, 102, 241, 0.12)", path: "/results/review", icon: <i className="bi bi-file-earmark-spreadsheet-fill" /> },
+      ];
+    }
+    if (isOperator) {
+      return [
+        { label: "Register Student", desc: "Enroll a new student", color: "#10B981", bg: "rgba(16, 185, 129, 0.12)", path: "/students/register", icon: <i className="bi bi-person-plus-fill" /> },
+        { label: "Upload Results", desc: "Record marks & continuous assessment", color: "#D97706", bg: "rgba(217, 119, 6, 0.12)", path: "/students/results/add", icon: <i className="bi bi-cloud-arrow-up-fill" /> },
+        { label: "Search & Edit Result", desc: "Lookup student score entry", color: "#D97706", bg: "rgba(217, 119, 6, 0.12)", path: "/results/student-editor", icon: <i className="bi bi-pencil-square" /> },
+        { label: "Generate PINs", desc: "Create scratch cards for students", color: "#2563EB", bg: "rgba(37, 99, 235, 0.12)", path: "/results/pins", icon: <i className="bi bi-key-fill" /> },
+        { label: "Student Attendance", desc: "Mark class register", color: "#6366F1", bg: "rgba(99, 102, 241, 0.12)", path: "/students/attendance", icon: <i className="bi bi-check2-square" /> },
+        { label: "CBT Exams", desc: "Online exam hall & monitor", color: "#0F2744", bg: "rgba(15, 39, 68, 0.12)", path: "/cbt/exams", icon: <i className="bi bi-pc-display" /> },
+      ];
+    }
+    return QUICK_ACTIONS;
+  }, [isPrincipal, isOperator]);
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [totalUsers, setTotalUsers] = useState(0);
@@ -1056,9 +1084,27 @@ export default function AdminDashboard() {
               <div>
                 <div className="db-session-badge">
                   <span>●</span> {academicSession || "Current Session"} — {currentTerm || "Active Term"}
+                  {isPrincipal && (
+                    <span className="ms-2 px-2 py-0.5 rounded-pill bg-warning text-dark fw-bold" style={{ fontSize: "10px" }}>
+                      Academic Leadership
+                    </span>
+                  )}
+                  {isOperator && (
+                    <span className="ms-2 px-2 py-0.5 rounded-pill bg-info text-dark fw-bold" style={{ fontSize: "10px" }}>
+                      Data Operations & Registry
+                    </span>
+                  )}
                 </div>
-                <h1 className="db-greeting">{getGreeting()}, {user?.firstname || "Administrator"}.</h1>
-                <p className="db-hero-sub">Welcome to your school management cockpit. Continuous assessment and live broadsheets are active.</p>
+                <h1 className="db-greeting">
+                  {getGreeting()}, {isPrincipal ? `Principal ${user?.firstname || user?.surname || ""}` : isOperator ? `Operator ${user?.firstname || user?.surname || ""}` : (user?.firstname || "Administrator")}.
+                </h1>
+                <p className="db-hero-sub">
+                  {isPrincipal
+                    ? "Welcome to your Academic Leadership Cockpit. Continuous assessment, staff duty, and broadsheet approvals are live."
+                    : isOperator
+                    ? "Welcome to your School Registry & Data Entry Cockpit. Student registration, continuous assessment marks, and CBT exams are active."
+                    : "Welcome to your school management cockpit. Continuous assessment and live broadsheets are active."}
+                </p>
                 <div className="d-flex flex-wrap gap-2">
                   <button className="db-btn-gold" onClick={()=>navigate("/results/pins")}>
                     <i className="bi bi-key-fill" /> Generate PINs
@@ -1114,7 +1160,7 @@ export default function AdminDashboard() {
 
             {/* Quick Actions Bar */}
             <div className="db-actions">
-              {QUICK_ACTIONS.map((a) => (
+              {dashboardActions.map((a) => (
                 <a
                   key={a.label}
                   href={a.path}
@@ -1132,18 +1178,20 @@ export default function AdminDashboard() {
               ))}
             </div>
 
-            {/* Result Review Queue */}
-            <ResultReviewQueue
-              batches={reviewBatches}
-              loading={reviewLoading}
-              busyId={reviewBusyId}
-              error={reviewError}
-              onRefresh={fetchReviewBatches}
-              onApprove={(batch)=>runReviewAction(batch,"approve")}
-              onPublish={(batch)=>runReviewAction(batch,"publish")}
-              onReopen={(batch)=>runReviewAction(batch,"reopen")}
-              onOpenBroadsheet={(batch)=>navigate(`/results/broadsheet/${batch.id}`)}
-            />
+            {/* Result Review Queue (Principal & Proprietor Only) */}
+            {!isOperator && (
+              <ResultReviewQueue
+                batches={reviewBatches}
+                loading={reviewLoading}
+                busyId={reviewBusyId}
+                error={reviewError}
+                onRefresh={fetchReviewBatches}
+                onApprove={(batch)=>runReviewAction(batch,"approve")}
+                onPublish={(batch)=>runReviewAction(batch,"publish")}
+                onReopen={(batch)=>runReviewAction(batch,"reopen")}
+                onOpenBroadsheet={(batch)=>navigate(`/results/broadsheet/${batch.id}`)}
+              />
+            )}
 
             {/* Academic Alerts Section */}
             <AcademicAlertSection

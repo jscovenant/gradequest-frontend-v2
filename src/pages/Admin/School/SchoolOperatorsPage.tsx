@@ -37,9 +37,10 @@ export default function SchoolOperatorsPage() {
     surname: "",
     email: "",
     phone: "",
-    operator_title: "Desk Officer / Portal Operator",
+    operator_title: "School Principal / Head Teacher",
+    role: "principal",
   });
-  const [createdPasswordModal, setCreatedPasswordModal] = useState<{ name: string; email: string; pass: string } | null>(null);
+  const [createdPasswordModal, setCreatedPasswordModal] = useState<{ name: string; email: string; pass: string; role?: string } | null>(null);
 
   // Edit Modal state
   const [editingOp, setEditingOp] = useState<SchoolOperator | null>(null);
@@ -48,6 +49,7 @@ export default function SchoolOperatorsPage() {
     surname: "",
     phone: "",
     operator_title: "",
+    role: "operator",
   });
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -85,6 +87,8 @@ export default function SchoolOperatorsPage() {
     );
   }, [operators, search]);
 
+  const principalCount = useMemo(() => operators.filter((o) => o.role === "principal").length, [operators]);
+  const operatorCount = useMemo(() => operators.filter((o) => o.role !== "principal").length, [operators]);
   const activeCount = useMemo(() => operators.filter((o) => o.status === 1).length, [operators]);
   const inactiveCount = useMemo(() => operators.filter((o) => o.status === 0).length, [operators]);
 
@@ -97,23 +101,25 @@ export default function SchoolOperatorsPage() {
     setCreating(true);
     try {
       const res = await authApi.post("/school/operators", newOp);
-      showToast(res.data.message || "Operator registered successfully!", "success");
+      showToast(res.data.message || "Account registered successfully!", "success");
       setShowCreateModal(false);
       setCreatedPasswordModal({
         name: `${newOp.firstname} ${newOp.surname}`,
         email: newOp.email,
         pass: res.data.temporary_password,
+        role: newOp.role,
       });
       setNewOp({
         firstname: "",
         surname: "",
         email: "",
         phone: "",
-        operator_title: "Desk Officer / Portal Operator",
+        operator_title: "School Principal / Head Teacher",
+        role: "principal",
       });
       loadOperators();
     } catch (err: any) {
-      showToast(err?.response?.data?.message || "Failed to register operator.", "error");
+      showToast(err?.response?.data?.message || "Failed to register account.", "error");
     } finally {
       setCreating(false);
     }
@@ -125,7 +131,8 @@ export default function SchoolOperatorsPage() {
       firstname: op.firstname,
       surname: op.surname,
       phone: op.phone || "",
-      operator_title: op.operator_title || "Desk Officer",
+      operator_title: op.operator_title || (op.role === "principal" ? "School Principal / Head Teacher" : "Desk Officer"),
+      role: op.role || "operator",
     });
   };
 
@@ -135,7 +142,7 @@ export default function SchoolOperatorsPage() {
     setSavingEdit(true);
     try {
       const res = await authApi.put(`/school/operators/${editingOp.id}`, editForm);
-      showToast(res.data.message || "Operator updated successfully.", "success");
+      showToast(res.data.message || "Details updated successfully.", "success");
       setEditingOp(null);
       loadOperators();
     } catch (err: any) {
@@ -343,14 +350,14 @@ export default function SchoolOperatorsPage() {
       `}</style>
 
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-      <PageTitle title="School Operators & Delegated Managers | SchoolProfit" />
+      <PageTitle title="School Administrators & Operators | GradeQuest" />
 
       <div className="container-fluid">
         <div className="row">
           <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
           <main className="col-md-9 col-lg-10 ms-auto px-3 px-md-4 db-main">
-            {loading && <Loader message="Loading school operators..." />}
+            {loading && <Loader message="Loading school staff..." />}
 
             {/* HERO */}
             <div className="db-hero">
@@ -360,15 +367,18 @@ export default function SchoolOperatorsPage() {
                 <div>
                   <div className="db-session-badge">
                     <span className="db-session-dot" />
-                    School Management — Safe Delegation
+                    School Leadership & Safe Delegation
                   </div>
-                  <h1 className="db-hero-title">School Operators & Portal Managers</h1>
+                  <h1 className="db-hero-title">School Administrators & Operators</h1>
                   <p className="db-hero-sub">
-                    Assign secretaries, IT teachers, and desk clerks to register students, upload results, and manage CBT exams—without exposing your proprietor master credentials or bank accounts.
+                    Appoint Principals/Head Teachers to oversee academics, result approvals, and duty logs, and Operators for student registration and continuous assessment—without exposing your proprietor master credentials, bank accounts, or financial settings.
                   </p>
                   <div className="d-flex gap-2 flex-wrap mt-3">
                     <div className="gq-stat-badge">
-                      Total Operators: <strong className="text-warning">{operators.length}</strong>
+                      Principals: <strong className="text-warning">{principalCount}</strong>
+                    </div>
+                    <div className="gq-stat-badge">
+                      Operators: <strong className="text-info">{operatorCount}</strong>
                     </div>
                     <div className="gq-stat-badge">
                       Active: <strong className="text-success">{activeCount}</strong>
@@ -384,7 +394,7 @@ export default function SchoolOperatorsPage() {
                 <div>
                   <button className="db-btn-gold" onClick={() => setShowCreateModal(true)}>
                     <i className="bi bi-person-plus-fill" />
-                    + Add School Operator
+                    + Add Administrator / Operator
                   </button>
                 </div>
               </div>
@@ -400,7 +410,7 @@ export default function SchoolOperatorsPage() {
                   <input
                     type="text"
                     className="form-control border-start-0 ps-0"
-                    placeholder="Search operator name, email, role..."
+                    placeholder="Search name, email, role..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
@@ -414,17 +424,17 @@ export default function SchoolOperatorsPage() {
 
               {loading ? (
                 <div className="text-center py-5">
-                  <p className="text-muted small mt-2">Loading school operators...</p>
+                  <p className="text-muted small mt-2">Loading administrators and operators...</p>
                 </div>
               ) : filtered.length === 0 ? (
                 <div className="text-center py-5">
                   <i className="bi bi-people text-muted" style={{ fontSize: 42 }} />
-                  <h6 className="fw-bold mt-2 text-dark">No School Operators Added Yet</h6>
+                  <h6 className="fw-bold mt-2 text-dark">No Administrators or Operators Added Yet</h6>
                   <p className="text-muted small" style={{ maxWidth: 450, margin: "0 auto 16px" }}>
-                    Create dedicated logins for your desk officers and computer operators to manage school operations safely.
+                    Create dedicated logins for your Principals, vice principals, and portal operators to manage school operations safely.
                   </p>
                   <button className="db-btn-gold" onClick={() => setShowCreateModal(true)}>
-                    <i className="bi bi-person-plus-fill" /> Add First Operator
+                    <i className="bi bi-person-plus-fill" /> Add First Account
                   </button>
                 </div>
               ) : (
@@ -432,8 +442,8 @@ export default function SchoolOperatorsPage() {
                   <table className="table table-hover align-middle mb-0">
                     <thead className="table-light small text-uppercase" style={{ fontSize: 11, letterSpacing: "0.5px" }}>
                       <tr>
-                        <th>Operator</th>
-                        <th>Role Title</th>
+                        <th>Administrator / Operator</th>
+                        <th>Role & Delegation</th>
                         <th>Contact Details</th>
                         <th>Status</th>
                         <th>Registered</th>
@@ -441,83 +451,109 @@ export default function SchoolOperatorsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filtered.map((op) => (
-                        <tr key={op.id}>
-                          <td>
-                            <div className="d-flex align-items-center gap-2">
-                              <div className="gq-avatar">
-                                {op.firstname.charAt(0)}
-                                {op.surname.charAt(0)}
-                              </div>
-                              <div>
-                                <div className="fw-bold text-dark">
-                                  {op.firstname} {op.surname}
+                      {filtered.map((op) => {
+                        const isPrincipal = op.role === "principal";
+                        return (
+                          <tr key={op.id}>
+                            <td>
+                              <div className="d-flex align-items-center gap-2">
+                                <div
+                                  className="gq-avatar"
+                                  style={{
+                                    background: isPrincipal ? "#EFF6FF" : "#F1F5F9",
+                                    color: isPrincipal ? "#2563EB" : "#475569",
+                                    border: isPrincipal ? "1px solid #BFDBFE" : "1px solid #E2E8F0",
+                                  }}
+                                >
+                                  {op.firstname.charAt(0)}
+                                  {op.surname.charAt(0)}
                                 </div>
-                                <small className="text-muted">{op.email}</small>
+                                <div>
+                                  <div className="fw-bold text-dark d-flex align-items-center gap-1">
+                                    {op.firstname} {op.surname}
+                                    {isPrincipal && (
+                                      <i className="bi bi-patch-check-fill text-primary" title="School Principal / Head Teacher" />
+                                    )}
+                                  </div>
+                                  <small className="text-muted">{op.email}</small>
+                                </div>
                               </div>
-                            </div>
-                          </td>
-                          <td>
-                            <span className="badge bg-light text-dark border px-2 py-1">
-                              {op.operator_title || "Desk Officer"}
-                            </span>
-                          </td>
-                          <td>
-                            <div className="small text-dark">{op.phone || "—"}</div>
-                            {op.last_login_at && (
-                              <small className="text-muted" style={{ fontSize: 11 }}>
-                                Last login: {new Date(op.last_login_at).toLocaleDateString()}
-                              </small>
-                            )}
-                          </td>
-                          <td>
-                            {op.status === 1 ? (
-                              <span className="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
-                                ● Active
-                              </span>
-                            ) : (
-                              <span className="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">
-                                ● Deactivated
-                              </span>
-                            )}
-                          </td>
-                          <td className="small text-muted">
-                            {op.created_at ? new Date(op.created_at).toLocaleDateString() : "—"}
-                          </td>
-                          <td className="text-end">
-                            <div className="btn-group btn-group-sm">
-                              <button
-                                className="btn btn-outline-primary"
-                                title="Edit details"
-                                onClick={() => openEdit(op)}
-                              >
-                                <i className="bi bi-pencil" />
-                              </button>
-                              <button
-                                className="btn btn-outline-secondary"
-                                title="Reset password"
-                                onClick={() => handleResetPassword(op)}
-                              >
-                                <i className="bi bi-key" />
-                              </button>
-                              <button
-                                className={`btn ${op.status === 1 ? "btn-outline-warning" : "btn-outline-success"}`}
-                                title={op.status === 1 ? "Deactivate operator" : "Activate operator"}
-                                onClick={() => handleToggleStatus(op)}
-                              >
-                                <i className={`bi ${op.status === 1 ? "bi-pause-circle" : "bi-play-circle"}`} />
-                              </button>
-                              <button
-                                className="btn btn-outline-danger"
-                                title="Delete operator"
-                                onClick={() => handleDelete(op)}
-                              >
-                                <i className="bi bi-trash" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td>
+                              <div className="d-flex flex-column gap-1">
+                                <div>
+                                  {isPrincipal ? (
+                                    <span className="badge bg-primary px-2 py-1">
+                                      <i className="bi bi-mortarboard-fill me-1" /> Principal
+                                    </span>
+                                  ) : (
+                                    <span className="badge bg-secondary px-2 py-1">
+                                      <i className="bi bi-person-badge me-1" /> Operator
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-muted small">
+                                  {op.operator_title || (isPrincipal ? "School Principal" : "Desk Officer")}
+                                </span>
+                              </div>
+                            </td>
+                            <td>
+                              <div className="small text-dark">{op.phone || "—"}</div>
+                              {op.last_login_at && (
+                                <small className="text-muted" style={{ fontSize: 11 }}>
+                                  Last login: {new Date(op.last_login_at).toLocaleDateString()}
+                                </small>
+                              )}
+                            </td>
+                            <td>
+                              {op.status === 1 ? (
+                                <span className="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                                  ● Active
+                                </span>
+                              ) : (
+                                <span className="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">
+                                  ● Deactivated
+                                </span>
+                              )}
+                            </td>
+                            <td className="small text-muted">
+                              {op.created_at ? new Date(op.created_at).toLocaleDateString() : "—"}
+                            </td>
+                            <td className="text-end">
+                              <div className="btn-group btn-group-sm">
+                                <button
+                                  className="btn btn-outline-primary"
+                                  title="Edit details"
+                                  onClick={() => openEdit(op)}
+                                >
+                                  <i className="bi bi-pencil" />
+                                </button>
+                                <button
+                                  className="btn btn-outline-secondary"
+                                  title="Reset password"
+                                  onClick={() => handleResetPassword(op)}
+                                >
+                                  <i className="bi bi-key" />
+                                </button>
+                                <button
+                                  className={`btn ${op.status === 1 ? "btn-outline-warning" : "btn-outline-success"}`}
+                                  title={op.status === 1 ? "Deactivate account" : "Activate account"}
+                                  onClick={() => handleToggleStatus(op)}
+                                >
+                                  <i className={`bi ${op.status === 1 ? "bi-pause-circle" : "bi-play-circle"}`} />
+                                </button>
+                                <button
+                                  className="btn btn-outline-danger"
+                                  title="Delete account"
+                                  onClick={() => handleDelete(op)}
+                                >
+                                  <i className="bi bi-trash" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -530,7 +566,11 @@ export default function SchoolOperatorsPage() {
               <div>
                 <strong>Proprietor Security Guard:</strong>
                 <br />
-                Operators have access to student records, results, attendance, CBT, and AI lesson planners. They are strictly blocked from viewing or editing School Bank Accounts, subscriptions, finances, or school ownership.
+                <strong>Principals</strong> manage academic approvals, broadsheets, student registers, classes, subjects, CBT, and teacher duty logs.
+                <br />
+                <strong>Operators</strong> assist with day-to-day student registration and marks entry.
+                <br />
+                Both roles are strictly blocked from accessing School Bank Accounts, platform subscriptions, wallet funds, or platform ownership settings.
               </div>
             </div>
 
@@ -549,17 +589,41 @@ export default function SchoolOperatorsPage() {
               <div className="modal-header bg-dark text-white p-3 border-0">
                 <h5 className="modal-title fs-6 fw-bold text-white d-flex align-items-center gap-2 m-0">
                   <i className="bi bi-person-plus-fill text-warning" />
-                  Add School Operator / Manager
+                  Add School Administrator or Operator
                 </h5>
                 <button type="button" className="btn-close btn-close-white" onClick={() => setShowCreateModal(false)} />
               </div>
               <form onSubmit={handleCreate}>
                 <div className="modal-body p-4">
                   <p className="text-muted small mb-3">
-                    Register an assistant, secretary, or IT operator. A temporary login password will be generated and emailed to them.
+                    Register a Principal/Head Teacher or School Operator. A temporary login password will be generated and emailed to them.
                   </p>
 
                   <div className="row g-3">
+                    <div className="col-12">
+                      <label className="form-label fw-bold small">Administrative Role *</label>
+                      <select
+                        className="form-select"
+                        value={newOp.role}
+                        onChange={(e) => {
+                          const r = e.target.value;
+                          setNewOp({
+                            ...newOp,
+                            role: r,
+                            operator_title: r === "principal" ? "School Principal / Head Teacher" : "Desk Officer / Portal Operator",
+                          });
+                        }}
+                      >
+                        <option value="principal">🎓 Principal / Head Teacher (Academic Leader & Broadsheet Approver)</option>
+                        <option value="operator">🖥️ School Operator / Registrar (Data Entry & Admissions Clerk)</option>
+                      </select>
+                      <div className="form-text text-muted" style={{ fontSize: "11.5px" }}>
+                        {newOp.role === "principal"
+                          ? "Principals have full academic control: approve & publish broadsheets, review alerts, manage teachers, classes, subjects, and CBT exams without seeing your bank account or platform billing."
+                          : "Operators can enroll students, upload continuous assessment scores, and manage exams without access to sensitive proprietor or financial settings."}
+                      </div>
+                    </div>
+
                     <div className="col-md-6">
                       <label className="form-label fw-bold small">First Name *</label>
                       <input
@@ -590,7 +654,7 @@ export default function SchoolOperatorsPage() {
                         required
                         value={newOp.email}
                         onChange={(e) => setNewOp({ ...newOp, email: e.target.value })}
-                        placeholder="operator@school.edu or gmail.com"
+                        placeholder="principal@school.edu or gmail.com"
                       />
                     </div>
                     <div className="col-md-6">
@@ -610,7 +674,7 @@ export default function SchoolOperatorsPage() {
                         className="form-control"
                         value={newOp.operator_title}
                         onChange={(e) => setNewOp({ ...newOp, operator_title: e.target.value })}
-                        placeholder="e.g. Desk Officer / ICT Coordinator"
+                        placeholder="e.g. School Principal / Head Teacher"
                       />
                     </div>
                   </div>
@@ -620,7 +684,7 @@ export default function SchoolOperatorsPage() {
                     Cancel
                   </button>
                   <button type="submit" className="db-btn-gold btn-sm" disabled={creating}>
-                    {creating ? "Creating..." : "Create Operator Account"}
+                    {creating ? "Creating..." : "Create Account"}
                   </button>
                 </div>
               </form>
@@ -636,13 +700,13 @@ export default function SchoolOperatorsPage() {
             <div className="modal-content" style={{ borderRadius: 16, overflow: "hidden" }}>
               <div className="modal-header bg-success text-white p-3 border-0">
                 <h5 className="modal-title fs-6 fw-bold text-white d-flex align-items-center gap-2 m-0">
-                  <i className="bi bi-check-circle-fill" /> Operator Created Successfully
+                  <i className="bi bi-check-circle-fill" /> Account Created Successfully
                 </h5>
                 <button type="button" className="btn-close btn-close-white" onClick={() => setCreatedPasswordModal(null)} />
               </div>
               <div className="modal-body p-4 text-center">
                 <p className="small text-muted mb-3">
-                  The account for <strong>{createdPasswordModal.name}</strong> is active. An email has been sent to{" "}
+                  The account for <strong>{createdPasswordModal.name}</strong> ({createdPasswordModal.role === "principal" ? "Principal / Head Teacher" : "School Operator"}) is active. An email has been sent to{" "}
                   <code>{createdPasswordModal.email}</code>.
                 </p>
                 <div className="p-3 bg-light rounded-3 border text-start mb-3">
@@ -673,13 +737,31 @@ export default function SchoolOperatorsPage() {
               <div className="modal-header bg-dark text-white p-3 border-0">
                 <h5 className="modal-title fs-6 fw-bold text-white d-flex align-items-center gap-2 m-0">
                   <i className="bi bi-pencil-fill text-warning" />
-                  Edit School Operator
+                  Edit Staff Details
                 </h5>
                 <button type="button" className="btn-close btn-close-white" onClick={() => setEditingOp(null)} />
               </div>
               <form onSubmit={handleUpdate}>
                 <div className="modal-body p-4">
                   <div className="row g-3">
+                    <div className="col-12">
+                      <label className="form-label fw-bold small">Administrative Role</label>
+                      <select
+                        className="form-select"
+                        value={editForm.role}
+                        onChange={(e) => {
+                          const r = e.target.value;
+                          setEditForm({
+                            ...editForm,
+                            role: r,
+                            operator_title: editForm.operator_title || (r === "principal" ? "School Principal / Head Teacher" : "Desk Officer"),
+                          });
+                        }}
+                      >
+                        <option value="principal">🎓 Principal / Head Teacher</option>
+                        <option value="operator">🖥️ School Operator / Registrar</option>
+                      </select>
+                    </div>
                     <div className="col-md-6">
                       <label className="form-label fw-bold small">First Name</label>
                       <input

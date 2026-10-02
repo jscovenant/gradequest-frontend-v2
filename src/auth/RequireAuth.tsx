@@ -22,28 +22,29 @@ export default function RequireAuth({ children, roles = [], permissions = [] }: 
   // Case-insensitive role check
   if (roles.length) {
     const rawRole = (user?.role || "").toLowerCase().trim();
-    const isSuperAdmin = rawRole === "superadmin" || rawRole === "super-admin";
+    const normRole = (user?.normalized_role || user?.role || "").toLowerCase().replace(/[\s-]/g, "_");
+    const isSuperAdmin = rawRole === "superadmin" || rawRole === "super-admin" || normRole === "super_admin";
     
     // SuperAdmin has full system access
     if (!isSuperAdmin) {
-      const isAdminRole = ["admin", "owner", "proprietor", "school-admin", "principal", "headteacher"].includes(rawRole);
-      const isOperatorRole = rawRole === "operator";
-      const isTeacherRole = rawRole === "teacher";
-      const isStudentRole = rawRole === "student";
-      const isParentRole = rawRole === "parent";
-      const isBursarRole = rawRole === "bursar";
-      const isSalesRep = ["sales-representative", "sales_representative", "salesrep"].includes(rawRole);
-      const isPlatformStaff = ["platform-staff", "platform_staff", "staff"].includes(rawRole);
+      const isAdminRole = ["admin", "owner", "proprietor", "school_admin", "school-admin", "principal", "headteacher"].includes(normRole) || ["admin", "owner", "proprietor", "school-admin", "principal", "headteacher"].includes(rawRole);
+      const isOperatorRole = normRole === "operator" || rawRole === "operator";
+      const isTeacherRole = ["teacher", "class_teacher", "class-teacher", "subject_teacher", "subject-teacher"].includes(normRole) || ["teacher", "class_teacher", "class-teacher", "subject_teacher", "subject-teacher"].includes(rawRole);
+      const isStudentRole = ["student", "pupil"].includes(normRole) || ["student", "pupil"].includes(rawRole);
+      const isParentRole = ["parent", "guardian"].includes(normRole) || ["parent", "guardian"].includes(rawRole);
+      const isBursarRole = ["bursar", "accountant"].includes(normRole) || ["bursar", "accountant"].includes(rawRole);
+      const isSalesRep = ["sales-representative", "sales_representative", "salesrep"].includes(normRole) || ["sales-representative", "sales_representative", "salesrep"].includes(rawRole);
+      const isPlatformStaff = ["platform-staff", "platform_staff", "staff"].includes(normRole) || ["platform-staff", "platform_staff", "staff"].includes(rawRole);
 
-      const normalizedRoles = roles.map((r) => r.toLowerCase().trim());
+      const normalizedRoles = roles.map((r) => r.toLowerCase().trim().replace(/[\s-]/g, "_"));
 
-      let roleMatches = normalizedRoles.includes(rawRole);
+      let roleMatches = normalizedRoles.includes(normRole) || normalizedRoles.includes(rawRole);
 
-      if (!roleMatches && isAdminRole && normalizedRoles.includes("admin")) {
+      if (!roleMatches && isAdminRole && (normalizedRoles.includes("admin") || normalizedRoles.includes("proprietor"))) {
         roleMatches = true;
       }
 
-      if (!roleMatches && isTeacherRole && normalizedRoles.includes("teacher")) {
+      if (!roleMatches && isTeacherRole && (normalizedRoles.includes("teacher") || normalizedRoles.includes("class_teacher") || normalizedRoles.includes("subject_teacher"))) {
         roleMatches = true;
       }
 
@@ -59,11 +60,11 @@ export default function RequireAuth({ children, roles = [], permissions = [] }: 
         roleMatches = true;
       }
 
-      if (!roleMatches && isSalesRep && (normalizedRoles.includes("sales-representative") || normalizedRoles.includes("salesrep"))) {
+      if (!roleMatches && isSalesRep && (normalizedRoles.includes("sales_representative") || normalizedRoles.includes("salesrep"))) {
         roleMatches = true;
       }
 
-      if (!roleMatches && isPlatformStaff && (normalizedRoles.includes("platform-staff") || normalizedRoles.includes("staff"))) {
+      if (!roleMatches && isPlatformStaff && (normalizedRoles.includes("platform_staff") || normalizedRoles.includes("staff"))) {
         roleMatches = true;
       }
 
@@ -73,9 +74,34 @@ export default function RequireAuth({ children, roles = [], permissions = [] }: 
         location.pathname.startsWith("/wallet") ||
         location.pathname.startsWith("/school/settings") ||
         location.pathname.startsWith("/school/operators") ||
-        location.pathname.startsWith("/admin/school/operators");
+        location.pathname.startsWith("/admin/school/operators") ||
+        location.pathname.startsWith("/admin/school/domain-and-website") ||
+        location.pathname.startsWith("/settings/whatsapp") ||
+        location.pathname.startsWith("/bursar");
 
-      const isOperatorAllowed = isOperatorRole && normalizedRoles.includes("admin") && !isProprietorOnlyRoute;
+      const isPrincipalRole = normRole === "principal" || rawRole === "principal" || normRole === "headteacher" || normRole === "head_teacher";
+
+      // Strictly deny Principal and Operator from accessing Proprietor-Only financial & platform ownership routes
+      if ((isPrincipalRole || isOperatorRole) && isProprietorOnlyRoute) {
+        return <Navigate to="/unauthorized" replace />;
+      }
+
+      // Strictly deny Operator from accessing Principal/Proprietor Executive Academic routes
+      const isOperatorRestrictedRoute =
+        isProprietorOnlyRoute ||
+        location.pathname.startsWith("/teachers") ||
+        location.pathname.startsWith("/teacher-subjects") ||
+        location.pathname.startsWith("/attendance/logs") ||
+        location.pathname.startsWith("/attendance/settings") ||
+        location.pathname.startsWith("/grading-scale") ||
+        location.pathname.startsWith("/academics/calendar") ||
+        location.pathname.startsWith("/results/deadlines");
+
+      if (isOperatorRole && isOperatorRestrictedRoute) {
+        return <Navigate to="/unauthorized" replace />;
+      }
+
+      const isOperatorAllowed = isOperatorRole && normalizedRoles.includes("admin") && !isOperatorRestrictedRoute;
 
       if (!roleMatches && !isOperatorAllowed) {
         return <Navigate to="/unauthorized" replace />;
@@ -85,7 +111,8 @@ export default function RequireAuth({ children, roles = [], permissions = [] }: 
 
   if (permissions.length) {
     const rawRole = (user?.role || "").toLowerCase().trim();
-    const isSuperAdmin = rawRole === "superadmin" || rawRole === "super-admin";
+    const normRole = (user?.normalized_role || user?.role || "").toLowerCase().replace(/[\s-]/g, "_");
+    const isSuperAdmin = rawRole === "superadmin" || rawRole === "super-admin" || normRole === "super_admin";
     if (!isSuperAdmin) {
       const userPermissions = Array.isArray(user?.super_admin_permissions) ? user.super_admin_permissions : [];
       const canAccess = userPermissions.includes("all") || permissions.some((permission) => userPermissions.includes(permission));

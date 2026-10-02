@@ -18,6 +18,7 @@ type ChildSummary = {
   attendance_rate_30d: number;
   fee_balance: number;
   results_count: number;
+  school_id?: number;
 };
 
 type DashboardResponse = {
@@ -73,7 +74,7 @@ const emptyDashboard: DashboardResponse = {
 
 function normalizeDashboardPayload(rawPayload: any): DashboardResponse {
   const payload: Partial<DashboardResponse> | null | undefined = rawPayload?.data ?? rawPayload;
-  const children = data?.children ?? [];
+  const children = payload?.children ?? [];
   const firstChildId = children[0]?.id ?? 0;
   const stats = payload?.stats || {};
 
@@ -293,6 +294,9 @@ export default function ParentDashboardPage() {
 
   const parentName = data?.parent?.name ?? "Parent";
   const children = data?.children ?? [];
+  const selectedChild = useMemo(() => {
+    return children.find((c) => c.id === selectedChildId) || children[0] || null;
+  }, [children, selectedChildId]);
   const paymentLink = `${window.location.origin}/pay-fees?${new URLSearchParams({
     ...(selectedChild?.school_id ? { school: String(selectedChild.school_id) } : {}),
     ...(selectedChild?.reg_no ? { student_reg_no: selectedChild.reg_no } : {}),

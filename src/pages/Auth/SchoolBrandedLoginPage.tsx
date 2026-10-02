@@ -95,20 +95,40 @@ export default function SchoolBrandedLoginPage() {
       setUser(user);
 
       // Route based on role
-      switch (user.role) {
-        case "Admin":
-        case "Operator":
-        case "Super-Admin":
-        case "Platform-Staff":
-        case "Teacher":
-        case "Student":
-        case "Parent":
-        case "Bursar":
-        case "Sales-Representative":
-          navigate("/dashboard");
-          break;
-        default:
-          navigate("/unauthorized");
+      const normRole = (user.normalized_role || user.role || "")
+        .toLowerCase()
+        .replace(/[\s-]/g, "_");
+
+      const validRoles = [
+        "admin",
+        "proprietor",
+        "owner",
+        "principal",
+        "operator",
+        "registrar",
+        "secretary",
+        "super_admin",
+        "superadmin",
+        "platform_staff",
+        "platformstaff",
+        "teacher",
+        "class_teacher",
+        "subject_teacher",
+        "student",
+        "pupil",
+        "parent",
+        "guardian",
+        "bursar",
+        "accountant",
+        "sales_representative",
+        "sales_rep",
+        "salesrep",
+      ];
+
+      if (validRoles.includes(normRole)) {
+        navigate("/dashboard");
+      } else {
+        navigate("/unauthorized");
       }
     } catch (err: any) {
       setError(

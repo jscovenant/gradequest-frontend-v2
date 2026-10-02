@@ -18,52 +18,70 @@ export default function Dashboard() {
     );
   }
 
-  switch (user.role) {
-    case "Admin":
-    case "Operator":
-      return (
-        <div className="pt-5">
-          <AdminDashboard />
-        </div>
-      );
+  const role = (user.normalized_role || user.role || "")
+    .toLowerCase()
+    .replace(/[\s-]/g, "_");
 
-    case "Super-Admin":
-    case "Platform-Staff":
+  switch (role) {
+    case "super_admin":
+    case "superadmin":
+    case "platform_staff":
+    case "platformstaff":
       return (
         <div className="pt-5">
           <SuperAdminDashboard />
         </div>
       );
 
-    case "Teacher":
+    case "admin":
+    case "proprietor":
+    case "owner":
+    case "principal":
+    case "operator":
+    case "registrar":
+    case "secretary":
+      return (
+        <div className="pt-5">
+          <AdminDashboard />
+        </div>
+      );
+
+    case "teacher":
+    case "class_teacher":
+    case "subject_teacher":
       return (
         <div className="pt-5">
           <TeacherDashboard />
         </div>
       );
 
-    case "Student":
+    case "student":
+    case "pupil":
       return (
         <div className="pt-5">
           <StudentDashboard />
         </div>
       );
 
-    case "Bursar":
+    case "bursar":
+    case "accountant":
       return (
         <div className="pt-5">
           <BursarDashboard />
         </div>
       );
 
-    case "Parent":
+    case "parent":
+    case "guardian":
       return (
         <div className="pt-5">
           <ParentDashboardPage />
         </div>
       );
 
-    case "Sales-Representative":
+    case "sales_representative":
+    case "sales_rep":
+    case "salesrep":
       return (
         <div className="pt-5">
           <SalesDashboardPage />
@@ -73,7 +91,7 @@ export default function Dashboard() {
     default:
       return (
         <div className="text-center mt-5">
-          <h3>Unauthorized role. Please contact admin.</h3>
+          <h3>Unauthorized role ({user.role}). Please contact admin.</h3>
         </div>
       );
   }

@@ -182,8 +182,64 @@ export default function SuperAdminDashboard() {
   const [scheduleMode, setScheduleMode] = useState<"immediate" | "scheduled">("immediate");
   const [customMaintenanceMsg, setCustomMaintenanceMsg] = useState("We are working harder to make things better, please hold on...");
   const [scheduledStartTime, setScheduledStartTime] = useState("");
-  const [scheduledEndTime, setScheduledEndTime] = useState("");
   const [sendEmailNotification, setSendEmailNotification] = useState(true);
+
+  // Split Gateway & SaaS Metrics
+  const [platformTechFeesEarned, setPlatformTechFeesEarned] = useState<number>(0);
+  const [platformGmv, setPlatformGmv] = useState<number>(0);
+  const [gatewaySplitHealth, setGatewaySplitHealth] = useState<{
+    total_schools: number;
+    split_ready_schools: number;
+    online_payment_enabled_schools: number;
+    split_health_percentage: number;
+  } | null>(null);
+
+  // 3-Step Multi-Tenant School Onboarding State
+  const [showOnboardModal, setShowOnboardModal] = useState(false);
+  const [onboardStep, setOnboardStep] = useState<1 | 2 | 3>(1);
+  const [onboardingSubmitting, setOnboardingSubmitting] = useState(false);
+  const [onboardSuccessResult, setOnboardSuccessResult] = useState<any>(null);
+  const [copiedCredentials, setCopiedCredentials] = useState(false);
+
+  // Onboard Form Data
+  const [onboardForm, setOnboardForm] = useState({
+    // Step 1: Identity & Branding
+    school_name: "",
+    school_code: "",
+    category: "all_through",
+    school_subdomain: "",
+    custom_domain: "",
+    primary_color: "#0F2744",
+    secondary_color: "#D97706",
+    address: "",
+    phone: "",
+    email: "",
+    logoFile: null as File | null,
+    stampFile: null as File | null,
+
+    // Step 2: Financial Gateway Split
+    bank_name: "",
+    bank_code: "",
+    account_number: "",
+    account_name: "",
+    paystack_subaccount_code: "",
+    flutterwave_subaccount_code: "",
+    monnify_subaccount_code: "",
+    tech_royalty_fee: 500,
+    platform_fee_bearer: "school",
+    bank_charge_bearer: "parent",
+    active_payment_gateway: "paystack",
+    online_payment_enabled: true,
+    active_edition_tier: "standard_cbt",
+
+    // Step 3: Lead Admin Provisioning
+    lead_admin_role: "proprietor",
+    admin_firstname: "",
+    admin_surname: "",
+    admin_email: "",
+    admin_phone: "",
+    admin_password: "",
+  });
 
   // Chart Ref
   const chartRef = useRef<HTMLCanvasElement | null>(null);
@@ -260,8 +316,91 @@ export default function SuperAdminDashboard() {
       if (res.data?.total_active_students !== undefined) {
         setActiveStudentsCount(Number(res.data.total_active_students));
       }
+      if (res.data?.tech_fees_earned !== undefined) {
+        setPlatformTechFeesEarned(Number(res.data.tech_fees_earned));
+      }
+      if (res.data?.gmv !== undefined) {
+        setPlatformGmv(Number(res.data.gmv));
+      }
+      if (res.data?.gateway_split_health) {
+        setGatewaySplitHealth(res.data.gateway_split_health);
+      }
     } catch {
       /* ignore */
+    }
+  }
+
+  function generateRandomPassword() {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$";
+    let pass = "";
+    for (let i = 0; i < 10; i++) {
+      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setOnboardForm((prev) => ({ ...prev, admin_password: pass }));
+  }
+
+  async function handleCompleteOnboarding(e: React.FormEvent) {
+    e.preventDefault();
+    if (!onboardForm.school_name.trim()) {
+      showError("Please enter the legal name of the school.");
+      setOnboardStep(1);
+      return;
+    }
+    if (!onboardForm.admin_firstname.trim() || !onboardForm.admin_surname.trim() || !onboardForm.admin_email.trim() || !onboardForm.admin_phone.trim()) {
+      showError("Please fill in all lead administrator contact information.");
+      setOnboardStep(3);
+      return;
+    }
+
+    setOnboardingSubmitting(true);
+    try {
+      const fd = new FormData();
+      fd.append("school_name", onboardForm.school_name.trim());
+      if (onboardForm.school_code) fd.append("school_code", onboardForm.school_code.trim());
+      if (onboardForm.category) fd.append("category", onboardForm.category);
+      if (onboardForm.school_subdomain) fd.append("school_subdomain", onboardForm.school_subdomain.trim());
+      if (onboardForm.custom_domain) fd.append("custom_domain", onboardForm.custom_domain.trim());
+      fd.append("primary_color", onboardForm.primary_color);
+      fd.append("secondary_color", onboardForm.secondary_color);
+      if (onboardForm.address) fd.append("address", onboardForm.address);
+      if (onboardForm.phone) fd.append("phone", onboardForm.phone);
+      if (onboardForm.email) fd.append("email", onboardForm.email);
+
+      if (onboardForm.logoFile) fd.append("logo", onboardForm.logoFile);
+      if (onboardForm.stampFile) fd.append("stamp", onboardForm.stampFile);
+
+      if (onboardForm.bank_name) fd.append("bank_name", onboardForm.bank_name);
+      if (onboardForm.bank_code) fd.append("bank_code", onboardForm.bank_code);
+      if (onboardForm.account_number) fd.append("account_number", onboardForm.account_number);
+      if (onboardForm.account_name) fd.append("account_name", onboardForm.account_name);
+      if (onboardForm.paystack_subaccount_code) fd.append("paystack_subaccount_code", onboardForm.paystack_subaccount_code);
+      if (onboardForm.flutterwave_subaccount_code) fd.append("flutterwave_subaccount_code", onboardForm.flutterwave_subaccount_code);
+      if (onboardForm.monnify_subaccount_code) fd.append("monnify_subaccount_code", onboardForm.monnify_subaccount_code);
+      fd.append("tech_royalty_fee", String(onboardForm.tech_royalty_fee));
+      fd.append("platform_fee_bearer", onboardForm.platform_fee_bearer);
+      fd.append("bank_charge_bearer", onboardForm.bank_charge_bearer);
+      fd.append("active_payment_gateway", onboardForm.active_payment_gateway);
+      fd.append("online_payment_enabled", onboardForm.online_payment_enabled ? "1" : "0");
+      fd.append("active_edition_tier", onboardForm.active_edition_tier);
+
+      fd.append("lead_admin_role", onboardForm.lead_admin_role);
+      fd.append("admin_firstname", onboardForm.admin_firstname.trim());
+      fd.append("admin_surname", onboardForm.admin_surname.trim());
+      fd.append("admin_email", onboardForm.admin_email.trim());
+      fd.append("admin_phone", onboardForm.admin_phone.trim());
+      if (onboardForm.admin_password) fd.append("admin_password", onboardForm.admin_password);
+
+      const res = await authApi.post("/superadmin/schools/onboard", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      setOnboardSuccessResult(res.data);
+      showSuccess(res.data?.message || "School tenant onboarded successfully!");
+      await Promise.all([fetchSchools(1, schoolsPerPage), fetchRevenue()]);
+    } catch (err: any) {
+      showError(err?.response?.data?.message || "Failed to onboard school. Please check your inputs.");
+    } finally {
+      setOnboardingSubmitting(false);
     }
   }
 
@@ -867,14 +1006,26 @@ export default function SuperAdminDashboard() {
                   </p>
                 </div>
                 <div className="sa-hero-actions">
+                  <button
+                    className="sa-btn sa-btn-gold"
+                    style={{ fontWeight: 800, boxShadow: "0 4px 14px rgba(217,119,6,0.3)" }}
+                    onClick={() => {
+                      setOnboardStep(1);
+                      setOnboardSuccessResult(null);
+                      if (!onboardForm.admin_password) generateRandomPassword();
+                      setShowOnboardModal(true);
+                    }}
+                  >
+                    <i className="bi bi-plus-circle-fill" /> Onboard School
+                  </button>
                   <button className="sa-btn sa-btn-light" onClick={() => refreshDashboard(true)}>
                     <i className="bi bi-arrow-repeat" /> Refresh
                   </button>
-                  <button className="sa-btn sa-btn-gold" onClick={() => navigate("/superadmin/billing-policy")}>
-                    <i className="bi bi-sliders" /> Billing Policy
+                  <button className="sa-btn sa-btn-soft" onClick={() => navigate("/superadmin/billing-policy")}>
+                    <i className="bi bi-sliders" /> Gateway Split Engine
                   </button>
                   <button className="sa-btn sa-btn-soft" onClick={() => navigate("/superadmin/subscribers")}>
-                    <i className="bi bi-buildings" /> School Directory
+                    <i className="bi bi-buildings" /> School Tenants Registry
                   </button>
                 </div>
               </section>
@@ -952,46 +1103,16 @@ export default function SuperAdminDashboard() {
                 </div>
               </section>
 
-              {/* Metrics Grid */}
+              {/* Primary SaaS Metrics Grid */}
               <div className="sa-metrics">
                 <div className="sa-metric tone-blue">
                   <div className="sa-metric-top">
                     <span className="sa-metric-icon"><i className="bi bi-buildings" /></span>
                     <i className="bi bi-arrow-up-right sa-metric-arrow" />
                   </div>
-                  <p>Registered Schools</p>
+                  <p>Total Schools Onboarded</p>
                   <h3>{tierCounts.total}</h3>
-                  <small>School owner accounts</small>
-                </div>
-
-                <div className="sa-metric tone-blue">
-                  <div className="sa-metric-top">
-                    <span className="sa-metric-icon"><i className="bi bi-cpu" /></span>
-                    <i className="bi bi-arrow-up-right sa-metric-arrow" />
-                  </div>
-                  <p>Standard CBT Edition</p>
-                  <h3>{tierCounts.standard_cbt}</h3>
-                  <small>₦500 / student tier</small>
-                </div>
-
-                <div className="sa-metric tone-teal">
-                  <div className="sa-metric-top">
-                    <span className="sa-metric-icon"><i className="bi bi-file-earmark-text" /></span>
-                    <i className="bi bi-arrow-up-right sa-metric-arrow" />
-                  </div>
-                  <p>Basic Result Edition</p>
-                  <h3>{tierCounts.basic_result}</h3>
-                  <small>Basic Result Edition tier</small>
-                </div>
-
-                <div className="sa-metric tone-green">
-                  <div className="sa-metric-top">
-                    <span className="sa-metric-icon"><i className="bi bi-credit-card" /></span>
-                    <i className="bi bi-arrow-up-right sa-metric-arrow" />
-                  </div>
-                  <p>Online Payments ON</p>
-                  <h3>{tierCounts.online_pay_enabled}</h3>
-                  <small>{tierCounts.online_pay_disabled} disabled / rejecting</small>
+                  <small>Isolated school tenants</small>
                 </div>
 
                 <div className="sa-metric tone-gold">
@@ -999,9 +1120,29 @@ export default function SuperAdminDashboard() {
                     <span className="sa-metric-icon"><i className="bi bi-people" /></span>
                     <i className="bi bi-arrow-up-right sa-metric-arrow" />
                   </div>
-                  <p>Active Students</p>
+                  <p>Total Students Under Management</p>
                   <h3>{activeStudentsCount.toLocaleString()}</h3>
-                  <small>Enrolled across all schools</small>
+                  <small>Active enrolled population</small>
+                </div>
+
+                <div className="sa-metric tone-green">
+                  <div className="sa-metric-top">
+                    <span className="sa-metric-icon"><i className="bi bi-cash-stack" /></span>
+                    <i className="bi bi-arrow-up-right sa-metric-arrow" />
+                  </div>
+                  <p>Platform Tech Fees Earned</p>
+                  <h3>{fmtNaira(platformTechFeesEarned || ytdRevenue)}</h3>
+                  <small>Automated split royalty revenue</small>
+                </div>
+
+                <div className="sa-metric tone-teal">
+                  <div className="sa-metric-top">
+                    <span className="sa-metric-icon"><i className="bi bi-shield-check" /></span>
+                    <i className="bi bi-arrow-up-right sa-metric-arrow" />
+                  </div>
+                  <p>Gateway Split Health</p>
+                  <h3>{gatewaySplitHealth?.split_health_percentage ?? 100}%</h3>
+                  <small>{tierCounts.online_pay_enabled} online • {gatewaySplitHealth?.split_ready_schools ?? tierCounts.total} subaccount ready</small>
                 </div>
               </div>
 
@@ -1544,6 +1685,719 @@ export default function SuperAdminDashboard() {
                         </button>
                       )}
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ───────────────────────────────────────────────────────────────────
+                  3-STEP MULTI-TENANT SCHOOL ONBOARDING WIZARD MODAL
+                  ─────────────────────────────────────────────────────────────────── */}
+              {showOnboardModal && (
+                <div
+                  style={{
+                    position: "fixed",
+                    inset: 0,
+                    zIndex: 1060,
+                    background: "rgba(15, 39, 68, 0.72)",
+                    backdropFilter: "blur(6px)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: 16,
+                    overflowY: "auto",
+                  }}
+                >
+                  <div
+                    style={{
+                      background: "#ffffff",
+                      borderRadius: 22,
+                      maxWidth: 720,
+                      width: "100%",
+                      padding: "32px 36px",
+                      boxShadow: "0 25px 50px -12px rgba(15, 39, 68, 0.35)",
+                      maxHeight: "92vh",
+                      overflowY: "auto",
+                      border: "1px solid #E2E8F0",
+                    }}
+                  >
+                    {/* Modal Header */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+                      <div>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "#D97706", letterSpacing: "0.08em", marginBottom: 4 }}>
+                          <i className="bi bi-rocket-takeoff-fill" /> Multi-Tenant Provisioning Engine
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0F2744" }}>
+                          Onboard School Tenant
+                        </h3>
+                        <p style={{ margin: "4px 0 0", color: "#64748B", fontSize: 13 }}>
+                          Register an isolated school tenant, setup payment gateway split rules, and provision the school owner.
+                        </p>
+                      </div>
+                      <button
+                        style={{ border: "none", background: "#F1F5F9", width: 34, height: 34, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, cursor: "pointer", color: "#64748B" }}
+                        onClick={() => setShowOnboardModal(false)}
+                      >
+                        &times;
+                      </button>
+                    </div>
+
+                    {/* SUCCESS VIEW */}
+                    {onboardSuccessResult ? (
+                      <div>
+                        <div
+                          style={{
+                            background: "#ECFDF5",
+                            border: "1px solid #A7F3D0",
+                            borderRadius: 16,
+                            padding: 24,
+                            textAlign: "center",
+                            marginBottom: 20,
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 56,
+                              height: 56,
+                              borderRadius: "50%",
+                              background: "#10B981",
+                              color: "#fff",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: 26,
+                              marginBottom: 12,
+                            }}
+                          >
+                            <i className="bi bi-check-lg" />
+                          </div>
+                          <h4 style={{ margin: 0, fontWeight: 800, color: "#065F46", fontSize: 18 }}>
+                            School Tenant Onboarded Successfully!
+                          </h4>
+                          <p style={{ margin: "6px 0 0", color: "#047857", fontSize: 13.5 }}>
+                            {onboardSuccessResult.school?.school_name} has been provisioned on the platform.
+                          </p>
+                        </div>
+
+                        {/* Summary details card */}
+                        <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 14, padding: 18, marginBottom: 20 }}>
+                          <h5 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 800, color: "#0F2744", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                            School & Administrator Sign-In Credentials
+                          </h5>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 13 }}>
+                            <div>
+                              <strong style={{ color: "#64748B", display: "block", fontSize: 11 }}>Portal Subdomain</strong>
+                              <span style={{ color: "#0F2744", fontWeight: 700 }}>
+                                https://{onboardSuccessResult.school?.school_subdomain}.schoolprofit.ng
+                              </span>
+                            </div>
+                            <div>
+                              <strong style={{ color: "#64748B", display: "block", fontSize: 11 }}>Assigned Role</strong>
+                              <span style={{ color: "#0F2744", fontWeight: 700, textTransform: "capitalize" }}>
+                                {onboardSuccessResult.lead_admin?.role || "Proprietor"}
+                              </span>
+                            </div>
+                            <div>
+                              <strong style={{ color: "#64748B", display: "block", fontSize: 11 }}>Sign-In Email</strong>
+                              <span style={{ color: "#0F2744", fontWeight: 700 }}>
+                                {onboardSuccessResult.lead_admin?.email}
+                              </span>
+                            </div>
+                            <div>
+                              <strong style={{ color: "#64748B", display: "block", fontSize: 11 }}>Temporary Password</strong>
+                              <span style={{ color: "#D97706", fontWeight: 800, background: "#FEF3C7", padding: "2px 8px", borderRadius: 6 }}>
+                                {onboardSuccessResult.lead_admin?.temporary_password}
+                              </span>
+                            </div>
+                            <div>
+                              <strong style={{ color: "#64748B", display: "block", fontSize: 11 }}>Paystack Subaccount</strong>
+                              <span style={{ color: "#0F2744", fontWeight: 700 }}>
+                                {onboardSuccessResult.split_gateway?.subaccount_code || "Will auto-create on first charge"}
+                              </span>
+                            </div>
+                            <div>
+                              <strong style={{ color: "#64748B", display: "block", fontSize: 11 }}>Technology Royalty Fee</strong>
+                              <span style={{ color: "#10B981", fontWeight: 700 }}>
+                                {fmtNaira(onboardSuccessResult.split_gateway?.tech_royalty_fee || 500)} / term fee payment
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                          <button
+                            type="button"
+                            className="sa-btn sa-btn-gold"
+                            onClick={() => {
+                              const text = `School: ${onboardSuccessResult.school?.school_name}\nPortal: https://${onboardSuccessResult.school?.school_subdomain}.schoolprofit.ng\nEmail: ${onboardSuccessResult.lead_admin?.email}\nPassword: ${onboardSuccessResult.lead_admin?.temporary_password}\nRole: ${onboardSuccessResult.lead_admin?.role}`;
+                              navigator.clipboard.writeText(text);
+                              setCopiedCredentials(true);
+                              setTimeout(() => setCopiedCredentials(false), 2500);
+                            }}
+                          >
+                            <i className={`bi ${copiedCredentials ? "bi-check-all" : "bi-clipboard"}`} />
+                            {copiedCredentials ? "Credentials Copied!" : "Copy Sign-in Details"}
+                          </button>
+                          <button
+                            type="button"
+                            className="sa-btn sa-btn-dark"
+                            onClick={() => {
+                              setShowOnboardModal(false);
+                              setOnboardSuccessResult(null);
+                            }}
+                          >
+                            Done & View in Registry
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* WIZARD FORM */
+                      <form onSubmit={handleCompleteOnboarding}>
+                        {/* Step Navigation Pills */}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 24 }}>
+                          <button
+                            type="button"
+                            onClick={() => setOnboardStep(1)}
+                            style={{
+                              padding: "10px 12px",
+                              borderRadius: 12,
+                              border: onboardStep === 1 ? "2px solid #0F2744" : "1px solid #E2E8F0",
+                              background: onboardStep === 1 ? "#0F2744" : "#F8FAFC",
+                              color: onboardStep === 1 ? "#fff" : "#64748B",
+                              fontSize: 12.5,
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              textAlign: "left",
+                            }}
+                          >
+                            <span style={{ opacity: 0.7, marginRight: 6 }}>Step 1:</span>
+                            School Identity
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setOnboardStep(2)}
+                            style={{
+                              padding: "10px 12px",
+                              borderRadius: 12,
+                              border: onboardStep === 2 ? "2px solid #0F2744" : "1px solid #E2E8F0",
+                              background: onboardStep === 2 ? "#0F2744" : "#F8FAFC",
+                              color: onboardStep === 2 ? "#fff" : "#64748B",
+                              fontSize: 12.5,
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              textAlign: "left",
+                            }}
+                          >
+                            <span style={{ opacity: 0.7, marginRight: 6 }}>Step 2:</span>
+                            Gateway Split
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setOnboardStep(3)}
+                            style={{
+                              padding: "10px 12px",
+                              borderRadius: 12,
+                              border: onboardStep === 3 ? "2px solid #0F2744" : "1px solid #E2E8F0",
+                              background: onboardStep === 3 ? "#0F2744" : "#F8FAFC",
+                              color: onboardStep === 3 ? "#fff" : "#64748B",
+                              fontSize: 12.5,
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              textAlign: "left",
+                            }}
+                          >
+                            <span style={{ opacity: 0.7, marginRight: 6 }}>Step 3:</span>
+                            Lead Admin
+                          </button>
+                        </div>
+
+                        {/* STEP 1: SCHOOL IDENTITY & BRANDING */}
+                        {onboardStep === 1 && (
+                          <div style={{ display: "grid", gap: 14 }}>
+                            <div>
+                              <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#0F2744", marginBottom: 5 }}>
+                                School Legal Name <span style={{ color: "#EF4444" }}>*</span>
+                              </label>
+                              <input
+                                type="text"
+                                className="form-control"
+                                required
+                                placeholder="e.g. St. Jude Premier Academy"
+                                value={onboardForm.school_name}
+                                onChange={(e) => setOnboardForm({ ...onboardForm, school_name: e.target.value })}
+                                style={{ borderRadius: 10, fontSize: 13.5 }}
+                              />
+                            </div>
+
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                              <div>
+                                <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#0F2744", marginBottom: 5 }}>
+                                  School Code / Prefix
+                                </label>
+                                <input
+                                  type="text"
+                                  className="form-control"
+                                  placeholder="e.g. SJPA"
+                                  value={onboardForm.school_code}
+                                  onChange={(e) => setOnboardForm({ ...onboardForm, school_code: e.target.value.toUpperCase() })}
+                                  style={{ borderRadius: 10, fontSize: 13.5 }}
+                                />
+                              </div>
+
+                              <div>
+                                <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#0F2744", marginBottom: 5 }}>
+                                  Category
+                                </label>
+                                <select
+                                  className="form-select"
+                                  value={onboardForm.category}
+                                  onChange={(e) => setOnboardForm({ ...onboardForm, category: e.target.value })}
+                                  style={{ borderRadius: 10, fontSize: 13.5 }}
+                                >
+                                  <option value="all_through">All-Through (Nursery - Senior Sec)</option>
+                                  <option value="primary">Primary School Only</option>
+                                  <option value="nursery">Nursery & Pre-School Only</option>
+                                  <option value="junior_secondary">Junior Secondary Only</option>
+                                  <option value="senior_secondary">Senior Secondary Only</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                              <div>
+                                <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#0F2744", marginBottom: 5 }}>
+                                  Subdomain
+                                </label>
+                                <div className="input-group">
+                                  <input
+                                    type="text"
+                                    className="form-control"
+                                    placeholder="stjude"
+                                    value={onboardForm.school_subdomain}
+                                    onChange={(e) => setOnboardForm({ ...onboardForm, school_subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9\-]/g, "") })}
+                                    style={{ borderTopLeftRadius: 10, borderBottomLeftRadius: 10, fontSize: 13 }}
+                                  />
+                                  <span className="input-group-text" style={{ fontSize: 12, color: "#64748B" }}>
+                                    .schoolprofit.ng
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div>
+                                <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#0F2744", marginBottom: 5 }}>
+                                  Custom Domain (Optional)
+                                </label>
+                                <input
+                                  type="text"
+                                  className="form-control"
+                                  placeholder="e.g. stjudeschool.com.ng"
+                                  value={onboardForm.custom_domain}
+                                  onChange={(e) => setOnboardForm({ ...onboardForm, custom_domain: e.target.value })}
+                                  style={{ borderRadius: 10, fontSize: 13 }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Brand Colors with live preview */}
+                            <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 14, padding: 14 }}>
+                              <label style={{ display: "block", fontSize: 12.5, fontWeight: 800, color: "#0F2744", marginBottom: 8 }}>
+                                Dynamic Brand Colors (Portal & Report Cards)
+                              </label>
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 14, alignItems: "center" }}>
+                                <div>
+                                  <small style={{ color: "#64748B", display: "block", marginBottom: 4, fontWeight: 600 }}>Primary Color</small>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                    <input
+                                      type="color"
+                                      value={onboardForm.primary_color}
+                                      onChange={(e) => setOnboardForm({ ...onboardForm, primary_color: e.target.value })}
+                                      style={{ width: 36, height: 36, border: "none", borderRadius: 8, cursor: "pointer" }}
+                                    />
+                                    <input
+                                      type="text"
+                                      className="form-control form-control-sm"
+                                      value={onboardForm.primary_color}
+                                      onChange={(e) => setOnboardForm({ ...onboardForm, primary_color: e.target.value })}
+                                      style={{ width: 85, fontSize: 12, fontWeight: 700 }}
+                                    />
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <small style={{ color: "#64748B", display: "block", marginBottom: 4, fontWeight: 600 }}>Secondary Color</small>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                    <input
+                                      type="color"
+                                      value={onboardForm.secondary_color}
+                                      onChange={(e) => setOnboardForm({ ...onboardForm, secondary_color: e.target.value })}
+                                      style={{ width: 36, height: 36, border: "none", borderRadius: 8, cursor: "pointer" }}
+                                    />
+                                    <input
+                                      type="text"
+                                      className="form-control form-control-sm"
+                                      value={onboardForm.secondary_color}
+                                      onChange={(e) => setOnboardForm({ ...onboardForm, secondary_color: e.target.value })}
+                                      style={{ width: 85, fontSize: 12, fontWeight: 700 }}
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Dynamic Preview Badge */}
+                                <div
+                                  style={{
+                                    background: onboardForm.primary_color,
+                                    border: `2px solid ${onboardForm.secondary_color}`,
+                                    borderRadius: 10,
+                                    padding: "8px 14px",
+                                    color: "#fff",
+                                    textAlign: "center",
+                                  }}
+                                >
+                                  <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>Brand Preview</div>
+                                  <div style={{ fontSize: 12, fontWeight: 700, color: onboardForm.secondary_color }}>
+                                    {onboardForm.school_name ? onboardForm.school_name.slice(0, 16) : "School Portal"}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Logos & Stamp */}
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                              <div>
+                                <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#0F2744", marginBottom: 5 }}>
+                                  School Crest / Logo
+                                </label>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="form-control form-control-sm"
+                                  onChange={(e) => setOnboardForm({ ...onboardForm, logoFile: e.target.files?.[0] || null })}
+                                  style={{ borderRadius: 8, fontSize: 12 }}
+                                />
+                              </div>
+
+                              <div>
+                                <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#0F2744", marginBottom: 5 }}>
+                                  Official Stamp / Signature
+                                </label>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="form-control form-control-sm"
+                                  onChange={(e) => setOnboardForm({ ...onboardForm, stampFile: e.target.files?.[0] || null })}
+                                  style={{ borderRadius: 8, fontSize: 12 }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* STEP 2: FINANCIAL GATEWAY SPLIT */}
+                        {onboardStep === 2 && (
+                          <div style={{ display: "grid", gap: 14 }}>
+                            <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 12, padding: "12px 16px", color: "#1E3A8A", fontSize: 12.5 }}>
+                              <i className="bi bi-info-circle-fill me-1" />
+                              <strong>Zero Cash-Holding Architecture:</strong> 100% of school tuition routes directly into the School Owner's bank subaccount. The platform technology royalty fee is automatically deducted at checkout and routed to the School Profit corporate account.
+                            </div>
+
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                              <div>
+                                <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#0F2744", marginBottom: 5 }}>
+                                  Settlement Bank Name
+                                </label>
+                                <input
+                                  type="text"
+                                  className="form-control"
+                                  placeholder="e.g. Access Bank / GTBank"
+                                  value={onboardForm.bank_name}
+                                  onChange={(e) => setOnboardForm({ ...onboardForm, bank_name: e.target.value })}
+                                  style={{ borderRadius: 10, fontSize: 13 }}
+                                />
+                              </div>
+
+                              <div>
+                                <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#0F2744", marginBottom: 5 }}>
+                                  Bank Code (Optional)
+                                </label>
+                                <input
+                                  type="text"
+                                  className="form-control"
+                                  placeholder="e.g. 058 (GTBank)"
+                                  value={onboardForm.bank_code}
+                                  onChange={(e) => setOnboardForm({ ...onboardForm, bank_code: e.target.value })}
+                                  style={{ borderRadius: 10, fontSize: 13 }}
+                                />
+                              </div>
+                            </div>
+
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                              <div>
+                                <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#0F2744", marginBottom: 5 }}>
+                                  Account Number
+                                </label>
+                                <input
+                                  type="text"
+                                  className="form-control"
+                                  placeholder="10-digit NUBAN"
+                                  value={onboardForm.account_number}
+                                  onChange={(e) => setOnboardForm({ ...onboardForm, account_number: e.target.value })}
+                                  style={{ borderRadius: 10, fontSize: 13 }}
+                                />
+                              </div>
+
+                              <div>
+                                <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#0F2744", marginBottom: 5 }}>
+                                  Account Name
+                                </label>
+                                <input
+                                  type="text"
+                                  className="form-control"
+                                  placeholder="Beneficiary Account Name"
+                                  value={onboardForm.account_name}
+                                  onChange={(e) => setOnboardForm({ ...onboardForm, account_name: e.target.value })}
+                                  style={{ borderRadius: 10, fontSize: 13 }}
+                                />
+                              </div>
+                            </div>
+
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                              <div>
+                                <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#0F2744", marginBottom: 5 }}>
+                                  Paystack Subaccount Code
+                                </label>
+                                <input
+                                  type="text"
+                                  className="form-control"
+                                  placeholder="e.g. ACCT_xxxx (or leave blank to auto-create)"
+                                  value={onboardForm.paystack_subaccount_code}
+                                  onChange={(e) => setOnboardForm({ ...onboardForm, paystack_subaccount_code: e.target.value })}
+                                  style={{ borderRadius: 10, fontSize: 13 }}
+                                />
+                              </div>
+
+                              <div>
+                                <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#0F2744", marginBottom: 5 }}>
+                                  Technology Royalty Fee (₦)
+                                </label>
+                                <input
+                                  type="number"
+                                  className="form-control"
+                                  value={onboardForm.tech_royalty_fee}
+                                  onChange={(e) => setOnboardForm({ ...onboardForm, tech_royalty_fee: Number(e.target.value) })}
+                                  style={{ borderRadius: 10, fontSize: 13 }}
+                                />
+                                <small style={{ color: "#64748B", fontSize: 11 }}>
+                                  Per termly fee payment routed to School Profit.
+                                </small>
+                              </div>
+                            </div>
+
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                              <div>
+                                <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#0F2744", marginBottom: 5 }}>
+                                  Technology Fee Bearer
+                                </label>
+                                <select
+                                  className="form-select"
+                                  value={onboardForm.platform_fee_bearer}
+                                  onChange={(e) => setOnboardForm({ ...onboardForm, platform_fee_bearer: e.target.value })}
+                                  style={{ borderRadius: 10, fontSize: 13 }}
+                                >
+                                  <option value="school">School Absorbs (Tuition Net)</option>
+                                  <option value="parent">Parent Pays (Checkout Surcharge)</option>
+                                </select>
+                              </div>
+
+                              <div>
+                                <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#0F2744", marginBottom: 5 }}>
+                                  Edition Pricing Tier
+                                </label>
+                                <select
+                                  className="form-select"
+                                  value={onboardForm.active_edition_tier}
+                                  onChange={(e) => setOnboardForm({ ...onboardForm, active_edition_tier: e.target.value })}
+                                  style={{ borderRadius: 10, fontSize: 13 }}
+                                >
+                                  <option value="standard_cbt">Standard CBT & AI (₦500 / term)</option>
+                                  <option value="basic_result">Basic Result Edition (₦300 / term)</option>
+                                  <option value="annual_full_session">Annual Full Session License</option>
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* STEP 3: LEAD ADMINISTRATOR PROVISIONING */}
+                        {onboardStep === 3 && (
+                          <div style={{ display: "grid", gap: 14 }}>
+                            <div style={{ background: "#FEF3C7", border: "1px solid #FDE68A", borderRadius: 12, padding: "12px 16px", color: "#92400E", fontSize: 12.5 }}>
+                              <i className="bi bi-shield-lock-fill me-1" />
+                              <strong>Lead Institutional Account:</strong> This user will receive full ownership credentials. They will be prompted to set a permanent private password on their first login.
+                            </div>
+
+                            <div>
+                              <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#0F2744", marginBottom: 5 }}>
+                                Lead Administrator Role <span style={{ color: "#EF4444" }}>*</span>
+                              </label>
+                              <select
+                                className="form-select"
+                                value={onboardForm.lead_admin_role}
+                                onChange={(e) => setOnboardForm({ ...onboardForm, lead_admin_role: e.target.value })}
+                                style={{ borderRadius: 10, fontSize: 13.5 }}
+                              >
+                                <option value="proprietor">School Proprietor / Owner (role: proprietor)</option>
+                                <option value="principal">Principal / Head Teacher (role: principal)</option>
+                              </select>
+                            </div>
+
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                              <div>
+                                <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#0F2744", marginBottom: 5 }}>
+                                  First Name <span style={{ color: "#EF4444" }}>*</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  className="form-control"
+                                  required
+                                  placeholder="e.g. Adebayo"
+                                  value={onboardForm.admin_firstname}
+                                  onChange={(e) => setOnboardForm({ ...onboardForm, admin_firstname: e.target.value })}
+                                  style={{ borderRadius: 10, fontSize: 13 }}
+                                />
+                              </div>
+
+                              <div>
+                                <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#0F2744", marginBottom: 5 }}>
+                                  Surname <span style={{ color: "#EF4444" }}>*</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  className="form-control"
+                                  required
+                                  placeholder="e.g. Adeleke"
+                                  value={onboardForm.admin_surname}
+                                  onChange={(e) => setOnboardForm({ ...onboardForm, admin_surname: e.target.value })}
+                                  style={{ borderRadius: 10, fontSize: 13 }}
+                                />
+                              </div>
+                            </div>
+
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                              <div>
+                                <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#0F2744", marginBottom: 5 }}>
+                                  Official Email Address <span style={{ color: "#EF4444" }}>*</span>
+                                </label>
+                                <input
+                                  type="email"
+                                  className="form-control"
+                                  required
+                                  placeholder="proprietor@stjudeschool.com.ng"
+                                  value={onboardForm.admin_email}
+                                  onChange={(e) => setOnboardForm({ ...onboardForm, admin_email: e.target.value })}
+                                  style={{ borderRadius: 10, fontSize: 13 }}
+                                />
+                              </div>
+
+                              <div>
+                                <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#0F2744", marginBottom: 5 }}>
+                                  Phone Number <span style={{ color: "#EF4444" }}>*</span>
+                                </label>
+                                <input
+                                  type="tel"
+                                  className="form-control"
+                                  required
+                                  placeholder="08031234567"
+                                  value={onboardForm.admin_phone}
+                                  onChange={(e) => setOnboardForm({ ...onboardForm, admin_phone: e.target.value })}
+                                  style={{ borderRadius: 10, fontSize: 13 }}
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+                                <label style={{ fontSize: 12.5, fontWeight: 700, color: "#0F2744", margin: 0 }}>
+                                  Temporary Sign-In Password
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={generateRandomPassword}
+                                  style={{ border: "none", background: "none", color: "#D97706", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                                >
+                                  <i className="bi bi-shuffle me-1" /> Generate Secure Password
+                                </button>
+                              </div>
+                              <input
+                                type="text"
+                                className="form-control"
+                                placeholder="Temporary password"
+                                value={onboardForm.admin_password}
+                                onChange={(e) => setOnboardForm({ ...onboardForm, admin_password: e.target.value })}
+                                style={{ borderRadius: 10, fontSize: 13, fontFamily: "monospace" }}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Modal Action Buttons */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24, paddingTop: 16, borderTop: "1px solid #E2E8F0" }}>
+                          {onboardStep > 1 ? (
+                            <button
+                              type="button"
+                              className="sa-btn sa-btn-soft"
+                              onClick={() => setOnboardStep((prev) => (prev - 1) as 1 | 2)}
+                            >
+                              <i className="bi bi-arrow-left" /> Back
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="sa-btn sa-btn-soft"
+                              onClick={() => setShowOnboardModal(false)}
+                            >
+                              Cancel
+                            </button>
+                          )}
+
+                          <div style={{ display: "flex", gap: 10 }}>
+                            {onboardStep < 3 ? (
+                              <button
+                                type="button"
+                                className="sa-btn sa-btn-gold"
+                                onClick={() => {
+                                  if (onboardStep === 1 && !onboardForm.school_name.trim()) {
+                                    showError("Please enter the school legal name.");
+                                    return;
+                                  }
+                                  setOnboardStep((prev) => (prev + 1) as 2 | 3);
+                                }}
+                              >
+                                Next Step <i className="bi bi-arrow-right" />
+                              </button>
+                            ) : (
+                              <button
+                                type="submit"
+                                className="sa-btn sa-btn-gold"
+                                disabled={onboardingSubmitting}
+                                style={{ fontWeight: 800 }}
+                              >
+                                {onboardingSubmitting ? (
+                                  <>
+                                    <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
+                                    Provisioning School Tenant...
+                                  </>
+                                ) : (
+                                  <>
+                                    <i className="bi bi-check2-circle" /> Complete School Onboarding
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </form>
+                    )}
                   </div>
                 </div>
               )}

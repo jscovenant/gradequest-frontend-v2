@@ -4,6 +4,7 @@ import { api } from "../utils/api";
 import { setToken, setUser } from "../utils/token";
 import PageTitle from "../components/PageTitle";
 import AiSalesChatWidget from "../components/AiSalesChatWidget";
+import { isCustomPortalHost } from "../utils/portal";
 
 type PortalTab = "school" | "parent" | "platform";
 
@@ -20,14 +21,33 @@ export default function Login() {
 
   useEffect(() => {
     const schoolParam = searchParams.get("school");
+
+    // Only load school branding if explicitly requested (?school=) or visiting via a custom school domain
+    if (!schoolParam && !isCustomPortalHost()) {
+      setSchoolBranding(null);
+      const icon = document.querySelector<HTMLLinkElement>("link[rel*='icon']");
+      if (icon) {
+        icon.href = "/favicon.svg?v=sp3";
+      }
+      return;
+    }
+
     const identifier = schoolParam || "current";
     api.get(`/public/school/${identifier}`)
       .then((res) => {
         if (res.data?.status && res.data?.school) {
           setSchoolBranding(res.data);
+          const icon = document.querySelector<HTMLLinkElement>("link[rel*='icon']");
+          if (icon && (res.data.school.logo || res.data.school.logo_url)) {
+            icon.href = res.data.school.logo_url || res.data.school.logo;
+          }
+        } else {
+          setSchoolBranding(null);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        setSchoolBranding(null);
+      });
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -42,20 +62,40 @@ export default function Login() {
       const { access_token, user } = response.data;
       setToken(access_token);
       setUser(user);
-      switch (user.role) {
-        case "Admin":
-        case "Operator":
-        case "Super-Admin":
-        case "Platform-Staff":
-        case "Teacher":
-        case "Student":
-        case "Parent":
-        case "Bursar":
-        case "Sales-Representative":
-          navigate("/dashboard");
-          break;
-        default:
-          navigate("/unauthorized");
+      const normRole = (user.normalized_role || user.role || "")
+        .toLowerCase()
+        .replace(/[\s-]/g, "_");
+
+      const validRoles = [
+        "admin",
+        "proprietor",
+        "owner",
+        "principal",
+        "operator",
+        "registrar",
+        "secretary",
+        "super_admin",
+        "superadmin",
+        "platform_staff",
+        "platformstaff",
+        "teacher",
+        "class_teacher",
+        "subject_teacher",
+        "student",
+        "pupil",
+        "parent",
+        "guardian",
+        "bursar",
+        "accountant",
+        "sales_representative",
+        "sales_rep",
+        "salesrep",
+      ];
+
+      if (validRoles.includes(normRole)) {
+        navigate("/dashboard");
+      } else {
+        navigate("/unauthorized");
       }
     } catch (err: any) {
       setError(err?.response?.data?.message || "Invalid credentials. Please verify your username and password.");
