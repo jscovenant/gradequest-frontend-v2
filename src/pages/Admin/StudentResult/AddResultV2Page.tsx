@@ -225,13 +225,36 @@ export default function AddResultV2Page() {
     },
   });
 
-  // Carry-over
+  // Carry-over & Cumulative Assessment State
   const [includeCarryOver, setIncludeCarryOver] = useState(false);
   const [schoolTerms, setSchoolTerms] = useState<string[]>([]);
   const [carryPreview, setCarryPreview] = useState<Record<number, Record<string, number>>>({});
+  const [carryScores, setCarryScores] = useState<Record<number, Record<string, number>>>({});
   const [reportColumnPolicy, setReportColumnPolicy] = useState<ReportColumnPolicy | null>(null);
   const carryOverAllowed = Boolean(reportColumnPolicy?.carry_over_allowed);
   const [carryLoading, setCarryLoading] = useState(false);
+
+  const isThirdTerm = useMemo(() => /third|3rd/i.test(term || ""), [term]);
+  const isSecondTerm = useMemo(() => /second|2nd/i.test(term || ""), [term]);
+  const canHaveCarryOver = isThirdTerm || isSecondTerm || carryOverAllowed;
+  const previousTermNames = useMemo(() => {
+    if (isThirdTerm) return ["First Term", "Second Term"];
+    if (isSecondTerm) return ["First Term"];
+    if (reportColumnPolicy?.columns?.show_first_term && reportColumnPolicy?.columns?.show_second_term) {
+      return ["First Term", "Second Term"];
+    }
+    if (reportColumnPolicy?.columns?.show_first_term) {
+      return ["First Term"];
+    }
+    return [];
+  }, [isThirdTerm, isSecondTerm, reportColumnPolicy]);
+
+  const autoPopulatedCount = useMemo(() => {
+    return subjects.filter((s) => {
+      const prev = carryScores[s.id] ?? carryPreview[s.id];
+      return prev && Object.values(prev).some((v) => v !== undefined && v !== null && v !== "");
+    }).length;
+  }, [subjects, carryScores, carryPreview]);
 
   // Attendance
   const [autoAttendance, setAutoAttendance] = useState<{
@@ -387,7 +410,22 @@ export default function AddResultV2Page() {
   const loadStudentInBatch = async (bId: number, stId: number) => {
     setPageLoading(true);
     try {
-      const res = await authApi.get(`/result-batches/${bId}/students/${stId}/result-form`);
+      let resolvedBId = bId;
+      if (!resolvedBId && selectedClassId && term && session) {
+        try {
+          const resolveRes = await authApi.post("/result-batches/resolve", {
+            class_id: Number(selectedClassId),
+            term,
+            session,
+          });
+          resolvedBId = resolveRes.data?.batch?.id || 0;
+          if (resolvedBId) setBatchId(resolvedBId);
+        } catch {
+          // ignore
+        }
+      }
+
+      const res = await authApi.get(`/result-batches/${resolvedBId || bId}/students/${stId}/result-form`);
       const data = res.data;
 
       const st: Student = data.student;
@@ -395,7 +433,7 @@ export default function AddResultV2Page() {
 
       setStudent(st);
       setSubjects(subjs);
-      setBatchId(bId);
+      setBatchId(resolvedBId || bId);
       if (st.level?.id) setSelectedClassId(st.level.id);
 
       if (data.term) setTerm(data.term);
@@ -404,13 +442,42 @@ export default function AddResultV2Page() {
 
       setReportColumnPolicy(data.report_column_policy ?? null);
       setSchoolTerms(data.terms ?? []);
-      setCarryPreview(data.carry_over_preview ?? {});
-      if (!data.report_column_policy?.carry_over_allowed) {
+
+      const preview = data.carry_over_preview ?? {};
+      setCarryPreview(preview);
+
+      const existingRows: any[] = data.existing?.results || [];
+
+      // Merge preview scores and any existing saved carry_over
+      const initialCarryScores: Record<number, Record<string, number>> = {};
+      for (const [sId, termMap] of Object.entries(preview)) {
+        initialCarryScores[Number(sId)] = { ...(termMap as Record<string, number>) };
+      }
+      for (const er of existingRows) {
+        if (er?.carry_over?.terms && er?.subject_id) {
+          initialCarryScores[Number(er.subject_id)] = {
+            ...(initialCarryScores[Number(er.subject_id)] || {}),
+            ...er.carry_over.terms,
+          };
+        }
+      }
+      setCarryScores(initialCarryScores);
+
+      const hasPrevScores = Object.values(initialCarryScores).some(
+        (terms) => Object.keys(terms).length > 0
+      );
+      const hadExistingCarry = existingRows.some((r: any) => r?.carry_over?.enabled);
+      const isThird = /third|3rd/i.test(data.term || term || "");
+      const isSecond = /second|2nd/i.test(data.term || term || "");
+      const allowed = Boolean(data.report_column_policy?.carry_over_allowed) || isThird || isSecond;
+
+      if (allowed && (hadExistingCarry || hasPrevScores || isThird)) {
+        setIncludeCarryOver(true);
+      } else if (!allowed) {
         setIncludeCarryOver(false);
       }
 
       // Initialize score state
-      const existingRows: any[] = data.existing?.results || [];
       const detectedType = detectScoreTypeFromExisting(existingRows);
       if (detectedType) setScoreType(detectedType);
 
@@ -713,18 +780,81 @@ export default function AddResultV2Page() {
   };
 
   // -----------------------------
-  // Carry Over Builder
+  // Carry Over & Cumulative Handlers
   // -----------------------------
-  function buildCarryOver(subjectId: number, currentTermName: string, currentTotal: number): CarryOverJson {
-    const prev = carryPreview[subjectId] ?? {};
-    const prevTotals = Object.values(prev).map((x) => Number(x) || 0);
+  const handleCarryScoreChange = (subjectId: number, termName: string, value: string) => {
+    const cleaned = value.replace(/^0+(?=\d)/, "");
+    if (cleaned === "") {
+      setCarryScores((prev) => {
+        const nextSubj = { ...(prev[subjectId] || {}) };
+        delete nextSubj[termName];
+        return { ...prev, [subjectId]: nextSubj };
+      });
+      return;
+    }
 
+    const num = Number(cleaned);
+    if (Number.isFinite(num) && num > 100) {
+      showWarning(`${termName} score cannot exceed 100`);
+      return;
+    }
+
+    setCarryScores((prev) => {
+      const nextSubj = { ...(prev[subjectId] || {}) };
+      nextSubj[termName] = Number.isFinite(num) ? num : 0;
+      return { ...prev, [subjectId]: nextSubj };
+    });
+  };
+
+  const getRowCumulative = (subjectId: number, currentTotal: number) => {
+    const prev = carryScores[subjectId] ?? carryPreview[subjectId] ?? {};
+    let sum = Number(currentTotal) || 0;
+    const termsMap: Record<string, number> = {};
+
+    for (const t of previousTermNames) {
+      const val = prev[t];
+      if (val !== undefined && val !== null && val !== "" && !Number.isNaN(Number(val))) {
+        const n = Number(val);
+        sum += n;
+        termsMap[t] = n;
+      }
+    }
+
+    const termCount = previousTermNames.length > 0 ? previousTermNames.length + 1 : 1;
+    const maxScore = termCount * 100;
+    const avg = termCount > 0 ? Number((sum / termCount).toFixed(1)) : 0;
+
+    return {
+      cumulativeTotal: sum,
+      cumulativeAverage: avg,
+      maxScore,
+      termsMap,
+    };
+  };
+
+  function buildCarryOver(subjectId: number, currentTermName: string, currentTotal: number): CarryOverJson {
+    const prev = carryScores[subjectId] ?? carryPreview[subjectId] ?? {};
+    const prevTerms: Record<string, number> = {};
+
+    for (const t of previousTermNames) {
+      if (prev[t] !== undefined && prev[t] !== null && prev[t] !== "" && !Number.isNaN(Number(prev[t]))) {
+        prevTerms[t] = Number(prev[t]);
+      }
+    }
+
+    for (const [k, v] of Object.entries(prev)) {
+      if (prevTerms[k] === undefined && v !== undefined && v !== null && v !== "" && !Number.isNaN(Number(v))) {
+        prevTerms[k] = Number(v);
+      }
+    }
+
+    const prevTotals = Object.values(prevTerms).map((x) => Number(x) || 0);
     const cumulativeTotal = prevTotals.reduce((a, b) => a + b, 0) + (Number(currentTotal) || 0);
-    const termCount = prevTotals.length + 1;
+    const termCount = previousTermNames.length > 0 ? previousTermNames.length + 1 : prevTotals.length + 1;
 
     return {
       enabled: true,
-      terms: prev,
+      terms: prevTerms,
       current_term: { [currentTermName]: Number(currentTotal) || 0 },
       cumulative_total: cumulativeTotal,
       cumulative_average: termCount ? Number((cumulativeTotal / termCount).toFixed(1)) : 0,
@@ -761,8 +891,8 @@ export default function AddResultV2Page() {
         attendance: summary.meta,
         behavior_notes: "",
         performance_trend:
-          includeCarryOver && carryOverAllowed
-            ? "Cumulative result columns are enabled for this report."
+          includeCarryOver && canHaveCarryOver
+            ? "Cumulative result columns are enabled for this report (1st, 2nd, and 3rd terms combined)."
             : "Use current term scores only.",
       });
 
@@ -811,7 +941,7 @@ export default function AddResultV2Page() {
     setSaving(true);
     try {
       const resultsPayload = Object.values(scores).map((row) => {
-        const carry = includeCarryOver && carryOverAllowed ? buildCarryOver(row.subject_id, term, row.total ?? 0) : null;
+        const carry = includeCarryOver && canHaveCarryOver ? buildCarryOver(row.subject_id, term, row.total ?? 0) : null;
         return {
           subject_id: row.subject_id,
           ca: row.ca,
@@ -1526,22 +1656,108 @@ export default function AddResultV2Page() {
                     </div>
                   </div>
 
-                  {/* Carry Over Toggle Banner */}
-                  {carryOverAllowed && (
-                    <div className="alert alert-info py-2 px-3 d-flex justify-content-between align-items-center mb-3">
-                      <div className="form-check mb-0">
-                        <input
-                          className="form-check-input"
-                          type="checkbox"
-                          id="includeCarryOverCheck"
-                          checked={includeCarryOver}
-                          onChange={(e) => setIncludeCarryOver(e.target.checked)}
-                        />
-                        <label className="form-check-label small fw-bold" htmlFor="includeCarryOverCheck">
-                          Include previous term scores (Cumulative Carry-Over)
-                        </label>
+                  {/* CUMULATIVE ASSESSMENT & PREVIOUS TERMS BANNER */}
+                  {canHaveCarryOver && (
+                    <div
+                      className="card mb-4 border-0 shadow-sm overflow-hidden"
+                      style={{
+                        borderRadius: 14,
+                        background: includeCarryOver
+                          ? "linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%)"
+                          : "#F8FAFC",
+                        border: includeCarryOver ? "1.5px solid #BFDBFE" : "1px solid #E2E8F0",
+                      }}
+                    >
+                      <div className="p-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
+                        <div className="d-flex align-items-center gap-3">
+                          <div
+                            style={{
+                              width: 44,
+                              height: 44,
+                              borderRadius: 12,
+                              background: includeCarryOver ? "#2563EB" : "#94A3B8",
+                              color: "#FFFFFF",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: 20,
+                              boxShadow: includeCarryOver ? "0 4px 12px rgba(37,99,235,0.25)" : "none",
+                              transition: "all 0.2s ease",
+                            }}
+                          >
+                            📊
+                          </div>
+                          <div>
+                            <div className="d-flex align-items-center gap-2 flex-wrap">
+                              <h5 className="mb-0 fw-bold" style={{ fontSize: 15, color: "#0F172A" }}>
+                                Cumulative Assessment (Previous Terms)
+                              </h5>
+                              {isThirdTerm && (
+                                <span
+                                  className="badge"
+                                  style={{ backgroundColor: "#DBEAFE", color: "#1E40AF", fontWeight: 700, fontSize: 11 }}
+                                >
+                                  🎯 3rd Term Annual Cumulative Mode
+                                </span>
+                              )}
+                              {isSecondTerm && (
+                                <span
+                                  className="badge"
+                                  style={{ backgroundColor: "#EDE9FE", color: "#5B21B6", fontWeight: 700, fontSize: 11 }}
+                                >
+                                  📈 2nd Term Cumulative Mode
+                                </span>
+                              )}
+                              {includeCarryOver ? (
+                                <span
+                                  className="badge bg-success-subtle text-success border border-success-subtle fw-bold"
+                                  style={{ fontSize: 11 }}
+                                >
+                                  ✓ Active in Matrix
+                                </span>
+                              ) : (
+                                <span className="badge bg-secondary-subtle text-secondary border fw-bold" style={{ fontSize: 11 }}>
+                                  ○ Single Term Entry
+                                </span>
+                              )}
+                            </div>
+                            <p className="mb-0 text-muted small mt-1">
+                              {isThirdTerm
+                                ? "Combines 1st Term and 2nd Term scores with this 3rd Term to calculate the Cumulative Total (/300) and Annual Average (%)."
+                                : isSecondTerm
+                                ? "Combines 1st Term scores with this 2nd Term to calculate the Cumulative Total (/200) and Average (%)."
+                                : "Optionally include previous term scores in this report."}
+                              {autoPopulatedCount > 0 && (
+                                <span className="text-primary fw-bold ms-2">
+                                  ✨ {autoPopulatedCount} of {subjects.length} subjects auto-detected from school records!
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="d-flex align-items-center gap-3">
+                          <div className="form-check form-switch m-0 d-flex align-items-center gap-2" style={{ cursor: "pointer" }}>
+                            <input
+                              className="form-check-input"
+                              type="checkbox"
+                              role="switch"
+                              id="carryOverSwitch"
+                              style={{ width: 46, height: 24, cursor: "pointer" }}
+                              checked={includeCarryOver}
+                              onChange={(e) => setIncludeCarryOver(e.target.checked)}
+                            />
+                            <label
+                              className="form-check-label fw-bold text-dark mb-0 small"
+                              htmlFor="carryOverSwitch"
+                              style={{ cursor: "pointer" }}
+                            >
+                              {includeCarryOver ? "Include Previous Scores" : "Enable Previous Scores"}
+                            </label>
+                          </div>
+                          {carryLoading && <span className="spinner-border spinner-border-sm text-primary" />}
+                        </div>
                       </div>
-                      {carryLoading && <span className="spinner-border spinner-border-sm" />}
                     </div>
                   )}
 
@@ -1552,17 +1768,72 @@ export default function AddResultV2Page() {
                         <table className="gq-se-table">
                           <thead>
                             <tr>
-                              <th style={{ width: 40 }}>#</th>
+                              <th style={{ width: 36 }}>#</th>
                               <th>Subject Name</th>
                               {caParts.map((max, idx) => (
-                                <th key={`th-ca-${idx}`} style={{ textAlign: "center", width: 100 }}>
+                                <th key={`th-ca-${idx}`} style={{ textAlign: "center", width: 85 }}>
                                   CA {idx + 1} (/{max})
                                 </th>
                               ))}
-                              <th style={{ textAlign: "center", width: 110 }}>Exam (/{examPart})</th>
-                              <th style={{ textAlign: "center", width: 90 }}>Total (100)</th>
-                              <th style={{ textAlign: "center", width: 80 }}>Grade</th>
-                              <th style={{ width: 150 }}>Remark</th>
+                              <th style={{ textAlign: "center", width: 95 }}>Exam (/{examPart})</th>
+                              <th style={{ textAlign: "center", width: 90 }}>
+                                {includeCarryOver ? `${term || "Term"} (100)` : "Total (100)"}
+                              </th>
+
+                              {/* Previous Terms Columns when includeCarryOver is ON */}
+                              {includeCarryOver &&
+                                previousTermNames.map((tName, pIdx) => (
+                                  <th
+                                    key={`th-prev-${pIdx}`}
+                                    style={{
+                                      textAlign: "center",
+                                      width: 105,
+                                      backgroundColor: pIdx === 0 ? "#F0FDF4" : "#F5F3FF",
+                                      borderLeft: pIdx === 0 ? "2px solid #E2E8F0" : undefined,
+                                    }}
+                                  >
+                                    <div className="d-flex flex-column align-items-center">
+                                      <span style={{ fontSize: 11, color: pIdx === 0 ? "#15803D" : "#6D28D9" }}>{tName}</span>
+                                      <span style={{ fontSize: 10, color: "#64748B", fontWeight: 600 }}>Previous (/100)</span>
+                                    </div>
+                                  </th>
+                                ))}
+
+                              {/* Cumulative Columns when includeCarryOver is ON */}
+                              {includeCarryOver && (
+                                <>
+                                  <th
+                                    style={{
+                                      textAlign: "center",
+                                      width: 110,
+                                      backgroundColor: "#EFF6FF",
+                                      borderLeft: "2px solid #BFDBFE",
+                                    }}
+                                  >
+                                    <div className="d-flex flex-column align-items-center">
+                                      <span style={{ fontSize: 11, color: "#1D4ED8" }}>Cum. Total</span>
+                                      <span style={{ fontSize: 10, color: "#64748B", fontWeight: 600 }}>
+                                        (/{ (previousTermNames.length + 1) * 100 })
+                                      </span>
+                                    </div>
+                                  </th>
+                                  <th
+                                    style={{
+                                      textAlign: "center",
+                                      width: 95,
+                                      backgroundColor: "#EFF6FF",
+                                    }}
+                                  >
+                                    <div className="d-flex flex-column align-items-center">
+                                      <span style={{ fontSize: 11, color: "#1D4ED8" }}>Cum. Avg</span>
+                                      <span style={{ fontSize: 10, color: "#64748B", fontWeight: 600 }}>(%)</span>
+                                    </div>
+                                  </th>
+                                </>
+                              )}
+
+                              <th style={{ textAlign: "center", width: 75 }}>Grade</th>
+                              <th style={{ width: 140 }}>Remark</th>
                             </tr>
                           </thead>
 
@@ -1571,6 +1842,8 @@ export default function AddResultV2Page() {
                               const row = scores[subj.name];
                               const total = row?.total ?? 0;
                               const totalClass = total >= 70 ? "high" : total >= 50 ? "mid" : total > 0 ? "low" : "";
+                              const cum = getRowCumulative(subj.id, total);
+                              const cumClass = cum.cumulativeAverage >= 70 ? "high" : cum.cumulativeAverage >= 50 ? "mid" : cum.cumulativeAverage > 0 ? "low" : "";
 
                               return (
                                 <tr key={subj.id}>
@@ -1614,12 +1887,68 @@ export default function AddResultV2Page() {
                                     />
                                   </td>
 
-                                  {/* Auto Total */}
+                                  {/* Current Term Total */}
                                   <td style={{ textAlign: "center" }}>
-                                    <span className={`gq-se-badge-total ${totalClass}`}>
-                                      {total}
-                                    </span>
+                                    <span className={`gq-se-badge-total ${totalClass}`}>{total}</span>
                                   </td>
+
+                                  {/* Previous Terms inputs when includeCarryOver is ON */}
+                                  {includeCarryOver &&
+                                    previousTermNames.map((tName, pIdx) => {
+                                      const prevVal = carryScores[subj.id]?.[tName] ?? carryPreview[subj.id]?.[tName];
+                                      return (
+                                        <td
+                                          key={`${subj.id}-prev-${pIdx}`}
+                                          style={{
+                                            textAlign: "center",
+                                            backgroundColor: pIdx === 0 ? "rgba(240, 253, 244, 0.4)" : "rgba(245, 243, 255, 0.4)",
+                                            borderLeft: pIdx === 0 ? "2px solid #E2E8F0" : undefined,
+                                          }}
+                                        >
+                                          <input
+                                            type="number"
+                                            min={0}
+                                            max={100}
+                                            className="gq-se-input-score"
+                                            style={{
+                                              borderColor: pIdx === 0 ? "#86EFAC" : "#C4B5FD",
+                                              backgroundColor: "#FFFFFF",
+                                            }}
+                                            value={prevVal !== undefined ? prevVal : ""}
+                                            placeholder="0"
+                                            onChange={(e) => handleCarryScoreChange(subj.id, tName, e.target.value)}
+                                          />
+                                        </td>
+                                      );
+                                    })}
+
+                                  {/* Cumulative Total and Average when includeCarryOver is ON */}
+                                  {includeCarryOver && (
+                                    <>
+                                      <td
+                                        style={{
+                                          textAlign: "center",
+                                          backgroundColor: "rgba(239, 246, 255, 0.4)",
+                                          borderLeft: "2px solid #BFDBFE",
+                                        }}
+                                      >
+                                        <span
+                                          className={`gq-se-badge-total ${cumClass}`}
+                                          style={{ fontWeight: 800, minWidth: 46 }}
+                                        >
+                                          {cum.cumulativeTotal}
+                                        </span>
+                                      </td>
+                                      <td style={{ textAlign: "center", backgroundColor: "rgba(239, 246, 255, 0.4)" }}>
+                                        <span
+                                          className={`badge ${cumClass === "high" ? "bg-success" : cumClass === "mid" ? "bg-primary" : "bg-secondary"}`}
+                                          style={{ fontSize: 12, padding: "5px 8px" }}
+                                        >
+                                          {cum.cumulativeAverage}%
+                                        </span>
+                                      </td>
+                                    </>
+                                  )}
 
                                   {/* Grade Input */}
                                   <td style={{ textAlign: "center" }}>
@@ -1627,7 +1956,7 @@ export default function AddResultV2Page() {
                                       type="text"
                                       maxLength={3}
                                       className="gq-se-input-text text-center fw-bold"
-                                      style={{ width: 55, textTransform: "uppercase" }}
+                                      style={{ width: 52, textTransform: "uppercase" }}
                                       value={row?.grade || ""}
                                       onChange={(e) => handleTextField(subj.name, "grade", e.target.value)}
                                       placeholder="A"
@@ -1656,12 +1985,15 @@ export default function AddResultV2Page() {
                     <div className="row g-3 mb-4">
                       {subjects.map((subj) => {
                         const row = scores[subj.name];
+                        const total = row?.total ?? 0;
+                        const cum = getRowCumulative(subj.id, total);
+
                         return (
                           <div className="col-md-6" key={subj.id}>
                             <div className="card border-1 shadow-sm h-100 rounded-3">
                               <div className="card-header bg-light d-flex justify-content-between align-items-center py-2">
                                 <span className="fw-bold text-dark">{subj.name}</span>
-                                <span className="badge bg-primary">Total: {row?.total ?? 0}</span>
+                                <span className="badge bg-primary">Total: {total}</span>
                               </div>
                               <div className="card-body p-3">
                                 <div className="row g-2 mb-2">
@@ -1688,6 +2020,50 @@ export default function AddResultV2Page() {
                                     />
                                   </div>
                                 </div>
+
+                                {/* Cumulative Sub-panel in Cards view */}
+                                {includeCarryOver && (
+                                  <div className="mb-2 p-2 rounded-3 border" style={{ backgroundColor: "#F8FAFC" }}>
+                                    <div className="d-flex justify-content-between align-items-center mb-1">
+                                      <span className="badge bg-primary-subtle text-primary border border-primary-subtle fw-bold" style={{ fontSize: 10 }}>
+                                        📊 Cumulative Assessment
+                                      </span>
+                                      <div className="small fw-bold text-dark" style={{ fontSize: 11.5 }}>
+                                        Cum: <span className="text-primary">{cum.cumulativeTotal}/{cum.maxScore}</span> ({cum.cumulativeAverage}%)
+                                      </div>
+                                    </div>
+                                    <div className="row g-2">
+                                      {previousTermNames.map((tName) => {
+                                        const prevVal = carryScores[subj.id]?.[tName] ?? carryPreview[subj.id]?.[tName];
+                                        return (
+                                          <div className="col" key={`card-${subj.id}-${tName}`}>
+                                            <label className="small text-muted fw-bold d-block text-truncate" style={{ fontSize: 10 }}>
+                                              {tName} (/100)
+                                            </label>
+                                            <input
+                                              type="number"
+                                              min={0}
+                                              max={100}
+                                              className="form-control form-control-sm text-center fw-bold"
+                                              value={prevVal !== undefined ? prevVal : ""}
+                                              placeholder="0"
+                                              onChange={(e) => handleCarryScoreChange(subj.id, tName, e.target.value)}
+                                            />
+                                          </div>
+                                        );
+                                      })}
+                                      <div className="col">
+                                        <label className="small text-muted fw-bold d-block text-truncate" style={{ fontSize: 10 }}>
+                                          {term || "Current"} (/100)
+                                        </label>
+                                        <div className="form-control form-control-sm text-center fw-bold bg-light">
+                                          {total}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+
                                 <div className="row g-2">
                                   <div className="col-4">
                                     <label className="small text-muted fw-bold">Grade</label>
