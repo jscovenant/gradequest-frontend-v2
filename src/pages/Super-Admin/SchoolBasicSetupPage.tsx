@@ -389,8 +389,14 @@ export default function SchoolBasicSetupPage() {
       const res = await authApi.post(`/superadmin/schools/${id}/preview-students`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+      const readyStudents = res.data?.summary?.ready ?? res.data?.summary?.ready_rows ?? 0;
+      const errorsFound = res.data?.summary?.errors ?? res.data?.summary?.errors_count ?? 0;
       setPreviewData(res.data);
-      showSuccess(`File validated: ${res.data?.summary?.ready ?? 0} valid students found.`);
+      if (errorsFound > 0) {
+        showSuccess(`File validated: ${readyStudents} valid students found (${errorsFound} rows have errors).`);
+      } else {
+        showSuccess(`File validated: ${readyStudents} valid students found.`);
+      }
     } catch (err: any) {
       showError(err?.response?.data?.message || "Failed to preview student Excel file.");
     } finally {
@@ -1230,88 +1236,115 @@ export default function SchoolBasicSetupPage() {
                   )}
 
                   {/* PREVIEW RESULTS TABLE */}
-                  {previewData && (
-                    <div>
-                      <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 bg-light rounded border mb-3">
-                        <div className="d-flex gap-3 align-items-center">
-                          <div>
-                            <span className="text-muted small d-block">Total Rows</span>
-                            <strong className="fs-5 text-dark">{previewData?.summary?.total ?? 0}</strong>
-                          </div>
-                          <div className="border-start ps-3">
-                            <span className="text-success small d-block">Ready to Import</span>
-                            <strong className="fs-5 text-success">{previewData?.summary?.ready ?? 0}</strong>
-                          </div>
-                          {previewData?.summary?.errors > 0 && (
-                            <div className="border-start ps-3">
-                              <span className="text-danger small d-block">Errors Found</span>
-                              <strong className="fs-5 text-danger">{previewData?.summary?.errors}</strong>
+                  {previewData && (() => {
+                    const totalRows = previewData?.summary?.total ?? previewData?.summary?.total_rows ?? 0;
+                    const readyRows = previewData?.summary?.ready ?? previewData?.summary?.ready_rows ?? 0;
+                    const errorRows = previewData?.summary?.errors ?? previewData?.summary?.errors_count ?? 0;
+                    return (
+                      <div>
+                        <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 bg-light rounded border mb-3">
+                          <div className="d-flex gap-3 align-items-center">
+                            <div>
+                              <span className="text-muted small d-block">Total Rows</span>
+                              <strong className="fs-5 text-dark">{totalRows}</strong>
                             </div>
-                          )}
+                            <div className="border-start ps-3">
+                              <span className="text-success small d-block">Ready to Import</span>
+                              <strong className="fs-5 text-success">{readyRows}</strong>
+                            </div>
+                            {errorRows > 0 && (
+                              <div className="border-start ps-3">
+                                <span className="text-danger small d-block">Issues Found</span>
+                                <strong className="fs-5 text-danger">{errorRows}</strong>
+                              </div>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            className="btn btn-success fw-bold px-4 py-2"
+                            style={{ borderRadius: 8 }}
+                            onClick={handleExecuteImport}
+                            disabled={importingStudents || readyRows === 0}
+                          >
+                            {importingStudents ? (
+                              <>
+                                <span className="spinner-border spinner-border-sm me-1" />
+                                Importing Students...
+                              </>
+                            ) : (
+                              <>
+                                <i className="bi bi-check2-all me-1" />
+                                Confirm &amp; Import {readyRows} Students
+                              </>
+                            )}
+                          </button>
                         </div>
 
-                        <button
-                          type="button"
-                          className="btn btn-success fw-bold px-4 py-2"
-                          style={{ borderRadius: 8 }}
-                          onClick={handleExecuteImport}
-                          disabled={importingStudents || (previewData?.summary?.ready ?? 0) === 0}
-                        >
-                          {importingStudents ? (
-                            <>
-                              <span className="spinner-border spinner-border-sm me-1" />
-                              Importing Students...
-                            </>
-                          ) : (
-                            <>
-                              <i className="bi bi-check2-all me-1" />
-                              Confirm &amp; Import {previewData?.summary?.ready ?? 0} Students
-                            </>
-                          )}
-                        </button>
-                      </div>
+                        {errorRows > 0 && (
+                          <div className="alert alert-warning py-2 px-3 small mb-3">
+                            <div className="fw-bold mb-1">
+                              <i className="bi bi-exclamation-triangle-fill me-1" />
+                              Notice: {errorRows} row(s) have validation issues and will be skipped during import:
+                            </div>
+                            <ul className="mb-0 ps-3">
+                              {previewData.errors?.slice(0, 5).map((err: string, i: number) => (
+                                <li key={i}>{err}</li>
+                              ))}
+                              {(previewData.errors?.length || 0) > 5 && (
+                                <li>...and {previewData.errors.length - 5} more issues</li>
+                              )}
+                            </ul>
+                          </div>
+                        )}
 
-                      {/* Preview Rows Table */}
-                      <div className="table-responsive" style={{ maxHeight: 350, overflowY: "auto" }}>
-                        <table className="table table-sm table-bordered align-middle small mb-0">
-                          <thead className="table-light">
-                            <tr>
-                              <th>#</th>
-                              <th>Name</th>
-                              <th>Gender</th>
-                              <th>Class</th>
-                              <th>Section</th>
-                              <th>Department</th>
-                              <th>Admission No</th>
-                              <th>Status</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {previewData.rows?.slice(0, 50).map((r: any, idx: number) => (
-                              <tr key={idx} className={r.status === "error" ? "table-danger" : ""}>
-                                <td>{idx + 1}</td>
-                                <td>
-                                  <strong>{r.surname}</strong> {r.firstname} {r.third_name || ""}
-                                </td>
-                                <td>{r.gender || "—"}</td>
-                                <td>{r.class_name || "—"}</td>
-                                <td>{r.section_name || "Auto"}</td>
-                                <td>{r.department_name || "None"}</td>
-                                <td>
-                                  <span className="font-monospace text-primary">{r.admission_no || "Auto-Assign"}</span>
-                                </td>
-                                <td>
-                                  <span className={`badge ${r.status === "ready" ? "bg-success" : "bg-danger"}`}>
-                                    {r.status}
-                                  </span>
-                                </td>
+                        {/* Preview Rows Table */}
+                        <div className="table-responsive" style={{ maxHeight: 380, overflowY: "auto" }}>
+                          <table className="table table-sm table-bordered align-middle small mb-0">
+                            <thead className="table-light">
+                              <tr>
+                                <th>#</th>
+                                <th>Name</th>
+                                <th>Gender</th>
+                                <th>Class</th>
+                                <th>Section</th>
+                                <th>Department</th>
+                                <th>Admission No</th>
+                                <th>Status</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody>
+                              {previewData.rows?.slice(0, 100).map((r: any, idx: number) => (
+                                <tr key={idx} className={r.status === "error" ? "table-danger" : ""}>
+                                  <td>{idx + 1}</td>
+                                  <td>
+                                    <strong>{r.surname}</strong> {r.firstname} {r.third_name || ""}
+                                    {r.errors && r.errors.length > 0 && (
+                                      <div className="text-danger small mt-1 font-monospace" style={{ fontSize: 11 }}>
+                                        {r.errors.join("; ")}
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td>{r.gender || "—"}</td>
+                                  <td>{r.class_name || "—"}</td>
+                                  <td>{r.section_name || "Auto"}</td>
+                                  <td>{r.department_name || "None"}</td>
+                                  <td>
+                                    <span className="font-monospace text-primary">{r.admission_no || "Auto-Assign"}</span>
+                                  </td>
+                                  <td>
+                                    <span className={`badge ${r.status === "ready" ? "bg-success" : "bg-danger"}`}>
+                                      {r.status}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               </div>
             )}
