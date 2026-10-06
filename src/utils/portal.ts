@@ -15,15 +15,13 @@ export const isCustomPortalHost = (): boolean => {
     return false;
   }
 
-  // Only custom school domains (e.g. portal.kingscollege.sch.ng) or app subdomain redirect to login
-  return (
-    host === "app.schoolprofit.ng" ||
-    host === "portal.schoolprofit.ng" ||
-    host === "app.gradequest.com.ng" ||
-    host === "portal.gradequest.com.ng" ||
-    (!host.endsWith(".schoolprofit.ng") && host !== "schoolprofit.ng" && !host.endsWith(".gradequest.com.ng") && host !== "gradequest.com.ng")
-  );
+  // Any custom school domain (e.g. samjaneariseandshineschool.com.ng) or school subdomain (e.g. samjane.schoolprofit.ng) or app/portal
+  return true;
 };
 
-export const portalLoginUrl = (origin = window.location.origin): string =>
-  `${origin.replace(/\/+$/, "")}/login`;
+export const portalLoginUrl = (origin = window.location.origin): string => {
+  if (isCustomPortalHost()) {
+    return `${origin.replace(/\/+$/, "")}/auth/login`;
+  }
+  return `${origin.replace(/\/+$/, "")}/login`;
+};

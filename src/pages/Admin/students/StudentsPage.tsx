@@ -1989,24 +1989,31 @@ export default function StudentsPage() {
                               <div>
                                 <label className="sp-label">Class *</label>
                                 <select className="sp-select" value={editedStudent.level_id || ""}
-                                  onChange={e => setEditedStudent({ ...editedStudent, level_id: e.target.value })}>
+                                  onChange={e => {
+                                    const chosenLevel = studentDetails.levels?.find((l: any) => String(l.id) === String(e.target.value));
+                                    setEditedStudent({
+                                      ...editedStudent,
+                                      level_id: e.target.value,
+                                      section_id: chosenLevel?.section_id ? chosenLevel.section_id : editedStudent.section_id,
+                                    });
+                                  }}>
                                   <option value="">Select class</option>
                                   {studentDetails.levels?.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
                                 </select>
                               </div>
                               <div>
-                                <label className="sp-label">Department *</label>
+                                <label className="sp-label">Department (Optional)</label>
                                 <select className="sp-select" value={editedStudent.department_id || ""}
                                   onChange={e => setEditedStudent({ ...editedStudent, department_id: e.target.value })}>
-                                  <option value="">Select department</option>
+                                  <option value="">None / Not Applicable</option>
                                   {studentDetails.departments?.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
                                 </select>
                               </div>
                               <div>
-                                <label className="sp-label">Section</label>
+                                <label className="sp-label">Section (Auto-derived)</label>
                                 <select className="sp-select" value={editedStudent.section_id || ""}
                                   onChange={e => setEditedStudent({ ...editedStudent, section_id: e.target.value ? parseInt(e.target.value) : "" })}>
-                                  <option value="">Select section</option>
+                                  <option value="">Select section (Optional)</option>
                                   {studentDetails.sections?.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
                                 </select>
                               </div>

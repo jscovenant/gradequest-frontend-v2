@@ -1,4 +1,4 @@
-import  { createContext, useContext, useState,} from "react";
+import { createContext, useContext, useState, useCallback, useMemo } from "react";
 import type { ReactNode } from "react";
 import Toast from "../components/ui/Toast";
 
@@ -22,38 +22,43 @@ interface ToastData {
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastData[]>([]);
 
-  const showToast = (
+  const showToast = useCallback((
     message: string,
     type: "success" | "error" | "info" | "warning",
     duration: number = 3000
   ) => {
-    const id = Date.now();
+    const id = Date.now() + Math.random();
     setToasts((prev) => [...prev, { id, message, type, duration }]);
-  };
+  }, []);
 
-  const removeToast = (id: number) => {
+  const removeToast = useCallback((id: number) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  };
+  }, []);
 
-  const showSuccess = (message: string, duration?: number) => {
+  const showSuccess = useCallback((message: string, duration?: number) => {
     showToast(message, "success", duration);
-  };
+  }, [showToast]);
 
-  const showError = (message: string, duration?: number) => {
+  const showError = useCallback((message: string, duration?: number) => {
     showToast(message, "error", duration);
-  };
+  }, [showToast]);
 
-  const showInfo = (message: string, duration?: number) => {
+  const showInfo = useCallback((message: string, duration?: number) => {
     showToast(message, "info", duration);
-  };
+  }, [showToast]);
 
-  const showWarning = (message: string, duration?: number) => {
+  const showWarning = useCallback((message: string, duration?: number) => {
     showToast(message, "warning", duration);
-  };
+  }, [showToast]);
+
+  const value = useMemo(
+    () => ({ showToast, showSuccess, showError, showInfo, showWarning }),
+    [showToast, showSuccess, showError, showInfo, showWarning]
+  );
 
   return (
     <ToastContext.Provider
-      value={{ showToast, showSuccess, showError, showInfo, showWarning }}
+      value={value}
     >
       {children}
       <div

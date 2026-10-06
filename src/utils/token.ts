@@ -1,5 +1,5 @@
-﻿// src/utils/token.ts
-import { portalLoginUrl } from "./portal";
+// src/utils/token.ts
+import { isCustomPortalHost, portalLoginUrl } from "./portal";
 
 const TOKEN_KEY = "gradequest_token";
 const USER_KEY = "gradequest_user";
@@ -91,8 +91,38 @@ export const clearUser = () => {
 };
 
 export const logout = () => {
+  const currentUser = getUser();
+  const schoolSubdomain = currentUser?.school?.subdomain || currentUser?.school?.slug;
+  const schoolCustomDomain = currentUser?.school?.custom_domain;
+  const schoolId = currentUser?.school_id || currentUser?.school?.id;
+
   clearToken();
   clearUser();
+
+  // 1. If currently on a custom school domain, always redirect to this domain's dedicated login page
+  if (isCustomPortalHost()) {
+    window.location.assign(portalLoginUrl());
+    return;
+  }
+
+  // 2. If user belonged to a school with its own custom domain, return to their dedicated school login
+  if (schoolCustomDomain) {
+    window.location.assign(`https://${schoolCustomDomain}/auth/login`);
+    return;
+  }
+
+  // 3. If user belonged to a school with subdomain on platform, return to school's dedicated branded login
+  if (schoolSubdomain) {
+    window.location.assign(`/school/${schoolSubdomain}/login`);
+    return;
+  }
+
+  if (schoolId) {
+    window.location.assign(`/school/${schoolId}/login`);
+    return;
+  }
+
+  // 4. Default platform fallback
   window.location.assign(portalLoginUrl());
 };
 

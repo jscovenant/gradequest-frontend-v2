@@ -1,4 +1,4 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
 import "aos/dist/aos.css";
 import RequireAuth from "./auth/RequireAuth";
@@ -6,6 +6,8 @@ import { FeatureProvider } from "./contexts/FeatureContext";
 import OnboardingGuard from "./auth/OnboardingGuard";
 import Loader from "./components/ui/dashboardLoader";
 import { isCustomPortalHost } from "./utils/portal";
+import { setSchoolBrowserIdentity } from "./utils/browserIdentity";
+import { publicApi } from "./utils/axios";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 import Login from "./pages/login";
@@ -89,6 +91,7 @@ const SchoolProfitInvoicePaymentPage = lazyWithRetry(() => import("./pages/Admin
 const WalletPage = lazyWithRetry(() => import("./pages/Admin/Wallet/WalletPage"));
 const AdminUserDetailsPage = lazyWithRetry(() => import("./pages/Super-Admin/AdminUserDetailsPage"));
 const SubscribersManagementPage = lazyWithRetry(() => import("./pages/Super-Admin/SubscribersManagementPage"));
+const SchoolBasicSetupPage = lazyWithRetry(() => import("./pages/Super-Admin/SchoolBasicSetupPage"));
 const MarketingEmailPage = lazyWithRetry(() => import("./pages/Super-Admin/MarketingEmailPage"));
 const SalesRepresentativesPage = lazyWithRetry(() => import("./pages/Super-Admin/SalesRepresentativesPage"));
 const SalesLeadsManagementPage = lazyWithRetry(() => import("./pages/Super-Admin/SalesLeadsPage"));
@@ -169,9 +172,33 @@ const PublicAdmissionFormPage = lazyWithRetry(() => import("./pages/PublicAdmiss
 const PublicAdmissionStatusPage = lazyWithRetry(() => import("./pages/PublicAdmissionStatusPage"));
 const SchoolBrandedLoginPage = lazyWithRetry(() => import("./pages/Auth/SchoolBrandedLoginPage"));
 
+function CustomDomainBrandSync() {
+  useEffect(() => {
+    if (isCustomPortalHost()) {
+      publicApi
+        .get("/public/school/current")
+        .then((res) => {
+          if (res.data?.status && res.data?.school) {
+            const sch = res.data.school;
+            const web = res.data.website;
+            setSchoolBrowserIdentity(
+              sch.name || sch.school_name,
+              sch.logo_url || sch.logo,
+              web?.site_title || web?.tagline
+            );
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
+
+  return null;
+}
+
 function App() {
   return (
     <BrowserRouter>
+      <CustomDomainBrandSync />
       <ErrorBoundary>
         <FeatureProvider>
           <Suspense fallback={<Loader message="Preparing page..." />}>
@@ -186,7 +213,7 @@ function App() {
           <Route path="/admission" element={<PublicAdmissionFormPage />} />
           <Route path="/admissions/apply/:slugOrId" element={<PublicAdmissionFormPage />} />
           <Route path="/admissions/status" element={<PublicAdmissionStatusPage />} />
-          <Route path="/login" element={<Login />} />
+          <Route path="/login" element={isCustomPortalHost() ? <SchoolBrandedLoginPage /> : <Login />} />
           <Route path="/register" element={<Signup />} />
           <Route path="/sales-representative/register" element={<PublicRepresentativeRegisterPage />} />
           <Route path="/become-a-partner" element={<PublicRepresentativeRegisterPage />} />
@@ -554,7 +581,7 @@ function App() {
           <Route
             path="/results/review"
             element={
-              <RequireAuth roles={["Admin"]}>
+              <RequireAuth roles={["Admin", "Teacher", "Principal", "Operator", "Super-Admin", "Platform-Staff"]}>
                 <OnboardingGuard>
                   <AdminResultReviewPage />
                 </OnboardingGuard>
@@ -1310,7 +1337,17 @@ function App() {
               </RequireAuth>
             }
           />
-              <Route
+          <Route
+            path="/superadmin/schools/:id/setup"
+            element={
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["support", "operations", "billing"]}>
+                <OnboardingGuard>
+                  <SchoolBasicSetupPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
             path="/demo-bookers"
             element={
               <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["sales"]}>

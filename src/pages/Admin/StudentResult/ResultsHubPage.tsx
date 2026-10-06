@@ -8,6 +8,7 @@ import Sidebar from "../../../components/LayoutComponents/Sidebar";
 import Footer from "../../../components/LayoutComponents/Footer";
 import PageTitle from "../../../components/PageTitle";
 import Loader from "../../../components/ui/dashboardLoader";
+import { getUser } from "../../../utils/token";
 
 type StudentClass = {
   id: number;
@@ -51,6 +52,11 @@ function getGreeting() {
 export default function ResultsHubPage() {
   const navigate = useNavigate();
   const { showError, showInfo } = useToast();
+
+  const currentUser = getUser();
+  const rawRole = (currentUser?.role || "").toLowerCase().trim();
+  const normRole = (currentUser?.normalized_role || currentUser?.role || "").toLowerCase().replace(/[\s-]/g, "_");
+  const isTeacher = ["teacher", "class_teacher", "class-teacher", "subject_teacher", "subject-teacher", "staff"].includes(normRole) || ["teacher", "class_teacher", "class-teacher", "subject_teacher", "subject-teacher", "staff"].includes(rawRole);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -604,9 +610,11 @@ export default function ResultsHubPage() {
             {/* HERO HEADER */}
             <div className="gq-rh-hero">
               <div className="gq-rh-hero-eyebrow">Result Management Command Center</div>
-              <h1 className="gq-rh-hero-title">{getGreeting()}, Administrator</h1>
+              <h1 className="gq-rh-hero-title">{getGreeting()}, {isTeacher ? (currentUser?.name || "Teacher") : "Administrator"}</h1>
               <p className="gq-rh-hero-sub">
-                Manage your complete school term results lifecycle in 4 seamless stages: score entry, batch compilation, administrative review & publishing, and student report card distribution.
+                {isTeacher
+                  ? "Input and manage continuous assessment (CA) and exam scores for your assigned classes, and preview or print student report cards."
+                  : "Manage your complete school term results lifecycle in 4 seamless stages: score entry, batch compilation, administrative review & publishing, and student report card distribution."}
               </p>
 
               {/* CONTEXT BAR */}
@@ -672,7 +680,9 @@ export default function ResultsHubPage() {
                     <span>⚡ End-of-Term Result Workflow</span>
                   </h2>
                   <p className="gq-rh-section-sub">
-                    Follow the standard 4-step progression to process and release academic results for {selectedTerm} {selectedSession}.
+                    {isTeacher
+                      ? `Follow the streamlined score entry and report card workflow for ${selectedTerm} ${selectedSession}.`
+                      : `Follow the standard 4-step progression to process and release academic results for ${selectedTerm} ${selectedSession}.`}
                   </p>
                 </div>
               </div>
@@ -688,7 +698,9 @@ export default function ResultsHubPage() {
                       <span>📝 Enter Student Scores</span>
                     </h3>
                     <p className="gq-rh-step-desc">
-                      Teachers and administrators input Continuous Assessment (CA 1, CA 2) and Exam scores for all subjects in their classes.
+                      {isTeacher
+                        ? "Input Continuous Assessment (CA 1, CA 2) and Exam scores or upload spreadsheet for your assigned classes."
+                        : "Teachers and administrators input Continuous Assessment (CA 1, CA 2) and Exam scores for all subjects in their classes."}
                     </p>
 
                     {/* Quick Class Shortcut */}
@@ -728,57 +740,62 @@ export default function ResultsHubPage() {
                   </button>
                 </div>
 
-                {/* STEP 2: COMPILE TERM RESULTS */}
-                <div className="gq-rh-step-card">
-                  <div>
-                    <span className="gq-rh-step-badge gq-rh-step-2">
-                      <span>2️⃣</span> Step 2 • Batch Computation
-                    </span>
-                    <h3 className="gq-rh-step-heading">
-                      <span>⚙️ Compile Term Results</span>
-                    </h3>
-                    <p className="gq-rh-step-desc">
-                      Calculate overall term scores, student class positions, subject averages, term attendance, and class teacher remarks.
-                    </p>
-                  </div>
+                {/* STEP 2 & 3: MASTER BROADSHEET & REVIEW/PUBLISH (ADMIN ONLY) */}
+                {!isTeacher && (
+                  <>
+                    {/* STEP 2: MASTER BROADSHEET & AUDIT */}
+                    <div className="gq-rh-step-card">
+                      <div>
+                        <span className="gq-rh-step-badge gq-rh-step-2">
+                          <span>2️⃣</span> Step 2 • Master Broadsheet
+                        </span>
+                        <h3 className="gq-rh-step-heading">
+                          <span>📊 Master Broadsheet & Audit</span>
+                        </h3>
+                        <p className="gq-rh-step-desc">
+                          Inspect class-wide marks, real-time automated positions, subject averages, and teacher remarks without manual calculations.
+                        </p>
+                      </div>
 
-                  <button
-                    className="gq-rh-btn-action gq-rh-btn-purple"
-                    onClick={() => navigate("/students/results/batch")}
-                    type="button"
-                  >
-                    Compile Term Batch →
-                  </button>
-                </div>
+                      <button
+                        className="gq-rh-btn-action gq-rh-btn-purple"
+                        onClick={() => navigate("/results/review")}
+                        type="button"
+                      >
+                        Open Broadsheet & Audit →
+                      </button>
+                    </div>
 
-                {/* STEP 3: REVIEW & PUBLISH */}
-                <div className="gq-rh-step-card">
-                  <div>
-                    <span className="gq-rh-step-badge gq-rh-step-3">
-                      <span>3️⃣</span> Step 3 • Principal Review
-                    </span>
-                    <h3 className="gq-rh-step-heading">
-                      <span>✅ Review & Publish</span>
-                    </h3>
-                    <p className="gq-rh-step-desc">
-                      Audit class completion rates, check for missing student marks, approve final results, and publish them online for parents.
-                    </p>
-                  </div>
+                    {/* STEP 3: REVIEW & PUBLISH */}
+                    <div className="gq-rh-step-card">
+                      <div>
+                        <span className="gq-rh-step-badge gq-rh-step-3">
+                          <span>3️⃣</span> Step 3 • Principal Review
+                        </span>
+                        <h3 className="gq-rh-step-heading">
+                          <span>✅ Review & Publish</span>
+                        </h3>
+                        <p className="gq-rh-step-desc">
+                          Audit class completion rates, check for missing student marks, approve final results, and publish them online for parents.
+                        </p>
+                      </div>
 
-                  <button
-                    className="gq-rh-btn-action gq-rh-btn-green"
-                    onClick={() => navigate("/results/review")}
-                    type="button"
-                  >
-                    Review & Publish →
-                  </button>
-                </div>
+                      <button
+                        className="gq-rh-btn-action gq-rh-btn-green"
+                        onClick={() => navigate("/results/review")}
+                        type="button"
+                      >
+                        Review & Publish →
+                      </button>
+                    </div>
+                  </>
+                )}
 
                 {/* STEP 4: STUDENT REPORT CARDS */}
                 <div className="gq-rh-step-card">
                   <div>
                     <span className="gq-rh-step-badge gq-rh-step-4">
-                      <span>4️⃣</span> Step 4 • Print & Share
+                      <span>{isTeacher ? "2️⃣" : "4️⃣"}</span> {isTeacher ? "Step 2 • Report Cards" : "Step 4 • Print & Share"}
                     </span>
                     <h3 className="gq-rh-step-heading">
                       <span>📄 Student Report Cards</span>
@@ -823,7 +840,7 @@ export default function ResultsHubPage() {
                     <span>📋 Class Results Progress Overview</span>
                   </h2>
                   <p className="gq-rh-section-sub">
-                    Live compilation status for {selectedTerm} {selectedSession} across all registered school classes.
+                    Live score entry & review status for {selectedTerm} {selectedSession} across all registered school classes.
                   </p>
                 </div>
 
@@ -871,7 +888,7 @@ export default function ResultsHubPage() {
                       <th>Class Name</th>
                       <th>Section / Dept</th>
                       <th>Batch Status</th>
-                      <th style={{ width: 180 }}>Compilation Progress</th>
+                      <th style={{ width: 180 }}>Score Entry Progress</th>
                       <th style={{ textAlign: "right", width: 260 }}>Actions</th>
                     </tr>
                   </thead>
@@ -962,30 +979,26 @@ export default function ResultsHubPage() {
                                   Enter Scores
                                 </button>
 
-                                <button
-                                  style={{
-                                    padding: "5px 10px",
-                                    borderRadius: 6,
-                                    border: "1px solid #7C3AED",
-                                    background: "#F5F3FF",
-                                    color: "#6D28D9",
-                                    fontSize: 12,
-                                    fontWeight: 700,
-                                    cursor: "pointer",
-                                  }}
-                                  onClick={() =>
-                                    navigate(
-                                      `/students/results/batch?classId=${cls.id}&term=${encodeURIComponent(
-                                        selectedTerm
-                                      )}&session=${encodeURIComponent(selectedSession)}`
-                                    )
-                                  }
-                                  type="button"
-                                >
-                                  Compile
-                                </button>
+                                {batch && !isTeacher && (
+                                  <button
+                                    style={{
+                                      padding: "5px 10px",
+                                      borderRadius: 6,
+                                      border: "1px solid #7C3AED",
+                                      background: "#F5F3FF",
+                                      color: "#6D28D9",
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      cursor: "pointer",
+                                    }}
+                                    onClick={() => navigate(`/results/broadsheet/${batch.id}`)}
+                                    type="button"
+                                  >
+                                    Broadsheet
+                                  </button>
+                                )}
 
-                                {batch && (
+                                {batch && !isTeacher && (
                                   <button
                                     style={{
                                       padding: "5px 10px",
@@ -1020,69 +1033,71 @@ export default function ResultsHubPage() {
               </div>
             </div>
 
-            {/* MANAGEMENT TOOLS & SETTINGS GRID */}
-            <div className="gq-rh-workflow-section">
-              <div className="gq-rh-section-header">
-                <div>
-                  <h2 className="gq-rh-section-title">
-                    <span>🛠️ Result Tools & Administration</span>
-                  </h2>
-                  <p className="gq-rh-section-sub">
-                    Configure report card design, generate online checking PINs, track teacher submissions, and manage transcripts.
-                  </p>
+            {/* MANAGEMENT TOOLS & SETTINGS GRID (ADMIN ONLY) */}
+            {!isTeacher && (
+              <div className="gq-rh-workflow-section">
+                <div className="gq-rh-section-header">
+                  <div>
+                    <h2 className="gq-rh-section-title">
+                      <span>🛠️ Result Tools & Administration</span>
+                    </h2>
+                    <p className="gq-rh-section-sub">
+                      Configure report card design, generate online checking PINs, track teacher submissions, and manage transcripts.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="gq-rh-tools-grid">
+                  <div className="gq-rh-tool-card" onClick={() => navigate("/result/monitor")}>
+                    <div className="gq-rh-tool-icon">📊</div>
+                    <div>
+                      <h4 className="gq-rh-tool-title">Submission Tracker</h4>
+                      <p className="gq-rh-tool-desc">Monitor teacher progress & deadlines</p>
+                    </div>
+                  </div>
+
+                  <div className="gq-rh-tool-card" onClick={() => navigate("/results/design")}>
+                    <div className="gq-rh-tool-icon">🎨</div>
+                    <div>
+                      <h4 className="gq-rh-tool-title">Report Card Design</h4>
+                      <p className="gq-rh-tool-desc">Templates, logo & color branding</p>
+                    </div>
+                  </div>
+
+                  <div className="gq-rh-tool-card" onClick={() => navigate("/results/pins")}>
+                    <div className="gq-rh-tool-icon">🔑</div>
+                    <div>
+                      <h4 className="gq-rh-tool-title">Generate Result PINs</h4>
+                      <p className="gq-rh-tool-desc">Parent scratch cards & access tokens</p>
+                    </div>
+                  </div>
+
+                  <div className="gq-rh-tool-card" onClick={() => navigate("/transcripts")}>
+                    <div className="gq-rh-tool-icon">📜</div>
+                    <div>
+                      <h4 className="gq-rh-tool-title">Student Transcripts</h4>
+                      <p className="gq-rh-tool-desc">Multi-term official academic records</p>
+                    </div>
+                  </div>
+
+                  <div className="gq-rh-tool-card" onClick={() => navigate("/results/withdrawn-archive")}>
+                    <div className="gq-rh-tool-icon">📦</div>
+                    <div>
+                      <h4 className="gq-rh-tool-title">Withdrawn Archive</h4>
+                      <p className="gq-rh-tool-desc">Archived records of past students</p>
+                    </div>
+                  </div>
+
+                  <div className="gq-rh-tool-card" onClick={() => navigate("/results/deadlines")}>
+                    <div className="gq-rh-tool-icon">⏰</div>
+                    <div>
+                      <h4 className="gq-rh-tool-title">Submission Deadlines</h4>
+                      <p className="gq-rh-tool-desc">Set score entry cutoff dates</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              <div className="gq-rh-tools-grid">
-                <div className="gq-rh-tool-card" onClick={() => navigate("/result/monitor")}>
-                  <div className="gq-rh-tool-icon">📊</div>
-                  <div>
-                    <h4 className="gq-rh-tool-title">Submission Tracker</h4>
-                    <p className="gq-rh-tool-desc">Monitor teacher progress & deadlines</p>
-                  </div>
-                </div>
-
-                <div className="gq-rh-tool-card" onClick={() => navigate("/results/design")}>
-                  <div className="gq-rh-tool-icon">🎨</div>
-                  <div>
-                    <h4 className="gq-rh-tool-title">Report Card Design</h4>
-                    <p className="gq-rh-tool-desc">Templates, logo & color branding</p>
-                  </div>
-                </div>
-
-                <div className="gq-rh-tool-card" onClick={() => navigate("/results/pins")}>
-                  <div className="gq-rh-tool-icon">🔑</div>
-                  <div>
-                    <h4 className="gq-rh-tool-title">Generate Result PINs</h4>
-                    <p className="gq-rh-tool-desc">Parent scratch cards & access tokens</p>
-                  </div>
-                </div>
-
-                <div className="gq-rh-tool-card" onClick={() => navigate("/transcripts")}>
-                  <div className="gq-rh-tool-icon">📜</div>
-                  <div>
-                    <h4 className="gq-rh-tool-title">Student Transcripts</h4>
-                    <p className="gq-rh-tool-desc">Multi-term official academic records</p>
-                  </div>
-                </div>
-
-                <div className="gq-rh-tool-card" onClick={() => navigate("/results/withdrawn-archive")}>
-                  <div className="gq-rh-tool-icon">📦</div>
-                  <div>
-                    <h4 className="gq-rh-tool-title">Withdrawn Archive</h4>
-                    <p className="gq-rh-tool-desc">Archived records of past students</p>
-                  </div>
-                </div>
-
-                <div className="gq-rh-tool-card" onClick={() => navigate("/results/deadlines")}>
-                  <div className="gq-rh-tool-icon">⏰</div>
-                  <div>
-                    <h4 className="gq-rh-tool-title">Submission Deadlines</h4>
-                    <p className="gq-rh-tool-desc">Set score entry cutoff dates</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            )}
 
             <Footer />
           </main>

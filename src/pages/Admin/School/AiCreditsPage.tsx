@@ -106,7 +106,8 @@ export default function AiCreditsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const currentUser = getUser();
-  const isAdmin = currentUser?.role === "Admin" || currentUser?.role === "Super-Admin";
+  const userRole = (currentUser?.normalized_role || currentUser?.role || "").toLowerCase().replace(/[\s-]/g, "_");
+  const isAdmin = ["admin", "super_admin", "superadmin", "owner", "proprietor"].includes(userRole);
 
   // Staff Allocations State
   const [staffData, setStaffData] = useState<StaffAllocationResponse | null>(null);

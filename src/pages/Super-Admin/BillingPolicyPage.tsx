@@ -218,11 +218,66 @@ export default function BillingPolicyPage() {
   const [selectedPeriodKeys, setSelectedPeriodKeys] = useState<string[]>([]);
   const [waiverReason, setWaiverReason] = useState("Waived due to verified zero platform usage during dormant term");
 
+  // Whogohost Reseller Wallet & Domain Orders State
+  const [domainOrdersData, setDomainOrdersData] = useState<{ reseller_credits?: any; orders?: any } | null>(null);
+  const [loadingDomainOrders, setLoadingDomainOrders] = useState(false);
+  const [retryingDomainOrderId, setRetryingDomainOrderId] = useState<number | null>(null);
+  const [markingDomainOrderId, setMarkingDomainOrderId] = useState<number | null>(null);
+
   const activeAccess = useMemo(() => accessList.filter((a) => a.status === "active").length, [accessList]);
   const suspiciousPeriods = useMemo(
     () => billingPeriods.filter((p) => Array.isArray(p.suspicious_flags) && p.suspicious_flags.length > 0),
     [billingPeriods]
   );
+
+  const fetchSuperAdminDomainOrders = async () => {
+    setLoadingDomainOrders(true);
+    try {
+      const res = await authApi.get("/superadmin/domain-orders");
+      if (res.data?.status) {
+        setDomainOrdersData(res.data);
+      }
+    } catch (err: any) {
+      console.warn("Unable to load domain orders:", err);
+    } finally {
+      setLoadingDomainOrders(false);
+    }
+  };
+
+  const handleSuperAdminRetryProvision = async (orderId: number) => {
+    setRetryingDomainOrderId(orderId);
+    try {
+      showInfo?.("Triggering domain registration with Whogohost...");
+      const res = await authApi.post(`/superadmin/domain-orders/${orderId}/retry-provision`);
+      if (res.data?.status) {
+        showSuccess?.(res.data.message || "Domain registration action completed!");
+        fetchSuperAdminDomainOrders();
+      } else {
+        showError?.(res.data.message || "Provisioning attempt failed.");
+      }
+    } catch (err: any) {
+      showError?.(err?.response?.data?.message || "Failed to communicate with domain registrar.");
+    } finally {
+      setRetryingDomainOrderId(null);
+    }
+  };
+
+  const handleSuperAdminMarkActive = async (orderId: number) => {
+    setMarkingDomainOrderId(orderId);
+    try {
+      const res = await authApi.post(`/superadmin/domain-orders/${orderId}/mark-active`);
+      if (res.data?.status) {
+        showSuccess?.(res.data.message || "Domain marked as Active!");
+        fetchSuperAdminDomainOrders();
+      } else {
+        showError?.(res.data.message || "Action failed.");
+      }
+    } catch (err: any) {
+      showError?.(err?.response?.data?.message || "Failed to mark domain as active.");
+    } finally {
+      setMarkingDomainOrderId(null);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -231,6 +286,7 @@ export default function BillingPolicyPage() {
       setPolicy({ ...defaultPolicy, ...(res.data.policy || {}) });
       setAccessList(Array.isArray(res.data.temporary_access) ? res.data.temporary_access : []);
       setBillingPeriods(Array.isArray(res.data.billing_periods) ? res.data.billing_periods : []);
+      fetchSuperAdminDomainOrders();
     } catch (err: any) {
       showError?.(err?.response?.data?.message || "Unable to load billing policy.");
     } finally {
@@ -499,33 +555,45 @@ export default function BillingPolicyPage() {
   return (
     <>
       <style>{`
-        .bp-main { padding: 24px; }
+        .bp-main { padding: 24px; max-width: 100%; overflow-x: hidden; box-sizing: border-box; }
         .bp-hero { margin-bottom: 24px; }
         .bp-kicker { font-size: 12px; font-weight: 700; text-transform: uppercase; color: #d300b0; letter-spacing: .08em; }
-        .bp-title { font-size: 26px; font-weight: 800; color: #0f172a; margin: 4px 0 6px; }
-        .bp-sub { color: #64748b; font-size: 14px; max-width: 760px; margin: 0; }
-        .bp-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 18px; }
-        @media (max-width: 992px) { .bp-grid { grid-template-columns: 1fr; } }
-        .bp-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; }
+        .bp-title { font-size: 26px; font-weight: 800; color: #0f172a; margin: 4px 0 6px; word-break: break-word; }
+        .bp-sub { color: #64748b; font-size: 14px; max-width: 760px; margin: 0; word-break: break-word; }
+        .bp-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 18px; min-width: 0; }
+        .bp-grid > * { min-width: 0; max-width: 100%; }
+        @media (max-width: 1199px) { .bp-grid { grid-template-columns: 1fr; } }
+        .bp-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; max-width: 100%; box-sizing: border-box; }
         .bp-card-pad { padding: 18px; }
-        .bp-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
-        .bp-card-title { font-size: 15px; font-weight: 700; color: #0f172a; }
-        .bp-muted { font-size: 12.5px; color: #64748b; }
+        .bp-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+        .bp-card-head > * { min-width: 0; }
+        .bp-card-title { font-size: 15px; font-weight: 700; color: #0f172a; word-break: break-word; }
+        .bp-muted { font-size: 12.5px; color: #64748b; word-break: break-word; }
         .bp-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        @media (max-width: 640px) { .bp-form-grid { grid-template-columns: 1fr; } }
-        .bp-field { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 600; color: #334155; }
-        .bp-input, .bp-select, .bp-textarea { width: 100%; border: 1px solid #cbd5e1; border-radius: 10px; padding: 9px 12px; font-size: 13.5px; background: #fff; }
+        @media (max-width: 768px) { .bp-form-grid { grid-template-columns: 1fr; } }
+        .bp-field { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 600; color: #334155; min-width: 0; }
+        .bp-input, .bp-select, .bp-textarea { width: 100%; max-width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 10px; padding: 9px 12px; font-size: 13.5px; background: #fff; }
         .bp-input:focus, .bp-select:focus, .bp-textarea:focus { outline: none; border-color: #d300b0; box-shadow: 0 0 0 3px rgba(211,0,176,.12); }
         .bp-textarea { min-height: 80px; resize: vertical; }
-        .bp-switch { display: flex; align-items: center; justify-content: space-between; padding: 12px; background: #f8fafc; border-radius: 12px; margin-top: 10px; }
-        .bp-switch input { width: 18px; height: 18px; }
+        .bp-switch { display: flex; align-items: center; justify-content: space-between; padding: 12px; background: #f8fafc; border-radius: 12px; margin-top: 10px; flex-wrap: wrap; gap: 8px; }
+        .bp-switch input { width: 18px; height: 18px; flex-shrink: 0; }
         .bp-btn { background: #0F2744; color: #fff; border: none; border-radius: 10px; padding: 10px 16px; font-size: 13.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
         .bp-btn:disabled { opacity: .6; cursor: not-allowed; }
         .bp-btn-outline { background: #fff; border: 1px solid #cbd5e1; color: #334155; border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
-        .bp-pill { display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: rgba(211,0,176,.12); color: #d300b0; }
-        .bp-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+        .bp-pill { display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: rgba(211,0,176,.12); color: #d300b0; max-width: 100%; }
+        .bp-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f1f5f9; flex-wrap: wrap; gap: 8px; }
+        .bp-row > * { min-width: 0; }
         .bp-row:last-child { border-bottom: none; }
         .bp-flag { font-size: 11px; font-weight: 700; color: #b91c1c; background: #fee2e2; border-radius: 999px; padding: 2px 8px; display: inline-block; margin: 2px 4px 0 0; }
+        .bp-audit-grid { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: flex-end; margin-bottom: 16px; }
+        .bp-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; max-width: 100%; }
+        @media (max-width: 768px) {
+          .bp-main { padding: 14px 10px; }
+          .bp-card-pad { padding: 14px 12px; }
+          .bp-title { font-size: 20px; }
+          .bp-hero { margin-bottom: 16px; }
+          .bp-audit-grid { grid-template-columns: 1fr; }
+        }
       `}</style>
 
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title="Billing Policy" />
@@ -573,7 +641,7 @@ export default function BillingPolicyPage() {
 
                     {/* Prominent Bank Charge Banner */}
                     <div style={{ background: "linear-gradient(135deg, #fdf4ff 0%, #fae8ff 100%)", border: "1.5px solid #f0abfc", borderRadius: 12, padding: "16px 18px", marginBottom: 16 }}>
-                      <div className="d-flex justify-content-between align-items-center mb-2">
+                      <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
                         <label style={{ fontSize: 13.5, fontWeight: 900, color: "#701a75", display: "flex", alignItems: "center", gap: 6 }}>
                           <i className="bi bi-bank2" />
                           Platform Bank Processing Charge (₦ / student transaction)
@@ -787,7 +855,7 @@ export default function BillingPolicyPage() {
                       ].map((item) => {
                         const currentPrice = Number(policy.domain_pricing?.[item.tld]?.price ?? item.defaultPrice);
                         return (
-                          <div key={item.tld} className="col-12 col-md-6 col-lg-4">
+                          <div key={item.tld} className="col-12 col-md-6 col-xl-4">
                             <div className="p-3 rounded-3 border bg-light h-100 d-flex flex-column justify-content-between">
                               <div>
                                 <div className="d-flex justify-content-between align-items-center mb-1">
@@ -882,7 +950,203 @@ export default function BillingPolicyPage() {
                   </div>
                 </section>
 
-                {/* 5. Inactivity & Dormant Term Waiver Card */}
+                {/* 5. Whogohost Reseller Wallet & Live School Domain Orders */}
+                <section className="bp-card" style={{ border: "2px solid #0ea5e9", boxShadow: "0 10px 25px rgba(14, 165, 233, 0.08)" }}>
+                  <div className="bp-card-pad">
+                    <div className="bp-card-head">
+                      <div>
+                        <div className="bp-card-title" style={{ color: "#0369a1", display: "flex", alignItems: "center", gap: 8, fontSize: 16 }}>
+                          <i className="bi bi-hdd-network-fill" style={{ color: "#0ea5e9" }} />
+                          5. Whogohost Reseller Wallet & Live School Domain Orders
+                        </div>
+                        <div className="bp-muted">
+                          Monitor your live Whogohost/GO54 reseller wallet balance and manage custom domain purchases across all schools. Once your reseller wallet is funded, you can retry automated provisioning with 1 click.
+                        </div>
+                      </div>
+                      <div className="d-flex align-items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          className="btn btn-outline-primary btn-sm fw-bold d-inline-flex align-items-center gap-1"
+                          onClick={fetchSuperAdminDomainOrders}
+                          disabled={loadingDomainOrders}
+                        >
+                          <i className="bi bi-arrow-repeat" />
+                          {loadingDomainOrders ? "Refreshing..." : "Refresh Wallet & Orders"}
+                        </button>
+                        <a
+                          href="https://whogohost.com/host/clientarea.php"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-primary btn-sm fw-bold d-inline-flex align-items-center gap-1 text-white"
+                          style={{ background: "#0F2744" }}
+                        >
+                          <i className="bi bi-wallet2" /> Top-Up GO54 Wallet
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Reseller Wallet Balance Display */}
+                    <div
+                      className="p-3 rounded-3 border mb-4 d-flex flex-wrap justify-content-between align-items-center gap-3"
+                      style={{
+                        background: Number(domainOrdersData?.reseller_credits?.balance ?? 0) < 5000
+                          ? "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)"
+                          : "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)",
+                        borderColor: Number(domainOrdersData?.reseller_credits?.balance ?? 0) < 5000 ? "#fcd34d" : "#86efac",
+                      }}
+                    >
+                      <div className="d-flex align-items-center gap-3" style={{ minWidth: 0 }}>
+                        <div
+                          style={{
+                            width: 48,
+                            height: 48,
+                            borderRadius: 12,
+                            background: Number(domainOrdersData?.reseller_credits?.balance ?? 0) < 5000 ? "#f59e0b" : "#10b981",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "#fff",
+                            fontSize: 24,
+                            flexShrink: 0,
+                          }}
+                        >
+                          <i className="bi bi-cash-stack" />
+                        </div>
+                        <div style={{ minWidth: 0, wordBreak: "break-word" }}>
+                          <div className="text-muted small fw-bold">WHOGOHOST / GO54 RESELLER WALLET BALANCE</div>
+                          <div className="fs-3 fw-bold text-dark font-monospace" style={{ wordBreak: "break-all" }}>
+                            {domainOrdersData?.reseller_credits?.formatted ?? `₦${Number(domainOrdersData?.reseller_credits?.balance ?? 0).toLocaleString()}`}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="d-flex align-items-center gap-2 flex-wrap">
+                        {Number(domainOrdersData?.reseller_credits?.balance ?? 0) < 5000 ? (
+                          <span className="badge bg-warning text-dark px-3 py-2 fw-bold">
+                            <i className="bi bi-exclamation-triangle-fill me-1" /> Low Balance — Top-up needed for new automated registrations
+                          </span>
+                        ) : (
+                          <span className="badge bg-success px-3 py-2 fw-bold">
+                            <i className="bi bi-check-circle-fill me-1" /> Sufficient Balance for Auto-Registration
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Domain Orders Table */}
+                    <div className="bp-table-wrap border rounded-3 bg-white">
+                      <table className="table table-hover align-middle mb-0" style={{ minWidth: 800 }}>
+                        <thead className="table-light small">
+                          <tr>
+                            <th className="ps-3">#</th>
+                            <th>School</th>
+                            <th>Domain Name</th>
+                            <th>Amount</th>
+                            <th>Paystack Ref</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            <th className="pe-3 text-end">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="small">
+                          {(!domainOrdersData?.orders?.data || domainOrdersData.orders.data.length === 0) ? (
+                            <tr>
+                              <td colSpan={8} className="text-center py-4 text-muted">
+                                {loadingDomainOrders ? "Loading domain orders..." : "No domain orders placed yet."}
+                              </td>
+                            </tr>
+                          ) : (
+                            domainOrdersData.orders.data.map((order: any) => (
+                              <tr key={order.id}>
+                                <td className="ps-3 fw-bold text-muted">{order.id}</td>
+                                <td>
+                                  <div className="fw-bold text-dark">{order.school_name || `School #${order.school_id}`}</div>
+                                  <div className="text-muted small">{order.school_email || "-"}</div>
+                                </td>
+                                <td>
+                                  <span className="fw-bold text-primary font-monospace">{order.domain_name}</span>
+                                  <span className="badge bg-light text-dark border ms-1">{order.tld}</span>
+                                </td>
+                                <td className="fw-bold text-dark">
+                                  ₦{Number(order.amount).toLocaleString()}
+                                </td>
+                                <td>
+                                  <code>{order.payment_reference}</code>
+                                  {order.paystack_transaction_id && (
+                                    <div className="text-muted small" style={{ fontSize: 11 }}>
+                                      ID: {order.paystack_transaction_id}
+                                    </div>
+                                  )}
+                                </td>
+                                <td>
+                                  {order.status === "active" && (
+                                    <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1">
+                                      <i className="bi bi-check-circle-fill me-1" /> Active & Live
+                                    </span>
+                                  )}
+                                  {order.status === "provisioning_pending" && (
+                                    <span className="badge bg-warning bg-opacity-10 text-warning text-dark border border-warning border-opacity-50 px-2 py-1">
+                                      <i className="bi bi-clock-history me-1" /> Paid — Pending Registrar
+                                    </span>
+                                  )}
+                                  {order.status === "pending_payment" && (
+                                    <span className="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 px-2 py-1">
+                                      Pending Payment
+                                    </span>
+                                  )}
+                                  {order.status === "failed" && (
+                                    <span className="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-2 py-1">
+                                      Registration Failed
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="text-muted">
+                                  {order.paid_at ? new Date(order.paid_at).toLocaleDateString() : (order.created_at ? new Date(order.created_at).toLocaleDateString() : "-")}
+                                </td>
+                                <td className="pe-3 text-end">
+                                  {order.status === "provisioning_pending" || order.status === "failed" ? (
+                                    <div className="d-inline-flex gap-1">
+                                      <button
+                                        type="button"
+                                        className="btn btn-warning btn-sm fw-bold d-inline-flex align-items-center gap-1"
+                                        onClick={() => handleSuperAdminRetryProvision(order.id)}
+                                        disabled={retryingDomainOrderId === order.id}
+                                      >
+                                        <i className="bi bi-arrow-repeat" />
+                                        {retryingDomainOrderId === order.id ? "Retrying..." : "Retry Provision"}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-outline-success btn-sm fw-bold d-inline-flex align-items-center gap-1"
+                                        onClick={() => handleSuperAdminMarkActive(order.id)}
+                                        disabled={markingDomainOrderId === order.id}
+                                        title="Mark Active if domain was registered manually directly on GO54/Whogohost"
+                                      >
+                                        <i className="bi bi-check-lg" />
+                                        {markingDomainOrderId === order.id ? "Activating..." : "Mark Active"}
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <a
+                                      href={`https://${order.domain_name}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="btn btn-outline-primary btn-sm fw-bold"
+                                    >
+                                      <i className="bi bi-box-arrow-up-right me-1" /> Visit
+                                    </a>
+                                  )}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </section>
+
+                {/* 6. Inactivity & Dormant Term Waiver Card */}
                 <section className="bp-card" style={{ border: "1.5px solid #cbd5e1" }}>
                   <div className="bp-card-pad">
                     <div className="bp-card-head">
@@ -900,7 +1164,7 @@ export default function BillingPolicyPage() {
                       </span>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, alignItems: "flex-end", marginBottom: 16 }}>
+                    <div className="bp-audit-grid">
                       <Field label="Select School to Audit">
                         <select
                           className="bp-select"
@@ -962,8 +1226,8 @@ export default function BillingPolicyPage() {
                         </div>
 
                         {/* Audit Table */}
-                        <div className="table-responsive" style={{ maxHeight: 320, overflowY: "auto", border: "1px solid #e2e8f0", borderRadius: 8, background: "#fff" }}>
-                          <table className="table table-sm table-hover mb-0" style={{ fontSize: 12.5 }}>
+                        <div className="bp-table-wrap" style={{ maxHeight: 320, overflow: "auto", border: "1px solid #e2e8f0", borderRadius: 8, background: "#fff" }}>
+                          <table className="table table-sm table-hover mb-0" style={{ fontSize: 12.5, minWidth: 680 }}>
                             <thead className="table-light" style={{ position: "sticky", top: 0, zIndex: 1 }}>
                               <tr>
                                 <th style={{ width: 40, textAlign: "center" }}>
@@ -1111,7 +1375,7 @@ export default function BillingPolicyPage() {
               </div>
 
               {/* Sidebar Controls */}
-              <aside style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+              <aside style={{ display: "flex", flexDirection: "column", gap: 18, minWidth: 0 }}>
                 <div className="bp-card bp-card-pad">
                   <div className="bp-card-title" style={{ marginBottom: 12 }}>Platform Policy Summary</div>
                   <div className="bp-row">
@@ -1196,11 +1460,11 @@ export default function BillingPolicyPage() {
                 </div>
                 {accessList.length ? accessList.map((a) => (
                   <div className="bp-row" key={a.id}>
-                    <div>
+                    <div style={{ minWidth: 0, flex: "1 1 200px" }}>
                       <div className="bp-card-title" style={{ fontSize: 14 }}>{a.school?.school_name || `School #${a.school_id}`}</div>
-                      <div className="bp-muted">{a.scope.replaceAll("_", " ")} | Ends {fmtDate(a.ends_at)} | {a.reason || "No reason"}</div>
+                      <div className="bp-muted" style={{ wordBreak: "break-word" }}>{a.scope.replaceAll("_", " ")} | Ends {fmtDate(a.ends_at)} | {a.reason || "No reason"}</div>
                     </div>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
                       <span className="bp-pill" style={a.status === "active" ? undefined : { background: "rgba(148,163,184,.16)", color: "#64748b" }}>{a.status}</span>
                       {a.status === "active" && <button className="bp-btn-outline" onClick={() => revokeAccess(a.id)}>Revoke</button>}
                     </div>

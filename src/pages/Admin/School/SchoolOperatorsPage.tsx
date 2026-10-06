@@ -583,112 +583,122 @@ export default function SchoolOperatorsPage() {
 
       {/* CREATE OPERATOR MODAL */}
       {showCreateModal && (
-        <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.6)", zIndex: 1050 }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content" style={{ borderRadius: 16, overflow: "hidden" }}>
-              <div className="modal-header bg-dark text-white p-3 border-0">
+        <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.6)", zIndex: 1050, overflowY: "auto" }}>
+          <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable" style={{ maxHeight: "calc(100vh - 3.5rem)", margin: "1.75rem auto" }}>
+            <form
+              onSubmit={handleCreate}
+              className="modal-content"
+              style={{
+                borderRadius: 16,
+                maxHeight: "calc(100vh - 3.5rem)",
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+              }}
+            >
+              <div className="modal-header bg-dark text-white p-3 border-0 flex-shrink-0">
                 <h5 className="modal-title fs-6 fw-bold text-white d-flex align-items-center gap-2 m-0">
                   <i className="bi bi-person-plus-fill text-warning" />
                   Add School Administrator or Operator
                 </h5>
                 <button type="button" className="btn-close btn-close-white" onClick={() => setShowCreateModal(false)} />
               </div>
-              <form onSubmit={handleCreate}>
-                <div className="modal-body p-4">
-                  <p className="text-muted small mb-3">
-                    Register a Principal/Head Teacher or School Operator. A temporary login password will be generated and emailed to them.
-                  </p>
 
-                  <div className="row g-3">
-                    <div className="col-12">
-                      <label className="form-label fw-bold small">Administrative Role *</label>
-                      <select
-                        className="form-select"
-                        value={newOp.role}
-                        onChange={(e) => {
-                          const r = e.target.value;
-                          setNewOp({
-                            ...newOp,
-                            role: r,
-                            operator_title: r === "principal" ? "School Principal / Head Teacher" : "Desk Officer / Portal Operator",
-                          });
-                        }}
-                      >
-                        <option value="principal">🎓 Principal / Head Teacher (Academic Leader & Broadsheet Approver)</option>
-                        <option value="operator">🖥️ School Operator / Registrar (Data Entry & Admissions Clerk)</option>
-                      </select>
-                      <div className="form-text text-muted" style={{ fontSize: "11.5px" }}>
-                        {newOp.role === "principal"
-                          ? "Principals have full academic control: approve & publish broadsheets, review alerts, manage teachers, classes, subjects, and CBT exams without seeing your bank account or platform billing."
-                          : "Operators can enroll students, upload continuous assessment scores, and manage exams without access to sensitive proprietor or financial settings."}
-                      </div>
-                    </div>
+              <div className="modal-body p-4" style={{ overflowY: "auto", minHeight: 0, flex: "1 1 auto" }}>
+                <p className="text-muted small mb-3">
+                  Register a Principal/Head Teacher or School Operator. A temporary login password will be generated and emailed to them.
+                </p>
 
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold small">First Name *</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        required
-                        value={newOp.firstname}
-                        onChange={(e) => setNewOp({ ...newOp, firstname: e.target.value })}
-                        placeholder="e.g. John"
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold small">Surname *</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        required
-                        value={newOp.surname}
-                        onChange={(e) => setNewOp({ ...newOp, surname: e.target.value })}
-                        placeholder="e.g. Doe"
-                      />
-                    </div>
-                    <div className="col-12">
-                      <label className="form-label fw-bold small">Login Email Address *</label>
-                      <input
-                        type="email"
-                        className="form-control"
-                        required
-                        value={newOp.email}
-                        onChange={(e) => setNewOp({ ...newOp, email: e.target.value })}
-                        placeholder="principal@school.edu or gmail.com"
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold small">Phone Number</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        value={newOp.phone}
-                        onChange={(e) => setNewOp({ ...newOp, phone: e.target.value })}
-                        placeholder="08012345678"
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold small">Role / Job Title</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        value={newOp.operator_title}
-                        onChange={(e) => setNewOp({ ...newOp, operator_title: e.target.value })}
-                        placeholder="e.g. School Principal / Head Teacher"
-                      />
+                <div className="row g-3">
+                  <div className="col-12">
+                    <label className="form-label fw-bold small">Administrative Role *</label>
+                    <select
+                      className="form-select"
+                      value={newOp.role}
+                      onChange={(e) => {
+                        const r = e.target.value;
+                        setNewOp({
+                          ...newOp,
+                          role: r,
+                          operator_title: r === "principal" ? "School Principal / Head Teacher" : "Desk Officer / Portal Operator",
+                        });
+                      }}
+                    >
+                      <option value="principal">🎓 Principal / Head Teacher (Academic Leader & Broadsheet Approver)</option>
+                      <option value="operator">🖥️ School Operator / Registrar (Data Entry & Admissions Clerk)</option>
+                    </select>
+                    <div className="form-text text-muted" style={{ fontSize: "11.5px" }}>
+                      {newOp.role === "principal"
+                        ? "Principals have full academic control: approve & publish broadsheets, review alerts, manage teachers, classes, subjects, and CBT exams without seeing your bank account or platform billing."
+                        : "Operators can enroll students, upload continuous assessment scores, and manage exams without access to sensitive proprietor or financial settings."}
                     </div>
                   </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold small">First Name *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      required
+                      value={newOp.firstname}
+                      onChange={(e) => setNewOp({ ...newOp, firstname: e.target.value })}
+                      placeholder="e.g. John"
+                    />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold small">Surname *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      required
+                      value={newOp.surname}
+                      onChange={(e) => setNewOp({ ...newOp, surname: e.target.value })}
+                      placeholder="e.g. Doe"
+                    />
+                  </div>
+                  <div className="col-12">
+                    <label className="form-label fw-bold small">Login Email Address *</label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      required
+                      value={newOp.email}
+                      onChange={(e) => setNewOp({ ...newOp, email: e.target.value })}
+                      placeholder="principal@school.edu or gmail.com"
+                    />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold small">Phone Number</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={newOp.phone}
+                      onChange={(e) => setNewOp({ ...newOp, phone: e.target.value })}
+                      placeholder="08012345678"
+                    />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold small">Role / Job Title</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={newOp.operator_title}
+                      onChange={(e) => setNewOp({ ...newOp, operator_title: e.target.value })}
+                      placeholder="e.g. School Principal / Head Teacher"
+                    />
+                  </div>
                 </div>
-                <div className="modal-footer bg-light p-3">
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowCreateModal(false)}>
-                    Cancel
-                  </button>
-                  <button type="submit" className="db-btn-gold btn-sm" disabled={creating}>
-                    {creating ? "Creating..." : "Create Account"}
-                  </button>
-                </div>
-              </form>
-            </div>
+              </div>
+
+              <div className="modal-footer bg-light p-3 flex-shrink-0" style={{ borderTop: "1px solid #dee2e6" }}>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowCreateModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="db-btn-gold btn-sm" disabled={creating}>
+                  {creating ? "Creating..." : "Create Account"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -731,87 +741,97 @@ export default function SchoolOperatorsPage() {
 
       {/* EDIT OPERATOR MODAL */}
       {editingOp && (
-        <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.6)", zIndex: 1050 }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content" style={{ borderRadius: 16, overflow: "hidden" }}>
-              <div className="modal-header bg-dark text-white p-3 border-0">
+        <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.6)", zIndex: 1050, overflowY: "auto" }}>
+          <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable" style={{ maxHeight: "calc(100vh - 3.5rem)", margin: "1.75rem auto" }}>
+            <form
+              onSubmit={handleUpdate}
+              className="modal-content"
+              style={{
+                borderRadius: 16,
+                maxHeight: "calc(100vh - 3.5rem)",
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+              }}
+            >
+              <div className="modal-header bg-dark text-white p-3 border-0 flex-shrink-0">
                 <h5 className="modal-title fs-6 fw-bold text-white d-flex align-items-center gap-2 m-0">
                   <i className="bi bi-pencil-fill text-warning" />
                   Edit Staff Details
                 </h5>
                 <button type="button" className="btn-close btn-close-white" onClick={() => setEditingOp(null)} />
               </div>
-              <form onSubmit={handleUpdate}>
-                <div className="modal-body p-4">
-                  <div className="row g-3">
-                    <div className="col-12">
-                      <label className="form-label fw-bold small">Administrative Role</label>
-                      <select
-                        className="form-select"
-                        value={editForm.role}
-                        onChange={(e) => {
-                          const r = e.target.value;
-                          setEditForm({
-                            ...editForm,
-                            role: r,
-                            operator_title: editForm.operator_title || (r === "principal" ? "School Principal / Head Teacher" : "Desk Officer"),
-                          });
-                        }}
-                      >
-                        <option value="principal">🎓 Principal / Head Teacher</option>
-                        <option value="operator">🖥️ School Operator / Registrar</option>
-                      </select>
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold small">First Name</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        required
-                        value={editForm.firstname}
-                        onChange={(e) => setEditForm({ ...editForm, firstname: e.target.value })}
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold small">Surname</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        required
-                        value={editForm.surname}
-                        onChange={(e) => setEditForm({ ...editForm, surname: e.target.value })}
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold small">Phone</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        value={editForm.phone}
-                        onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold small">Role Title</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        value={editForm.operator_title}
-                        onChange={(e) => setEditForm({ ...editForm, operator_title: e.target.value })}
-                      />
-                    </div>
+
+              <div className="modal-body p-4" style={{ overflowY: "auto", minHeight: 0, flex: "1 1 auto" }}>
+                <div className="row g-3">
+                  <div className="col-12">
+                    <label className="form-label fw-bold small">Administrative Role</label>
+                    <select
+                      className="form-select"
+                      value={editForm.role}
+                      onChange={(e) => {
+                        const r = e.target.value;
+                        setEditForm({
+                          ...editForm,
+                          role: r,
+                          operator_title: editForm.operator_title || (r === "principal" ? "School Principal / Head Teacher" : "Desk Officer"),
+                        });
+                      }}
+                    >
+                      <option value="principal">🎓 Principal / Head Teacher</option>
+                      <option value="operator">🖥️ School Operator / Registrar</option>
+                    </select>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold small">First Name</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      required
+                      value={editForm.firstname}
+                      onChange={(e) => setEditForm({ ...editForm, firstname: e.target.value })}
+                    />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold small">Surname</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      required
+                      value={editForm.surname}
+                      onChange={(e) => setEditForm({ ...editForm, surname: e.target.value })}
+                    />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold small">Phone</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editForm.phone}
+                      onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                    />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold small">Role Title</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editForm.operator_title}
+                      onChange={(e) => setEditForm({ ...editForm, operator_title: e.target.value })}
+                    />
                   </div>
                 </div>
-                <div className="modal-footer bg-light p-3">
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingOp(null)}>
-                    Cancel
-                  </button>
-                  <button type="submit" className="db-btn-gold btn-sm" disabled={savingEdit}>
-                    {savingEdit ? "Saving..." : "Save Changes"}
-                  </button>
-                </div>
-              </form>
-            </div>
+              </div>
+
+              <div className="modal-footer bg-light p-3 flex-shrink-0" style={{ borderTop: "1px solid #dee2e6" }}>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingOp(null)}>
+                  Cancel
+                </button>
+                <button type="submit" className="db-btn-gold btn-sm" disabled={savingEdit}>
+                  {savingEdit ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -136,6 +136,15 @@ export default function DomainAndWebsitePage() {
     schoolMeta?.custom_domain ||
     null;
 
+  const isPlatformPurchased = Boolean(
+    domainStatus?.is_platform_purchased ||
+    domainStatus?.auto_configured ||
+    domainStatus?.orders?.some((o: any) => 
+      o.paid_at && 
+      (o.domain_name === activeRegisteredDomain || (existingDomainInput && o.domain_name === existingDomainInput.trim()))
+    )
+  );
+
   // Color preset options
   const colorPresets = [
     { name: "Royal Navy & Gold", primary: "#0F2744", secondary: "#D97706", accent: "#2563EB" },
@@ -2218,9 +2227,11 @@ export default function DomainAndWebsitePage() {
                                 <div>
                                   <div className="d-flex align-items-center gap-2">
                                     <span className="badge bg-success text-white" style={{ fontSize: 10 }}>
-                                      REGISTERED SCHOOL DOMAIN
+                                      {isPlatformPurchased ? "AUTO-CONFIGURED SCHOOL DOMAIN" : "REGISTERED SCHOOL DOMAIN"}
                                     </span>
-                                    <span className="text-muted small">Configured for your school portal</span>
+                                    <span className="text-muted small">
+                                      {isPlatformPurchased ? "Managed & Hosted by SchoolProfit" : "Configured for your school portal"}
+                                    </span>
                                   </div>
                                   <div className="fs-5 fw-bold text-dark font-monospace mt-1">
                                     {activeRegisteredDomain}
@@ -2238,11 +2249,11 @@ export default function DomainAndWebsitePage() {
                                   {verifyingDns ? (
                                     <>
                                       <span className="spinner-border spinner-border-sm" />
-                                      Checking DNS...
+                                      {isPlatformPurchased ? "Checking Auto-Routing..." : "Checking DNS..."}
                                     </>
                                   ) : (
                                     <>
-                                      <i className="bi bi-arrow-repeat"></i> Verify DNS Records
+                                      <i className="bi bi-arrow-repeat"></i> {isPlatformPurchased ? "Check Configuration Status" : "Verify DNS Records"}
                                     </>
                                   )}
                                 </button>
@@ -2458,59 +2469,105 @@ export default function DomainAndWebsitePage() {
 
                   {/* Right Column: Dynamic DNS Setup */}
                   <div className="col-12 col-lg-4">
-                    <div className="db-panel">
-                      <div className="db-panel-head">
-                        <div>
-                          <h4 className="db-panel-title">
-                            <i className="bi bi-hdd-network text-primary"></i> DNS Setup Records
-                          </h4>
-                          <p className="db-panel-sub">Add these in your domain control panel (GoDaddy, Namecheap, cPanel).</p>
-                        </div>
-                      </div>
-                      <div className="p-4 small">
-                        {setupChoice === "subdomain" ? (
-                          <>
-                            <div className="alert alert-info py-2 px-3 small mb-3">
-                              <strong>Zero Website Interruption:</strong> Since you are connecting a subdomain, your main website remains completely untouched!
-                            </div>
-                            <div className="p-3 bg-light rounded-3 border mb-3">
-                              <div className="fw-bold text-primary mb-1">Required Subdomain CNAME Record:</div>
-                              <div className="text-muted">Type: <span className="badge bg-dark">CNAME</span></div>
-                              <div className="text-muted mt-1">
-                                Host / Name: <code>{existingDomainInput ? existingDomainInput.split(".")[0] : "portal"}</code>
-                              </div>
-                              <div className="text-dark fw-bold mt-1">
-                                Target / Value: <code className="text-primary">portal.schoolprofit.ng</code>
-                              </div>
-                              <div className="text-muted small mt-1">TTL: <code>Auto / 300s</code></div>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <p className="text-muted mb-2">Configure these two records to point your entire website & portal to SchoolProfit:</p>
-                            <div className="p-3 bg-light rounded-3 mb-2 border">
-                              <div className="fw-bold text-dark">Record 1 (Root Domain):</div>
-                              <div className="text-muted mt-1">Type: <span className="badge bg-dark">A</span></div>
-                              <div className="text-muted">Host: <code>@</code></div>
-                              <div className="text-dark fw-bold mt-1">Value: <code>18.133.82.13</code></div>
-                            </div>
-                            <div className="p-3 bg-light rounded-3 border mb-3">
-                              <div className="fw-bold text-dark">Record 2 (WWW / Subdomain):</div>
-                              <div className="text-muted mt-1">Type: <span className="badge bg-dark">CNAME</span></div>
-                              <div className="text-muted">Host: <code>www</code></div>
-                              <div className="text-dark fw-bold mt-1">Value: <code className="text-primary">portal.schoolprofit.ng</code></div>
-                            </div>
-                          </>
-                        )}
-
-                        <div className="p-3 rounded-3 border bg-white shadow-sm text-muted">
-                          <div className="fw-bold text-dark small mb-1">
-                            <i className="bi bi-clock-history me-1 text-warning"></i> Propagation Time
+                    {isPlatformPurchased ? (
+                      <div className="db-panel border border-success border-opacity-25" style={{ background: "rgba(16, 185, 129, 0.03)" }}>
+                        <div className="db-panel-head">
+                          <div>
+                            <h4 className="db-panel-title text-success">
+                              <i className="bi bi-patch-check-fill text-success me-1"></i> Auto-Configured Domain
+                            </h4>
+                            <p className="db-panel-sub">Purchased on SchoolProfit — 100% automated hosting & routing.</p>
                           </div>
-                          DNS changes typically take <strong>5 to 15 minutes</strong>. Once saved, click <strong>"Verify DNS Records"</strong> to activate.
+                        </div>
+                        <div className="p-4 small">
+                          <div className="alert alert-success py-2 px-3 small mb-3">
+                            <i className="bi bi-check2-circle me-1 fw-bold"></i>
+                            <strong>No Manual Action Required:</strong> Because this domain was purchased directly on SchoolProfit, nameservers, DNS A-records, and SSL security are automatically provisioned.
+                          </div>
+
+                          <div className="p-3 bg-white rounded-3 border mb-3 shadow-sm">
+                            <div className="fw-bold text-dark mb-2">Automated Configuration Checklist:</div>
+                            <div className="d-flex align-items-center gap-2 mb-2 text-success">
+                              <i className="bi bi-check-circle-fill"></i>
+                              <span>Payment Confirmed & Verified</span>
+                            </div>
+                            <div className="d-flex align-items-center gap-2 mb-2 text-success">
+                              <i className="bi bi-check-circle-fill"></i>
+                              <span>Nameservers Auto-Assigned</span>
+                            </div>
+                            <div className="d-flex align-items-center gap-2 mb-2 text-success">
+                              <i className="bi bi-check-circle-fill"></i>
+                              <span>Portal Route: <code>18.133.82.13</code></span>
+                            </div>
+                            <div className="d-flex align-items-center gap-2 text-success">
+                              <i className="bi bi-shield-lock-fill"></i>
+                              <span>Automated Let's Encrypt SSL</span>
+                            </div>
+                          </div>
+
+                          <div className="p-3 rounded-3 border bg-white shadow-sm text-muted">
+                            <div className="fw-bold text-dark small mb-1">
+                              <i className="bi bi-info-circle me-1 text-primary"></i> Registry Propagation
+                            </div>
+                            New domains may take a few minutes for global DNS propagation across internet providers. Your school portal is automatically routed as soon as registry propagation finishes.
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="db-panel">
+                        <div className="db-panel-head">
+                          <div>
+                            <h4 className="db-panel-title">
+                              <i className="bi bi-hdd-network text-primary"></i> DNS Setup Records
+                            </h4>
+                            <p className="db-panel-sub">Add these in your domain control panel (GoDaddy, Namecheap, cPanel).</p>
+                          </div>
+                        </div>
+                        <div className="p-4 small">
+                          {setupChoice === "subdomain" ? (
+                            <>
+                              <div className="alert alert-info py-2 px-3 small mb-3">
+                                <strong>Zero Website Interruption:</strong> Since you are connecting a subdomain, your main website remains completely untouched!
+                              </div>
+                              <div className="p-3 bg-light rounded-3 border mb-3">
+                                <div className="fw-bold text-primary mb-1">Required Subdomain CNAME Record:</div>
+                                <div className="text-muted">Type: <span className="badge bg-dark">CNAME</span></div>
+                                <div className="text-muted mt-1">
+                                  Host / Name: <code>{existingDomainInput ? existingDomainInput.split(".")[0] : "portal"}</code>
+                                </div>
+                                <div className="text-dark fw-bold mt-1">
+                                  Target / Value: <code className="text-primary">portal.schoolprofit.ng</code>
+                                </div>
+                                <div className="text-muted small mt-1">TTL: <code>Auto / 300s</code></div>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-muted mb-2">Configure these two records to point your entire website & portal to SchoolProfit:</p>
+                              <div className="p-3 bg-light rounded-3 mb-2 border">
+                                <div className="fw-bold text-dark">Record 1 (Root Domain):</div>
+                                <div className="text-muted mt-1">Type: <span className="badge bg-dark">A</span></div>
+                                <div className="text-muted">Host: <code>@</code></div>
+                                <div className="text-dark fw-bold mt-1">Value: <code>18.133.82.13</code></div>
+                              </div>
+                              <div className="p-3 bg-light rounded-3 border mb-3">
+                                <div className="fw-bold text-dark">Record 2 (WWW / Subdomain):</div>
+                                <div className="text-muted mt-1">Type: <span className="badge bg-dark">CNAME</span></div>
+                                <div className="text-muted">Host: <code>www</code></div>
+                                <div className="text-dark fw-bold mt-1">Value: <code className="text-primary">portal.schoolprofit.ng</code></div>
+                              </div>
+                            </>
+                          )}
+
+                          <div className="p-3 rounded-3 border bg-white shadow-sm text-muted">
+                            <div className="fw-bold text-dark small mb-1">
+                              <i className="bi bi-clock-history me-1 text-warning"></i> Propagation Time
+                            </div>
+                            DNS changes typically take <strong>5 to 15 minutes</strong>. Once saved, click <strong>"Verify DNS Records"</strong> to activate.
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

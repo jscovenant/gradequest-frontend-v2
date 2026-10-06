@@ -528,24 +528,19 @@ export default function ResultBatchSetupPage() {
                   </h1>
 
                   <p className="db-hero-sub">
-                    Select <b>Class</b>, <b>Term</b> and <b>Session</b> to resolve a result batch, then proceed to upload results.
-                    {isTeacher ? " You will only see classes assigned to you." : ""}
+                    Select <b>Class</b>, <b>Term</b> and <b>Session</b> to enter scores on screen or upload via Excel.
+                    {isTeacher ? " As a teacher, you can only access classes assigned to you." : ""}
                   </p>
 
                   <div className="db-hero-btns">
                     <button className="db-btn-gold" onClick={handleResolveBatch} disabled={!canContinue || resolving || loadingMeta}>
-                      <i className="bi bi-arrow-right-circle" />
-                      Start Uploading Results
+                      <i className="bi bi-pencil-square" />
+                      Continue to Enter / Upload Scores
                     </button>
 
                     <button className="db-btn-outline" onClick={clearSavedContext} disabled={resolving}>
                       <i className="bi bi-eraser" />
-                      Clear selection
-                    </button>
-
-                    <button className="db-btn-outline" onClick={() => navigate("/results/upload")} disabled={resolving}>
-                      <i className="bi bi-upload" />
-                      Go to upload
+                      Reset selection
                     </button>
                   </div>
                 </div>
@@ -611,11 +606,11 @@ export default function ResultBatchSetupPage() {
                   <div style={{ padding: 16, display: "grid", gap: 12 }}>
                     {isTeacher ? (
                       <div className="db-alert db-alert--warn">
-                        <i className="bi bi-exclamation-triangle-fill" />
+                        <i className="bi bi-shield-lock-fill" />
                         <div>
-                          <div style={{ fontWeight: 900, marginBottom: 2 }}>Teacher restriction</div>
+                          <div style={{ fontWeight: 900, marginBottom: 2 }}>Assigned Classes Only</div>
                           <div style={{ opacity: 0.85 }}>
-                            You can only prepare batches for classes assigned to you by the admin.
+                            You are restricted to entering Continuous Assessment and Exam scores only for classes assigned to you by the school administrator.
                           </div>
                         </div>
                       </div>
@@ -623,9 +618,9 @@ export default function ResultBatchSetupPage() {
                       <div className="db-alert db-alert--info">
                         <i className="bi bi-info-circle-fill" />
                         <div>
-                          <div style={{ fontWeight: 900, marginBottom: 2 }}>Tip</div>
+                          <div style={{ fontWeight: 900, marginBottom: 2 }}>Automated Calculations</div>
                           <div style={{ opacity: 0.85 }}>
-                            Prepare once, upload for all students, then compute positions/averages once per batch.
+                            Select the class, term, and session. Scores entered online or uploaded via Excel automatically calculate rankings, grades, and averages in real time.
                           </div>
                         </div>
                       </div>

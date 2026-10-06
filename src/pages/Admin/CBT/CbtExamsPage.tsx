@@ -340,6 +340,11 @@ export default function CbtExamsPage() {
     ai_cbt_question_credit_cost?: number;
   } | null>(null);
 
+  const currentUser = getUser();
+  const rawRole = (currentUser?.role || "").toLowerCase().trim();
+  const normRole = (currentUser?.normalized_role || currentUser?.role || "").toLowerCase().replace(/[\s-]/g, "_");
+  const isTeacher = ["teacher", "class_teacher", "class-teacher", "subject_teacher", "subject-teacher", "staff"].includes(normRole) || ["teacher", "class_teacher", "class-teacher", "subject_teacher", "subject-teacher", "staff"].includes(rawRole);
+
   const groups = useMemo(() => {
     const fromSections = (examDetail?.sections || []).flatMap((section) =>
       (section.question_groups || []).map((group) => ({ ...group, sectionTitle: section.title }))
@@ -477,8 +482,7 @@ export default function CbtExamsPage() {
         };
       });
 
-      const user = getUser();
-      const isTeacher = String(user?.role || "").toLowerCase() === "teacher";
+      const user = currentUser;
 
       let finalSubjects: Subject[] = [];
       if (isTeacher) {
@@ -989,6 +993,10 @@ export default function CbtExamsPage() {
     }
   }
   async function prepareAndDownloadOfflineBundle() {
+    if (isTeacher) {
+      showError("Teachers do not have permission to download offline CBT packages.");
+      return;
+    }
     setSaving(true);
     setOfflineLicense(null);
     setSyncResult(null);
@@ -1021,6 +1029,10 @@ export default function CbtExamsPage() {
   }
 
   async function downloadOfflineBundle() {
+    if (isTeacher) {
+      showError("Teachers do not have permission to download offline CBT packages.");
+      return;
+    }
     if (!offlineLicense?.id) {
       showError("Generate an offline license first.");
       return;
@@ -1051,6 +1063,10 @@ export default function CbtExamsPage() {
   }
 
   async function downloadOfflineInstaller() {
+    if (isTeacher) {
+      showError("Teachers do not have permission to download offline CBT packages or apps.");
+      return;
+    }
     setSaving(true);
     try {
       const token = getToken?.() || "";
@@ -1133,7 +1149,6 @@ export default function CbtExamsPage() {
   const scheduledCount = exams.filter((exam) => (exam.schedules || []).length > 0).length;
   const totalQuestions = exams.reduce((sum, exam) => sum + Number(exam.questions_count || 0), 0);
   const selectedSchedule = examDetail?.schedules?.[0] || null;
-  const currentUser = getUser();
   const schoolCode = currentUser?.role === "Admin" ? currentUser?.reg_no : currentUser?.school_code;
   const publicAccessUrl = `${window.location.origin}/cbt/access${schoolCode ? `?school_code=${encodeURIComponent(schoolCode)}` : ""}`;
   const cbtManualUrl = "/docs/gradequest-cbt-online-offline-manual.pdf";
@@ -1460,7 +1475,9 @@ export default function CbtExamsPage() {
                 <div className="cbt-hero-actions">
                   <a className="cbt-btn cbt-soft" href={publicAccessUrl} target="_blank" rel="noreferrer"><i className="bi bi-box-arrow-up-right" /> Public Access</a>
                   <button className="cbt-btn cbt-soft" type="button" onClick={() => setManualOpen(true)}><i className="bi bi-question-circle" /> CBT Manual</button>
-                  <button className="cbt-btn cbt-soft" type="button" disabled={saving} onClick={downloadOfflineInstaller}><i className="bi bi-windows" /> Download Offline App</button>
+                  {!isTeacher && (
+                    <button className="cbt-btn cbt-soft" type="button" disabled={saving} onClick={downloadOfflineInstaller}><i className="bi bi-windows" /> Download Offline App</button>
+                  )}
                   <button className="cbt-btn cbt-primary" type="button" onClick={() => setCreateModalOpen(true)}><i className="bi bi-plus-circle" /> New Exam</button>
                   <button className="cbt-btn cbt-gold" onClick={load}><i className="bi bi-arrow-repeat" /> Refresh</button>
                 </div>
@@ -2157,18 +2174,20 @@ export default function CbtExamsPage() {
                     </button>
                   </div>
 
-                  <div className="cbt-side-card">
-                    <h3>Offline CBT</h3>
-                    <p>Download the Windows server app, then prepare a signed exam package for school WiFi exams.</p>
-                    <div className="d-flex flex-column gap-2">
-                      <button className="cbt-btn cbt-primary w-100" type="button" disabled={saving} onClick={downloadOfflineInstaller}>
-                        <i className="bi bi-download" /> Download Offline App
-                      </button>
-                      <button className="cbt-btn cbt-soft w-100" type="button" onClick={() => setLicenseModalOpen(true)}>
-                        <i className="bi bi-router" /> Offline Package
-                      </button>
+                  {!isTeacher && (
+                    <div className="cbt-side-card">
+                      <h3>Offline CBT</h3>
+                      <p>Download the Windows server app, then prepare a signed exam package for school WiFi exams.</p>
+                      <div className="d-flex flex-column gap-2">
+                        <button className="cbt-btn cbt-primary w-100" type="button" disabled={saving} onClick={downloadOfflineInstaller}>
+                          <i className="bi bi-download" /> Download Offline App
+                        </button>
+                        <button className="cbt-btn cbt-soft w-100" type="button" onClick={() => setLicenseModalOpen(true)}>
+                          <i className="bi bi-router" /> Offline Package
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <form className="cbt-panel" onSubmit={addSection}>
                     <div className="cbt-head"><h2>Add section</h2><p>Use sections for Paper 1, Essay, Objectives, or subject parts.</p></div>
@@ -2480,7 +2499,7 @@ export default function CbtExamsPage() {
         </div>
       )}
 
-      {licenseModalOpen && (
+      {licenseModalOpen && !isTeacher && (
         <div className="cbt-modal-backdrop" role="dialog" aria-modal="true">
           <div className="cbt-modal cbt-modal-sm">
             <div className="cbt-modal-head">
@@ -2566,7 +2585,9 @@ export default function CbtExamsPage() {
               <div className="cbt-work-actions mb-3">
                 <a className="cbt-btn cbt-primary" href={cbtManualUrl} target="_blank" rel="noreferrer"><i className="bi bi-file-earmark-pdf" /> Download PDF Manual</a>
                 <a className="cbt-btn cbt-soft" href={publicAccessUrl} target="_blank" rel="noreferrer"><i className="bi bi-box-arrow-up-right" /> Open Online Access Page</a>
-                <button className="cbt-btn cbt-soft" type="button" disabled={saving} onClick={downloadOfflineInstaller}><i className="bi bi-windows" /> Download Offline App</button>
+                {!isTeacher && (
+                  <button className="cbt-btn cbt-soft" type="button" disabled={saving} onClick={downloadOfflineInstaller}><i className="bi bi-windows" /> Download Offline App</button>
+                )}
               </div>
               <div className="cbt-manual-grid">
                 <div className="cbt-manual-card">

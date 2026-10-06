@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "../../../utils/axios";
+import { getUser } from "../../../utils/token";
 import { useToast } from "../../../contexts/ToastContext";
 import TopNav from "../../../components/LayoutComponents/TopNav";
 import Sidebar from "../../../components/LayoutComponents/Sidebar";
@@ -87,6 +88,11 @@ export default function AdminResultReviewPage() {
   const navigate = useNavigate();
   const { showSuccess, showError, showWarning } = useToast();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const currentUser = getUser();
+  const rawRole = (currentUser?.role || "").toLowerCase().trim();
+  const normRole = (currentUser?.normalized_role || currentUser?.role || "").toLowerCase().replace(/[\s-]/g, "_");
+  const canManageApproval = ["admin", "owner", "proprietor", "school_owner", "principal", "headteacher", "head_teacher", "super_admin", "platform_staff"].includes(normRole) || ["admin", "owner", "proprietor", "school-owner", "principal", "headteacher", "super-admin"].includes(rawRole);
 
   const [pageLoading, setPageLoading] = useState(true);
   const [loadingBatches, setLoadingBatches] = useState(false);
@@ -470,7 +476,7 @@ export default function AdminResultReviewPage() {
                   </p>
                 </div>
                 <div className="rr-hero-actions">
-                  <button className="rr-btn rr-btn-light" onClick={() => navigate("/students/results/batch")}><i className="bi bi-plus-circle" /> Prepare result</button>
+                  <button className="rr-btn rr-btn-light" onClick={() => navigate("/students/results/add")}><i className="bi bi-pencil-square" /> Enter results</button>
                   <button className="rr-btn rr-btn-gold" onClick={() => navigate("/results/design")}><i className="bi bi-palette" /> Result design</button>
                 </div>
               </section>
@@ -519,11 +525,15 @@ export default function AdminResultReviewPage() {
 
                     <div className="rr-action-row">
                       <button className="rr-btn rr-btn-soft" onClick={() => navigate(`/results/broadsheet/${selectedBatch.id}`)}><i className="bi bi-table" /> Open broadsheet</button>
-                      <button className="rr-btn rr-btn-soft" onClick={() => navigate(`/results/upload?batchId=${selectedBatch.id}`)}><i className="bi bi-upload" /> Upload/enter scores</button>
+                      <button className="rr-btn rr-btn-soft" onClick={() => navigate(`/students/results/add?batchId=${selectedBatch.id}`)}><i className="bi bi-pencil-square" /> Enter scores</button>
                       <button className="rr-btn rr-btn-dark" onClick={() => runBatchAction("compute")} disabled={busyAction !== null}><i className="bi bi-calculator" /> {busyAction === "compute" ? "Computing" : "Compute"}</button>
-                      <button className="rr-btn rr-btn-dark" onClick={() => runBatchAction("approve")} disabled={busyAction !== null || !selectedBatch.review?.can_approve}><i className="bi bi-check2-circle" /> {busyAction === "approve" ? "Approving" : "Approve"}</button>
-                      <button className="rr-btn rr-btn-gold" onClick={() => runBatchAction("publish")} disabled={busyAction !== null || !selectedBatch.review?.can_publish}><i className="bi bi-send-check" /> {busyAction === "publish" ? "Publishing" : "Publish"}</button>
-                      {String(selectedBatch.status).toLowerCase() === "published" && <button className="rr-btn rr-btn-soft" onClick={() => runBatchAction("reopen")} disabled={busyAction !== null}><i className="bi bi-unlock" /> Reopen</button>}
+                      {canManageApproval && (
+                        <>
+                          <button className="rr-btn rr-btn-dark" onClick={() => runBatchAction("approve")} disabled={busyAction !== null || !selectedBatch.review?.can_approve}><i className="bi bi-check2-circle" /> {busyAction === "approve" ? "Approving" : "Approve"}</button>
+                          <button className="rr-btn rr-btn-gold" onClick={() => runBatchAction("publish")} disabled={busyAction !== null || !selectedBatch.review?.can_publish}><i className="bi bi-send-check" /> {busyAction === "publish" ? "Publishing" : "Publish"}</button>
+                          {String(selectedBatch.status).toLowerCase() === "published" && <button className="rr-btn rr-btn-soft" onClick={() => runBatchAction("reopen")} disabled={busyAction !== null}><i className="bi bi-unlock" /> Reopen</button>}
+                        </>
+                      )}
                     </div>
 
                     <div className="rr-student-toolbar">

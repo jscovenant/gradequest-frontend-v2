@@ -939,10 +939,18 @@ export default function TeacherDashboard() {
                   <div className="d-flex gap-2 flex-wrap">
                     <button
                       className="teacher-db-btn-gold"
-                      onClick={() => navigate("/results/upload")}
+                      onClick={() => navigate("/students/results/add")}
                     >
-                      <i className="bi bi-file-earmark-arrow-up-fill me-1" />
-                      Upload Results
+                      <i className="bi bi-pencil-square me-1" />
+                      Enter Results
+                    </button>
+
+                    <button
+                      className="teacher-db-btn-outline"
+                      onClick={() => navigate("/students/results/add?mode=excel")}
+                    >
+                      <i className="bi bi-file-earmark-spreadsheet-fill me-1 text-success" />
+                      Upload Excel Sheet
                     </button>
 
                     <button
@@ -1040,8 +1048,8 @@ export default function TeacherDashboard() {
             <div className="t-qa-grid">
               {[
                 { title: "Take Attendance", desc: "Mark daily classroom register", icon: "clipboard-check-fill", color: "#2563EB", bg: "#DBEAFE", route: "/students/attendance" },
-                { title: "Upload Results", desc: "Score entries & assessments", icon: "cloud-arrow-up-fill", color: "#D97706", bg: "#FEF3C7", route: "/results/upload" },
-                { title: "AI Lesson Planner", desc: "Generate term weekly lesson plans", icon: "journal-richtext", color: "#7C3AED", bg: "#EDE9FE", route: "/settings/ai-lesson-plans" },
+                { title: "Enter Results", desc: "Online score entry & remarks", icon: "pencil-square", color: "#D97706", bg: "#FEF3C7", route: "/students/results/add" },
+                { title: "Upload Excel Scores", desc: "Import spreadsheet for assigned class", icon: "file-earmark-spreadsheet-fill", color: "#16A34A", bg: "#DCFCE7", route: "/students/results/add?mode=excel" },
                 { title: "Broadsheets & Reports", desc: "Class broadsheets & report cards", icon: "file-earmark-bar-graph-fill", color: "#10B981", bg: "#D1FAE5", route: "/reports" },
               ].map((qa) => (
                 <div
@@ -1211,7 +1219,9 @@ export default function TeacherDashboard() {
                                 <div
                                   key={batch.id}
                                   className="rounded-3 p-2"
-                                  style={{ backgroundColor: "#F8FAFC", border: "1px solid #E2E8F0" }}
+                                  style={{ backgroundColor: "#F8FAFC", border: "1px solid #E2E8F0", cursor: "pointer" }}
+                                  onClick={() => navigate(`/students/results/add?batchId=${batch.id}`)}
+                                  title="Click to enter scores for this batch"
                                 >
                                   <div className="d-flex justify-content-between gap-2 small">
                                     <span className="fw-bold text-truncate" style={{ color: "#0F2744" }}>

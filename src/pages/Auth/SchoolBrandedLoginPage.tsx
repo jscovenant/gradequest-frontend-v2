@@ -3,6 +3,7 @@ import { useParams, useSearchParams, useNavigate, Link } from "react-router-dom"
 import { publicApi } from "../../utils/axios";
 import { setToken, setUser } from "../../utils/token";
 import { isCustomPortalHost } from "../../utils/portal";
+import { setSchoolBrowserIdentity } from "../../utils/browserIdentity";
 import PageTitle from "../../components/PageTitle";
 
 // Helper to sanitize and normalize media URLs
@@ -53,6 +54,11 @@ export default function SchoolBrandedLoginPage() {
       const res = await publicApi.get(`/public/school/${schoolParam}`);
       if (res.data?.status && res.data?.school) {
         setSchoolData(res.data);
+        setSchoolBrowserIdentity(
+          res.data.school.name || res.data.school.school_name,
+          res.data.school.logo_url || res.data.school.logo,
+          "Portal Sign In"
+        );
       } else {
         setFetchError("School portal not found. Please verify the school web address.");
       }
@@ -63,6 +69,11 @@ export default function SchoolBrandedLoginPage() {
         const fallbackRes = await publicApi.get(`/public/school/current`);
         if (fallbackRes.data?.status && fallbackRes.data?.school) {
           setSchoolData(fallbackRes.data);
+          setSchoolBrowserIdentity(
+            fallbackRes.data.school.name || fallbackRes.data.school.school_name,
+            fallbackRes.data.school.logo_url || fallbackRes.data.school.logo,
+            "Portal Sign In"
+          );
         } else {
           setFetchError("Unable to connect to school portal. Please try again later.");
         }

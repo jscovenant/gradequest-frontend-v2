@@ -410,6 +410,18 @@ export default function AdminUserDetailsPage() {
                 </div>
 
                 <div className="d-flex gap-2 flex-wrap">
+                  {admin?.school_id && (
+                    <button
+                      className="btn btn-warning text-dark btn-sm px-3 fw-bold"
+                      style={{ borderRadius: 8 }}
+                      onClick={() => navigate(`/superadmin/schools/${admin.school_id}/setup`)}
+                      title="Setup branding, classes, subjects, and import students for this school"
+                    >
+                      <i className="bi bi-tools me-1" />
+                      Basic Setup &amp; Onboard Students
+                    </button>
+                  )}
+
                   <button className="btn btn-primary btn-sm px-3" style={{ borderRadius: 8, fontWeight: 700 }} onClick={openEditModal}>
                     <i className="bi bi-pencil-square me-1" />
                     Edit Profile

@@ -73,7 +73,7 @@ export default function StudentRegisterPage() {
 
   const requiredOk = useMemo(() =>
     Boolean(form.firstname.trim() && form.surname.trim() && form.third_name.trim() &&
-      form.gender.trim() && form.level_id && form.section_id && form.department_id),
+      form.gender.trim() && form.level_id),
   [form]);
 
   /* Progress — count filled fields */
@@ -106,6 +106,16 @@ export default function StudentRegisterPage() {
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm(p => ({ ...p, [e.target.name]: e.target.value }));
+
+  const handleLevelChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    const selectedLevel = (levels as any[]).find(l => String(l.id) === String(val));
+    setForm(p => ({
+      ...p,
+      level_id: val,
+      section_id: selectedLevel?.section_id ? String(selectedLevel.section_id) : p.section_id,
+    }));
+  };
 
   const handlePhotoChange = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
@@ -430,20 +440,20 @@ export default function StudentRegisterPage() {
                         </Field>
                       )}
                       <Field label="Class / Level" required>
-                        <select name="level_id" className="sr-select" value={form.level_id} onChange={handleChange}>
+                        <select name="level_id" className="sr-select" value={form.level_id} onChange={handleLevelChange}>
                           <option value="">Select class</option>
                           {levels.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                         </select>
                       </Field>
-                      <Field label="Section" required>
+                      <Field label="Section" hint="Auto-derived from class (editable if needed)">
                         <select name="section_id" className="sr-select" value={form.section_id} onChange={handleChange}>
-                          <option value="">Select section</option>
+                          <option value="">Select section (Optional)</option>
                           {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
                       </Field>
-                      <Field label="Department" required>
+                      <Field label="Department" hint="Optional — only for Senior Secondary (Science, Arts, Commercial)">
                         <select name="department_id" className="sr-select" value={form.department_id} onChange={handleChange}>
-                          <option value="">Select department</option>
+                          <option value="">None / Not Applicable</option>
                           {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                         </select>
                       </Field>

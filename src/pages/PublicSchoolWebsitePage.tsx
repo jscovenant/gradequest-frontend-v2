@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { publicApi } from "../utils/axios";
 import { isCustomPortalHost } from "../utils/portal";
+import { setSchoolBrowserIdentity } from "../utils/browserIdentity";
 
 // Helper to sanitize and normalize asset URLs
 const resolveMediaUrl = (url?: string | null) => {
@@ -271,6 +272,13 @@ export default function PublicSchoolWebsitePage() {
       const res = await publicApi.get(`/public/school/${identifier}`);
       if (res.data.status) {
         setData(res.data);
+        if (res.data.school) {
+          setSchoolBrowserIdentity(
+            res.data.school.name || res.data.school.school_name,
+            res.data.school.logo_url || res.data.school.logo,
+            res.data.website?.tagline || res.data.website?.site_title
+          );
+        }
       } else {
         setError("School website not found.");
       }
@@ -431,10 +439,64 @@ export default function PublicSchoolWebsitePage() {
   return (
     <div style={{ fontFamily: `${fontFamily}, system-ui, -apple-system, sans-serif`, color: "#1E293B", backgroundColor: "#F8FAFC", overflowX: "hidden" }}>
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap');
+
         :root {
           --sp-primary: ${primaryColor};
           --sp-secondary: ${secondaryColor};
           --sp-accent: ${accentColor};
+        }
+
+        /* Typography & Topography System */
+        .sp-display-title {
+          font-size: clamp(2.1rem, 5.2vw, 3.65rem);
+          font-weight: 800;
+          line-height: 1.15;
+          letter-spacing: -0.035em;
+        }
+
+        .sp-section-title {
+          font-size: clamp(1.65rem, 3.4vw, 2.45rem);
+          font-weight: 800;
+          line-height: 1.25;
+          letter-spacing: -0.025em;
+        }
+
+        .sp-section-subtitle {
+          font-size: clamp(0.95rem, 1.8vw, 1.1rem);
+          line-height: 1.72;
+          color: #64748B;
+          max-width: 680px;
+          margin-left: auto;
+          margin-right: auto;
+        }
+
+        .sp-lead-text {
+          font-size: clamp(1.05rem, 2vw, 1.22rem);
+          line-height: 1.75;
+          color: #475569;
+        }
+
+        /* Navbar & Brand Responsiveness */
+        .sp-navbar-brand-wrap {
+          max-width: calc(100% - 62px);
+        }
+        .sp-brand-name {
+          font-size: clamp(0.95rem, 3.5vw, 1.22rem);
+          font-weight: 800;
+          line-height: 1.15;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: clamp(170px, 45vw, 380px);
+        }
+        .sp-brand-tagline {
+          font-size: 11px;
+          letter-spacing: 0.02em;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: clamp(170px, 45vw, 380px);
         }
 
         /* Scroll-triggered Fade-In & Reveal Animations */
@@ -567,8 +629,8 @@ export default function PublicSchoolWebsitePage() {
           background: ${heroBgImage ? `linear-gradient(135deg, rgba(10, 25, 47, 0.92) 0%, rgba(15, 39, 68, 0.94) 100%), url('${heroBgImage}') center/cover no-repeat` : `linear-gradient(135deg, ${primaryColor} 0%, #0A192F 100%)`};
           color: #FFFFFF;
           overflow: hidden;
-          padding-top: 52px;
-          padding-bottom: 96px;
+          padding-top: clamp(40px, 5vw, 68px);
+          padding-bottom: clamp(64px, 8vw, 108px);
         }
         .sp-hero-mesh {
           position: absolute;
@@ -587,16 +649,22 @@ export default function PublicSchoolWebsitePage() {
           border-radius: 24px;
           box-shadow: 0 24px 48px rgba(0, 0, 0, 0.30);
           transition: transform 0.4s ease, box-shadow 0.4s ease;
+          padding: clamp(20px, 3.5vw, 36px);
         }
         .sp-glass-card:hover {
           transform: translateY(-4px);
           box-shadow: 0 28px 56px rgba(0, 0, 0, 0.38);
         }
 
-        /* Section Styling */
+        /* Section Styling with Proper Responsive Spacing */
         .sp-section {
-          padding: 84px 0;
+          padding: clamp(54px, 7vw, 92px) 0;
           position: relative;
+        }
+        @media (max-width: 767.98px) {
+          .sp-section {
+            padding: 44px 0;
+          }
         }
         .sp-section-light { background: #FFFFFF; }
         .sp-section-muted { background: #F8FAFC; }
@@ -608,11 +676,12 @@ export default function PublicSchoolWebsitePage() {
           gap: 7px;
           font-size: 11.5px;
           font-weight: 800;
-          letter-spacing: 0.05em;
+          letter-spacing: 0.07em;
           text-transform: uppercase;
-          padding: 6px 14px;
-          border-radius: 100px;
-          margin-bottom: 14px;
+          padding: 6px 16px;
+          border-radius: 9999px;
+          margin-bottom: 16px;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
         }
 
         /* Cards & Hover Effects */
@@ -620,16 +689,18 @@ export default function PublicSchoolWebsitePage() {
           background: #FFFFFF;
           border: 1px solid #E2E8F0;
           border-radius: 20px;
-          padding: 30px 26px;
+          padding: clamp(22px, 2.5vw, 30px);
           height: 100%;
+          display: flex;
+          flex-direction: column;
           transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.35s ease;
           box-shadow: 0 4px 16px rgba(15, 39, 68, 0.04);
           position: relative;
           overflow: hidden;
         }
         .sp-card-interactive:hover {
-          transform: translateY(-8px);
-          box-shadow: 0 20px 40px rgba(15, 39, 68, 0.11);
+          transform: translateY(-6px);
+          box-shadow: 0 20px 42px rgba(15, 39, 68, 0.10);
           border-color: var(--sp-secondary);
         }
 
@@ -682,7 +753,7 @@ export default function PublicSchoolWebsitePage() {
           display: flex;
           flex-direction: column;
           justify-content: flex-end;
-          padding: 20px;
+          padding: 16px;
           opacity: 0;
           transition: opacity 0.35s ease;
         }
@@ -690,7 +761,27 @@ export default function PublicSchoolWebsitePage() {
           opacity: 1;
         }
 
-        /* Category Filter Tabs */
+        /* Category Filter Tabs - Swipeable on mobile */
+        .sp-gallery-filter-wrap {
+          display: flex;
+          justify-content: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        @media (max-width: 767.98px) {
+          .sp-gallery-filter-wrap {
+            justify-content: flex-start;
+            overflow-x: auto;
+            white-space: nowrap;
+            padding: 4px 2px 12px;
+            scrollbar-width: none;
+            -webkit-overflow-scrolling: touch;
+          }
+          .sp-gallery-filter-wrap::-webkit-scrollbar {
+            display: none;
+          }
+        }
+
         .sp-filter-btn {
           padding: 8px 18px;
           font-size: 13px;
@@ -700,6 +791,7 @@ export default function PublicSchoolWebsitePage() {
           background: #FFFFFF;
           color: #64748B;
           transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+          white-space: nowrap;
         }
         .sp-filter-btn.active {
           background: var(--sp-primary);
@@ -714,13 +806,17 @@ export default function PublicSchoolWebsitePage() {
           transform: translateY(-1px);
         }
 
-        /* Principal Portrait Frame */
+        /* Responsive Principal Portrait Frame */
         .sp-principal-frame {
           position: relative;
           border-radius: 24px;
           overflow: hidden;
-          box-shadow: 0 24px 48px rgba(15, 39, 68, 0.16);
+          box-shadow: 0 20px 48px rgba(15, 39, 68, 0.14);
           border: 4px solid #FFFFFF;
+          aspect-ratio: 4 / 5;
+          max-width: 360px;
+          width: 100%;
+          margin: 0 auto;
           transition: transform 0.4s ease;
         }
         .sp-principal-frame:hover {
@@ -791,30 +887,28 @@ export default function PublicSchoolWebsitePage() {
       {/* ========================================================================= */}
       <nav className="navbar navbar-expand-lg sticky-top shadow-sm py-2.5" style={{ backgroundColor: primaryColor, backdropFilter: "blur(12px)", zIndex: 1030 }}>
         <div className="container">
-          {/* Logo & Brand */}
-          <Link to={`/school/${school.id}`} className="navbar-brand d-flex align-items-center gap-2.5 text-white text-decoration-none">
+          {/* Logo Only Brand */}
+          <Link
+            to={isCustomPortalHost() ? "/" : `/school/${school.id}`}
+            className="navbar-brand d-inline-flex align-items-center text-white text-decoration-none py-1"
+            title={school.name}
+          >
             {schoolLogo && logoLoaded ? (
               <img
                 src={schoolLogo}
                 alt={school.name}
                 onError={() => setLogoLoaded(false)}
                 className="rounded-3 bg-white p-1 shadow-sm"
-                style={{ height: 46, width: 46, objectFit: "contain" }}
+                style={{ height: 48, maxWidth: 180, objectFit: "contain", display: "block" }}
               />
             ) : (
               <div
-                className="rounded-3 fw-extrabold d-flex align-items-center justify-content-center shadow-sm"
-                style={{ width: 46, height: 46, backgroundColor: secondaryColor, color: "#FFFFFF", fontSize: 20 }}
+                className="rounded-3 fw-extrabold d-flex align-items-center justify-content-center shadow-sm px-3"
+                style={{ height: 46, minWidth: 46, backgroundColor: secondaryColor, color: "#FFFFFF", fontSize: 20 }}
               >
                 {school.name?.[0] || "S"}
               </div>
             )}
-            <div>
-              <div className="fw-extrabold fs-5 lh-1 text-white">{website.site_title || school.name}</div>
-              <small className="opacity-75 d-block text-white-50 mt-1" style={{ fontSize: "11px", letterSpacing: "0.02em" }}>
-                {website.tagline || "Knowledge, Character & Leadership"}
-              </small>
-            </div>
           </Link>
 
           {/* Mobile Toggler */}
@@ -900,15 +994,15 @@ export default function PublicSchoolWebsitePage() {
                 </div>
               )}
 
-              <h1 className="display-4 fw-extrabold text-white mb-3 lh-sm">
+              <h1 className="sp-display-title text-white mb-3">
                 {website.hero_title || `Empowering Future Leaders at ${school.name}`}
               </h1>
 
-              <p className="lead text-white-50 mb-4" style={{ fontSize: "1.1rem", lineHeight: 1.7, maxWidth: 620 }}>
+              <p className="sp-lead-text text-white text-opacity-75 mb-4" style={{ maxWidth: 620 }}>
                 {website.hero_subtitle || "Delivering world-class academic distinction, disciplined moral character, and hands-on digital skills preparing our students to lead and thrive globally."}
               </p>
 
-              <div className="d-flex flex-wrap gap-3 mb-5">
+              <div className="d-flex flex-wrap gap-2.5 gap-sm-3 mb-4 mb-sm-5">
                 {admission.is_open && (
                   <Link to={admissionUrl} className="sp-btn-gold">
                     <i className="bi bi-check2-circle fs-5"></i>
@@ -928,27 +1022,27 @@ export default function PublicSchoolWebsitePage() {
               {/* 4 Quick Stat Pills */}
               <div className="row g-2 g-sm-3">
                 <div className="col-6 col-sm-3">
-                  <div className="p-3 rounded-4 bg-white bg-opacity-10 border border-white border-opacity-10 text-center">
-                    <div className="fs-4 fw-extrabold text-warning">100%</div>
-                    <div className="text-white-50" style={{ fontSize: "11px" }}>Exam Success</div>
+                  <div className="p-2.5 p-sm-3 rounded-4 bg-white bg-opacity-10 border border-white border-opacity-10 text-center">
+                    <div className="fw-extrabold text-warning" style={{ fontSize: "clamp(1.2rem, 3.2vw, 1.55rem)" }}>100%</div>
+                    <div className="text-white-50" style={{ fontSize: "11px", fontWeight: 600 }}>Exam Success</div>
                   </div>
                 </div>
                 <div className="col-6 col-sm-3">
-                  <div className="p-3 rounded-4 bg-white bg-opacity-10 border border-white border-opacity-10 text-center">
-                    <div className="fs-4 fw-extrabold text-warning">15 : 1</div>
-                    <div className="text-white-50" style={{ fontSize: "11px" }}>Student Ratio</div>
+                  <div className="p-2.5 p-sm-3 rounded-4 bg-white bg-opacity-10 border border-white border-opacity-10 text-center">
+                    <div className="fw-extrabold text-warning" style={{ fontSize: "clamp(1.2rem, 3.2vw, 1.55rem)" }}>15 : 1</div>
+                    <div className="text-white-50" style={{ fontSize: "11px", fontWeight: 600 }}>Student Ratio</div>
                   </div>
                 </div>
                 <div className="col-6 col-sm-3">
-                  <div className="p-3 rounded-4 bg-white bg-opacity-10 border border-white border-opacity-10 text-center">
-                    <div className="fs-4 fw-extrabold text-warning">STEAM</div>
-                    <div className="text-white-50" style={{ fontSize: "11px" }}>Robotics Labs</div>
+                  <div className="p-2.5 p-sm-3 rounded-4 bg-white bg-opacity-10 border border-white border-opacity-10 text-center">
+                    <div className="fw-extrabold text-warning" style={{ fontSize: "clamp(1.2rem, 3.2vw, 1.55rem)" }}>STEAM</div>
+                    <div className="text-white-50" style={{ fontSize: "11px", fontWeight: 600 }}>Robotics Labs</div>
                   </div>
                 </div>
                 <div className="col-6 col-sm-3">
-                  <div className="p-3 rounded-4 bg-white bg-opacity-10 border border-white border-opacity-10 text-center">
-                    <div className="fs-4 fw-extrabold text-warning">24 / 7</div>
-                    <div className="text-white-50" style={{ fontSize: "11px" }}>Campus Security</div>
+                  <div className="p-2.5 p-sm-3 rounded-4 bg-white bg-opacity-10 border border-white border-opacity-10 text-center">
+                    <div className="fw-extrabold text-warning" style={{ fontSize: "clamp(1.2rem, 3.2vw, 1.55rem)" }}>24 / 7</div>
+                    <div className="text-white-50" style={{ fontSize: "11px", fontWeight: 600 }}>Campus Security</div>
                   </div>
                 </div>
               </div>
@@ -1076,10 +1170,10 @@ export default function PublicSchoolWebsitePage() {
             <div className="sp-badge-pill" style={{ background: "rgba(15, 39, 68, 0.08)", color: primaryColor }}>
               <i className="bi bi-gem me-1"></i> Core Institutional Foundation
             </div>
-            <h2 className="fw-extrabold text-dark display-6">
+            <h2 className="sp-section-title text-dark">
               Why Parents Choose <span className="text-primary">{school.name}</span>
             </h2>
-            <p className="text-muted">
+            <p className="sp-section-subtitle mt-2">
               {website.about_content || "Dedicated educators, individualized mentoring, modern technology, and a proven track record of producing top scorers and responsible citizens."}
             </p>
           </div>
@@ -1136,28 +1230,28 @@ export default function PublicSchoolWebsitePage() {
 
           {/* Mission, Vision & Motto Strip */}
           <div className="mt-5 p-4 p-md-5 rounded-4 bg-white border shadow-sm sp-reveal-up sp-delay-3">
-            <div className="row g-4 align-items-center">
-              <div className="col-12 col-md-4 border-md-end">
+            <div className="row g-4 align-items-stretch">
+              <div className="col-12 col-md-4 pb-3 pb-md-0 border-bottom border-md-bottom-0 border-md-end">
                 <div className="d-flex align-items-center gap-2 mb-2 text-warning fw-bold">
                   <i className="bi bi-compass-fill fs-5"></i>
                   <span>OUR MISSION</span>
                 </div>
-                <p className="text-muted small mb-0" style={{ lineHeight: 1.6 }}>
+                <p className="text-muted small mb-0" style={{ lineHeight: 1.65 }}>
                   {website.mission || "To deliver high-impact education through modern pedagogies, ethical values, and digital technology that empowers every student."}
                 </p>
               </div>
 
-              <div className="col-12 col-md-4 border-md-end">
+              <div className="col-12 col-md-4 py-3 py-md-0 border-bottom border-md-bottom-0 border-md-end">
                 <div className="d-flex align-items-center gap-2 mb-2 text-primary fw-bold">
                   <i className="bi bi-eye-fill fs-5"></i>
                   <span>OUR VISION</span>
                 </div>
-                <p className="text-muted small mb-0" style={{ lineHeight: 1.6 }}>
+                <p className="text-muted small mb-0" style={{ lineHeight: 1.65 }}>
                   {website.vision || "To be a premier learning institution raising globally competitive leaders of integrity, competence, and compassion."}
                 </p>
               </div>
 
-              <div className="col-12 col-md-4">
+              <div className="col-12 col-md-4 pt-3 pt-md-0">
                 <div className="d-flex align-items-center gap-2 mb-2 text-success fw-bold">
                   <i className="bi bi-bookmark-star-fill fs-5"></i>
                   <span>SCHOOL MOTTO</span>
@@ -1179,11 +1273,11 @@ export default function PublicSchoolWebsitePage() {
           <div className="row align-items-center g-5">
             {/* Principal Photo */}
             <div className="col-12 col-lg-5 text-center sp-reveal-left">
-              <div className="sp-principal-frame mx-auto" style={{ maxWidth: 360, height: 430 }}>
+              <div className="sp-principal-frame mx-auto">
                 {principalPhoto ? (
                   <img src={principalPhoto} alt={website.principal_name || "The Principal"} className="w-100 h-100 object-fit-cover" />
                 ) : (
-                  <div className="w-100 h-100 d-flex flex-column align-items-center justify-content-center text-white" style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, #0F2744 100%)` }}>
+                  <div className="w-100 h-100 d-flex flex-column align-items-center justify-content-center text-white p-4" style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, #0F2744 100%)` }}>
                     {schoolLogo && logoLoaded ? (
                       <img src={schoolLogo} alt="Emblem" style={{ width: 80, height: 80, objectFit: "contain", marginBottom: 16 }} />
                     ) : (
@@ -1201,7 +1295,7 @@ export default function PublicSchoolWebsitePage() {
               <div className="sp-badge-pill" style={{ background: "rgba(15, 39, 68, 0.08)", color: primaryColor }}>
                 <i className="bi bi-quote fs-6"></i> Leadership Message
               </div>
-              <h2 className="fw-extrabold text-dark mb-3 display-6">
+              <h2 className="sp-section-title text-dark mb-3">
                 {website.principal_welcome_title || `Welcome to ${school.name}`}
               </h2>
               <p className="text-muted lead mb-4" style={{ fontSize: "1.05rem", lineHeight: 1.8 }}>
@@ -1233,14 +1327,14 @@ export default function PublicSchoolWebsitePage() {
             <div className="sp-badge-pill" style={{ background: "rgba(37, 99, 235, 0.10)", color: accentColor }}>
               <i className="bi bi-mortarboard me-1"></i> Educational Streams
             </div>
-            <h2 className="fw-extrabold text-dark display-6">Academic Programs</h2>
-            <p className="text-muted">Structured learning pathways designed for intellectual curiosity, foundational mastery, and examination distinction.</p>
+            <h2 className="sp-section-title text-dark">Academic Programs</h2>
+            <p className="sp-section-subtitle mt-2">Structured learning pathways designed for intellectual curiosity, foundational mastery, and examination distinction.</p>
           </div>
 
           <div className="row g-4">
             {programsList.map((prog: any, idx: number) => (
               <div key={idx} className={`col-12 col-md-6 col-lg-3 sp-reveal-up sp-delay-${(idx % 4) + 1}`}>
-                <div className="sp-card-interactive d-flex flex-column">
+                <div className="sp-card-interactive d-flex flex-column h-100">
                   <div className="d-flex align-items-center justify-content-between mb-3">
                     <span className="badge bg-warning bg-opacity-15 text-dark fw-bold px-3 py-1.5 rounded-pill font-monospace" style={{ fontSize: "11px" }}>
                       {prog.badge || "Academic"}
@@ -1274,12 +1368,12 @@ export default function PublicSchoolWebsitePage() {
             <div className="sp-badge-pill" style={{ background: "rgba(217, 119, 6, 0.12)", color: secondaryColor }}>
               <i className="bi bi-camera-fill me-1"></i> Campus Life & Facilities
             </div>
-            <h2 className="fw-extrabold text-dark display-6">Photo Gallery & Campus Tour</h2>
-            <p className="text-muted">Explore vibrant student life, state-of-the-art laboratories, sports events, and modern learning spaces.</p>
+            <h2 className="sp-section-title text-dark">Photo Gallery & Campus Tour</h2>
+            <p className="sp-section-subtitle mt-2">Explore vibrant student life, state-of-the-art laboratories, sports events, and modern learning spaces.</p>
           </div>
 
           {/* Category Filter Pills */}
-          <div className="d-flex justify-content-center flex-wrap gap-2 mb-5 sp-reveal-up sp-delay-1">
+          <div className="sp-gallery-filter-wrap mb-4 sp-reveal-up sp-delay-1">
             {galleryCategories.map((cat) => (
               <button
                 key={cat}
@@ -1292,18 +1386,18 @@ export default function PublicSchoolWebsitePage() {
             ))}
           </div>
 
-          {/* Gallery Masonry Grid */}
-          <div className="row g-3 g-md-4">
+          {/* Gallery Masonry Grid (2 columns on mobile, 3 on tablet, 4 on desktop) */}
+          <div className="row g-2.5 g-sm-3 g-md-4">
             {filteredGallery.map((item: any, idx: number) => (
-              <div key={idx} className={`col-12 col-sm-6 col-lg-3 sp-reveal-scale sp-delay-${(idx % 4) + 1}`}>
+              <div key={idx} className={`col-6 col-md-4 col-lg-3 sp-reveal-scale sp-delay-${(idx % 4) + 1}`}>
                 <div className="sp-gallery-card" onClick={() => setActiveLightboxIndex(idx)}>
                   <img src={resolveMediaUrl(item.image || item.image_url)} alt={item.title} className="sp-gallery-img" />
                   <div className="sp-gallery-overlay">
-                    <span className="badge bg-warning text-dark fw-bold align-self-start mb-2 px-2.5 py-1" style={{ fontSize: "10px" }}>
+                    <span className="badge bg-warning text-dark fw-bold align-self-start mb-1 mb-sm-2 px-2 py-0.5" style={{ fontSize: "9.5px" }}>
                       {item.category || "Campus"}
                     </span>
-                    <h6 className="fw-bold text-white mb-1" style={{ fontSize: "14px" }}>{item.title}</h6>
-                    <small className="text-white-50 text-truncate">{item.caption || "Click to expand image"}</small>
+                    <h6 className="fw-bold text-white mb-0 mb-sm-1 text-truncate" style={{ fontSize: "clamp(12px, 1.8vw, 14px)" }}>{item.title}</h6>
+                    <small className="text-white-50 text-truncate d-none d-sm-block">{item.caption || "Click to expand image"}</small>
                   </div>
                 </div>
               </div>
@@ -1382,21 +1476,21 @@ export default function PublicSchoolWebsitePage() {
             <div className="sp-badge-pill" style={{ background: "rgba(15, 39, 68, 0.08)", color: primaryColor }}>
               <i className="bi bi-building me-1"></i> Infrastructure & Environment
             </div>
-            <h2 className="fw-extrabold text-dark display-6">State-of-the-Art Facilities</h2>
-            <p className="text-muted">Purpose-built physical and digital infrastructure inspiring creativity, experimentation, and wellness.</p>
+            <h2 className="sp-section-title text-dark">State-of-the-Art Facilities</h2>
+            <p className="sp-section-subtitle mt-2">Purpose-built physical and digital infrastructure inspiring creativity, experimentation, and wellness.</p>
           </div>
 
           <div className="row g-4">
             {facilitiesList.map((fac: any, idx: number) => {
               const iconClass = resolveBootstrapIcon(fac.icon, "bi-building");
               return (
-                <div key={idx} className={`col-12 col-md-6 col-lg-3 sp-reveal-up sp-delay-${(idx % 4) + 1}`}>
-                  <div className="sp-card-interactive">
+                <div key={idx} className={`col-12 col-sm-6 col-lg-3 sp-reveal-up sp-delay-${(idx % 4) + 1}`}>
+                  <div className="sp-card-interactive d-flex flex-column h-100">
                     <div className="sp-icon-box mb-3">
                       <i className={`bi ${iconClass} fs-3`}></i>
                     </div>
                     <h5 className="fw-bold text-dark mb-2">{fac.title}</h5>
-                    <p className="text-muted small mb-0" style={{ lineHeight: 1.65 }}>{fac.desc || fac.description}</p>
+                    <p className="text-muted small mb-0 flex-grow-1" style={{ lineHeight: 1.65 }}>{fac.desc || fac.description}</p>
                   </div>
                 </div>
               );
@@ -1414,14 +1508,14 @@ export default function PublicSchoolWebsitePage() {
             <div className="sp-badge-pill" style={{ background: "rgba(217, 119, 6, 0.12)", color: secondaryColor }}>
               <i className="bi bi-chat-heart-fill me-1"></i> Parent & Alumni Reviews
             </div>
-            <h2 className="fw-extrabold text-dark display-6">Voices of Our Community</h2>
-            <p className="text-muted">Read genuine feedback from parents who entrust us with their children's formative education.</p>
+            <h2 className="sp-section-title text-dark">Voices of Our Community</h2>
+            <p className="sp-section-subtitle mt-2">Read genuine feedback from parents who entrust us with their children's formative education.</p>
           </div>
 
           <div className="row g-4">
             {testimonialsList.map((t: any, idx: number) => (
-              <div key={idx} className={`col-12 col-lg-4 sp-reveal-up sp-delay-${(idx % 3) + 1}`}>
-                <div className="sp-card-interactive d-flex flex-column">
+              <div key={idx} className={`col-12 col-md-6 col-lg-4 sp-reveal-up sp-delay-${(idx % 3) + 1}`}>
+                <div className="sp-card-interactive d-flex flex-column h-100">
                   <div className="d-flex text-warning mb-3">
                     {[...Array(t.rating || 5)].map((_, i) => (
                       <i key={i} className="bi bi-star-fill me-1" style={{ fontSize: "14px" }}></i>
@@ -1430,7 +1524,7 @@ export default function PublicSchoolWebsitePage() {
                   <p className="text-muted fst-italic mb-4 flex-grow-1" style={{ lineHeight: 1.7, fontSize: "14.5px" }}>
                     "{t.content}"
                   </p>
-                  <div className="d-flex align-items-center gap-3 pt-3 border-top">
+                  <div className="d-flex align-items-center gap-3 pt-3 border-top mt-auto">
                     <div className="rounded-circle bg-primary bg-opacity-10 text-primary fw-bold d-flex align-items-center justify-content-center" style={{ width: 44, height: 44, fontSize: "16px" }}>
                       {t.name?.[0] || "P"}
                     </div>
@@ -1456,18 +1550,18 @@ export default function PublicSchoolWebsitePage() {
               <span className="badge rounded-pill bg-warning text-dark fw-bold px-3 py-2 mb-3">
                 <i className="bi bi-stars me-1"></i> 4-STEP ADMISSION PROCESS
               </span>
-              <h2 className="display-6 fw-extrabold text-white mb-3">
+              <h2 className="sp-section-title text-white mb-3">
                 Join Our Next Academic Cohort
               </h2>
-              <p className="lead text-white-50" style={{ fontSize: "1.05rem" }}>
+              <p className="sp-section-subtitle text-white-50" style={{ maxWidth: 620 }}>
                 Enrolling your child is quick, transparent, and completely digital.
               </p>
             </div>
 
             {/* 4 Step Roadmap */}
-            <div className="row g-4 mb-5">
+            <div className="row g-3 g-md-4 mb-5">
               <div className="col-6 col-md-3 sp-reveal-up sp-delay-1">
-                <div className="p-4 rounded-4 bg-white bg-opacity-10 border border-white border-opacity-10 text-center h-100">
+                <div className="p-3.5 p-md-4 rounded-4 bg-white bg-opacity-10 border border-white border-opacity-10 text-center h-100">
                   <div className="rounded-circle bg-warning text-dark fw-bold d-inline-flex align-items-center justify-content-center mb-3" style={{ width: 40, height: 40 }}>
                     1
                   </div>
@@ -1476,7 +1570,7 @@ export default function PublicSchoolWebsitePage() {
                 </div>
               </div>
               <div className="col-6 col-md-3 sp-reveal-up sp-delay-2">
-                <div className="p-4 rounded-4 bg-white bg-opacity-10 border border-white border-opacity-10 text-center h-100">
+                <div className="p-3.5 p-md-4 rounded-4 bg-white bg-opacity-10 border border-white border-opacity-10 text-center h-100">
                   <div className="rounded-circle bg-warning text-dark fw-bold d-inline-flex align-items-center justify-content-center mb-3" style={{ width: 40, height: 40 }}>
                     2
                   </div>
@@ -1485,7 +1579,7 @@ export default function PublicSchoolWebsitePage() {
                 </div>
               </div>
               <div className="col-6 col-md-3 sp-reveal-up sp-delay-3">
-                <div className="p-4 rounded-4 bg-white bg-opacity-10 border border-white border-opacity-10 text-center h-100">
+                <div className="p-3.5 p-md-4 rounded-4 bg-white bg-opacity-10 border border-white border-opacity-10 text-center h-100">
                   <div className="rounded-circle bg-warning text-dark fw-bold d-inline-flex align-items-center justify-content-center mb-3" style={{ width: 40, height: 40 }}>
                     3
                   </div>
@@ -1494,7 +1588,7 @@ export default function PublicSchoolWebsitePage() {
                 </div>
               </div>
               <div className="col-6 col-md-3 sp-reveal-up sp-delay-4">
-                <div className="p-4 rounded-4 bg-white bg-opacity-10 border border-white border-opacity-10 text-center h-100">
+                <div className="p-3.5 p-md-4 rounded-4 bg-white bg-opacity-10 border border-white border-opacity-10 text-center h-100">
                   <div className="rounded-circle bg-warning text-dark fw-bold d-inline-flex align-items-center justify-content-center mb-3" style={{ width: 40, height: 40 }}>
                     4
                   </div>
@@ -1525,8 +1619,8 @@ export default function PublicSchoolWebsitePage() {
             <div className="sp-badge-pill" style={{ background: "rgba(15, 39, 68, 0.08)", color: primaryColor }}>
               <i className="bi bi-question-circle me-1"></i> Questions & Answers
             </div>
-            <h2 className="fw-extrabold text-dark display-6">Frequently Asked Questions</h2>
-            <p className="text-muted">Clear answers to common questions regarding admissions, academics, and school life.</p>
+            <h2 className="sp-section-title text-dark">Frequently Asked Questions</h2>
+            <p className="sp-section-subtitle mt-2">Clear answers to common questions regarding admissions, academics, and school life.</p>
           </div>
 
           <div className="d-flex flex-column gap-3">
@@ -1564,10 +1658,10 @@ export default function PublicSchoolWebsitePage() {
               <div className="sp-badge-pill" style={{ background: "rgba(15, 39, 68, 0.08)", color: primaryColor }}>
                 <i className="bi bi-envelope-paper me-1"></i> Get In Touch
               </div>
-              <h2 className="fw-extrabold text-dark mb-3 display-6">
+              <h2 className="sp-section-title text-dark mb-3">
                 Visit Our Campus or Contact Us
               </h2>
-              <p className="text-muted mb-4" style={{ lineHeight: 1.7 }}>
+              <p className="sp-section-subtitle ms-0 mb-4 text-start">
                 Our admissions officers and academic counselors are available to answer your questions and guide you through enrollment.
               </p>
 

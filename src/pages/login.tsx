@@ -20,10 +20,16 @@ export default function Login() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // If accessed on a custom school domain, immediately redirect to dedicated school branded login
+    if (isCustomPortalHost()) {
+      navigate("/auth/login", { replace: true });
+      return;
+    }
+
     const schoolParam = searchParams.get("school");
 
-    // Only load school branding if explicitly requested (?school=) or visiting via a custom school domain
-    if (!schoolParam && !isCustomPortalHost()) {
+    // Only load school branding if explicitly requested (?school=)
+    if (!schoolParam) {
       setSchoolBranding(null);
       const icon = document.querySelector<HTMLLinkElement>("link[rel*='icon']");
       if (icon) {

@@ -76,6 +76,28 @@ type ScoreRow = {
 
 type ScoresState = Record<string, ScoreRow>;
 
+type ImportPreview = {
+  summary: {
+    students_found: number;
+    ready_rows: number;
+    subjects_found: number;
+    errors_count: number;
+    warnings_count: number;
+    can_import: boolean;
+  };
+  rows: Array<{
+    row: number;
+    admission_no: string;
+    student_name: string;
+    status: string;
+    subjects: Array<{ subject_id: number; subject_name: string; ca: number; exam: number; total: number }>;
+  }>;
+  errors: string[];
+  warnings: string[];
+};
+
+type AssessmentFormat = "ca_exam" | "ca_ca_exam" | "ca_ca_ca_ca_exam";
+
 function useQuery() {
   const { search } = useLocation();
   return useMemo(() => new URLSearchParams(search), [search]);
@@ -93,6 +115,85 @@ function parseParts(typeStr: string) {
     .map((x) => Number(x.trim()))
     .filter((n) => !Number.isNaN(n));
 }
+
+function getCanonicalSubjectKey(name: string): string {
+  const clean = (name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const aliases: Record<string, string> = {
+    agric: "agric_science",
+    agricscience: "agric_science",
+    agriculturalscience: "agric_science",
+    agriculturescience: "agric_science",
+    agricsci: "agric_science",
+    crk: "crs",
+    crs: "crs",
+    christianreligiousstudies: "crs",
+    christianreligionstudies: "crs",
+    christianreligiousknowledge: "crs",
+    christianreligionknowledge: "crs",
+    irk: "irs",
+    irs: "irs",
+    islamicreligiousstudies: "irs",
+    islamicreligionstudies: "irs",
+    islamicreligiousknowledge: "irs",
+    cca: "cca",
+    culturalandcreativeart: "cca",
+    culturalcreativeart: "cca",
+    culturalandcreativearts: "cca",
+    culturalcreativearts: "cca",
+    creativeart: "cca",
+    creativearts: "cca",
+    phe: "phe",
+    physicalhealtheducation: "phe",
+    physicalandhealtheducation: "phe",
+    physicaleducation: "phe",
+    security: "security_education",
+    securityeducation: "security_education",
+    civi: "civic_education",
+    civic: "civic_education",
+    civiceducation: "civic_education",
+    french: "french",
+    frenchlanguage: "french",
+    socialstudies: "social_studies",
+    socialstudy: "social_studies",
+    socialandcitizenship: "social_studies",
+    basictechnology: "basic_technology",
+    basictech: "basic_technology",
+    introtech: "basic_technology",
+    introductorytechnology: "basic_technology",
+    basicscience: "basic_science",
+    integratedscience: "basic_science",
+    homeeconomics: "home_economics",
+    english: "english_language",
+    englishlanguage: "english_language",
+    maths: "mathematics",
+    math: "mathematics",
+    mathematics: "mathematics",
+    businessstudies: "business_studies",
+    computer: "computer_studies",
+    computerstudies: "computer_studies",
+    computerscience: "computer_studies",
+    accounting: "financial_accounting",
+    financialaccounting: "financial_accounting",
+    literature: "literature_in_english",
+    literatureinenglish: "literature_in_english",
+    garmentmaking: "garment_making",
+  };
+  return aliases[clean] || clean;
+}
+
+function deduplicateSubjects(list: Subject[]): Subject[] {
+  const seen = new Set<string>();
+  const result: Subject[] = [];
+  for (const s of list) {
+    const key = getCanonicalSubjectKey(s.name);
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(s);
+    }
+  }
+  return result;
+}
+
 
 function detectScoreTypeFromExisting(
   existingRows: Array<{ ca?: Record<string, any>; exam?: number | null; total?: number | null }>
@@ -171,6 +272,18 @@ export default function AddResultV2Page() {
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(() => window.innerWidth >= 768);
   const [pageLoading, setPageLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"table" | "card">("table");
+
+  // Mode: manual score entry vs excel spreadsheet upload
+  const urlMode = query.get("mode") === "excel" ? "excel" : "manual";
+  const [entryTab, setEntryTab] = useState<"manual" | "excel">(urlMode);
+
+  // Excel Upload states
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [assessmentFormat, setAssessmentFormat] = useState<AssessmentFormat>("ca_exam");
+  const importFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // -----------------------------
   // Classes & Roster
@@ -386,6 +499,152 @@ export default function AddResultV2Page() {
       setClassStudents([]);
     } finally {
       setLoadingStudents(false);
+    }
+  };
+
+  // -----------------------------
+  // Bulk Excel Import Handlers
+  // -----------------------------
+  const downloadTemplate = async (format: "xlsx" | "csv") => {
+    if (!selectedClassId) {
+      showWarning?.("Please select a class first to download its template.");
+      return;
+    }
+    let bId = batchId;
+    if (!bId && term && session) {
+      try {
+        const resolveRes = await authApi.post("/result-batches/resolve", {
+          class_id: Number(selectedClassId),
+          term,
+          session,
+        });
+        bId = resolveRes.data?.batch?.id || null;
+        if (bId) setBatchId(bId);
+      } catch (err: any) {
+        showError?.(err?.response?.data?.message || "Failed to resolve class batch.");
+        return;
+      }
+    }
+    if (!bId) {
+      showWarning?.("Unable to resolve result batch for this class.");
+      return;
+    }
+
+    try {
+      const res = await authApi.get(`/result-batches/${bId}/result-import/template`, {
+        params: {
+          format,
+          assessment_format: assessmentFormat,
+        },
+        responseType: "blob",
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      const clsName = classes.find((c) => c.id === Number(selectedClassId))?.name || `class_${selectedClassId}`;
+      link.download = `${clsName.replace(/\s+/g, "_")}_result_template.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      showSuccess?.(`Downloaded ${format.toUpperCase()} template for ${clsName}.`);
+    } catch (e: any) {
+      console.error(e);
+      showError?.(e?.response?.data?.message || "Unable to download result template.");
+    }
+  };
+
+  const handlePreviewImport = async () => {
+    if (!selectedClassId) {
+      showWarning?.("Please select a class first.");
+      return;
+    }
+    if (!importFile) {
+      showWarning?.("Choose an Excel or CSV file first.");
+      return;
+    }
+
+    let bId = batchId;
+    if (!bId && term && session) {
+      try {
+        const resolveRes = await authApi.post("/result-batches/resolve", {
+          class_id: Number(selectedClassId),
+          term,
+          session,
+        });
+        bId = resolveRes.data?.batch?.id || null;
+        if (bId) setBatchId(bId);
+      } catch (err: any) {
+        showError?.(err?.response?.data?.message || "Failed to resolve class batch.");
+        return;
+      }
+    }
+    if (!bId) {
+      showWarning?.("Unable to resolve result batch for this class.");
+      return;
+    }
+
+    const form = new FormData();
+    form.append("file", importFile);
+
+    setPreviewing(true);
+    try {
+      const res = await authApi.post(`/result-batches/${bId}/result-import/preview`, form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setImportPreview(res.data);
+      if (res.data?.summary?.can_import) {
+        showSuccess?.("File verified! All student records are ready to import.");
+      } else {
+        showWarning?.("Please review the highlighted issues before importing.");
+      }
+    } catch (e: any) {
+      console.error(e);
+      const data = e?.response?.data;
+      const message = data?.message || data?.errors?.file?.[0] || "Unable to preview result file.";
+      showError?.(message);
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    let bId = batchId;
+    if (!bId && selectedClassId && term && session) {
+      try {
+        const resolveRes = await authApi.post("/result-batches/resolve", {
+          class_id: Number(selectedClassId),
+          term,
+          session,
+        });
+        bId = resolveRes.data?.batch?.id || null;
+        if (bId) setBatchId(bId);
+      } catch {
+        // ignore
+      }
+    }
+
+    if (!selectedClassId || !bId || !importFile || !importPreview?.summary?.can_import) return;
+
+    const form = new FormData();
+    form.append("file", importFile);
+
+    setImporting(true);
+    try {
+      const res = await authApi.post(`/result-batches/${bId}/result-import/import`, form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      showSuccess?.(res.data?.message || "Results imported successfully! 🎉");
+      setImportFile(null);
+      setImportPreview(null);
+      await loadClassRoster(Number(selectedClassId), bId);
+    } catch (e: any) {
+      console.error(e);
+      const data = e?.response?.data;
+      const message = data?.message || data?.errors?.file?.[0] || "Unable to import result file.";
+      showError?.(message);
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -1338,6 +1597,18 @@ export default function AddResultV2Page() {
                 >
                   ← Results Command Hub
                 </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${entryTab === "excel" ? "btn-success text-white" : "btn-outline-warning"}`}
+                  style={{ borderRadius: 8, fontWeight: 700 }}
+                  onClick={() => {
+                    setStep(1);
+                    setEntryTab("excel");
+                  }}
+                >
+                  <i className="bi bi-file-earmark-spreadsheet-fill me-1" />
+                  Upload Excel Scores
+                </button>
                 {batchId && (
                   <button
                     className="btn btn-warning btn-sm"
@@ -1380,146 +1651,470 @@ export default function AddResultV2Page() {
               </button>
             </div>
 
-            {/* STEP 1: CLASS ROSTER & SEARCH PICKER */}
+            {/* STEP 1: CLASS ROSTER & SEARCH PICKER OR EXCEL UPLOAD */}
             {step === 1 && (
-              <div className="row g-4">
-                {/* Class Selection & Quick Roster */}
-                <div className="col-lg-7">
-                  <div className="gq-se-panel h-100">
-                    <div className="gq-se-panel-header">
-                      <h3 className="gq-se-panel-title">
-                        <span>🏫 Step 1A: Choose Class Roster</span>
+              <div>
+                {/* MODE TOGGLE TABS */}
+                <div className="d-flex justify-content-between align-items-center mb-4 p-2 rounded-3 bg-white border shadow-sm flex-wrap gap-2">
+                  <div className="d-flex gap-2">
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${entryTab === "manual" ? "btn-primary fw-bold" : "btn-light text-secondary"}`}
+                      style={{ borderRadius: 8, padding: "8px 18px", fontSize: 13 }}
+                      onClick={() => setEntryTab("manual")}
+                    >
+                      <i className="bi bi-pencil-square me-1" />
+                      1. Enter Scores Online (Roster)
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${entryTab === "excel" ? "btn-success fw-bold text-white" : "btn-light text-secondary"}`}
+                      style={{ borderRadius: 8, padding: "8px 18px", fontSize: 13 }}
+                      onClick={() => setEntryTab("excel")}
+                    >
+                      <i className="bi bi-file-earmark-spreadsheet-fill me-1" />
+                      2. Upload via Excel File (.xlsx / .csv)
+                    </button>
+                  </div>
+                  <span className="small text-muted d-none d-md-inline pe-2">
+                    {entryTab === "manual"
+                      ? "✍️ Select class and student to enter continuous assessment & exam scores."
+                      : "📊 Download class template, enter marks in Excel, and upload at once."}
+                  </span>
+                </div>
+
+                {entryTab === "excel" ? (
+                  /* EXCEL WORKFLOW PANEL */
+                  <div className="gq-se-panel mb-4">
+                    <div className="gq-se-panel-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                      <h3 className="gq-se-panel-title m-0">
+                        <i className="bi bi-file-earmark-spreadsheet-fill text-success me-2" />
+                        Bulk Upload Results via Excel (.xlsx / .csv)
                       </h3>
-                      <span className="badge bg-primary">Recommended for Teachers</span>
+                      <button
+                        type="button"
+                        className="btn btn-outline-primary btn-sm fw-bold"
+                        style={{ borderRadius: 8 }}
+                        onClick={() => setEntryTab("manual")}
+                      >
+                        <i className="bi bi-pencil-square me-1" />
+                        Switch to Online Roster Entry
+                      </button>
                     </div>
 
                     <div className="p-4">
-                      <div className="mb-3">
-                        <label className="form-label fw-bold text-dark small">Select Your Class</label>
-                        <select
-                          className="form-select"
-                          style={{ padding: "10px 14px", borderRadius: 10, fontWeight: 700 }}
-                          value={selectedClassId}
-                          onChange={(e) => {
-                            const val = e.target.value ? Number(e.target.value) : "";
-                            setSelectedClassId(val);
-                            setStudent(null);
-                          }}
-                        >
-                          <option value="">-- Choose Class to Load Students --</option>
-                          {classes.map((cls) => (
-                            <option key={cls.id} value={cls.id}>
-                              {cls.name} {cls.section?.name ? `(${cls.section.name})` : ""}
-                            </option>
-                          ))}
-                        </select>
+                      {/* CLASS & FORMAT SELECTORS */}
+                      <div className="row g-3 mb-4 align-items-end">
+                        <div className="col-md-5">
+                          <label className="form-label fw-bold text-dark small">1. Select Target Class</label>
+                          <select
+                            className="form-select"
+                            style={{ padding: "10px 14px", borderRadius: 10, fontWeight: 700 }}
+                            value={selectedClassId}
+                            onChange={(e) => {
+                              const val = e.target.value ? Number(e.target.value) : "";
+                              setSelectedClassId(val);
+                              setImportFile(null);
+                              setImportPreview(null);
+                            }}
+                          >
+                            <option value="">-- Choose Class to Upload Scores --</option>
+                            {classes.map((cls) => (
+                              <option key={cls.id} value={cls.id}>
+                                {cls.name} {cls.section?.name ? `(${cls.section.name})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="col-md-4">
+                          <label className="form-label fw-bold text-dark small">2. Score Breakdown Format</label>
+                          <select
+                            className="form-select"
+                            style={{ padding: "10px 14px", borderRadius: 10, fontWeight: 600 }}
+                            value={assessmentFormat}
+                            onChange={(e) => {
+                              setAssessmentFormat(e.target.value as AssessmentFormat);
+                              setImportPreview(null);
+                            }}
+                          >
+                            <option value="ca_exam">CA + Exam (e.g. 40 / 60)</option>
+                            <option value="ca_ca_exam">CA 1 + CA 2 + Exam (e.g. 20 / 20 / 60)</option>
+                            <option value="ca_ca_ca_ca_exam">4 CAs + Exam (e.g. 10 / 10 / 10 / 10 / 60)</option>
+                          </select>
+                        </div>
+
+                        <div className="col-md-3">
+                          <label className="form-label fw-bold text-dark small d-block">Active Term & Session</label>
+                          <div className="p-2 px-3 rounded-3 bg-light border text-truncate fw-bold text-secondary small">
+                            {term || "Current Term"} • {session || "Session"}
+                          </div>
+                        </div>
                       </div>
 
-                      {selectedClassId ? (
-                        <div>
-                          <div className="d-flex justify-content-between align-items-center mb-2">
-                            <span className="small fw-bold text-secondary">
-                              Class Students ({classStudents.length})
-                            </span>
-                            <input
-                              type="text"
-                              placeholder="Filter students by name..."
-                              className="form-control form-control-sm"
-                              style={{ width: 220, borderRadius: 8 }}
-                              value={studentFilterText}
-                              onChange={(e) => setStudentFilterText(e.target.value)}
-                            />
-                          </div>
-
-                          {loadingStudents ? (
-                            <div className="p-4 text-center text-muted">
-                              <span className="spinner-border spinner-border-sm me-2" /> Loading class roster...
-                            </div>
-                          ) : filteredRoster.length === 0 ? (
-                            <div className="alert alert-light border text-center text-muted p-4">
-                              No students found in this class.
-                            </div>
-                          ) : (
-                            <div className="gq-se-roster-list border rounded-3">
-                              {filteredRoster.map((st) => (
-                                <div
-                                  key={st.id}
-                                  className={`gq-se-roster-item ${student?.id === st.id ? "active" : ""}`}
-                                  onClick={() => loadStudentInBatch(batchId || 0, st.id)}
-                                >
-                                  <div>
-                                    <div className="gq-se-roster-name">
-                                      {st.firstname} {st.surname}
-                                    </div>
-                                    <div className="gq-se-roster-reg">{st.reg_no}</div>
-                                  </div>
-
-                                  <div className="d-flex align-items-center gap-2">
-                                    {st.status === "completed" ? (
-                                      <span className="badge bg-success-subtle text-success border border-success-subtle">
-                                        ✓ Saved
-                                      </span>
-                                    ) : (
-                                      <span className="badge bg-secondary-subtle text-secondary">Pending</span>
-                                    )}
-                                    <button
-                                      className="btn btn-sm btn-primary"
-                                      style={{ borderRadius: 6, fontSize: 11.5, fontWeight: 700 }}
-                                    >
-                                      Enter Scores →
-                                    </button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                      {!selectedClassId ? (
+                        <div className="alert alert-info border-0 rounded-4 p-4 text-center">
+                          <i className="bi bi-info-circle-fill text-primary fs-3 d-block mb-2" />
+                          <h5 className="fw-bold text-dark mb-1">Select your class above to begin</h5>
+                          <p className="text-muted small mb-0">
+                            Once you select a class, you can download its pre-formatted spreadsheet template with all your enrolled students and active subjects.
+                          </p>
                         </div>
                       ) : (
-                        <div className="alert alert-light border text-center p-4 text-muted">
-                          Select a class above to load students.
+                        <div className="row g-4">
+                          {/* STEP 1: DOWNLOAD TEMPLATE */}
+                          <div className="col-md-6">
+                            <div className="p-3 rounded-4 border bg-white h-100 d-flex flex-column justify-content-between">
+                              <div>
+                                <div className="d-flex align-items-center gap-2 mb-2">
+                                  <span className="badge bg-primary rounded-circle p-2 px-3 fw-bold">Step 1</span>
+                                  <h6 className="fw-bold m-0 text-dark">Download Class Spreadsheet Template</h6>
+                                </div>
+                                <p className="small text-muted mb-3">
+                                  This template comes pre-filled with all enrolled students and subjects for <strong>{classes.find(c => c.id === selectedClassId)?.name}</strong>. Simply enter scores into the Excel columns and save.
+                                </p>
+                              </div>
+
+                              <div className="d-flex gap-2 flex-wrap">
+                                <button
+                                  type="button"
+                                  className="btn btn-outline-success fw-bold flex-fill"
+                                  style={{ borderRadius: 8, padding: "9px 14px" }}
+                                  onClick={() => downloadTemplate("xlsx")}
+                                >
+                                  <i className="bi bi-file-earmark-excel-fill me-1" />
+                                  Excel Template (.xlsx)
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-outline-secondary fw-bold"
+                                  style={{ borderRadius: 8, padding: "9px 14px" }}
+                                  onClick={() => downloadTemplate("csv")}
+                                >
+                                  <i className="bi bi-filetype-csv me-1" />
+                                  CSV Template
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* STEP 2: UPLOAD & PREVIEW */}
+                          <div className="col-md-6">
+                            <div className="p-3 rounded-4 border bg-white h-100 d-flex flex-column justify-content-between">
+                              <div>
+                                <div className="d-flex align-items-center gap-2 mb-2">
+                                  <span className="badge bg-success rounded-circle p-2 px-3 fw-bold">Step 2</span>
+                                  <h6 className="fw-bold m-0 text-dark">Upload Completed Spreadsheet</h6>
+                                </div>
+                                <p className="small text-muted mb-3">
+                                  Select your filled Excel sheet or CSV. The system will inspect every row and verify all scores before importing.
+                                </p>
+                              </div>
+
+                              <div>
+                                <input
+                                  ref={importFileInputRef}
+                                  type="file"
+                                  accept=".xlsx,.xls,.csv"
+                                  className="form-control form-control-sm mb-2"
+                                  style={{ borderRadius: 8 }}
+                                  onClick={(e) => { (e.currentTarget as HTMLInputElement).value = ""; }}
+                                  onChange={(e) => {
+                                    const f = e.target.files?.[0] || null;
+                                    setImportFile(f);
+                                    setImportPreview(null);
+                                  }}
+                                />
+
+                                <div className="d-flex gap-2">
+                                  <button
+                                    type="button"
+                                    className="btn btn-primary fw-bold flex-fill"
+                                    style={{ borderRadius: 8 }}
+                                    disabled={!importFile || previewing}
+                                    onClick={handlePreviewImport}
+                                  >
+                                    {previewing ? (
+                                      <>
+                                        <span className="spinner-border spinner-border-sm me-1" /> Validating File...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <i className="bi bi-shield-check me-1" /> Preview & Verify Scores
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* STEP 3: PREVIEW & IMPORT CONFIRMATION */}
+                          {importPreview && (
+                            <div className="col-12">
+                              <div className="p-4 rounded-4 border bg-white">
+                                <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                                  <div>
+                                    <h5 className="fw-bold m-0 text-dark">
+                                      <i className="bi bi-check-circle-fill text-success me-2" />
+                                      Spreadsheet Verification Summary
+                                    </h5>
+                                    <p className="small text-muted m-0">Review the extracted marks below before confirming import.</p>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    className="btn btn-success fw-bold px-4 py-2"
+                                    style={{ borderRadius: 10, fontSize: 14 }}
+                                    disabled={!importPreview.summary.can_import || importing}
+                                    onClick={handleConfirmImport}
+                                  >
+                                    {importing ? (
+                                      <>
+                                        <span className="spinner-border spinner-border-sm me-1" /> Importing Results...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <i className="bi bi-cloud-arrow-up-fill me-1" /> Confirm & Import Scores Now
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+
+                                {/* KPI TILES */}
+                                <div className="row g-3 mb-3">
+                                  <div className="col-sm-3">
+                                    <div className="p-3 rounded-3 bg-light text-center border">
+                                      <div className="small text-muted fw-bold">Students Found</div>
+                                      <div className="fs-4 fw-bolder text-dark">{importPreview.summary.students_found}</div>
+                                    </div>
+                                  </div>
+                                  <div className="col-sm-3">
+                                    <div className="p-3 rounded-3 bg-success-subtle text-center border border-success-subtle">
+                                      <div className="small text-success fw-bold">Ready to Import</div>
+                                      <div className="fs-4 fw-bolder text-success">{importPreview.summary.ready_rows}</div>
+                                    </div>
+                                  </div>
+                                  <div className="col-sm-3">
+                                    <div className="p-3 rounded-3 bg-light text-center border">
+                                      <div className="small text-muted fw-bold">Subjects Detected</div>
+                                      <div className="fs-4 fw-bolder text-primary">{importPreview.summary.subjects_found}</div>
+                                    </div>
+                                  </div>
+                                  <div className="col-sm-3">
+                                    <div className={`p-3 rounded-3 text-center border ${importPreview.summary.errors_count > 0 ? "bg-danger-subtle border-danger-subtle text-danger" : "bg-light text-muted"}`}>
+                                      <div className="small fw-bold">Errors / Warnings</div>
+                                      <div className="fs-4 fw-bolder">{importPreview.summary.errors_count + importPreview.summary.warnings_count}</div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* ERROR/WARNING ALERTS */}
+                                {importPreview.errors.length > 0 && (
+                                  <div className="alert alert-danger rounded-3 mb-3">
+                                    <h6 className="fw-bold mb-1"><i className="bi bi-exclamation-triangle-fill me-2" />Please correct the following errors before importing:</h6>
+                                    <ul className="mb-0 small ps-3">
+                                      {importPreview.errors.map((err, i) => <li key={i}>{err}</li>)}
+                                    </ul>
+                                  </div>
+                                )}
+                                {importPreview.warnings.length > 0 && (
+                                  <div className="alert alert-warning rounded-3 mb-3">
+                                    <h6 className="fw-bold mb-1"><i className="bi bi-exclamation-circle-fill me-2" />Warnings:</h6>
+                                    <ul className="mb-0 small ps-3">
+                                      {importPreview.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                                    </ul>
+                                  </div>
+                                )}
+
+                                {/* TABLE PREVIEW */}
+                                <div className="table-responsive rounded-3 border" style={{ maxHeight: 350 }}>
+                                  <table className="table table-hover table-sm align-middle m-0" style={{ fontSize: 12.5 }}>
+                                    <thead className="table-light sticky-top">
+                                      <tr>
+                                        <th>Row</th>
+                                        <th>Admission No</th>
+                                        <th>Student Name</th>
+                                        <th>Status</th>
+                                        <th>Subjects</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {importPreview.rows.map((row, idx) => (
+                                        <tr key={idx}>
+                                          <td>{row.row}</td>
+                                          <td><code>{row.admission_no}</code></td>
+                                          <td className="fw-bold">{row.student_name}</td>
+                                          <td>
+                                            {row.status === "valid" ? (
+                                              <span className="badge bg-success-subtle text-success">✓ Ready</span>
+                                            ) : (
+                                              <span className="badge bg-danger-subtle text-danger">{row.status}</span>
+                                            )}
+                                          </td>
+                                          <td>
+                                            <div className="d-flex flex-wrap gap-1">
+                                              {row.subjects.map((sub, sIdx) => (
+                                                <span key={sIdx} className="badge bg-light text-dark border">
+                                                  {sub.subject_name}: <strong>{sub.total}</strong>
+                                                </span>
+                                              ))}
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
                   </div>
-                </div>
+                ) : (
+                  /* MANUAL ENTRY ROW */
+                  <div className="row g-4">
+                    {/* Class Selection & Quick Roster */}
+                    <div className="col-lg-7">
+                      <div className="gq-se-panel h-100">
+                        <div className="gq-se-panel-header">
+                          <h3 className="gq-se-panel-title">
+                            <span>🏫 Step 1A: Choose Class Roster</span>
+                          </h3>
+                          <span className="badge bg-primary">Recommended for Teachers</span>
+                        </div>
 
-                {/* Direct Lookup Alternative */}
-                <div className="col-lg-5">
-                  <div className="gq-se-panel h-100">
-                    <div className="gq-se-panel-header">
-                      <h3 className="gq-se-panel-title">
-                        <span>🔍 Step 1B: Direct Student Lookup</span>
-                      </h3>
+                        <div className="p-4">
+                          <div className="mb-3">
+                            <label className="form-label fw-bold text-dark small">Select Your Class</label>
+                            <select
+                              className="form-select"
+                              style={{ padding: "10px 14px", borderRadius: 10, fontWeight: 700 }}
+                              value={selectedClassId}
+                              onChange={(e) => {
+                                const val = e.target.value ? Number(e.target.value) : "";
+                                setSelectedClassId(val);
+                                setStudent(null);
+                              }}
+                            >
+                              <option value="">-- Choose Class to Load Students --</option>
+                              {classes.map((cls) => (
+                                <option key={cls.id} value={cls.id}>
+                                  {cls.name} {cls.section?.name ? `(${cls.section.name})` : ""}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {selectedClassId ? (
+                            <div>
+                              <div className="d-flex justify-content-between align-items-center mb-2">
+                                <span className="small fw-bold text-secondary">
+                                  Class Students ({classStudents.length})
+                                </span>
+                                <input
+                                  type="text"
+                                  placeholder="Filter students by name..."
+                                  className="form-control form-control-sm"
+                                  style={{ width: 220, borderRadius: 8 }}
+                                  value={studentFilterText}
+                                  onChange={(e) => setStudentFilterText(e.target.value)}
+                                />
+                              </div>
+
+                              {loadingStudents ? (
+                                <div className="p-4 text-center text-muted">
+                                  <span className="spinner-border spinner-border-sm me-2" /> Loading class roster...
+                                </div>
+                              ) : filteredRoster.length === 0 ? (
+                                <div className="alert alert-light border text-center text-muted p-4">
+                                  No students found in this class.
+                                </div>
+                              ) : (
+                                <div className="gq-se-roster-list border rounded-3">
+                                  {filteredRoster.map((st) => (
+                                    <div
+                                      key={st.id}
+                                      className={`gq-se-roster-item ${student?.id === st.id ? "active" : ""}`}
+                                      onClick={() => loadStudentInBatch(batchId || 0, st.id)}
+                                    >
+                                      <div>
+                                        <div className="gq-se-roster-name">
+                                          {st.firstname} {st.surname}
+                                        </div>
+                                        <div className="gq-se-roster-reg">{st.reg_no}</div>
+                                      </div>
+
+                                      <div className="d-flex align-items-center gap-2">
+                                        {st.status === "completed" ? (
+                                          <span className="badge bg-success-subtle text-success border border-success-subtle">
+                                            ✓ Saved
+                                          </span>
+                                        ) : (
+                                          <span className="badge bg-secondary-subtle text-secondary">Pending</span>
+                                        )}
+                                        <button
+                                          className="btn btn-sm btn-primary"
+                                          style={{ borderRadius: 6, fontSize: 11.5, fontWeight: 700 }}
+                                        >
+                                          Enter Scores →
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="alert alert-light border text-center p-4 text-muted">
+                              Select a class above to load students.
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="p-4">
-                      <p className="small text-muted mb-3">
-                        Want to enter or edit a single student without selecting a whole class? Search by admission number:
-                      </p>
+                    {/* Direct Lookup Alternative */}
+                    <div className="col-lg-5">
+                      <div className="gq-se-panel h-100">
+                        <div className="gq-se-panel-header">
+                          <h3 className="gq-se-panel-title">
+                            <span>🔍 Step 1B: Direct Student Lookup</span>
+                          </h3>
+                        </div>
 
-                      <div className="mb-3">
-                        <label className="form-label fw-bold text-dark small">Admission Number</label>
-                        <input
-                          className="form-control"
-                          style={{ padding: "10px 14px", borderRadius: 10 }}
-                          value={admissionNo}
-                          onChange={(e) => setAdmissionNo(e.target.value)}
-                          placeholder="e.g. STU-2024-001"
-                          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                        />
+                        <div className="p-4">
+                          <p className="small text-muted mb-3">
+                            Want to enter or edit a single student without selecting a whole class? Search by admission number:
+                          </p>
+
+                          <div className="mb-3">
+                            <label className="form-label fw-bold text-dark small">Admission Number</label>
+                            <input
+                              className="form-control"
+                              style={{ padding: "10px 14px", borderRadius: 10 }}
+                              value={admissionNo}
+                              onChange={(e) => setAdmissionNo(e.target.value)}
+                              placeholder="e.g. STU-2024-001"
+                              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                            />
+                          </div>
+
+                          <button
+                            className="btn btn-dark w-100 py-2 fw-bold"
+                            style={{ borderRadius: 10 }}
+                            onClick={handleSearch}
+                            disabled={searching}
+                          >
+                            {searching ? "Searching..." : "Search & Open Sheet →"}
+                          </button>
+                        </div>
                       </div>
-
-                      <button
-                        className="btn btn-dark w-100 py-2 fw-bold"
-                        style={{ borderRadius: 10 }}
-                        onClick={handleSearch}
-                        disabled={searching}
-                      >
-                        {searching ? "Searching..." : "Search & Open Sheet →"}
-                      </button>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
 

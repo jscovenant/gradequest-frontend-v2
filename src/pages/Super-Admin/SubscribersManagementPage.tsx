@@ -608,7 +608,7 @@ export default function SubscribersManagementPage() {
                         <th style={{ fontWeight: 700, color: "#475569" }}>Students</th>
                         <th style={{ fontWeight: 700, color: "#475569" }}>Online Fee Pay</th>
                         <th style={{ fontWeight: 700, color: "#475569" }}>Status</th>
-                        <th style={{ fontWeight: 700, color: "#475569", width: 170 }}>Actions</th>
+                        <th style={{ fontWeight: 700, color: "#475569", width: 220 }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -685,12 +685,22 @@ export default function SubscribersManagementPage() {
                               <td>
                                 <div className="d-flex align-items-center gap-1">
                                   <button
-                                    className="btn btn-sm btn-outline-primary"
-                                    style={{ borderRadius: 10, fontWeight: 600 }}
-                                    onClick={() => navigate(`/admin-users/view/${row.id}`)}
+                                    className="btn btn-sm text-white"
+                                    style={{ borderRadius: 10, fontWeight: 600, background: "#0F2744", borderColor: "#0F2744", fontSize: 11, padding: "5px 10px", whiteSpace: "nowrap" }}
+                                    onClick={() => navigate(`/superadmin/schools/${row.school?.id || row.id}/setup`)}
+                                    title="Setup branding, classes, subjects, and import students for this school"
                                   >
-                                    <i className="bi bi-gear me-1" />
-                                    Manage
+                                    <i className="bi bi-tools me-1" />
+                                    Setup &amp; Onboard
+                                  </button>
+
+                                  <button
+                                    className="btn btn-sm btn-outline-primary"
+                                    style={{ borderRadius: 10, fontWeight: 600, fontSize: 11, padding: "5px 8px" }}
+                                    onClick={() => navigate(`/admin-users/view/${row.id}`)}
+                                    title="View account and billing details"
+                                  >
+                                    <i className="bi bi-gear" />
                                   </button>
 
                                   {phoneClean.length >= 8 && (

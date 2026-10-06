@@ -163,8 +163,14 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       featureKey === "gradequest_plus" ||
       featureKey.startsWith("whatsapp_") ||
       featureKey === "fees" ||
-      featureKey === "results"
+      featureKey === "results" ||
+      featureKey === "staff_attendance" ||
+      featureKey === "attendance"
     ) {
+      return true;
+    }
+    const aliases = featureAliases[featureKey] || [featureKey];
+    if (aliases.some((alias) => featureSet.has(alias.toLowerCase()))) {
       return true;
     }
     return featureAccess.can(featureKey);
@@ -180,6 +186,69 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       return !canUseFeature(item.featureKey);
     }
     return false;
+  };
+
+  const userRole = (user.normalized_role || user.role || "").toLowerCase().replace(/[\s-]/g, "_");
+  const isOperator = userRole === "operator" || userRole === "registrar" || userRole === "secretary";
+  const isPrincipal = userRole === "principal" || userRole === "head_teacher" || userRole === "headteacher";
+
+  const checkRole = (roles?: string[]) => {
+    if (!roles || roles.length === 0) return true;
+    const normAllowed = roles.map((r) => r.toLowerCase().replace(/[\s-]/g, "_"));
+    if (normAllowed.includes(userRole)) return true;
+    if ((userRole === "proprietor" || userRole === "owner" || userRole === "admin") && (normAllowed.includes("admin") || normAllowed.includes("proprietor"))) return true;
+    if (isPrincipal && (normAllowed.includes("admin") || normAllowed.includes("principal"))) return true;
+    if (isOperator && (normAllowed.includes("admin") || normAllowed.includes("operator"))) return true;
+    if (
+      (userRole === "class_teacher" || userRole === "subject_teacher" || userRole === "teacher" || userRole === "staff") &&
+      (normAllowed.includes("teacher") || normAllowed.includes("class_teacher") || normAllowed.includes("subject_teacher") || normAllowed.includes("staff"))
+    ) return true;
+    if ((userRole === "super_admin" || userRole === "superadmin" || userRole === "platform_staff") && (normAllowed.includes("super_admin") || normAllowed.includes("superadmin") || normAllowed.includes("platform_staff"))) return true;
+    if ((userRole === "bursar" || userRole === "accountant") && (normAllowed.includes("bursar") || normAllowed.includes("accountant"))) return true;
+    if ((userRole === "parent" || userRole === "guardian") && (normAllowed.includes("parent") || normAllowed.includes("guardian"))) return true;
+    if ((userRole === "student" || userRole === "pupil") && (normAllowed.includes("student") || normAllowed.includes("pupil"))) return true;
+    return false;
+  };
+
+  const isChildAllowedForRole = (child: { href?: string; roles?: string[]; superAdminPermission?: string }) => {
+    const href = child.href || "";
+
+    if (isOperator && (
+      href.includes("/billing") ||
+      href.includes("/wallet") ||
+      href.includes("/bank-account") ||
+      href.includes("/settings") ||
+      href.includes("/domain-and-website") ||
+      href.includes("/operators") ||
+      href.includes("/bursar") ||
+      href.includes("/teachers") ||
+      href.includes("/teacher-subjects") ||
+      href.includes("/attendance/logs") ||
+      href.includes("/attendance/settings") ||
+      href.includes("/grading-scale") ||
+      href.includes("/academics/calendar") ||
+      href.includes("/results/deadlines")
+    )) {
+      return false;
+    }
+
+    if (isPrincipal && (
+      href.includes("/billing") ||
+      href.includes("/wallet") ||
+      href.includes("/bank-account") ||
+      href.includes("/school/settings") ||
+      href.includes("/domain-and-website") ||
+      href.includes("/settings/whatsapp") ||
+      href.includes("/operators") ||
+      href.includes("/bursar")
+    )) {
+      return false;
+    }
+
+    const roleOk = !child.roles || checkRole(child.roles);
+    return roleOk
+      && canUseSuperAdminArea(child.superAdminPermission)
+      && !shouldHideForPlan(child);
   };
 
   const ComingSoonBadge = () => (
@@ -323,6 +392,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       hideIfNoFeature: true,
       children: [
         { label: "CBT Exams", href: "/cbt/exams", roles: ["Admin", "Teacher"], featureKey: "cbt_online", hideIfNoFeature: true },
+        { label: "Offline CBT Runner", href: "/cbt/offline-runner", roles: ["Admin"], featureKey: "cbt_online", hideIfNoFeature: true },
       ],
       roles: ["Admin", "Teacher"],
     },
@@ -391,7 +461,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       lockIfNoFeature: true,
       hideIfNoFeature: true,
       children: [
-        { label: "Staff Attendance", href: "/scan-qr", roles: ["Admin", "Teacher"] },
+        { label: "Mark Attendance (Scan QR)", href: "/scan-qr", roles: ["Admin", "Teacher"] },
         { label: "Staff Attendance Logs", href: "/attendance/logs", roles: ["Admin"] },
         { label: "Attendance Settings", href: "/attendance/settings", roles: ["Admin"] },
       ],
@@ -807,65 +877,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
             <ul className="nav flex-column gap-1">
               {menuItems
                 .filter((item) => {
-                  const userRole = (user.normalized_role || user.role || "").toLowerCase().replace(/[\s-]/g, "_");
-                  const isOperator = userRole === "operator" || userRole === "registrar" || userRole === "secretary";
-                  const isPrincipal = userRole === "principal" || userRole === "head_teacher";
-
-                  const checkRole = (roles: string[]) => {
-                    const normAllowed = roles.map((r) => r.toLowerCase().replace(/[\s-]/g, "_"));
-                    if (normAllowed.includes(userRole)) return true;
-                    if ((userRole === "proprietor" || userRole === "owner" || userRole === "admin") && (normAllowed.includes("admin") || normAllowed.includes("proprietor"))) return true;
-                    if (isPrincipal && (normAllowed.includes("admin") || normAllowed.includes("principal"))) return true;
-                    if (isOperator && (normAllowed.includes("admin") || normAllowed.includes("operator"))) return true;
-                    if ((userRole === "class_teacher" || userRole === "subject_teacher" || userRole === "teacher") && (normAllowed.includes("teacher") || normAllowed.includes("class_teacher") || normAllowed.includes("subject_teacher"))) return true;
-                    if ((userRole === "super_admin" || userRole === "superadmin" || userRole === "platform_staff") && (normAllowed.includes("super_admin") || normAllowed.includes("superadmin") || normAllowed.includes("platform_staff"))) return true;
-                    if ((userRole === "bursar" || userRole === "accountant") && (normAllowed.includes("bursar") || normAllowed.includes("accountant"))) return true;
-                    if ((userRole === "parent" || userRole === "guardian") && (normAllowed.includes("parent") || normAllowed.includes("guardian"))) return true;
-                    if ((userRole === "student" || userRole === "pupil") && (normAllowed.includes("student") || normAllowed.includes("pupil"))) return true;
-                    return false;
-                  };
-
-                  const isChildAllowedForRole = (child: { href?: string; roles?: string[]; superAdminPermission?: string }) => {
-                    const href = child.href || "";
-
-                    if (isOperator && (
-                      href.includes("/billing") ||
-                      href.includes("/wallet") ||
-                      href.includes("/bank-account") ||
-                      href.includes("/settings") ||
-                      href.includes("/domain-and-website") ||
-                      href.includes("/operators") ||
-                      href.includes("/bursar") ||
-                      href.includes("/teachers") ||
-                      href.includes("/teacher-subjects") ||
-                      href.includes("/attendance/logs") ||
-                      href.includes("/attendance/settings") ||
-                      href.includes("/grading-scale") ||
-                      href.includes("/academics/calendar") ||
-                      href.includes("/results/deadlines")
-                    )) {
-                      return false;
-                    }
-
-                    if (isPrincipal && (
-                      href.includes("/billing") ||
-                      href.includes("/wallet") ||
-                      href.includes("/bank-account") ||
-                      href.includes("/school/settings") ||
-                      href.includes("/domain-and-website") ||
-                      href.includes("/settings/whatsapp") ||
-                      href.includes("/operators") ||
-                      href.includes("/bursar")
-                    )) {
-                      return false;
-                    }
-
-                    const roleOk = !child.roles || checkRole(child.roles);
-                    return roleOk
-                      && canUseSuperAdminArea(child.superAdminPermission)
-                      && !shouldHideForPlan(child);
-                  };
-
                   if (isOperator && (
                     item.collapseId === "billingMenu_admin" ||
                     item.collapseId === "settingsMenu" ||
@@ -954,44 +965,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
                             >
                               <div className="mt-1 mb-2">
                                 {item.children
-                                  .filter((child) => {
-                                    const userRole = (user.normalized_role || user.role || "").toLowerCase().replace(/[\s-]/g, "_");
-                                    const isOperator = userRole === "operator" || userRole === "registrar" || userRole === "secretary";
-                                    const isPrincipal = userRole === "principal" || userRole === "head_teacher" || userRole === "headteacher";
-                                    const href = child.href || "";
-
-                                    if (isOperator && (
-                                      href.includes("/billing") ||
-                                      href.includes("/wallet") ||
-                                      href.includes("/bank-account") ||
-                                      href.includes("/settings") ||
-                                      href.includes("/domain-and-website") ||
-                                      href.includes("/operators") ||
-                                      href.includes("/bursar")
-                                    )) {
-                                      return false;
-                                    }
-
-                                    if (isPrincipal && (
-                                      href.includes("/billing") ||
-                                      href.includes("/wallet") ||
-                                      href.includes("/bank-account") ||
-                                      href.includes("/school/settings") ||
-                                      href.includes("/domain-and-website") ||
-                                      href.includes("/settings/whatsapp") ||
-                                      href.includes("/operators") ||
-                                      href.includes("/bursar")
-                                    )) {
-                                      return false;
-                                    }
-
-                                    const normAllowed = (child.roles || []).map((r) => r.toLowerCase().replace(/[\s-]/g, "_"));
-                                    const isChildAllowed = !child.roles || normAllowed.includes(userRole) || ((userRole === "proprietor" || userRole === "admin") && normAllowed.includes("admin")) || (isPrincipal && (normAllowed.includes("admin") || normAllowed.includes("principal"))) || (isOperator && (normAllowed.includes("admin") || normAllowed.includes("operator")));
-
-                                    return isChildAllowed
-                                      && canUseSuperAdminArea(child.superAdminPermission)
-                                      && !shouldHideForPlan(child);
-                                  })
+                                  .filter(isChildAllowedForRole)
                                   .map((child) => (
                                     <NavLink
                                       key={child.label}
