@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { authApi } from "../../../utils/axios";
+import { resolveMediaUrl } from "../../../utils/apiUrl";
 import TopNav from "../../../components/LayoutComponents/TopNav";
 import Sidebar from "../../../components/LayoutComponents/Sidebar";
 import PageTitle from "../../../components/PageTitle";
@@ -295,8 +296,9 @@ export default function ParentAttendancePage() {
         }
 
         .p-child-avatar {
-          width: 30px;
-          height: 30px;
+          width: 36px;
+          height: 36px;
+          min-width: 36px;
           border-radius: 50%;
           background: #E2E8F0;
           display: flex;
@@ -305,6 +307,7 @@ export default function ParentAttendancePage() {
           font-weight: 700;
           font-size: 12px;
           color: #0F2744;
+          overflow: hidden;
         }
 
         /* KPI Cards */
@@ -436,7 +439,18 @@ export default function ParentAttendancePage() {
                       >
                         <div className="p-child-avatar">
                           {child.photo ? (
-                            <img src={child.photo} alt={child.firstname} className="w-100 h-100 rounded-circle object-fit-cover" />
+                            <img
+                              src={resolveMediaUrl(child.photo, "/media/profile.jpg", "uploads/users")}
+                              alt={child.firstname}
+                              className="w-100 h-100 rounded-circle object-fit-cover"
+                              onError={(e) => {
+                                const target = e.currentTarget as HTMLImageElement;
+                                target.style.display = "none";
+                                if (target.parentElement) {
+                                  target.parentElement.textContent = initials;
+                                }
+                              }}
+                            />
                           ) : (
                             initials
                           )}
