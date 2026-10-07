@@ -182,11 +182,11 @@ export default function InvoiceNotificationDetailsPage() {
   <PageTitle title="Invoice Details" />
       <div className="container-fluid">
         <div className="row">
-          <Sidebar sidebarOpen={sidebarOpen} />
+          <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
           <main
-            className="col-md-9 col-lg-10 ms-auto"
-            style={{ padding: 24, background: "#f5f1eb", minHeight: "100vh" }}
+            className="col-md-9 col-lg-10 ms-auto gq-app-main d-flex flex-column min-vh-100"
+            style={{ padding: "calc(66px + 24px) 28px 40px", background: "#f8fafc", minHeight: "100vh" }}
           >
             {loading && <Loader message="Loading reminder..." />}
 
