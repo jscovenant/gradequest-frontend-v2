@@ -1000,6 +1000,16 @@ function App() {
               </RequireAuth>
             }
           />
+          <Route
+            path="/announcements"
+            element={
+              <RequireAuth roles={["Admin"]}>
+                <OnboardingGuard>
+                  <WhatsAppSettingsPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
 
           <Route
             path="/school/bank-account-setting"

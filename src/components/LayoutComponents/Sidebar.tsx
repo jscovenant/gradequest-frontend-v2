@@ -223,10 +223,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       href.includes("/bursar") ||
       href.includes("/teachers") ||
       href.includes("/teacher-subjects") ||
-      href.includes("/attendance/logs") ||
-      href.includes("/attendance/settings") ||
       href.includes("/grading-scale") ||
-      href.includes("/academics/calendar") ||
       href.includes("/results/deadlines")
     )) {
       return false;
@@ -375,7 +372,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       children: [
         { label: "Classes", href: "/levels" },
         { label: "Subjects", href: "/subjects" },
-        { label: "Sessions & Terms", href: "/academics/calendar" },
+        { label: "Academic Calendar", href: "/academics/calendar" },
         { label: "Departments", href: "/departments" },
         { label: "Sections", href: "/sections" },
         { label: "Grading Scale", href: "/grading-scale" },
@@ -519,6 +516,13 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       roles: ["Super-Admin", "Platform-Staff"],
     },
     {
+      label: "Announcements",
+      icon: "megaphone",
+      href: "/announcements",
+      roles: ["Admin"],
+    },
+
+    {
       label: "Results",
       icon: "file-earmark-text",
       href: "/results",
@@ -596,14 +600,10 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
     },
 
     {
-      label: "Attendance",
+      label: "Attendance Report",
       icon: "calendar-check",
-      collapseId: "parentAttendanceMenu",
+      href: "/parent/attendance",
       roles: ["Parent"],
-      children: [
-        { label: "Attendance Report", href: "/parent/attendance" },
-        { label: "Absence History", href: "/parent/attendance/history" },
-      ],
     },
 
     {
@@ -618,25 +618,17 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
     },
 
     {
-      label: "Communication",
-      icon: "chat-dots",
-      collapseId: "parentCommunicationMenu",
+      label: "Announcements",
+      icon: "megaphone",
+      href: "/parent/messages",
       roles: ["Parent"],
-      children: [
-        { label: "Messages & Notices", href: "/parent/messages" },
-        { label: "Announcements", href: "/parent/announcements" },
-      ],
     },
 
     {
-      label: "School Information",
-      icon: "building",
-      collapseId: "parentSchoolMenu",
+      label: "Academic Calendar",
+      icon: "calendar3",
+      href: "/parent/calendar",
       roles: ["Parent"],
-      children: [
-        { label: "Academic Calendar", href: "/parent/calendar" },
-        { label: "School Events", href: "/parent/events" },
-      ],
     },
   ];
 

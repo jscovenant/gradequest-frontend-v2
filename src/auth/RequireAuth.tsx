@@ -86,15 +86,12 @@ export default function RequireAuth({ children, roles = [], permissions = [] }: 
         return <Navigate to="/unauthorized" replace />;
       }
 
-      // Strictly deny Operator from accessing Principal/Proprietor Executive Academic routes
+      // Strictly deny Operator from accessing sensitive HR & Examination Policy routes
       const isOperatorRestrictedRoute =
         isProprietorOnlyRoute ||
         location.pathname.startsWith("/teachers") ||
         location.pathname.startsWith("/teacher-subjects") ||
-        location.pathname.startsWith("/attendance/logs") ||
-        location.pathname.startsWith("/attendance/settings") ||
         location.pathname.startsWith("/grading-scale") ||
-        location.pathname.startsWith("/academics/calendar") ||
         location.pathname.startsWith("/results/deadlines");
 
       if (isOperatorRole && isOperatorRestrictedRoute) {
