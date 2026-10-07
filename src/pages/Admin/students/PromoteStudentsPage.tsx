@@ -8,7 +8,7 @@ import { authApi } from "../../../utils/axios";
 import { useToast } from "../../../contexts/ToastContext";
 import PageTitle from "../../../components/PageTitle";
 
-type Option = { id: number; name: string };
+type Option = { id: number; name: string; students_count?: number };
 
 type StudentRow = {
   id: number;
@@ -779,12 +779,12 @@ export default function PromoteStudentsPage() {
                         </option>
                         {fromClasses.map((c) => (
                           <option key={c.id} value={c.id}>
-                            {c.name}
+                            {c.name} {typeof c.students_count === "number" ? `(${c.students_count} ${c.students_count === 1 ? "student" : "students"})` : ""}
                           </option>
                         ))}
                       </select>
                       <div className="db-help">
-                        {isTeacher ? "Teachers can only promote from assigned class." : "Loads students in this class."}
+                        {isTeacher ? "Teachers can only promote from assigned class." : "Loads active students in this class."}
                       </div>
                     </div>
 
@@ -800,7 +800,7 @@ export default function PromoteStudentsPage() {
                         <option value="">Select class</option>
                         {allClasses.map((c) => (
                           <option key={c.id} value={c.id} disabled={String(c.id) === fromClassId}>
-                            {c.name}
+                            {c.name} {typeof c.students_count === "number" ? `(${c.students_count} ${c.students_count === 1 ? "student" : "students"})` : ""}
                           </option>
                         ))}
                       </select>
@@ -936,8 +936,14 @@ export default function PromoteStudentsPage() {
                     ) : filteredStudents.length === 0 ? (
                       <tr>
                         <td colSpan={4} className="db-empty">
-                          <div style={{ fontWeight: 800, color: "#1a1a2e" }}>No students found</div>
-                          <div style={{ marginTop: 6 }}>Try clearing search or check the selected class.</div>
+                          <div style={{ fontWeight: 800, color: "#1a1a2e" }}>
+                            {query.trim() ? "No matching students found" : "No active students in this class"}
+                          </div>
+                          <div style={{ marginTop: 6 }}>
+                            {query.trim()
+                              ? `No active students match "${query}". Try clearing your search.`
+                              : "This class currently does not have any active students eligible for promotion."}
+                          </div>
                         </td>
                       </tr>
                     ) : (
