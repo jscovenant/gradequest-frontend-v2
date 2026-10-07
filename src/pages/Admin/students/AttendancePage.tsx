@@ -111,14 +111,24 @@ export default function AttendancePage() {
       setClasses(cls);
       const academicCalendar: AcademicCalendar = payload.academic_calendar || { configured: false, weeks: [] };
       setCalendar(academicCalendar);
-      if (academicCalendar.current_week) setWeekNumber(String(academicCalendar.current_week.number));
+      if (academicCalendar.current_week) {
+        setWeekNumber(String(academicCalendar.current_week.number));
+      } else if (academicCalendar.weeks && academicCalendar.weeks.length > 0) {
+        const matchingWeek = academicCalendar.weeks.find((w) => date >= w.start_date && date <= w.end_date);
+        if (matchingWeek) {
+          setWeekNumber(String(matchingWeek.number));
+        } else {
+          setWeekNumber(String(academicCalendar.weeks[0].number));
+          setDate(academicCalendar.weeks[0].start_date);
+        }
+      }
 
       const r = String(payload.role || "").toLowerCase();
       setRole(r === "admin" ? "admin" : r === "teacher" ? "teacher" : "other");
 
       if (payload.default_class_id) {
         setClassId(String(payload.default_class_id));
-      } else if (cls.length === 1) {
+      } else if (cls.length > 0) {
         setClassId(String(cls[0].id));
       }
     } catch (err) {
@@ -219,6 +229,14 @@ export default function AttendancePage() {
     setWeekNumber(value);
     const week = calendar.weeks.find((item) => String(item.number) === value);
     if (week && (date < week.start_date || date > week.end_date)) setDate(week.start_date);
+  };
+
+  const handleDateChange = (newDate: string) => {
+    setDate(newDate);
+    const week = calendar.weeks.find((item) => newDate >= item.start_date && newDate <= item.end_date);
+    if (week) {
+      setWeekNumber(String(week.number));
+    }
   };
 
   /* ================= UI HELPERS ================= */
@@ -815,7 +833,7 @@ export default function AttendancePage() {
                     onChange={(e) => setClassId(e.target.value)}
                     title={disableClassSelect ? "Teacher class is fixed" : "Select class"}
                   >
-                    <option value="">{loadingPage ? "Loading classes…" : "Select Class"}</option>
+                    <option value="">{loadingPage ? "Loading classes…" : classes.length === 0 ? "No classes available" : "Select Class"}</option>
                     {classes.map((cls) => (
                       <option key={cls.id} value={cls.id}>
                         {cls.name}
@@ -827,7 +845,7 @@ export default function AttendancePage() {
                     type="date"
                     className="db-input"
                     value={date}
-                    onChange={(e) => setDate(e.target.value)}
+                    onChange={(e) => handleDateChange(e.target.value)}
                     disabled={loadingStudents || loadingPage}
                     min={calendar.weeks.find((week) => String(week.number) === weekNumber)?.start_date}
                     max={calendar.weeks.find((week) => String(week.number) === weekNumber)?.end_date}
