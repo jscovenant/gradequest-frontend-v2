@@ -606,6 +606,51 @@ export default function SubjectsPage() {
     }
   }
 
+  async function bulkArchiveSubjects() {
+    const ids = Object.entries(selectedIds)
+      .filter(([_, v]) => v)
+      .map(([k]) => Number(k));
+
+    if (ids.length === 0) return showError("Please select at least one subject to archive.");
+
+    const confirmed = window.confirm(
+      `Are you sure you want to archive ${ids.length} selected subject(s)? They will be hidden from new subject allocation.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setBusyKey("subject:bulk-archive");
+      const res = await authApi.post("/subjects/bulk-archive", { subject_ids: ids });
+      showSuccess(res.data?.message ?? "Subjects successfully archived.");
+      setSelectedIds({});
+      await fetchSubjects();
+    } catch (err: any) {
+      showError(getErrorMessage(err));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function bulkRestoreSubjects() {
+    const ids = Object.entries(selectedIds)
+      .filter(([_, v]) => v)
+      .map(([k]) => Number(k));
+
+    if (ids.length === 0) return showError("Please select at least one subject to restore.");
+
+    try {
+      setBusyKey("subject:bulk-restore");
+      const res = await authApi.post("/subjects/bulk-restore", { subject_ids: ids });
+      showSuccess(res.data?.message ?? "Subjects successfully restored.");
+      setSelectedIds({});
+      await fetchSubjects();
+    } catch (err: any) {
+      showError(getErrorMessage(err));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
   /* =========================
      CURRICULUM PRESET IMPORTER
   ========================= */
@@ -1575,35 +1620,167 @@ export default function SubjectsPage() {
                 </div>
               )}
 
+              {/* Bulk Selection Bar */}
+              {selectedCount > 0 && (
+                <div
+                  style={{
+                    background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)",
+                    borderRadius: 14,
+                    padding: "14px 18px",
+                    color: "#FFFFFF",
+                    marginBottom: 16,
+                    boxShadow: "0 8px 24px rgba(15, 23, 42, 0.18)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <span
+                      style={{
+                        background: showArchived ? "rgba(239, 68, 68, 0.2)" : "rgba(59, 130, 246, 0.22)",
+                        border: `1px solid ${showArchived ? "rgba(248, 113, 113, 0.45)" : "rgba(96, 165, 250, 0.45)"}`,
+                        color: showArchived ? "#FCA5A5" : "#93C5FD",
+                        fontWeight: 700,
+                        fontSize: 13,
+                        padding: "5px 12px",
+                        borderRadius: 999,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <span>✓</span> {selectedCount} subject{selectedCount > 1 ? "s" : ""} selected
+                    </span>
+                    <button
+                      type="button"
+                      onClick={clearSelection}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        color: "#94A3B8",
+                        fontSize: 12.5,
+                        cursor: "pointer",
+                        padding: 0,
+                        textDecoration: "underline",
+                      }}
+                    >
+                      Deselect all
+                    </button>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    {!showArchived ? (
+                      <>
+                        <button
+                          type="button"
+                          className="db-chip-btn"
+                          style={{ background: "#FFFFFF", color: "#0F172A", fontWeight: 700 }}
+                          onClick={() => setShowAssignSection(true)}
+                        >
+                          Assign Section ({selectedCount})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={bulkArchiveSubjects}
+                          disabled={busyKey === "subject:bulk-archive"}
+                          style={{
+                            background: "#DC2626",
+                            color: "#FFFFFF",
+                            border: "none",
+                            borderRadius: 8,
+                            padding: "7px 16px",
+                            fontSize: 13,
+                            fontWeight: 700,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            cursor: "pointer",
+                            boxShadow: "0 2px 8px rgba(220, 38, 38, 0.35)",
+                          }}
+                        >
+                          📦 Archive Selected ({selectedCount})
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={bulkRestoreSubjects}
+                        disabled={busyKey === "subject:bulk-restore"}
+                        style={{
+                          background: "#059669",
+                          color: "#FFFFFF",
+                          border: "none",
+                          borderRadius: 8,
+                          padding: "7px 16px",
+                          fontSize: 13,
+                          fontWeight: 700,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          cursor: "pointer",
+                          boxShadow: "0 2px 8px rgba(5, 150, 105, 0.35)",
+                        }}
+                      >
+                        🔄 Restore to Active ({selectedCount})
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Table Toolbar */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 14, borderBottom: "1px solid #F1F5F9", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
                 <div style={{ fontSize: 13, color: "#64748B" }}>
                   Total: <b style={{ color: "#0F172A" }}>{filteredSubjects.length}</b> {showArchived ? "archived" : "active"} subjects
-                  {selectedCount > 0 && !showArchived && (
-                    <span style={{ marginLeft: 10, color: "#2563EB", fontWeight: 700 }}>
+                  {selectedCount > 0 && (
+                    <span style={{ marginLeft: 10, color: showArchived ? "#DC2626" : "#2563EB", fontWeight: 700 }}>
                       • {selectedCount} selected
                     </span>
                   )}
                 </div>
 
-                {!showArchived && (
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button className="db-chip-btn" onClick={selectAllFiltered} disabled={filteredSubjects.length === 0} type="button">
-                      Select All
-                    </button>
-                    <button className="db-chip-btn" onClick={clearSelection} disabled={selectedCount === 0} type="button">
-                      Clear
-                    </button>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button className="db-chip-btn" onClick={selectAllFiltered} disabled={filteredSubjects.length === 0} type="button">
+                    Select All
+                  </button>
+                  <button className="db-chip-btn" onClick={clearSelection} disabled={selectedCount === 0} type="button">
+                    Clear
+                  </button>
+                  {!showArchived ? (
+                    <>
+                      <button
+                        className="db-chip-btn"
+                        onClick={() => setShowAssignSection(true)}
+                        disabled={selectedCount === 0}
+                        type="button"
+                      >
+                        Assign Section ({selectedCount})
+                      </button>
+                      <button
+                        className="db-chip-btn"
+                        style={{ color: "#DC2626", borderColor: "#FECACA", background: "#FEF2F2", fontWeight: 700 }}
+                        onClick={bulkArchiveSubjects}
+                        disabled={selectedCount === 0 || busyKey === "subject:bulk-archive"}
+                        type="button"
+                      >
+                        📦 Archive Selected ({selectedCount})
+                      </button>
+                    </>
+                  ) : (
                     <button
                       className="db-chip-btn"
-                      onClick={() => setShowAssignSection(true)}
-                      disabled={selectedCount === 0}
+                      style={{ color: "#059669", borderColor: "#A7F3D0", background: "#ECFDF5", fontWeight: 700 }}
+                      onClick={bulkRestoreSubjects}
+                      disabled={selectedCount === 0 || busyKey === "subject:bulk-restore"}
                       type="button"
                     >
-                      Assign Section ({selectedCount})
+                      🔄 Restore Selected ({selectedCount})
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               {/* Subject Table */}
@@ -1615,11 +1792,12 @@ export default function SubjectsPage() {
                         <input
                           type="checkbox"
                           checked={allFilteredSelected}
-                          disabled={showArchived || filteredSubjects.length === 0}
+                          disabled={filteredSubjects.length === 0}
                           onChange={(e) => {
                             if (e.target.checked) selectAllFiltered();
                             else clearSelection();
                           }}
+                          style={{ width: 16, height: 16, cursor: "pointer" }}
                         />
                       </th>
                       <th>Subject Name</th>
@@ -1659,7 +1837,7 @@ export default function SubjectsPage() {
                               type="checkbox"
                               checked={!!selectedIds[s.id]}
                               onChange={() => toggleSelect(s.id)}
-                              disabled={showArchived}
+                              style={{ width: 16, height: 16, cursor: "pointer" }}
                             />
                           </td>
                           <td>

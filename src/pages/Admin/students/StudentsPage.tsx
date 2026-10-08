@@ -190,6 +190,12 @@ export default function StudentsPage() {
   const [downloadingTemplate, setDownloadingTemplate] = useState<"xlsx" | "csv" | null>(null);
   const [updatingLifecycleId, setUpdatingLifecycleId] = useState<number | null>(null);
 
+  /* Bulk selection */
+  const [selectedStudentIds, setSelectedStudentIds] = useState<Record<number, boolean>>({});
+  const [bulkStatusModalOpen, setBulkStatusModalOpen] = useState(false);
+  const [bulkTargetStatus, setBulkTargetStatus] = useState<"active" | "alumni" | "graduate">("graduate");
+  const [processingBulkStatus, setProcessingBulkStatus] = useState(false);
+
   /* Profile */
   const [selectedStudent, setSelectedStudent]   = useState<Student | null>(null);
   const [studentDetails, setStudentDetails]     = useState<any>(null);
@@ -365,8 +371,6 @@ export default function StudentsPage() {
 
   const updateStudentLifecycle = async (student: Student, student_status: "active" | "alumni" | "graduate") => {
     if ((student.student_status || (student.status === 1 ? "active" : "inactive")) === student_status) return;
-    const confirmed = window.confirm(`Mark ${fullName(student) || "this student"} as ${lifecycleLabel(student_status)}?`);
-    if (!confirmed) return;
     setUpdatingLifecycleId(student.id);
     try {
       const res = await authApi.patch(`/students/${student.id}/lifecycle-status`, { student_status });
@@ -377,6 +381,81 @@ export default function StudentsPage() {
       showError(err?.response?.data?.message ?? "Could not update student status");
     } finally {
       setUpdatingLifecycleId(null);
+    }
+  };
+
+  const selectedStudentCount = useMemo(() => {
+    return Object.values(selectedStudentIds).filter(Boolean).length;
+  }, [selectedStudentIds]);
+
+  const selectedStudentsList = useMemo(() => {
+    return students.filter((s) => !!selectedStudentIds[s.id]);
+  }, [students, selectedStudentIds]);
+
+  const allCurrentPageSelected = useMemo(() => {
+    return students.length > 0 && students.every((s) => !!selectedStudentIds[s.id]);
+  }, [students, selectedStudentIds]);
+
+  const toggleSelectAllCurrentPage = () => {
+    if (allCurrentPageSelected) {
+      setSelectedStudentIds((prev) => {
+        const next = { ...prev };
+        students.forEach((s) => delete next[s.id]);
+        return next;
+      });
+    } else {
+      setSelectedStudentIds((prev) => {
+        const next = { ...prev };
+        students.forEach((s) => {
+          next[s.id] = true;
+        });
+        return next;
+      });
+    }
+  };
+
+  const toggleStudentSelect = (id: number) => {
+    setSelectedStudentIds((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
+
+  const clearStudentSelection = () => {
+    setSelectedStudentIds({});
+  };
+
+  const openBulkStatusConfirm = (status: "active" | "alumni" | "graduate") => {
+    if (selectedStudentCount === 0) {
+      showError("Please select at least one student.");
+      return;
+    }
+    setBulkTargetStatus(status);
+    setBulkStatusModalOpen(true);
+  };
+
+  const executeBulkStatusChange = async () => {
+    const ids = Object.entries(selectedStudentIds)
+      .filter(([_, v]) => v)
+      .map(([k]) => Number(k));
+
+    if (ids.length === 0) return;
+
+    setProcessingBulkStatus(true);
+    try {
+      const res = await authApi.patch("/students/bulk-lifecycle-status", {
+        student_ids: ids,
+        student_status: bulkTargetStatus,
+      });
+      showSuccess(res.data?.message ?? "Students status updated successfully.");
+      setBulkStatusModalOpen(false);
+      clearStudentSelection();
+      profileCache.current = {};
+      await fetchStudents();
+    } catch (err: any) {
+      showError(err?.response?.data?.message ?? "Failed to update student status.");
+    } finally {
+      setProcessingBulkStatus(false);
     }
   };
 
@@ -1666,10 +1745,139 @@ export default function StudentsPage() {
                 </div>
               )}
 
+              {/* Bulk Selection Action Toolbar */}
+              {selectedStudentCount > 0 && (
+                <div
+                  style={{
+                    background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)",
+                    borderRadius: 14,
+                    padding: "14px 18px",
+                    color: "#FFFFFF",
+                    marginBottom: 16,
+                    boxShadow: "0 8px 24px rgba(15, 23, 42, 0.18)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: 12,
+                    animation: "spFadeUp .3s ease both",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <span
+                      style={{
+                        background: "rgba(59, 130, 246, 0.22)",
+                        border: "1px solid rgba(96, 165, 250, 0.45)",
+                        color: "#93C5FD",
+                        fontWeight: 700,
+                        fontSize: 13,
+                        padding: "5px 12px",
+                        borderRadius: 999,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <span>✓</span> {selectedStudentCount} student{selectedStudentCount > 1 ? "s" : ""} selected
+                    </span>
+                    <button
+                      type="button"
+                      onClick={clearStudentSelection}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        color: "#94A3B8",
+                        fontSize: 12.5,
+                        cursor: "pointer",
+                        padding: 0,
+                        textDecoration: "underline",
+                      }}
+                    >
+                      Deselect all
+                    </button>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em" }}>
+                      Change Status To:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => openBulkStatusConfirm("graduate")}
+                      style={{
+                        background: "#2563EB",
+                        color: "#FFFFFF",
+                        border: "none",
+                        borderRadius: 8,
+                        padding: "7px 14px",
+                        fontSize: 12.5,
+                        fontWeight: 700,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        cursor: "pointer",
+                        boxShadow: "0 2px 8px rgba(37, 99, 235, 0.35)",
+                      }}
+                    >
+                      🎓 Graduate ({selectedStudentCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openBulkStatusConfirm("alumni")}
+                      style={{
+                        background: "#D97706",
+                        color: "#FFFFFF",
+                        border: "none",
+                        borderRadius: 8,
+                        padding: "7px 14px",
+                        fontSize: 12.5,
+                        fontWeight: 700,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        cursor: "pointer",
+                        boxShadow: "0 2px 8px rgba(217, 119, 6, 0.35)",
+                      }}
+                    >
+                      🏛️ Alumni ({selectedStudentCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openBulkStatusConfirm("active")}
+                      style={{
+                        background: "#059669",
+                        color: "#FFFFFF",
+                        border: "none",
+                        borderRadius: 8,
+                        padding: "7px 14px",
+                        fontSize: 12.5,
+                        fontWeight: 700,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        cursor: "pointer",
+                        boxShadow: "0 2px 8px rgba(5, 150, 105, 0.35)",
+                      }}
+                    >
+                      🟢 Active ({selectedStudentCount})
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="overflow-auto">
                 <table className="db-table">
                   <thead>
                     <tr>
+                      <th style={{ width: 44, paddingLeft: 16 }}>
+                        <input
+                          type="checkbox"
+                          checked={allCurrentPageSelected}
+                          onChange={toggleSelectAllCurrentPage}
+                          title="Select/Deselect all on this page"
+                          style={{ width: 16, height: 16, cursor: "pointer" }}
+                        />
+                      </th>
                       <th>Student</th><th>Reg. No</th><th>Class</th><th>Status</th>
                       <th style={{ textAlign: "right" }}>Action</th>
                     </tr>
@@ -1678,6 +1886,9 @@ export default function StudentsPage() {
                     {loading ? (
                       Array.from({ length: 5 }).map((_, i) => (
                         <tr key={i}>
+                          <td style={{ width: 44, paddingLeft: 16 }}>
+                            <div className="sp-skel" style={{ width: 16, height: 16, borderRadius: 4 }} />
+                          </td>
                           <td>
                             <div className="d-flex align-items-center gap-3">
                               <div className="sp-skel" style={{ width: 40, height: 40, borderRadius: "50%", flexShrink: 0 }} />
@@ -1692,12 +1903,20 @@ export default function StudentsPage() {
                         </tr>
                       ))
                     ) : students.length === 0 ? (
-                      <tr><td colSpan={5} className="db-table-empty">No students found.</td></tr>
+                      <tr><td colSpan={6} className="db-table-empty">No students found.</td></tr>
                     ) : students.map(s => {
                       const lifecycle = s.student_status || (s.status === 1 ? "active" : "inactive");
                       const initials = [s.firstname?.[0], s.surname?.[0]].filter(Boolean).join("").toUpperCase();
                       return (
                         <tr key={s.id}>
+                          <td style={{ width: 44, paddingLeft: 16 }}>
+                            <input
+                              type="checkbox"
+                              checked={!!selectedStudentIds[s.id]}
+                              onChange={() => toggleStudentSelect(s.id)}
+                              style={{ width: 16, height: 16, cursor: "pointer" }}
+                            />
+                          </td>
                           <td>
                             <div className="d-flex align-items-center gap-3">
                               {s.photo
@@ -2366,6 +2585,193 @@ export default function StudentsPage() {
     </div>
   </div>
 )}
+
+      {/* ══════════════════════════════════════
+          BULK STATUS CHANGE CONFIRMATION MODAL
+      ══════════════════════════════════════ */}
+      {bulkStatusModalOpen && (
+        <div
+          className="wd-overlay"
+          onMouseDown={() => {
+            if (!processingBulkStatus) setBulkStatusModalOpen(false);
+          }}
+        >
+          <div
+            className="wd-card"
+            style={{ width: "min(540px, 94vw)" }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div
+              className="wd-header"
+              style={{
+                background:
+                  bulkTargetStatus === "graduate"
+                    ? "linear-gradient(135deg, #0F172A 0%, #1E3A8A 100%)"
+                    : bulkTargetStatus === "alumni"
+                    ? "linear-gradient(135deg, #0F172A 0%, #78350F 100%)"
+                    : "linear-gradient(135deg, #0F172A 0%, #064E3B 100%)",
+              }}
+            >
+              <div
+                className="wd-icon-wrap"
+                style={{
+                  background:
+                    bulkTargetStatus === "graduate"
+                      ? "rgba(37, 99, 235, 0.25)"
+                      : bulkTargetStatus === "alumni"
+                      ? "rgba(217, 119, 6, 0.25)"
+                      : "rgba(5, 150, 105, 0.25)",
+                  borderColor:
+                    bulkTargetStatus === "graduate"
+                      ? "rgba(96, 165, 250, 0.45)"
+                      : bulkTargetStatus === "alumni"
+                      ? "rgba(251, 191, 36, 0.45)"
+                      : "rgba(52, 211, 153, 0.45)",
+                }}
+              >
+                <span style={{ fontSize: 22 }}>
+                  {bulkTargetStatus === "graduate" ? "🎓" : bulkTargetStatus === "alumni" ? "🏛️" : "🟢"}
+                </span>
+              </div>
+              <div className="wd-title">
+                {bulkTargetStatus === "graduate"
+                  ? "Mark Students as Graduate"
+                  : bulkTargetStatus === "alumni"
+                  ? "Mark Students as Alumni"
+                  : "Restore Students to Active"}
+              </div>
+              <div className="wd-subtitle">
+                {selectedStudentCount} student{selectedStudentCount > 1 ? "s" : ""} selected for status change
+              </div>
+            </div>
+
+            <div className="wd-body">
+              <div
+                style={{
+                  background:
+                    bulkTargetStatus === "graduate"
+                      ? "rgba(37, 99, 235, 0.06)"
+                      : bulkTargetStatus === "alumni"
+                      ? "rgba(217, 119, 6, 0.06)"
+                      : "rgba(5, 150, 105, 0.06)",
+                  border: `1px solid ${
+                    bulkTargetStatus === "graduate"
+                      ? "rgba(37, 99, 235, 0.2)"
+                      : bulkTargetStatus === "alumni"
+                      ? "rgba(217, 119, 6, 0.2)"
+                      : "rgba(5, 150, 105, 0.2)"
+                  }`,
+                  borderRadius: 10,
+                  padding: "14px 16px",
+                  marginBottom: 16,
+                  fontSize: 13,
+                  color: "#334155",
+                  lineHeight: 1.5,
+                }}
+              >
+                {bulkTargetStatus === "graduate" ? (
+                  <>
+                    <strong>Graduate Status:</strong> These students will be marked as graduates. They will be archived from active classroom rosters, but their complete academic transcripts and broadsheets remain fully preserved.
+                  </>
+                ) : bulkTargetStatus === "alumni" ? (
+                  <>
+                    <strong>Alumni Status:</strong> These students will be marked as alumni. They will be removed from daily class attendance and tuition billings while maintaining their full record history.
+                  </>
+                ) : (
+                  <>
+                    <strong>Active Status:</strong> These students will be returned to active rosters and will count toward active classroom rosters and school billing limits.
+                  </>
+                )}
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 8 }}>
+                  Selected Students ({selectedStudentCount})
+                </div>
+                <div
+                  style={{
+                    maxHeight: 160,
+                    overflowY: "auto",
+                    border: "1px solid #E2E8F0",
+                    borderRadius: 10,
+                    padding: 8,
+                    background: "#F8FAFC",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                  }}
+                >
+                  {selectedStudentsList.map((s) => (
+                    <div
+                      key={s.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "6px 10px",
+                        background: "#FFFFFF",
+                        borderRadius: 6,
+                        border: "1px solid #EDF2F7",
+                        fontSize: 12.5,
+                      }}
+                    >
+                      <span style={{ fontWeight: 700, color: "#0F172A" }}>{fullName(s)}</span>
+                      <span style={{ color: "#64748B", fontSize: 11.5 }}>
+                        {s.reg_no} • {s.level?.name || "No class"}
+                      </span>
+                    </div>
+                  ))}
+                  {selectedStudentCount > selectedStudentsList.length && (
+                    <div style={{ textAlign: "center", fontSize: 12, color: "#64748B", padding: 4 }}>
+                      + {selectedStudentCount - selectedStudentsList.length} more student(s) from other pages
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="wd-footer" style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button
+                type="button"
+                className="wd-btn-cancel"
+                onClick={() => setBulkStatusModalOpen(false)}
+                disabled={processingBulkStatus}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="db-btn-gold"
+                style={{
+                  background:
+                    bulkTargetStatus === "graduate"
+                      ? "#2563EB"
+                      : bulkTargetStatus === "alumni"
+                      ? "#D97706"
+                      : "#059669",
+                  borderColor: "transparent",
+                  color: "#FFFFFF",
+                  padding: "9px 18px",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  borderRadius: 8,
+                  cursor: "pointer",
+                }}
+                onClick={executeBulkStatusChange}
+                disabled={processingBulkStatus}
+              >
+                {processingBulkStatus ? (
+                  <>
+                    <span className="sp-spinner" /> Updating…
+                  </>
+                ) : (
+                  `Confirm ${lifecycleLabel(bulkTargetStatus)} (${selectedStudentCount})`
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
