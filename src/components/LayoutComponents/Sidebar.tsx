@@ -313,6 +313,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       roles: ["Super-Admin", "Platform-Staff"],
       superAdminPermission: "support",
     },
+    {
+      label: "Twilio WhatsApp",
+      icon: "whatsapp",
+      href: "/superadmin/twilio-whatsapp",
+      roles: ["Super-Admin", "Platform-Staff"],
+    },
 
     {
       label: "Students",
@@ -487,7 +493,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
         { label: "Platform Staff", href: "/superadmin/platform-staff", superAdminPermission: "staff" },
         { label: "Subscribers", href: "/superadmin/subscribers", superAdminPermission: "billing" },
         { label: "Billing Policy & Bank Charges", href: "/superadmin/billing-policy", superAdminPermission: "billing" },
-        { label: "Twilio WhatsApp", href: "/superadmin/twilio-whatsapp", superAdminPermission: "support" },
+        { label: "Twilio WhatsApp", href: "/superadmin/twilio-whatsapp" },
         { label: "Bookings", href: "/demo-bookers", superAdminPermission: "sales" }
       ],
       
