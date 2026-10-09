@@ -1,6 +1,8 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PageTitle from "../components/PageTitle";
 import CbtHtml from "../components/cbt/CbtHtml";
+import CbtNetworkStatus from "../components/cbt/CbtNetworkStatus";
+import CbtRejectionNotice, { CbtRejection } from "../components/cbt/CbtRejectionNotice";
 
 type BundleSummary = {
   id: number;
@@ -133,7 +135,9 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
 
   if (!res.ok) {
     const payload = await res.json().catch(() => ({}));
-    throw new Error(payload?.message || "Offline CBT request failed.");
+    const err: any = new Error(payload?.message || "Offline CBT request failed.");
+    err.rejection = payload?.rejection;
+    throw err;
   }
 
   return res.json();
@@ -183,6 +187,7 @@ export default function OfflineCbtRunnerPage() {
   const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [calcValue, setCalcValue] = useState("");
   const [message, setMessage] = useState("");
+  const [rejection, setRejection] = useState<CbtRejection | null>(null);
   const eventThrottleRef = useRef<Record<string, number>>({});
   const forcedSubmitRef = useRef(false);
   const isServerConsole = ["localhost", "127.0.0.1"].includes(window.location.hostname) || window.location.search.includes("server=1");
@@ -224,6 +229,7 @@ export default function OfflineCbtRunnerPage() {
     if (!file) return;
 
     setBusy(true);
+    setRejection(null);
     try {
       const bundleJson = JSON.parse(await file.text());
       const res = await apiFetch<{ message: string; bundle: BundleSummary }>("/offline-cbt/bundle/import", {
@@ -247,18 +253,30 @@ export default function OfflineCbtRunnerPage() {
 
   async function refreshStudentExams(regNo = studentRegNo) {
     setBusy(true);
+    setRejection(null);
     try {
-      const res = await apiFetch<{ student: Student; exams: ExamSummary[]; school?: { name?: string } }>("/offline-cbt/students/lookup", {
+      const res = await apiFetch<{ student: Student; exams: ExamSummary[]; rejection?: CbtRejection; school?: { name?: string } }>("/offline-cbt/students/lookup", {
         method: "POST",
         body: JSON.stringify({ student_reg_no: regNo }),
       });
       setStudent(res.student);
       setExams(res.exams || []);
+      if (res.rejection) {
+        setRejection(res.rejection);
+      }
       setMessage("");
     } catch (err: any) {
       setStudent(null);
       setExams([]);
-      setMessage(err.message || "Admission number was not found.");
+      if (err?.rejection) {
+        setRejection(err.rejection);
+      } else {
+        setRejection({
+          reason: "no_exam_set",
+          title: "Admission Number Not Found",
+          message: err.message || "Admission number was not found on this local CBT server. Please verify your registration number with the invigilator.",
+        });
+      }
     } finally {
       setBusy(false);
     }
@@ -272,6 +290,7 @@ export default function OfflineCbtRunnerPage() {
   async function startExam(exam: ExamSummary) {
     if (!student) return;
     setBusy(true);
+    setRejection(null);
     try {
       const res = await apiFetch<{ attempt: Attempt; exam: ExamPaper; student: Student }>("/offline-cbt/exams/" + exam.id + "/start", {
         method: "POST",
@@ -577,6 +596,12 @@ export default function OfflineCbtRunnerPage() {
 
       <main className="offline-cbt">
         <div className="offline-shell">
+          <CbtNetworkStatus
+            pingUrl={`${apiRoot}/offline-cbt/ping`}
+            serverLabel={isServerConsole ? "Local Server Engine" : "Local CBT Server"}
+            isHostServer={isServerConsole}
+          />
+
           <section className="offline-hero">
             <div>
               <h1>{isServerConsole ? "Offline CBT Control Room" : "Student CBT Access"}</h1>
@@ -591,6 +616,7 @@ export default function OfflineCbtRunnerPage() {
 
           {message && <div className="offline-alert">{message}</div>}
           {loading && <div className="offline-alert">Checking local CBT server...</div>}
+          {rejection && <CbtRejectionNotice rejection={rejection} onRetry={() => refreshStudentExams()} />}
 
           {!examPaper && (
             <section className="offline-grid">

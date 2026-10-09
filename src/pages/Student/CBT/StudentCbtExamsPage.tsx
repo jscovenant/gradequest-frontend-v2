@@ -6,6 +6,8 @@ import Footer from "../../../components/LayoutComponents/Footer";
 import Loader from "../../../components/ui/dashboardLoader";
 import PageTitle from "../../../components/PageTitle";
 import CbtHtml from "../../../components/cbt/CbtHtml";
+import CbtNetworkStatus from "../../../components/cbt/CbtNetworkStatus";
+import CbtRejectionNotice, { CbtRejection } from "../../../components/cbt/CbtRejectionNotice";
 import { authApi } from "../../../utils/axios";
 import { useToast } from "../../../contexts/ToastContext";
 
@@ -99,6 +101,7 @@ export default function StudentCbtExamsPage() {
   const [syncStatus, setSyncStatus] = useState<"synced" | "syncing" | "offline_saved">("synced");
   const [unsyncedQuestionIds, setUnsyncedQuestionIds] = useState<number[]>([]);
   const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+  const [rejection, setRejection] = useState<CbtRejection | null>(null);
 
   const eventThrottleRef = useRef<Record<string, number>>({});
   const saveTimersRef = useRef<Record<number, number>>({});
@@ -141,11 +144,33 @@ export default function StudentCbtExamsPage() {
 
   async function load() {
     setLoading(true);
+    setRejection(null);
     try {
       const res = await authApi.get("/cbt/student/exams");
-      setExams(Array.isArray(res.data?.exams) ? res.data.exams : []);
+      const list = Array.isArray(res.data?.exams) ? res.data.exams : [];
+      setExams(list);
+      if (res.data?.rejection) {
+        setRejection(res.data.rejection);
+      } else if (list.length === 0) {
+        setRejection({
+          reason: "no_exam_set",
+          title: "No CBT Exam Scheduled for Your Class",
+          message: "There are currently no active CBT examinations scheduled for your class or department. Published exams will appear here.",
+        });
+      }
     } catch (e: any) {
-      showError(e?.response?.data?.message || "Unable to load CBT exams.");
+      if (e?.response?.data?.rejection) {
+        setRejection(e.response.data.rejection);
+      } else {
+        const msg = e?.response?.data?.message || "Unable to load CBT exams.";
+        const isFee = msg.toLowerCase().includes("fee") || msg.toLowerCase().includes("clearance") || msg.toLowerCase().includes("tuition");
+        const isPlan = msg.toLowerCase().includes("edition") || msg.toLowerCase().includes("upgrade") || msg.toLowerCase().includes("subscription");
+        setRejection({
+          reason: isFee ? "school_fee" : isPlan ? "platform_fee" : "no_exam_set",
+          title: isFee ? "School Fee Clearance Required" : isPlan ? "Platform Subscription Required" : "Access Denied",
+          message: msg,
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -387,7 +412,11 @@ export default function StudentCbtExamsPage() {
       }
       showSuccess("CBT exam started.");
     } catch (e: any) {
-      showError(e?.response?.data?.message || "Unable to start CBT exam.");
+      if (e?.response?.data?.rejection) {
+        setRejection(e.response.data.rejection);
+      } else {
+        showError(e?.response?.data?.message || "Unable to start CBT exam.");
+      }
     } finally {
       setStartingId(null);
     }
@@ -659,24 +688,32 @@ export default function StudentCbtExamsPage() {
       <PageTitle title="My CBT Exams" />
       <div className="container-fluid"><div className="row"><Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
         <main className="col-md-9 col-lg-10 ms-auto db-main scbt-main">{loading && <Loader message="Loading CBT exams..." />}<div className="scbt-shell">
+          <CbtNetworkStatus pingUrl="/public/cbt/ping" serverLabel="Exam Host Server" />
+
           <section className="scbt-hero"><h1>My CBT Exams</h1><p>Start only when your teacher or school tells you to begin. Passages will stay attached to their questions.</p></section>
 
           {!examPaper && (
-            <section className="scbt-grid">
-              {exams.length === 0 ? <div className="scbt-card"><p className="scbt-title">No CBT exam available</p><p className="scbt-sub">Published exams assigned to your class will appear here.</p></div> : exams.map((exam) => (
-                <article className="scbt-card" key={exam.id}>
-                  <h2 className="scbt-title">{exam.title}</h2>
-                  <p className="scbt-sub">{exam.subject?.name || "Subject"} - {exam.term?.name || "Term"} {exam.academic_session?.name || ""}</p>
-                  {exam.fee_access && !exam.fee_access.allowed && (
-                    <div className="scbt-warning">
-                      {exam.fee_access.message || "Access denied. Complete the required school fee payment before starting this exam."}
-                    </div>
-                  )}
-                  <div className="scbt-meta"><span className="scbt-pill">{exam.duration_minutes} minutes</span><span className="scbt-pill">{exam.questions_count ?? 0} questions</span><span className="scbt-pill">{exam.delivery_mode}</span></div>
-                  <button className="scbt-btn" disabled={startingId === exam.id || exam.fee_access?.allowed === false} onClick={() => startExam(exam.id)}>{startingId === exam.id ? "Starting..." : "Start Exam"}</button>
-                </article>
-              ))}
-            </section>
+            <>
+              {rejection && exams.length === 0 && (
+                <CbtRejectionNotice rejection={rejection} onRetry={() => load()} />
+              )}
+
+              <section className="scbt-grid">
+                {exams.length === 0 && !rejection ? <div className="scbt-card"><p className="scbt-title">No CBT exam available</p><p className="scbt-sub">Published exams assigned to your class will appear here.</p></div> : exams.map((exam) => (
+                  <article className="scbt-card" key={exam.id}>
+                    <h2 className="scbt-title">{exam.title}</h2>
+                    <p className="scbt-sub">{exam.subject?.name || "Subject"} - {exam.term?.name || "Term"} {exam.academic_session?.name || ""}</p>
+                    {exam.fee_access && !exam.fee_access.allowed && (
+                      <div className="scbt-warning">
+                        {exam.fee_access.message || "Access denied. Complete the required school fee payment before starting this exam."}
+                      </div>
+                    )}
+                    <div className="scbt-meta"><span className="scbt-pill">{exam.duration_minutes} minutes</span><span className="scbt-pill">{exam.questions_count ?? 0} questions</span><span className="scbt-pill">{exam.delivery_mode}</span></div>
+                    <button className="scbt-btn" disabled={startingId === exam.id || exam.fee_access?.allowed === false} onClick={() => startExam(exam.id)}>{startingId === exam.id ? "Starting..." : "Start Exam"}</button>
+                  </article>
+                ))}
+              </section>
+            </>
           )}
 
           {examPaper && (

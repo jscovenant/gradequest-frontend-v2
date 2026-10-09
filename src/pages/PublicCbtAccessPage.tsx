@@ -3,6 +3,8 @@ import { useSearchParams } from "react-router-dom";
 
 import PageTitle from "../components/PageTitle";
 import CbtHtml from "../components/cbt/CbtHtml";
+import CbtNetworkStatus from "../components/cbt/CbtNetworkStatus";
+import CbtRejectionNotice, { CbtRejection } from "../components/cbt/CbtRejectionNotice";
 import { publicApi } from "../utils/axios";
 import { useToast } from "../contexts/ToastContext";
 
@@ -108,6 +110,7 @@ export default function PublicCbtAccessPage() {
   const [syncStatus, setSyncStatus] = useState<"synced" | "syncing" | "offline_saved">("synced");
   const [unsyncedQuestionIds, setUnsyncedQuestionIds] = useState<number[]>([]);
   const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+  const [rejection, setRejection] = useState<CbtRejection | null>(null);
   const eventThrottleRef = useRef<Record<string, number>>({});
   const saveTimersRef = useRef<Record<number, number>>({});
   const forcedSubmitRef = useRef(false);
@@ -243,6 +246,7 @@ export default function PublicCbtAccessPage() {
   async function lookup(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
+    setRejection(null);
     setSelectedExam(null);
     setAttempt(null);
     setExamPaper(null);
@@ -255,9 +259,29 @@ export default function PublicCbtAccessPage() {
       const list = Array.isArray(res.data?.exams) ? res.data.exams : [];
       setExams(list);
       setSelectedExam(list[0] || null);
-      if (list.length === 0) showError("No CBT exam is scheduled for this student right now.");
+
+      if (res.data?.rejection) {
+        setRejection(res.data.rejection);
+      } else if (list.length === 0) {
+        setRejection({
+          reason: "no_exam_set",
+          title: "No CBT Exam Scheduled for Your Class",
+          message: "No active CBT exams are currently scheduled for your class or department. If you have an exam today, please inform your invigilator.",
+        });
+      }
     } catch (e: any) {
-      showError(e?.response?.data?.message || "Unable to check CBT access.");
+      if (e?.response?.data?.rejection) {
+        setRejection(e.response.data.rejection);
+      } else {
+        const msg = e?.response?.data?.message || "Unable to check CBT access.";
+        const isFee = msg.toLowerCase().includes("fee") || msg.toLowerCase().includes("clearance") || msg.toLowerCase().includes("tuition");
+        const isPlan = msg.toLowerCase().includes("edition") || msg.toLowerCase().includes("upgrade") || msg.toLowerCase().includes("subscription");
+        setRejection({
+          reason: isFee ? "school_fee" : isPlan ? "platform_fee" : "no_exam_set",
+          title: isFee ? "School Fee Clearance Required" : isPlan ? "Platform Subscription Required" : "Access Denied",
+          message: msg,
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -271,6 +295,7 @@ export default function PublicCbtAccessPage() {
   async function startExam(exam: ExamSummary) {
     setPendingExam(null);
     setStartingId(exam.id);
+    setRejection(null);
     try {
       const res = await publicApi.post("/public/cbt/access/start", {
         ...form,
@@ -308,7 +333,11 @@ export default function PublicCbtAccessPage() {
       }
       showSuccess("CBT exam started.");
     } catch (e: any) {
-      showError(e?.response?.data?.message || "Unable to start CBT exam.");
+      if (e?.response?.data?.rejection) {
+        setRejection(e.response.data.rejection);
+      } else {
+        showError(e?.response?.data?.message || "Unable to start CBT exam.");
+      }
     } finally {
       setStartingId(null);
     }
@@ -668,6 +697,11 @@ export default function PublicCbtAccessPage() {
 
       <main className="pcbt-page">
         <div className="pcbt-shell">
+          <CbtNetworkStatus
+            pingUrl="/public/cbt/ping"
+            serverLabel="CBT Exam Server"
+          />
+
           <section className="pcbt-hero">
             <div>
               <span className="pcbt-pill">Public CBT access</span>
@@ -696,6 +730,11 @@ export default function PublicCbtAccessPage() {
               <div className="pcbt-card">
                 <h2 className="pcbt-title">{school ? school.name : "Scheduled exams"}</h2>
                 {student && <p className="pcbt-sub">{student.name} - {student.reg_no} - {student.class || "Class not set"}</p>}
+
+                {rejection && (
+                  <CbtRejectionNotice rejection={rejection} onRetry={() => lookup(new Event("submit") as any)} />
+                )}
+
                 <div className="pcbt-exam-list">
                   {exams.length === 0 ? <p className="pcbt-sub mb-0">No exam loaded yet.</p> : exams.map((exam) => (
                     <article className="pcbt-exam-item" key={exam.id}>
