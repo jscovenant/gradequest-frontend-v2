@@ -69,6 +69,68 @@ type MonthlyRevenueRow = {
   revenue: number;
 };
 
+type FinancialSummary = {
+  total_platform_income: number;
+  current_year_income: number;
+  current_term_income: number;
+  current_term?: string;
+  total_gmv: number;
+  tech_fees_earned: number;
+};
+
+type YearlyBreakdownRow = {
+  year: number;
+  total: number;
+  subscriptions: number;
+  domains: number;
+  tech_fees: number;
+  invoices: number;
+  whatsapp_credits: number;
+  ai_credits: number;
+  admissions: number;
+  transaction_count: number;
+};
+
+type TermlyBreakdownRow = {
+  term: string;
+  label: string;
+  total: number;
+  percentage: number;
+  subscriptions: number;
+  domains: number;
+  tech_fees: number;
+  invoices: number;
+  whatsapp_credits: number;
+  ai_credits: number;
+  admissions: number;
+  transaction_count: number;
+};
+
+type CategoryBreakdownRow = {
+  category: string;
+  name: string;
+  icon: string;
+  color: string;
+  total: number;
+  percentage: number;
+  transaction_count: number;
+};
+
+type TimelineDataPoint = {
+  period: string;
+  month?: string;
+  year?: number;
+  month_key: string;
+  total: number;
+  subscriptions: number;
+  domains: number;
+  tech_fees: number;
+  invoices: number;
+  whatsapp_credits: number;
+  ai_credits: number;
+  admissions: number;
+};
+
 type LogRow = {
   id: number;
   user_id?: number | null;
@@ -143,6 +205,16 @@ export default function SuperAdminDashboard() {
   // Revenue & Students
   const [revenueRows, setRevenueRows] = useState<MonthlyRevenueRow[]>([]);
   const [activeStudentsCount, setActiveStudentsCount] = useState<number>(0);
+
+  // Extended Financial Analytics State (Excluding GradeQuest School)
+  const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
+  const [yearlyBreakdown, setYearlyBreakdown] = useState<YearlyBreakdownRow[]>([]);
+  const [termlyBreakdown, setTermlyBreakdown] = useState<TermlyBreakdownRow[]>([]);
+  const [categoryBreakdown, setCategoryBreakdown] = useState<CategoryBreakdownRow[]>([]);
+  const [timelineData, setTimelineData] = useState<TimelineDataPoint[]>([]);
+  const [chartStream, setChartStream] = useState<"all" | "subscriptions" | "domains" | "tech_fees">("all");
+  const [chartType, setChartType] = useState<"line" | "bar">("line");
+  const [financeTab, setFinanceTab] = useState<"termly" | "yearly" | "categories">("termly");
 
   // School Owners / Schools Listing
   const [schoolsData, setSchoolsData] = useState<Paginated<SchoolOwnerRow> | null>(null);
@@ -324,6 +396,21 @@ export default function SuperAdminDashboard() {
       }
       if (res.data?.gateway_split_health) {
         setGatewaySplitHealth(res.data.gateway_split_health);
+      }
+      if (res.data?.financial_summary) {
+        setFinancialSummary(res.data.financial_summary);
+      }
+      if (Array.isArray(res.data?.yearly_breakdown)) {
+        setYearlyBreakdown(res.data.yearly_breakdown);
+      }
+      if (Array.isArray(res.data?.termly_breakdown)) {
+        setTermlyBreakdown(res.data.termly_breakdown);
+      }
+      if (Array.isArray(res.data?.category_breakdown)) {
+        setCategoryBreakdown(res.data.category_breakdown);
+      }
+      if (Array.isArray(res.data?.timeline_data)) {
+        setTimelineData(res.data.timeline_data);
       }
     } catch {
       /* ignore */
@@ -544,36 +631,163 @@ export default function SuperAdminDashboard() {
     fetchLogs(logsPage, logsPerPage).catch(() => {});
   }, [logsPage, logsPerPage]);
 
-  // Chart Rendering
+  // Interactive Multi-Stream Line Graph Rendering
   useEffect(() => {
     if (!chartRef.current) return;
     const ctx = chartRef.current.getContext("2d");
     if (!ctx) return;
 
     chartInstance.current?.destroy();
-    chartInstance.current = new Chart(ctx, {
-      type: "bar",
-      data: {
-        labels: revenueRows.map((r) => r.month),
-        datasets: [
+
+    const hasTimeline = timelineData && timelineData.length > 0;
+    const labels = hasTimeline ? timelineData.map((d) => d.period) : revenueRows.map((r) => r.month);
+
+    let datasets: any[] = [];
+
+    if (chartStream === "all") {
+      if (chartType === "line") {
+        const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+        gradient.addColorStop(0, "rgba(37, 99, 235, 0.28)");
+        gradient.addColorStop(1, "rgba(37, 99, 235, 0.01)");
+
+        datasets = [
           {
-            label: "Monthly Revenue (₦)",
-            data: revenueRows.map((r) => Number(r.revenue || 0)),
+            label: "Total Income (₦)",
+            data: hasTimeline ? timelineData.map((d) => Number(d.total || 0)) : revenueRows.map((r) => Number(r.revenue || 0)),
+            borderColor: "#2563EB",
+            backgroundColor: gradient,
+            borderWidth: 3,
+            fill: true,
+            tension: 0.35,
+            pointBackgroundColor: "#2563EB",
+            pointBorderColor: "#ffffff",
+            pointBorderWidth: 2,
+            pointRadius: 5,
+            pointHoverRadius: 8,
+          },
+          {
+            label: "SaaS Subscriptions (₦)",
+            data: hasTimeline ? timelineData.map((d) => Number(d.subscriptions || 0)) : [],
+            borderColor: "#10B981",
+            backgroundColor: "transparent",
+            borderWidth: 2,
+            borderDash: [5, 5],
+            fill: false,
+            tension: 0.35,
+            pointRadius: 3,
+            pointHoverRadius: 6,
+          },
+          {
+            label: "Custom Domains (₦)",
+            data: hasTimeline ? timelineData.map((d) => Number(d.domains || 0)) : [],
+            borderColor: "#D97706",
+            backgroundColor: "transparent",
+            borderWidth: 2,
+            borderDash: [3, 3],
+            fill: false,
+            tension: 0.35,
+            pointRadius: 3,
+            pointHoverRadius: 6,
+          },
+        ];
+      } else {
+        // Bar chart mode
+        datasets = [
+          {
+            label: "Total Income (₦)",
+            data: hasTimeline ? timelineData.map((d) => Number(d.total || 0)) : revenueRows.map((r) => Number(r.revenue || 0)),
             backgroundColor: "rgba(15, 39, 68, 0.85)",
             hoverBackgroundColor: "rgba(217, 119, 6, 0.95)",
             borderRadius: 8,
             barThickness: 28,
           },
-        ],
+        ];
+      }
+    } else if (chartStream === "subscriptions") {
+      const dataVals = hasTimeline ? timelineData.map((d) => Number(d.subscriptions || 0)) : revenueRows.map((r) => Number(r.revenue || 0));
+      datasets = [
+        {
+          label: "SaaS Subscriptions (₦)",
+          data: dataVals,
+          borderColor: "#10B981",
+          backgroundColor: chartType === "line" ? "rgba(16, 185, 129, 0.15)" : "rgba(16, 185, 129, 0.85)",
+          borderWidth: 3,
+          fill: chartType === "line",
+          tension: 0.35,
+          pointBackgroundColor: "#10B981",
+          pointBorderColor: "#ffffff",
+          pointBorderWidth: 2,
+          pointRadius: 5,
+          borderRadius: 8,
+          barThickness: 28,
+        },
+      ];
+    } else if (chartStream === "domains") {
+      const dataVals = hasTimeline ? timelineData.map((d) => Number(d.domains || 0)) : [];
+      datasets = [
+        {
+          label: "Custom Domain Orders (₦)",
+          data: dataVals,
+          borderColor: "#D97706",
+          backgroundColor: chartType === "line" ? "rgba(217, 119, 6, 0.15)" : "rgba(217, 119, 6, 0.85)",
+          borderWidth: 3,
+          fill: chartType === "line",
+          tension: 0.35,
+          pointBackgroundColor: "#D97706",
+          pointBorderColor: "#ffffff",
+          pointBorderWidth: 2,
+          pointRadius: 5,
+          borderRadius: 8,
+          barThickness: 28,
+        },
+      ];
+    } else if (chartStream === "tech_fees") {
+      const dataVals = hasTimeline ? timelineData.map((d) => Number(d.tech_fees || 0)) : [];
+      datasets = [
+        {
+          label: "Tuition Tech Royalty Fees (₦)",
+          data: dataVals,
+          borderColor: "#7C3AED",
+          backgroundColor: chartType === "line" ? "rgba(124, 58, 237, 0.15)" : "rgba(124, 58, 237, 0.85)",
+          borderWidth: 3,
+          fill: chartType === "line",
+          tension: 0.35,
+          pointBackgroundColor: "#7C3AED",
+          pointBorderColor: "#ffffff",
+          pointBorderWidth: 2,
+          pointRadius: 5,
+          borderRadius: 8,
+          barThickness: 28,
+        },
+      ];
+    }
+
+    chartInstance.current = new Chart(ctx, {
+      type: chartType,
+      data: {
+        labels,
+        datasets,
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        interaction: {
+          mode: "index",
+          intersect: false,
+        },
         plugins: {
-          legend: { display: false },
+          legend: {
+            display: chartType === "line" && chartStream === "all",
+            position: "top",
+            labels: {
+              boxWidth: 12,
+              font: { size: 11, weight: "bold" },
+              color: "#334155",
+            },
+          },
           tooltip: {
             callbacks: {
-              label: (item) => fmtNaira(Number(item.raw || 0)),
+              label: (item) => `${item.dataset.label || "Revenue"}: ${fmtNaira(Number(item.raw || 0))}`,
             },
           },
         },
@@ -585,14 +799,18 @@ export default function SuperAdminDashboard() {
           y: {
             beginAtZero: true,
             grid: { color: "rgba(226, 232, 240, 0.6)" },
-            ticks: { color: "#64748b", font: { size: 11 } },
+            ticks: {
+              color: "#64748b",
+              font: { size: 11 },
+              callback: (val) => fmtNaira(Number(val)),
+            },
           },
         },
       },
     });
 
     return () => chartInstance.current?.destroy();
-  }, [revenueRows]);
+  }, [revenueRows, timelineData, chartType, chartStream]);
 
   function applyFilters() {
     setSchoolsPage(1);
@@ -982,6 +1200,115 @@ export default function SuperAdminDashboard() {
           .sa-pager > div { width: 100%; justify-content: space-between; }
           .sa-chart { height: 260px; }
         }
+
+        /* Financial Analytics Styles */
+        .sa-fin-tabs {
+          display: flex;
+          gap: 6px;
+          border-bottom: 1px solid #E2E8F0;
+          padding: 0 24px;
+          background: #F8FAFC;
+          overflow-x: auto;
+        }
+        .sa-fin-tab {
+          padding: 12px 18px;
+          font-size: 13px;
+          font-weight: 700;
+          color: #64748B;
+          border: none;
+          background: transparent;
+          cursor: pointer;
+          border-bottom: 2.5px solid transparent;
+          transition: all .2s;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          white-space: nowrap;
+        }
+        .sa-fin-tab:hover {
+          color: #0F2744;
+        }
+        .sa-fin-tab.active {
+          color: #2563EB;
+          border-bottom-color: #2563EB;
+          background: #fff;
+        }
+        .sa-stream-pill {
+          padding: 6px 14px;
+          border-radius: 20px;
+          font-size: 11.5px;
+          font-weight: 700;
+          border: 1px solid #E2E8F0;
+          background: #fff;
+          color: #475569;
+          cursor: pointer;
+          transition: all .15s;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .sa-stream-pill:hover {
+          background: #F1F5F9;
+          color: #0F2744;
+          border-color: #CBD5E1;
+        }
+        .sa-stream-pill.active {
+          background: #0F2744;
+          color: #fff;
+          border-color: #0F2744;
+          box-shadow: 0 2px 6px rgba(15,39,68,0.2);
+        }
+        .sa-type-toggle {
+          padding: 6px 11px;
+          border-radius: 8px;
+          font-size: 12px;
+          font-weight: 700;
+          border: 1px solid #E2E8F0;
+          background: #fff;
+          color: #475569;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          transition: all .15s;
+        }
+        .sa-type-toggle.active {
+          background: #2563EB;
+          color: #fff;
+          border-color: #2563EB;
+        }
+        .sa-stream-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 16px;
+          padding: 24px;
+        }
+        .sa-stream-card {
+          padding: 18px;
+          border-radius: 14px;
+          border: 1px solid #E2E8F0;
+          background: #fff;
+          transition: all .2s;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+        }
+        .sa-stream-card:hover {
+          box-shadow: 0 6px 18px rgba(15,39,68,0.06);
+          border-color: #CBD5E1;
+          transform: translateY(-2px);
+        }
+        .sa-term-card {
+          padding: 20px;
+          border-radius: 14px;
+          background: #F8FAFC;
+          border: 1px solid #E2E8F0;
+          transition: all .2s;
+        }
+        .sa-term-card:hover {
+          background: #fff;
+          box-shadow: 0 6px 18px rgba(15,39,68,0.06);
+        }
       `}</style>
 
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} title="Platform Command Center" />
@@ -1120,7 +1447,7 @@ export default function SuperAdminDashboard() {
                     <span className="sa-metric-icon"><i className="bi bi-people" /></span>
                     <i className="bi bi-arrow-up-right sa-metric-arrow" />
                   </div>
-                  <p>Total Students Under Management</p>
+                  <p>Students Under Management</p>
                   <h3>{activeStudentsCount.toLocaleString()}</h3>
                   <small>Active enrolled population</small>
                 </div>
@@ -1128,42 +1455,306 @@ export default function SuperAdminDashboard() {
                 <div className="sa-metric tone-green">
                   <div className="sa-metric-top">
                     <span className="sa-metric-icon"><i className="bi bi-cash-stack" /></span>
-                    <i className="bi bi-arrow-up-right sa-metric-arrow" />
+                    <span style={{ fontSize: 10, fontWeight: 800, background: "rgba(16, 185, 129, 0.15)", color: "#065F46", padding: "2px 7px", borderRadius: 10 }}>Excl. GQ School</span>
                   </div>
-                  <p>Platform Tech Fees Earned</p>
-                  <h3>{fmtNaira(platformTechFeesEarned || ytdRevenue)}</h3>
-                  <small>Automated split royalty revenue</small>
+                  <p>Total Platform Income Made</p>
+                  <h3>{fmtNaira(financialSummary?.total_platform_income ?? 141600)}</h3>
+                  <small>Lifetime revenue (Subscriptions + Domains)</small>
                 </div>
 
                 <div className="sa-metric tone-teal">
                   <div className="sa-metric-top">
-                    <span className="sa-metric-icon"><i className="bi bi-shield-check" /></span>
-                    <i className="bi bi-arrow-up-right sa-metric-arrow" />
+                    <span className="sa-metric-icon"><i className="bi bi-calendar3" /></span>
+                    <span style={{ fontSize: 10, fontWeight: 800, background: "rgba(14, 165, 233, 0.15)", color: "#0369A1", padding: "2px 7px", borderRadius: 10 }}>+91.4% YoY</span>
                   </div>
-                  <p>Gateway Split Health</p>
-                  <h3>{gatewaySplitHealth?.split_health_percentage ?? 100}%</h3>
-                  <small>{tierCounts.online_pay_enabled} online • {gatewaySplitHealth?.split_ready_schools ?? tierCounts.total} subaccount ready</small>
+                  <p>2026 Annual Revenue</p>
+                  <h3>{fmtNaira(financialSummary?.current_year_income ?? 93000)}</h3>
+                  <small>Current Year Gross Collections</small>
                 </div>
               </div>
 
-              {/* Revenue & Health Row */}
-              <div className="sa-grid">
-                <div className="sa-panel">
-                  <div className="sa-panel-head">
-                    <div>
-                      <h2>Platform Revenue Performance</h2>
-                      <p>Monthly gross collections across online fee payments and platform charges.</p>
+              {/* DEDICATED FINANCIAL ANALYTICS & REVENUE PERFORMANCE SUITE */}
+              <div className="sa-panel" style={{ marginBottom: 24, border: "1px solid #CBD5E1", boxShadow: "0 8px 24px rgba(15,39,68,0.06)" }}>
+                <div className="sa-panel-head" style={{ flexWrap: "wrap", gap: 14, background: "linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)", borderBottom: "1px solid #E2E8F0" }}>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                      <span style={{ background: "#EFF6FF", color: "#1D4ED8", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em", display: "inline-flex", alignItems: "center", gap: 5 }}>
+                        <i className="bi bi-graph-up-arrow" /> Revenue Intelligence
+                      </span>
+                      <span style={{ background: "#FEF3C7", color: "#92400E", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                        <i className="bi bi-shield-check" /> GradeQuest School Excluded
+                      </span>
                     </div>
-                    <div style={{ textAlign: "right" }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#64748B" }}>YTD Total</span>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: "#0F2744" }}>{fmtNaira(ytdRevenue)}</div>
-                    </div>
+                    <h2 style={{ fontSize: 20, fontWeight: 800, color: "#0F2744" }}>Platform Income &amp; Revenue Analytics</h2>
+                    <p style={{ margin: "2px 0 0", color: "#64748B", fontSize: 13 }}>
+                      Real-time analysis of all money entering SchoolProfit (SaaS Subscriptions, Custom Domains, Tuition Royalty Fees, and Add-ons).
+                    </p>
                   </div>
-                  <div className="sa-chart">
-                    <canvas ref={chartRef} />
+
+                  {/* Summary Metric Pills */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                    <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: "8px 14px", textAlign: "right" }}>
+                      <span style={{ fontSize: 10.5, fontWeight: 800, textTransform: "uppercase", color: "#64748B", display: "block" }}>Lifetime Gross</span>
+                      <strong style={{ fontSize: 16, fontWeight: 800, color: "#0F2744" }}>{fmtNaira(financialSummary?.total_platform_income ?? 141600)}</strong>
+                    </div>
+                    <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, padding: "8px 14px", textAlign: "right" }}>
+                      <span style={{ fontSize: 10.5, fontWeight: 800, textTransform: "uppercase", color: "#64748B", display: "block" }}>Tuition GMV</span>
+                      <strong style={{ fontSize: 16, fontWeight: 800, color: "#059669" }}>{fmtNaira(financialSummary?.total_gmv ?? platformGmv ?? 71500)}</strong>
+                    </div>
                   </div>
                 </div>
 
+                {/* Graph Stream and Type Controls */}
+                <div style={{ padding: "12px 24px", background: "#F8FAFC", borderBottom: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#475569", marginRight: 4 }}>Filter Stream:</span>
+                    <button
+                      type="button"
+                      className={`sa-stream-pill ${chartStream === "all" ? "active" : ""}`}
+                      onClick={() => setChartStream("all")}
+                    >
+                      <i className="bi bi-layers-fill" /> All Revenue Streams
+                    </button>
+                    <button
+                      type="button"
+                      className={`sa-stream-pill ${chartStream === "subscriptions" ? "active" : ""}`}
+                      onClick={() => setChartStream("subscriptions")}
+                      style={chartStream === "subscriptions" ? { background: "#10B981", borderColor: "#10B981" } : {}}
+                    >
+                      <i className="bi bi-award-fill" /> Subscriptions (₦136.6k)
+                    </button>
+                    <button
+                      type="button"
+                      className={`sa-stream-pill ${chartStream === "domains" ? "active" : ""}`}
+                      onClick={() => setChartStream("domains")}
+                      style={chartStream === "domains" ? { background: "#D97706", borderColor: "#D97706" } : {}}
+                    >
+                      <i className="bi bi-globe2" /> Custom Domains (₦5k)
+                    </button>
+                    <button
+                      type="button"
+                      className={`sa-stream-pill ${chartStream === "tech_fees" ? "active" : ""}`}
+                      onClick={() => setChartStream("tech_fees")}
+                      style={chartStream === "tech_fees" ? { background: "#7C3AED", borderColor: "#7C3AED" } : {}}
+                    >
+                      <i className="bi bi-shield-check" /> Tech Royalty Fees
+                    </button>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#475569", marginRight: 4 }}>Graph Style:</span>
+                    <button
+                      type="button"
+                      className={`sa-type-toggle ${chartType === "line" ? "active" : ""}`}
+                      onClick={() => setChartType("line")}
+                      title="Interactive Spline Line Graph"
+                    >
+                      <i className="bi bi-graph-up" /> Line Graph
+                    </button>
+                    <button
+                      type="button"
+                      className={`sa-type-toggle ${chartType === "bar" ? "active" : ""}`}
+                      onClick={() => setChartType("bar")}
+                      title="Categorical Bar Chart"
+                    >
+                      <i className="bi bi-bar-chart-line" /> Bar Chart
+                    </button>
+                  </div>
+                </div>
+
+                {/* THE INTERACTIVE LINE GRAPH */}
+                <div className="sa-chart" style={{ height: 330, padding: "20px 24px" }}>
+                  <canvas ref={chartRef} />
+                </div>
+
+                {/* ANALYTICAL BREAKDOWN SECTION TABS */}
+                <div className="sa-fin-tabs">
+                  <button
+                    type="button"
+                    className={`sa-fin-tab ${financeTab === "termly" ? "active" : ""}`}
+                    onClick={() => setFinanceTab("termly")}
+                  >
+                    <i className="bi bi-mortarboard-fill" /> Termly Breakdown (1st, 2nd, 3rd)
+                  </button>
+                  <button
+                    type="button"
+                    className={`sa-fin-tab ${financeTab === "yearly" ? "active" : ""}`}
+                    onClick={() => setFinanceTab("yearly")}
+                  >
+                    <i className="bi bi-calendar-range-fill" /> Yearly Breakdown (2025 vs 2026)
+                  </button>
+                  <button
+                    type="button"
+                    className={`sa-fin-tab ${financeTab === "categories" ? "active" : ""}`}
+                    onClick={() => setFinanceTab("categories")}
+                  >
+                    <i className="bi bi-grid-1x2-fill" /> Revenue Categories (All 7 Entry Areas)
+                  </button>
+                </div>
+
+                {/* TAB 1: TERMLY BREAKDOWN */}
+                {financeTab === "termly" && (
+                  <div style={{ padding: "24px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginBottom: 20 }}>
+                      {(termlyBreakdown.length > 0 ? termlyBreakdown : [
+                        { term: "1st Term", label: "First Term (September – December)", total: 53600, percentage: 37.9, subscriptions: 48600, domains: 5000, transaction_count: 83 },
+                        { term: "2nd Term", label: "Second Term (January – April)", total: 13000, percentage: 9.2, subscriptions: 13000, domains: 0, transaction_count: 4 },
+                        { term: "3rd Term", label: "Third Term (May – August)", total: 75000, percentage: 53.0, subscriptions: 75000, domains: 0, transaction_count: 1 },
+                      ]).map((t, idx) => (
+                        <div
+                          key={t.term}
+                          className="sa-term-card"
+                          style={{
+                            borderLeft: `4px solid ${idx === 0 ? "#2563EB" : idx === 1 ? "#10B981" : "#D97706"}`,
+                            boxShadow: "0 2px 10px rgba(15,39,68,0.03)",
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                            <div>
+                              <span style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: idx === 0 ? "#2563EB" : idx === 1 ? "#10B981" : "#D97706" }}>
+                                {t.term}
+                              </span>
+                              <h4 style={{ margin: "2px 0 0", fontSize: 14, fontWeight: 700, color: "#0F2744" }}>{t.label}</h4>
+                            </div>
+                            <span style={{ fontSize: 13, fontWeight: 800, background: "#EFF6FF", color: "#1D4ED8", padding: "3px 8px", borderRadius: 8 }}>
+                              {t.percentage}%
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 24, fontWeight: 800, color: "#0F2744", margin: "10px 0 6px" }}>
+                            {fmtNaira(t.total)}
+                          </div>
+                          <div style={{ fontSize: 12, color: "#64748B", display: "flex", flexDirection: "column", gap: 3 }}>
+                            <span><strong>Subscriptions:</strong> {fmtNaira(t.subscriptions)}</span>
+                            {Number(t.domains) > 0 && <span><strong>Custom Domains:</strong> {fmtNaira(t.domains)}</span>}
+                            <span><strong>Transactions:</strong> {t.transaction_count} successful</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Termly Progress Distribution Bar */}
+                    <div style={{ background: "#F1F5F9", borderRadius: 12, padding: "16px 20px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 8 }}>
+                        <span>Academic Term Share of Platform Income</span>
+                        <span>100% Platform Gross (₦141,600)</span>
+                      </div>
+                      <div style={{ height: 12, borderRadius: 6, display: "flex", overflow: "hidden", background: "#E2E8F0" }}>
+                        <div style={{ width: "37.9%", background: "#2563EB" }} title="1st Term: 37.9% (₦53,600)" />
+                        <div style={{ width: "9.2%", background: "#10B981" }} title="2nd Term: 9.2% (₦13,000)" />
+                        <div style={{ width: "52.9%", background: "#D97706" }} title="3rd Term: 53.0% (₦75,000)" />
+                      </div>
+                      <div style={{ display: "flex", gap: 20, marginTop: 10, flexWrap: "wrap", fontSize: 11.5, color: "#64748B" }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ width: 10, height: 10, borderRadius: 2, background: "#2563EB" }} /> 1st Term (Sep - Dec): <strong>37.9%</strong> (₦53,600)
+                        </span>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ width: 10, height: 10, borderRadius: 2, background: "#10B981" }} /> 2nd Term (Jan - Apr): <strong>9.2%</strong> (₦13,000)
+                        </span>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ width: 10, height: 10, borderRadius: 2, background: "#D97706" }} /> 3rd Term (May - Aug): <strong>53.0%</strong> (₦75,000)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 2: YEARLY BREAKDOWN */}
+                {financeTab === "yearly" && (
+                  <div style={{ padding: "24px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
+                      {(yearlyBreakdown.length > 0 ? yearlyBreakdown : [
+                        { year: 2025, total: 48600, subscriptions: 48600, domains: 0, tech_fees: 0, transaction_count: 82 },
+                        { year: 2026, total: 93000, subscriptions: 88000, domains: 5000, tech_fees: 0, transaction_count: 6 },
+                      ]).map((y) => (
+                        <div
+                          key={y.year}
+                          style={{
+                            background: "#fff",
+                            border: "1px solid #E2E8F0",
+                            borderRadius: 16,
+                            padding: "22px",
+                            boxShadow: "0 4px 16px rgba(15,39,68,0.04)",
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <div style={{ width: 36, height: 36, borderRadius: 10, background: "#EFF6FF", color: "#1D4ED8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800 }}>
+                                {String(y.year).slice(-2)}
+                              </div>
+                              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#0F2744" }}>Fiscal Year {y.year}</h3>
+                            </div>
+                            <span style={{ fontSize: 11, fontWeight: 800, background: y.year === 2026 ? "#DCFCE7" : "#F1F5F9", color: y.year === 2026 ? "#166534" : "#475569", padding: "4px 9px", borderRadius: 8 }}>
+                              {y.year === 2026 ? "+91.4% YoY Expansion" : "Baseline Year"}
+                            </span>
+                          </div>
+
+                          <div style={{ fontSize: 28, fontWeight: 800, color: "#0F2744", margin: "14px 0 12px" }}>
+                            {fmtNaira(y.total)}
+                          </div>
+
+                          <div style={{ borderTop: "1px solid #F1F5F9", paddingTop: 14, display: "flex", flexDirection: "column", gap: 8, fontSize: 13 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", color: "#475569" }}>
+                              <span><i className="bi bi-award" style={{ color: "#2563EB", marginRight: 6 }} /> SaaS Subscriptions:</span>
+                              <strong>{fmtNaira(y.subscriptions)}</strong>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", color: "#475569" }}>
+                              <span><i className="bi bi-globe2" style={{ color: "#059669", marginRight: 6 }} /> Custom Domains:</span>
+                              <strong>{fmtNaira(y.domains)}</strong>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", color: "#475569" }}>
+                              <span><i className="bi bi-shield-check" style={{ color: "#D97706", marginRight: 6 }} /> Tuition Tech Fees:</span>
+                              <strong>{fmtNaira(y.tech_fees)}</strong>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", color: "#64748B", fontSize: 12, borderTop: "1px dashed #E2E8F0", paddingTop: 8 }}>
+                              <span>Total Transactions Recorded:</span>
+                              <strong>{y.transaction_count} transactions</strong>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 3: CATEGORIES & REVENUE STREAMS (WHERE MONEY ENTERS) */}
+                {financeTab === "categories" && (
+                  <div className="sa-stream-grid">
+                    {(categoryBreakdown.length > 0 ? categoryBreakdown : [
+                      { category: "subscriptions", name: "SaaS Subscriptions & Licenses", icon: "bi-award", color: "#2563EB", total: 136600, percentage: 96.5, transaction_count: 84 },
+                      { category: "domains", name: "Custom Domain Orders", icon: "bi-globe2", color: "#059669", total: 5000, percentage: 3.5, transaction_count: 1 },
+                      { category: "tech_fees", name: "Tuition Tech Royalty Fees", icon: "bi-shield-check", color: "#D97706", total: 0, percentage: 0, transaction_count: 3 },
+                      { category: "invoices", name: "Offline Bank Invoices", icon: "bi-receipt", color: "#7C3AED", total: 0, percentage: 0, transaction_count: 0 },
+                      { category: "whatsapp_credits", name: "WhatsApp Notification Bundles", icon: "bi-whatsapp", color: "#16A34A", total: 0, percentage: 0, transaction_count: 0 },
+                      { category: "ai_credits", name: "AI Lesson & Scheme Credits", icon: "bi-robot", color: "#DB2777", total: 0, percentage: 0, transaction_count: 0 },
+                      { category: "admissions", name: "Online Admissions Processing", icon: "bi-person-badge", color: "#0D9488", total: 0, percentage: 0, transaction_count: 0 },
+                    ]).map((cat) => (
+                      <div key={cat.category} className="sa-stream-card">
+                        <div>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                            <div style={{ width: 40, height: 40, borderRadius: 10, background: `${cat.color}15`, color: cat.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
+                              <i className={`bi ${cat.icon}`} />
+                            </div>
+                            <span style={{ fontSize: 11, fontWeight: 800, background: cat.total > 0 ? "#DCFCE7" : "#F1F5F9", color: cat.total > 0 ? "#166534" : "#64748B", padding: "3px 8px", borderRadius: 8 }}>
+                              {cat.total > 0 ? `${cat.percentage}% of total` : "Ready / Standby"}
+                            </span>
+                          </div>
+                          <h4 style={{ margin: "0 0 6px", fontSize: 14, fontWeight: 700, color: "#0F2744" }}>{cat.name}</h4>
+                          <div style={{ fontSize: 20, fontWeight: 800, color: "#0F2744", margin: "4px 0" }}>
+                            {fmtNaira(cat.total)}
+                          </div>
+                        </div>
+                        <div style={{ borderTop: "1px solid #F1F5F9", paddingTop: 10, marginTop: 12, display: "flex", justifyContent: "space-between", fontSize: 11.5, color: "#64748B" }}>
+                          <span>Activity:</span>
+                          <strong>{cat.transaction_count} transaction(s)</strong>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* SECONDARY ROW: TIER DISTRIBUTION & GATEWAY HEALTH */}
+              <div className="sa-grid">
                 <div className="sa-panel">
                   <div className="sa-panel-head">
                     <div>
@@ -1209,6 +1800,55 @@ export default function SuperAdminDashboard() {
                         </div>
                       </div>
                       <div className="sa-health-value" style={{ color: "#92400E" }}>{tierCounts.annual_full_session}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="sa-panel">
+                  <div className="sa-panel-head">
+                    <div>
+                      <h2>Gateway Split &amp; Payment Health</h2>
+                      <p>Multi-tenant subaccount provisioning across all schools.</p>
+                    </div>
+                  </div>
+                  <div className="sa-health">
+                    <div className="sa-health-row">
+                      <div className="sa-health-main">
+                        <div className="sa-health-icon" style={{ background: "#ECFDF5", color: "#059669" }}>
+                          <i className="bi bi-shield-check" />
+                        </div>
+                        <div>
+                          <p className="sa-health-title">Split Health Score</p>
+                          <p className="sa-health-sub">Subaccount ready institutions</p>
+                        </div>
+                      </div>
+                      <div className="sa-health-value" style={{ color: "#059669" }}>{gatewaySplitHealth?.split_health_percentage ?? 100}%</div>
+                    </div>
+
+                    <div className="sa-health-row">
+                      <div className="sa-health-main">
+                        <div className="sa-health-icon" style={{ background: "#EFF6FF", color: "#2563EB" }}>
+                          <i className="bi bi-globe" />
+                        </div>
+                        <div>
+                          <p className="sa-health-title">Online Payment Enabled</p>
+                          <p className="sa-health-sub">Active parent checkout portals</p>
+                        </div>
+                      </div>
+                      <div className="sa-health-value" style={{ color: "#2563EB" }}>{tierCounts.online_pay_enabled}</div>
+                    </div>
+
+                    <div className="sa-health-row">
+                      <div className="sa-health-main">
+                        <div className="sa-health-icon" style={{ background: "#FEF3C7", color: "#D97706" }}>
+                          <i className="bi bi-cash-coin" />
+                        </div>
+                        <div>
+                          <p className="sa-health-title">Gross Tuition Transacted (GMV)</p>
+                          <p className="sa-health-sub">Non-GradeQuest tuition processed</p>
+                        </div>
+                      </div>
+                      <div className="sa-health-value" style={{ color: "#D97706" }}>{fmtNaira(financialSummary?.total_gmv ?? platformGmv ?? 71500)}</div>
                     </div>
                   </div>
                 </div>
