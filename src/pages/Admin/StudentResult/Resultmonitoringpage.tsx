@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { authApi } from "../../../utils/axios";
 import TopNav from "../../../components/LayoutComponents/TopNav";
 import Sidebar from "../../../components/LayoutComponents/Sidebar";
-import Footer from "../../../features/frontend/footer";
+import Footer from "../../../components/LayoutComponents/Footer";
 import PageTitle from "../../../components/PageTitle";
 
 /* ─── Types ─── */

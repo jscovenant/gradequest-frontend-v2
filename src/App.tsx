@@ -571,7 +571,7 @@ function App() {
              <Route
             path="/result/monitor"
             element={
-              <RequireAuth roles={["Admin"]}>
+              <RequireAuth roles={["Admin", "Teacher", "Principal", "Operator", "Super-Admin", "Platform-Staff"]}>
                 <OnboardingGuard>
                   <ResultMonitoringPage />
                 </OnboardingGuard>
@@ -615,7 +615,7 @@ function App() {
           <Route
             path="/admin/result-monitoring"
             element={
-              <RequireAuth roles={["Admin"]}>
+              <RequireAuth roles={["Admin", "Teacher", "Principal", "Operator", "Super-Admin", "Platform-Staff"]}>
                 <OnboardingGuard>
                   <Navigate to="/result/monitor" replace />
                 </OnboardingGuard>
@@ -626,7 +626,7 @@ function App() {
           <Route
             path="/admin/academic-alerts"
             element={
-              <RequireAuth roles={["Admin"]}>
+              <RequireAuth roles={["Admin", "Teacher", "Principal", "Operator", "Super-Admin", "Platform-Staff"]}>
                 <OnboardingGuard>
                   <Navigate to="/result/monitor" replace />
                 </OnboardingGuard>
