@@ -97,6 +97,7 @@ const SalesRepresentativesPage = lazyWithRetry(() => import("./pages/Super-Admin
 const SalesLeadsManagementPage = lazyWithRetry(() => import("./pages/Super-Admin/SalesLeadsPage"));
 const SalesPayoutsPage = lazyWithRetry(() => import("./pages/Super-Admin/SalesPayoutsPage"));
 const PlatformStaffPage = lazyWithRetry(() => import("./pages/Super-Admin/PlatformStaffPage"));
+const UserRolesPermissionsPage = lazyWithRetry(() => import("./pages/Super-Admin/UserRolesPermissionsPage"));
 const SubscriptionPlansPage = lazyWithRetry(() => import("./pages/Super-Admin/SubscriptionPlansPage"));
 const BillingPolicyPage = lazyWithRetry(() => import("./pages/Super-Admin/BillingPolicyPage"));
 const TwilioWhatsappPage = lazyWithRetry(() => import("./pages/Super-Admin/TwilioWhatsappPage"));
@@ -1376,7 +1377,28 @@ function App() {
                 </OnboardingGuard>
               </RequireAuth>
             }
-          />          <Route
+          />
+          <Route
+            path="/superadmin/users-permissions"
+            element={
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["staff"]}>
+                <OnboardingGuard>
+                  <UserRolesPermissionsPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/superadmin/roles-permissions"
+            element={
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["staff"]}>
+                <OnboardingGuard>
+                  <UserRolesPermissionsPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
             path="/superadmin/sales-representatives"
             element={
               <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["sales"]}>

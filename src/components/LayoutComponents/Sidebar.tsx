@@ -498,6 +498,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       collapseId: "billingMenu",
       children: [
         { label: "Platform Staff", href: "/superadmin/platform-staff", superAdminPermission: "staff" },
+        { label: "User Roles & Permissions", href: "/superadmin/users-permissions", superAdminPermission: "staff" },
         { label: "Subscribers", href: "/superadmin/subscribers", superAdminPermission: "billing" },
         { label: "Billing Policy & Bank Charges", href: "/superadmin/billing-policy", superAdminPermission: "billing" },
         { label: "Twilio WhatsApp", href: "/superadmin/twilio-whatsapp" },
