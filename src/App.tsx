@@ -1079,7 +1079,7 @@ function App() {
           <Route
             path="/teachers"
             element={
-              <RequireAuth roles={["Admin"]}>
+              <RequireAuth roles={["Admin", "Operator"]}>
                 <OnboardingGuard>
                   <TeachersPage />
                 </OnboardingGuard>
@@ -1090,7 +1090,7 @@ function App() {
           <Route
             path="/teacher-subjects"
             element={
-              <RequireAuth roles={["Admin"]}>
+              <RequireAuth roles={["Admin", "Operator"]}>
                 <OnboardingGuard>
                   <TeacherSubjectsPage />
                 </OnboardingGuard>

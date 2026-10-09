@@ -89,13 +89,24 @@ export default function RequireAuth({ children, roles = [], permissions = [] }: 
       // Strictly deny Operator from accessing sensitive HR & Examination Policy routes
       const isOperatorRestrictedRoute =
         isProprietorOnlyRoute ||
-        location.pathname.startsWith("/teachers") ||
-        location.pathname.startsWith("/teacher-subjects") ||
         location.pathname.startsWith("/grading-scale") ||
         location.pathname.startsWith("/results/deadlines");
 
       if (isOperatorRole && isOperatorRestrictedRoute) {
         return <Navigate to="/unauthorized" replace />;
+      }
+
+      // Deny CBT routes for schools in basic_result tier
+      if (location.pathname.startsWith("/cbt") || location.pathname.startsWith("/student/cbt")) {
+        const userTier = (
+          user?.school?.active_edition_tier ||
+          (user as any)?.active_edition_tier ||
+          (user?.schoolsetting as any)?.active_edition_tier ||
+          ""
+        ).toLowerCase();
+        if (userTier === "basic_result") {
+          return <Navigate to="/dashboard" replace />;
+        }
       }
 
       const isOperatorAllowed = isOperatorRole && normalizedRoles.includes("admin") && !isOperatorRestrictedRoute;

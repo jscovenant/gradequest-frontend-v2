@@ -178,7 +178,16 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
 
   const shouldHideForPlan = (item: MenuItem | MenuChild) => {
     if (isBasicResultTier) {
-      if (item.featureKey === "cbt_online" || (item as any).collapseId === "cbtMenu" || item.href?.includes("/cbt")) {
+      if (
+        item.featureKey === "cbt_online" ||
+        item.featureKey === "cbt_offline" ||
+        item.featureKey === "cbt" ||
+        item.featureKey === "ai_cbt_question_generator" ||
+        (item as any).collapseId === "cbtMenu" ||
+        item.label?.toLowerCase() === "cbt" ||
+        item.label?.toLowerCase().includes("cbt") ||
+        item.href?.includes("/cbt")
+      ) {
         return true;
       }
     }
@@ -221,8 +230,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       href.includes("/domain-and-website") ||
       href.includes("/operators") ||
       href.includes("/bursar") ||
-      href.includes("/teachers") ||
-      href.includes("/teacher-subjects") ||
       href.includes("/grading-scale") ||
       href.includes("/results/deadlines")
     )) {
@@ -342,7 +349,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
         { label: "All Teachers", href: "/teachers" },
         { label: "Assign Subjects", href: "/teacher-subjects" },
       ],
-      roles: ["Admin"],
+      roles: ["Admin", "Operator"],
       featureKey: "support_teacher_management",
       lockIfNoFeature: true,
     },
@@ -881,7 +888,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
                     item.collapseId === "operatorsMenu" ||
                     item.collapseId === "accountMenu" ||
                     item.collapseId === "feesMenu" ||
-                    item.collapseId === "teachersMenu" ||
                     item.collapseId === "staffAttendanceMenu"
                   )) {
                     return false;

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { authApi } from "../utils/axios";
-import { getToken } from "../utils/token"; // or however you store token
+import { getToken, getUser, setUser } from "../utils/token"; // or however you store token
 
 type FeatureState = {
   loading: boolean;
@@ -49,6 +49,23 @@ export function FeatureProvider({ children }: { children: React.ReactNode }) {
       const res = await authApi.get("/user/features");
       const list: string[] = Array.isArray(res.data?.features) ? res.data.features : [];
       setFeatures(list.map((x) => String(x).trim()).filter(Boolean));
+      if (res.data?.active_edition_tier) {
+        const currentUser = getUser();
+        if (
+          currentUser &&
+          (currentUser.active_edition_tier !== res.data.active_edition_tier ||
+            currentUser.school?.active_edition_tier !== res.data.active_edition_tier)
+        ) {
+          setUser({
+            ...currentUser,
+            active_edition_tier: res.data.active_edition_tier,
+            school: {
+              ...(currentUser.school || {}),
+              active_edition_tier: res.data.active_edition_tier,
+            },
+          });
+        }
+      }
     } catch (e) {
       // IMPORTANT: do not redirect here. just fail closed.
       setFeatures([]);
