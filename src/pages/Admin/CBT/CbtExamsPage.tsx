@@ -1071,14 +1071,16 @@ export default function CbtExamsPage() {
     try {
       const token = getToken?.() || "";
       const base = getApiBaseUrl().replace(/\/+$/, "");
+      const isGradeQuest = typeof window !== "undefined" && window.location.hostname.toLowerCase().includes("gradequest");
+      const appName = isGradeQuest ? "GradeQuest" : "SchoolProfit";
+      const fileName = `${appName}OfflineCBTSetup.exe`;
       const directUrl = `${base}/public/cbt/offline/installer/download?token=${encodeURIComponent(token)}`;
 
-      showSuccess("Downloading SchoolProfit Offline CBT Setup (106 MB)... Check your browser's download bar.");
+      showSuccess(`Downloading ${appName} Offline CBT Setup (107 MB)... Check your browser's download bar.`);
 
       const a = document.createElement("a");
       a.href = directUrl;
-      a.download = "SchoolProfitOfflineCBTSetup.exe";
-      a.target = "_blank";
+      a.download = fileName;
       document.body.appendChild(a);
       a.click();
       a.remove();
