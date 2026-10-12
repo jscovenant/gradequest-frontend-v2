@@ -319,12 +319,13 @@ export default function BillingPage() {
         ? data.studentsList.map((s) => s.id)
         : undefined;
 
+      const isFullSession = data.mode === "session" || (data.mode !== "term" && clearanceScope === "session");
       const res = await authApi.post("/school/clearance/initiate-online", {
         type: data.mode,
         session_id: data.sessionId,
-        term_id: clearanceScope === "term" ? data.termId : null,
+        term_id: isFullSession ? null : (data.termId || selectedTermId),
         student_ids: studentIds,
-        is_full_session: clearanceScope === "session" || data.mode === "session",
+        is_full_session: isFullSession,
       });
 
       if (res.data?.success) {
@@ -563,12 +564,13 @@ export default function BillingPage() {
         ? clearanceModal.studentsList.map((s) => s.id)
         : undefined;
 
+      const isFullSession = clearanceModal.mode === "session" || (clearanceModal.mode !== "term" && clearanceScope === "session");
       const res = await authApi.post("/school/clearance/initiate-paystack", {
         type: clearanceModal.mode,
         session_id: clearanceModal.sessionId,
-        term_id: clearanceScope === "term" ? clearanceModal.termId : null,
+        term_id: isFullSession ? null : (clearanceModal.termId || selectedTermId),
         student_ids: studentIds,
-        is_full_session: clearanceScope === "session" || clearanceModal.mode === "session",
+        is_full_session: isFullSession,
         callback_url: window.location.origin + window.location.pathname,
       });
 
@@ -640,11 +642,12 @@ export default function BillingPage() {
       let res;
       if (clearanceModal.mode === "selected" || clearanceModal.mode === "single") {
         const ids = clearanceModal.studentsList.map((s) => s.id);
+        const isFullSession = clearanceModal.mode === "session" || (clearanceModal.mode !== "term" && clearanceScope === "session");
         res = await authApi.post("/school/clearance/clear-selected", {
           student_ids: ids,
           session_id: clearanceModal.sessionId,
-          term_id: clearanceScope === "term" ? clearanceModal.termId : null,
-          is_full_session: clearanceScope === "session",
+          term_id: isFullSession ? null : (clearanceModal.termId || selectedTermId),
+          is_full_session: isFullSession,
         });
       } else if (clearanceModal.mode === "session") {
         res = await authApi.post("/school/clearance/clear-school-session", {
