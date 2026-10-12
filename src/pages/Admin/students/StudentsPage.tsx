@@ -214,6 +214,8 @@ export default function StudentsPage() {
     wallet_balance: number;
     session_id?: number;
     term_id?: number;
+    past_arrears_slots?: number;
+    past_arrears_fee?: number;
   } | null>(null);
   const [clearingViaWallet, setClearingViaWallet] = useState(false);
   const [clearingViaPaystack, setClearingViaPaystack] = useState(false);
@@ -3498,7 +3500,7 @@ export default function StudentsPage() {
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span style={{ fontSize: 16 }}>⚡</span>
                     <span style={{ fontSize: 13, fontWeight: 700, color: "#1E1B4B" }}>
-                      Platform Fee Clearance (₦{(clearanceSummary?.fee_per_student || 1000).toLocaleString()}/student)
+                      SchoolProfit Platform Fee Clearance (₦{(clearanceSummary?.fee_per_student || 1000).toLocaleString()}/student)
                     </span>
                   </div>
                   <div
@@ -3517,8 +3519,30 @@ export default function StudentsPage() {
                 </div>
 
                 <p style={{ margin: "0 0 10px 0", fontSize: 11.5, color: "#4B5563", lineHeight: 1.45 }}>
-                  Promotion advances class rosters immediately. Platform clearance unlocks Report Card PDF viewing/printing, CBT exams, and Broadsheets for this academic period.
+                  Promotion advances class rosters immediately. SchoolProfit platform clearance unlocks Report Card PDF viewing/printing, CBT exams, and Broadsheets for this academic period.
                 </p>
+
+                {Boolean((clearanceSummary?.past_arrears_slots || 0) > 0) && (
+                  <div
+                    style={{
+                      background: "rgba(245, 158, 11, 0.1)",
+                      border: "1px solid rgba(245, 158, 11, 0.3)",
+                      borderRadius: 8,
+                      padding: "6px 10px",
+                      fontSize: 11.5,
+                      color: "#92400E",
+                      marginBottom: 10,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <span>ℹ️</span>
+                    <span>
+                      <strong>Past Arrears Protected:</strong> {clearanceSummary?.past_arrears_slots} unpaid past term-slot(s) detected across school history. Genuine dormant/zero-activity periods are auto-waived by SchoolProfit.
+                    </span>
+                  </div>
+                )}
 
                 {targetClearanceIds.length > 0 && (
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
