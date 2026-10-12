@@ -115,6 +115,11 @@ export default function BillingPage() {
     coverage_percent?: number;
     session_id?: number | null;
     term_id?: number | null;
+    session_name?: string | null;
+    term_name?: string | null;
+    period_label?: string | null;
+    shortfall_fee?: number;
+    min_quota_fee?: number;
   } | null>(null);
 
   const [payments, setPayments] = useState<PaymentRow[]>([]);
@@ -136,11 +141,12 @@ export default function BillingPage() {
   const [rosterLastPage, setRosterLastPage] = useState<number>(1);
   const [clearanceScope, setClearanceScope] = useState<"term" | "session">("term");
   const [clearingSingleId, setClearingSingleId] = useState<number | null>(null);
+  const [autoSelecting70, setAutoSelecting70] = useState(false);
 
   // Clearance Modal state
   const [clearanceModal, setClearanceModal] = useState<{
     isOpen: boolean;
-    mode: "selected" | "term" | "session" | "single";
+    mode: "selected" | "term" | "session" | "single" | "min_quota";
     title: string;
     subtitle: string;
     sessionId?: number | null;
@@ -317,7 +323,7 @@ export default function BillingPage() {
       const res = await authApi.post("/school/clearance/initiate-online", {
         type: data.mode,
         session_id: data.sessionId,
-        term_id: clearanceScope === "term" ? data.termId : null,
+        term_id: (clearanceScope === "term" || data.mode === "min_quota") ? data.termId : null,
         student_ids: studentIds,
         is_full_session: clearanceScope === "session" || data.mode === "session",
       });
@@ -339,16 +345,80 @@ export default function BillingPage() {
     }
   };
 
-  // Helper to auto-select minimum 70% shortfall
-  const handleAutoSelectMinimum70 = () => {
+  // Helper to auto-select minimum 70% shortfall across all pages and classes
+  const handleAutoSelectMinimum70 = async () => {
     const shortfall = clearanceSummary?.shortfall_students || 0;
-    if (shortfall <= 0) return;
-    const unpaidList = rosterStudents
-      .filter((s) => s.status !== "paid" && s.status !== "override")
-      .map((s) => s.id);
-    const toSelect = unpaidList.slice(0, shortfall);
-    setSelectedStudentIds(toSelect);
-    showSuccess?.(`Selected ${toSelect.length} student(s) to meet the 70% minimum clearance threshold.`);
+    if (shortfall <= 0) {
+      showSuccess?.("70% minimum coverage threshold is already met!");
+      return;
+    }
+
+    setAutoSelecting70(true);
+    try {
+      const res = await authApi.get("/school/clearance/unpaid-student-ids", {
+        params: {
+          session_id: clearanceSummary?.session_id,
+          term_id: clearanceScope === "term" ? clearanceSummary?.term_id : undefined,
+          limit: shortfall,
+        },
+      });
+
+      if (res.data?.success && Array.isArray(res.data.student_ids)) {
+        const fetchedIds: number[] = res.data.student_ids;
+        setSelectedStudentIds(fetchedIds);
+        showSuccess?.(
+          `Successfully selected ${fetchedIds.length} student(s) across all classes/pages to satisfy the 70% minimum threshold.`
+        );
+        const rosterEl = document.getElementById("clearance-roster-section");
+        if (rosterEl) {
+          rosterEl.scrollIntoView({ behavior: "smooth" });
+        }
+      } else {
+        showError?.("Could not fetch unpaid students for auto-selection.");
+      }
+    } catch (err: any) {
+      showError?.(err?.response?.data?.message || "Failed to auto-select students across all pages.");
+    } finally {
+      setAutoSelecting70(false);
+    }
+  };
+
+  // 1-Click Fulfill 70% Minimum Policy Quota Modal
+  const openMinQuotaClearanceModal = async () => {
+    if (!clearanceSummary?.session_id || !clearanceSummary?.term_id) {
+      showError?.("Current academic period is not active.");
+      return;
+    }
+    const shortfall = clearanceSummary.shortfall_students || 0;
+    if (shortfall <= 0) {
+      showSuccess?.("Your school has already met or exceeded the 70% minimum clearance policy!");
+      return;
+    }
+    const fee = Number(clearanceSummary.shortfall_fee || (shortfall * feePerStudent));
+    const defaultTab = (clearanceSummary.wallet_balance || 0) >= fee ? "wallet" : "paystack";
+
+    const modalObj = {
+      isOpen: true,
+      mode: "min_quota" as const,
+      title: `Fulfill 70% Minimum Quota (${shortfall} Students)`,
+      subtitle: `Clear ${shortfall} student(s) to meet the mandatory 70% clearance threshold for ${clearanceSummary.period_label || 'Current Term'}.`,
+      sessionId: clearanceSummary.session_id,
+      termId: clearanceSummary.term_id,
+      studentsList: [],
+      studentCount: shortfall,
+      feePerStudent: feePerStudent,
+      totalFee: fee,
+      walletBalance: Number(clearanceSummary.wallet_balance || 0),
+      loadingOnline: false,
+      initiatingPaystack: false,
+      activeTab: defaultTab,
+      virtualAccount: null,
+      invoiceId: null,
+      invoiceNo: null,
+    };
+
+    setClearanceModal(modalObj);
+    fetchWemaVirtualAccount(modalObj);
   };
 
   // Open Checkout Modal for Selected Students
@@ -573,7 +643,7 @@ export default function BillingPage() {
       const res = await authApi.post("/school/clearance/initiate-paystack", {
         type: clearanceModal.mode,
         session_id: clearanceModal.sessionId,
-        term_id: clearanceScope === "term" ? clearanceModal.termId : null,
+        term_id: (clearanceScope === "term" || clearanceModal.mode === "min_quota") ? clearanceModal.termId : null,
         student_ids: studentIds,
         is_full_session: clearanceScope === "session" || clearanceModal.mode === "session",
         callback_url: window.location.origin + window.location.pathname,
@@ -645,7 +715,12 @@ export default function BillingPage() {
     setModalProcessingWallet(true);
     try {
       let res;
-      if (clearanceModal.mode === "selected" || clearanceModal.mode === "single") {
+      if (clearanceModal.mode === "min_quota") {
+        res = await authApi.post("/school/clearance/clear-min-quota", {
+          session_id: clearanceModal.sessionId,
+          term_id: clearanceModal.termId,
+        });
+      } else if (clearanceModal.mode === "selected" || clearanceModal.mode === "single") {
         const ids = clearanceModal.studentsList.map((s) => s.id);
         res = await authApi.post("/school/clearance/clear-selected", {
           student_ids: ids,
@@ -1060,9 +1135,36 @@ export default function BillingPage() {
 
               <div className="db-hero-inner">
                 <div>
-                  <div className="db-session-badge">
-                    <span className="db-session-dot" />
-                    Fee Clearance & Platform Billing
+                  {/* High-Visibility Active Session & Term Badge */}
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      background: "rgba(16, 185, 129, 0.16)",
+                      border: "1px solid rgba(16, 185, 129, 0.4)",
+                      borderRadius: 999,
+                      padding: "6px 16px",
+                      marginBottom: 12,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        background: "#10B981",
+                        boxShadow: "0 0 8px #10B981",
+                        display: "inline-block",
+                      }}
+                    />
+                    <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#A7F3D0" }}>
+                      ACTIVE BILLING PERIOD
+                    </span>
+                    <span style={{ color: "rgba(255,255,255,0.4)" }}>|</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: "#FFFFFF" }}>
+                      🎓 {clearanceSummary?.period_label || (clearanceSummary?.session_name ? `${clearanceSummary.session_name} • ${clearanceSummary.term_name || 'Active Term'}` : "Active Academic Session & Term")}
+                    </span>
                   </div>
 
                   <h1 className="db-greeting">
@@ -1070,7 +1172,7 @@ export default function BillingPage() {
                   </h1>
 
                   <p className="db-hero-sub">
-                    Manage per-student fee clearances, fund your school wallet for instant batch payments, and review transaction history.
+                    Manage per-student fee clearances and platform operations for <strong>{clearanceSummary?.period_label || "the current active academic period"}</strong>. Cleared students gain instant access to computer-based testing (CBT) and official end-of-term report card generation.
                   </p>
 
                   <div className="db-hero-btns">
@@ -1095,16 +1197,16 @@ export default function BillingPage() {
                 <div className="db-hero-stat-card d-none d-lg-block">
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                     <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#FBBF24" }}>
-                      Clearance Overview
+                      Billing Cycle Overview
                     </span>
                     <i className="bi bi-shield-check" style={{ color: "#CBD5E1", fontSize: 14 }} />
                   </div>
 
                   <div className="db-hero-stat-row">
                     <div className="db-hero-stat-item">
-                      <span className="db-hero-stat-label">Pricing Model</span>
-                      <span className="db-hero-stat-val" style={{ fontSize: 12.5, color: "#FFFFFF" }}>
-                        Free Core (Pay-As-You-Go)
+                      <span className="db-hero-stat-label">Active Period</span>
+                      <span className="db-hero-stat-val" style={{ fontSize: 12.5, color: "#60A5FA", fontWeight: 700 }}>
+                        {clearanceSummary?.term_name || "Active Term"}
                       </span>
                     </div>
 
@@ -1129,9 +1231,9 @@ export default function BillingPage() {
                     <div className="db-hero-stat-sep" />
 
                     <div className="db-hero-stat-item">
-                      <span className="db-hero-stat-label">Cleared / Total</span>
-                      <span className="db-hero-stat-val">
-                        {clearanceSummary?.cleared_count || 0} / {clearanceSummary?.total_students || 0}
+                      <span className="db-hero-stat-label">Coverage</span>
+                      <span className="db-hero-stat-val" style={{ color: (clearanceSummary?.coverage_percent || 0) >= 70 ? "#10B981" : "#F59E0B" }}>
+                        {clearanceSummary?.coverage_percent || 0}% ({clearanceSummary?.cleared_count || 0}/{clearanceSummary?.total_students || 0})
                       </span>
                     </div>
                   </div>
@@ -1197,7 +1299,7 @@ export default function BillingPage() {
               <div className="db-stat-card">
                 <div>
                   <div className="d-flex align-items-center justify-content-between">
-                    <span className="db-muted" style={{ fontSize: 12.5, fontWeight: 600 }}>Cleared Students (Active Term)</span>
+                    <span className="db-muted" style={{ fontSize: 12.5, fontWeight: 600 }}>Cleared Students ({clearanceSummary?.term_name || "Active Term"})</span>
                     <div className="db-stat-icon-wrap" style={{ background: "rgba(16, 185, 129, 0.12)", color: "#10B981" }}>
                       <i className="bi bi-check-circle-fill" />
                     </div>
@@ -1208,9 +1310,18 @@ export default function BillingPage() {
                 </div>
                 <div className="mt-3 pt-2 border-top d-flex justify-content-between align-items-center">
                   <span style={{ fontSize: 11.5, color: "#64748B" }}>
-                    {clearanceSummary?.total_students ? Math.round(((clearanceSummary.cleared_count || 0) / clearanceSummary.total_students) * 100) : 0}% coverage this term
+                    {clearanceSummary?.coverage_percent || 0}% coverage for this period
                   </span>
-                  <span className="badge bg-success-subtle text-success fw-bold" style={{ fontSize: 11 }}>Active</span>
+                  <span
+                    className={`badge ${
+                      (clearanceSummary?.coverage_percent || 0) >= 70
+                        ? "bg-success-subtle text-success"
+                        : "bg-warning-subtle text-warning-emphasis"
+                    } fw-bold`}
+                    style={{ fontSize: 11 }}
+                  >
+                    {(clearanceSummary?.coverage_percent || 0) >= 70 ? "70% Quota Met" : "Shortfall"}
+                  </span>
                 </div>
               </div>
 
@@ -1229,18 +1340,241 @@ export default function BillingPage() {
                 </div>
                 <div className="mt-3 pt-2 border-top d-flex justify-content-between align-items-center">
                   <span style={{ fontSize: 11.5, color: "#64748B" }}>
-                    Total payable: {fmtNaira(Number(clearanceSummary?.term_clearance_fee || 0))}
+                    Payable: {fmtNaira(Number(clearanceSummary?.term_clearance_fee || 0))}
                   </span>
                   <a href="#clearance-roster-section" className="text-decoration-none fw-bold" style={{ fontSize: 12, color: "#D97706" }}>
-                    Clear &darr;
+                    Roster &darr;
                   </a>
                 </div>
               </div>
             </div>
 
-            {/* ===== WHOLE SCHOOL BULK CLEARANCE OPTIONS ===== */}
+            {/* ===== EXECUTIVE 70% COMPLIANCE & OPERATIONS METER ===== */}
+            <div
+              style={{
+                background: clearanceSummary?.is_minimum_coverage_met === false
+                  ? "linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)"
+                  : "linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)",
+                border: clearanceSummary?.is_minimum_coverage_met === false ? "1.5px solid #F59E0B" : "1.5px solid #86EFAC",
+                borderRadius: 16,
+                padding: "20px 24px",
+                marginBottom: 24,
+                boxShadow: "0 4px 14px rgba(15, 39, 68, 0.04)",
+              }}
+            >
+              <div className="d-flex align-items-start justify-content-between flex-wrap gap-3">
+                <div className="d-flex align-items-start gap-3" style={{ maxWidth: 750 }}>
+                  <div
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 12,
+                      background: clearanceSummary?.is_minimum_coverage_met === false ? "#D97706" : "#16A34A",
+                      color: "#FFFFFF",
+                      display: "grid",
+                      placeItems: "center",
+                      fontSize: 22,
+                      flexShrink: 0,
+                      boxShadow: clearanceSummary?.is_minimum_coverage_met === false
+                        ? "0 4px 10px rgba(217, 119, 6, 0.3)"
+                        : "0 4px 10px rgba(22, 163, 74, 0.3)",
+                    }}
+                  >
+                    <i className={`bi ${clearanceSummary?.is_minimum_coverage_met === false ? "bi-shield-lock-fill" : "bi-shield-check"}`} />
+                  </div>
+                  <div>
+                    <div className="d-flex align-items-center gap-2 flex-wrap mb-1">
+                      <span
+                        style={{
+                          background: clearanceSummary?.is_minimum_coverage_met === false ? "#B45309" : "#15803D",
+                          color: "#FFFFFF",
+                          fontSize: 10.5,
+                          fontWeight: 800,
+                          padding: "3px 9px",
+                          borderRadius: 999,
+                          letterSpacing: "0.04em",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        {clearanceSummary?.is_minimum_coverage_met === false ? "70% Minimum Policy Required" : "Platform Active • 70% Quota Met"}
+                      </span>
+                      <span style={{ fontSize: 12, color: "#64748B", fontWeight: 700 }}>
+                        {clearanceSummary?.period_label || "Current Billing Cycle"}
+                      </span>
+                    </div>
+
+                    <h4 style={{ fontSize: 17, fontWeight: 800, color: "#0F2744", margin: "2px 0 6px" }}>
+                      {clearanceSummary?.is_minimum_coverage_met === false
+                        ? `Shortfall: ${clearanceSummary?.shortfall_students || 0} student(s) required to satisfy 70% threshold`
+                        : `Compliance Satisfied (${clearanceSummary?.coverage_percent || 0}% Cleared)`}
+                    </h4>
+
+                    <p style={{ fontSize: 13, color: clearanceSummary?.is_minimum_coverage_met === false ? "#78350F" : "#166534", margin: 0, lineHeight: 1.5 }}>
+                      {clearanceSummary?.is_minimum_coverage_met === false ? (
+                        <>
+                          Under SchoolProfit operational policy, schools must clear at least <strong>70% of enrolled students</strong> (minimum <strong>{clearanceSummary?.minimum_students_required || 0}</strong> of <strong>{clearanceSummary?.total_students || 0}</strong> students) to unlock official term report cards and CBT examination modules. You have cleared <strong>{clearanceSummary?.cleared_count || 0} students ({clearanceSummary?.coverage_percent || 0}%)</strong>.
+                        </>
+                      ) : (
+                        <>
+                          Your school has met or exceeded the 70% coverage quota for this billing cycle. Platform examinations and report card modules are fully accessible for all cleared students. You can clear any remaining <strong>{clearanceSummary?.pending_count || 0}</strong> students at any time.
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {clearanceSummary?.is_minimum_coverage_met === false && (clearanceSummary?.shortfall_students || 0) > 0 && (
+                  <div className="d-flex align-items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      className="db-btn-gold"
+                      style={{ padding: "10px 18px", fontSize: 13 }}
+                      onClick={openMinQuotaClearanceModal}
+                    >
+                      <i className="bi bi-lightning-charge-fill me-1" />
+                      1-Click Pay 70% Quota ({fmtNaira(clearanceSummary?.shortfall_fee || ((clearanceSummary?.shortfall_students || 0) * feePerStudent))})
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-dark fw-bold"
+                      style={{ padding: "9px 15px", fontSize: 12.5, borderRadius: 10, background: "#FFFFFF" }}
+                      onClick={handleAutoSelectMinimum70}
+                      disabled={autoSelecting70}
+                    >
+                      {autoSelecting70 ? (
+                        <><span className="spinner-border spinner-border-sm me-1" /> Selecting Across All Pages…</>
+                      ) : (
+                        <><i className="bi bi-check2-all me-1" /> Auto-Select Shortfall ({clearanceSummary?.shortfall_students})</>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Visual Progress Bar */}
+              <div style={{ marginTop: 16 }}>
+                <div className="d-flex justify-content-between align-items-center mb-1" style={{ fontSize: 12, fontWeight: 700 }}>
+                  <span style={{ color: "#0F2744" }}>
+                    Clearance Progress: <strong>{clearanceSummary?.cleared_count || 0} of {clearanceSummary?.total_students || 0} Students</strong> ({clearanceSummary?.coverage_percent || 0}%)
+                  </span>
+                  <span style={{ color: (clearanceSummary?.coverage_percent || 0) >= 70 ? "#16A34A" : "#D97706" }}>
+                    Target: 70% ({clearanceSummary?.minimum_students_required || 0} Students)
+                  </span>
+                </div>
+                <div style={{ width: "100%", height: 10, background: "rgba(0,0,0,0.08)", borderRadius: 999, overflow: "hidden", position: "relative" }}>
+                  <div
+                    style={{
+                      height: "100%",
+                      width: `${Math.min(100, clearanceSummary?.coverage_percent || 0)}%`,
+                      background: (clearanceSummary?.coverage_percent || 0) >= 70
+                        ? "linear-gradient(90deg, #10B981, #059669)"
+                        : "linear-gradient(90deg, #F59E0B, #D97706)",
+                      transition: "width 0.5s ease",
+                      borderRadius: 999,
+                    }}
+                  />
+                  {/* 70% Indicator Marker */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: "70%",
+                      top: 0,
+                      bottom: 0,
+                      width: 2,
+                      background: "#0F2744",
+                      zIndex: 2,
+                    }}
+                    title="70% Policy Requirement Marker"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* ===== 3 EXECUTIVE SETTLEMENT PACKAGES ===== */}
             <div className="row g-3 mb-4">
-              <div className="col-12 col-lg-6">
+              {/* PACKAGE 1: 70% Minimum Quota */}
+              <div className="col-12 col-lg-4">
+                <div
+                  style={{
+                    background: "#FFFFFF",
+                    border: clearanceSummary?.is_minimum_coverage_met === false ? "2px solid #F59E0B" : "1px solid #E2E8F0",
+                    borderRadius: 16,
+                    padding: 22,
+                    height: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    boxShadow: clearanceSummary?.is_minimum_coverage_met === false
+                      ? "0 8px 24px rgba(245, 158, 11, 0.12)"
+                      : "0 4px 12px rgba(15, 39, 68, 0.03)",
+                    position: "relative",
+                  }}
+                >
+                  <div>
+                    <div className="d-flex align-items-center justify-content-between mb-2">
+                      <div className="d-flex align-items-center gap-2">
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 10,
+                            background: "rgba(217, 119, 6, 0.12)",
+                            color: "#D97706",
+                            display: "grid",
+                            placeItems: "center",
+                            fontSize: 18,
+                          }}
+                        >
+                          <i className="bi bi-shield-check" />
+                        </div>
+                        <div className="db-strong" style={{ fontSize: 15.5 }}>70% Minimum Quota</div>
+                      </div>
+                      <span
+                        className="db-pill"
+                        style={{
+                          background: clearanceSummary?.is_minimum_coverage_met === false ? "#FEF3C7" : "#ECFDF5",
+                          color: clearanceSummary?.is_minimum_coverage_met === false ? "#92400E" : "#047857",
+                          fontWeight: 800,
+                          fontSize: 11,
+                        }}
+                      >
+                        {clearanceSummary?.is_minimum_coverage_met === false ? "Recommended" : "Completed"}
+                      </span>
+                    </div>
+
+                    <p className="db-muted" style={{ fontSize: 13, margin: "8px 0 14px", lineHeight: 1.5 }}>
+                      Instantly clear the exact shortfall of <strong>{clearanceSummary?.shortfall_students || 0} student(s)</strong> across classes to satisfy policy and unlock platform access for <strong>{clearanceSummary?.period_label || "Active Period"}</strong>.
+                    </p>
+                  </div>
+
+                  <div className="pt-3 border-top d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div>
+                      <div className="db-muted" style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 700 }}>
+                        {clearanceSummary?.is_minimum_coverage_met === false ? "Shortfall Payable" : "Quota Status"}
+                      </div>
+                      <div className="db-strong" style={{ fontSize: 18, color: "#D97706" }}>
+                        {clearanceSummary?.is_minimum_coverage_met === false
+                          ? fmtNaira(clearanceSummary?.shortfall_fee || ((clearanceSummary?.shortfall_students || 0) * feePerStudent))
+                          : "Satisfied (₦0)"}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="db-btn-gold"
+                      style={{ padding: "9px 16px", fontSize: 12.5 }}
+                      onClick={openMinQuotaClearanceModal}
+                      disabled={clearanceSummary?.is_minimum_coverage_met !== false || (clearanceSummary?.shortfall_students || 0) <= 0}
+                    >
+                      <i className="bi bi-lightning-charge-fill me-1" />
+                      {clearanceSummary?.is_minimum_coverage_met === false ? "Pay 70% Quota" : "Policy Met"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* PACKAGE 2: 100% Whole School (Current Term) */}
+              <div className="col-12 col-lg-4">
                 <div
                   style={{
                     background: "#FFFFFF",
@@ -1271,21 +1605,21 @@ export default function BillingPage() {
                         >
                           <i className="bi bi-calendar2-check-fill" />
                         </div>
-                        <div className="db-strong" style={{ fontSize: 16 }}>Clear Whole School (Current Term)</div>
+                        <div className="db-strong" style={{ fontSize: 15.5 }}>Clear Entire School</div>
                       </div>
-                      <span className="db-pill" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 800 }}>
-                        {fmtNaira(feePerStudent)} / student
+                      <span className="db-pill" style={{ background: "#EFF6FF", color: "#1D4ED8", fontWeight: 800, fontSize: 11 }}>
+                        Current Term
                       </span>
                     </div>
 
                     <p className="db-muted" style={{ fontSize: 13, margin: "8px 0 14px", lineHeight: 1.5 }}>
-                      Instantly clear all <strong>{clearanceSummary?.pending_count || 0} unpaid student(s)</strong> for the current active term using your <strong>School Wallet</strong> or <strong>Direct Bank Transfer</strong>.
+                      Clear all <strong>{clearanceSummary?.pending_count || 0} unpaid student(s)</strong> across every class for <strong>{clearanceSummary?.term_name || "the current active term"}</strong>. 100% whole school clearance.
                     </p>
                   </div>
 
                   <div className="pt-3 border-top d-flex align-items-center justify-content-between flex-wrap gap-2">
                     <div>
-                      <div className="db-muted" style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 700 }}>Total Term Clearance</div>
+                      <div className="db-muted" style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 700 }}>Total Term Fee</div>
                       <div className="db-strong" style={{ fontSize: 18, color: "#2563EB" }}>
                         {fmtNaira(Number(clearanceSummary?.term_clearance_fee || 0))}
                       </div>
@@ -1293,19 +1627,20 @@ export default function BillingPage() {
 
                     <button
                       type="button"
-                      className="db-btn-gold"
-                      style={{ padding: "10px 20px", fontSize: 13 }}
+                      className="db-btn-outline"
+                      style={{ padding: "9px 16px", fontSize: 12.5 }}
                       onClick={openTermClearanceModal}
                       disabled={(clearanceSummary?.pending_count || 0) === 0}
                     >
-                      <i className="bi bi-check2-all" />
-                      Clear Whole School ({fmtNaira(Number(clearanceSummary?.term_clearance_fee || 0))})
+                      <i className="bi bi-check2-all me-1" />
+                      Clear Whole School
                     </button>
                   </div>
                 </div>
               </div>
 
-              <div className="col-12 col-lg-6">
+              {/* PACKAGE 3: Full Academic Session */}
+              <div className="col-12 col-lg-4">
                 <div
                   style={{
                     background: "#FFFFFF",
@@ -1336,21 +1671,21 @@ export default function BillingPage() {
                         >
                           <i className="bi bi-award-fill" />
                         </div>
-                        <div className="db-strong" style={{ fontSize: 16 }}>Clear Full Academic Session (3 Terms Upfront)</div>
+                        <div className="db-strong" style={{ fontSize: 15.5 }}>Full Academic Session</div>
                       </div>
-                      <span className="db-pill" style={{ background: "#ECFDF5", color: "#047857", fontWeight: 800 }}>
-                        {fmtNaira(feePerStudent * termsCount)} / full year
+                      <span className="db-pill" style={{ background: "#ECFDF5", color: "#047857", fontWeight: 800, fontSize: 11 }}>
+                        All 3 Terms
                       </span>
                     </div>
 
                     <p className="db-muted" style={{ fontSize: 13, margin: "8px 0 14px", lineHeight: 1.5 }}>
-                      Clear all <strong>{clearanceSummary?.total_students || 0} active students</strong> across all {termsCount} terms for the entire academic session upfront. No interruptions all year.
+                      Clear all <strong>{clearanceSummary?.total_students || 0} active students</strong> across all 3 terms for <strong>{clearanceSummary?.session_name || "the academic session"}</strong> upfront. Zero billing interruptions all year.
                     </p>
                   </div>
 
                   <div className="pt-3 border-top d-flex align-items-center justify-content-between flex-wrap gap-2">
                     <div>
-                      <div className="db-muted" style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 700 }}>Total Full Session Fee</div>
+                      <div className="db-muted" style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 700 }}>Total Session Fee</div>
                       <div className="db-strong" style={{ fontSize: 18, color: "#10B981" }}>
                         {fmtNaira(Number(clearanceSummary?.session_clearance_fee || 0))}
                       </div>
@@ -1359,12 +1694,12 @@ export default function BillingPage() {
                     <button
                       type="button"
                       className="db-btn-outline"
-                      style={{ padding: "10px 20px", fontSize: 13, background: "#10B981", borderColor: "#10B981", color: "#FFFFFF" }}
+                      style={{ padding: "9px 16px", fontSize: 12.5, background: "#10B981", borderColor: "#10B981", color: "#FFFFFF" }}
                       onClick={openSessionClearanceModal}
                       disabled={(clearanceSummary?.total_students || 0) === 0}
                     >
-                      <i className="bi bi-stars" />
-                      Clear Full Session ({fmtNaira(Number(clearanceSummary?.session_clearance_fee || 0))})
+                      <i className="bi bi-stars me-1" />
+                      Clear Full Year
                     </button>
                   </div>
                 </div>
@@ -1392,7 +1727,7 @@ export default function BillingPage() {
                     </span>
                   </div>
                   <p className="db-panel-sub">
-                    Select students who have paid school fees to clear their platform charges individually or in bulk.
+                    Select students who have paid school fees to clear their platform charges individually or in bulk for <strong>{clearanceSummary?.period_label || "the active period"}</strong>.
                   </p>
                 </div>
 
@@ -1426,7 +1761,7 @@ export default function BillingPage() {
                     onClick={() => setClearanceScope("term")}
                   >
                     <i className="bi bi-calendar-event" />
-                    Current Term ({fmtNaira(feePerStudent)}/student)
+                    Current Term ({clearanceSummary?.term_name || "Active Term"} • {fmtNaira(feePerStudent)}/student)
                   </button>
                   <button
                     type="button"
@@ -1447,78 +1782,10 @@ export default function BillingPage() {
                     onClick={() => setClearanceScope("session")}
                   >
                     <i className="bi bi-award-fill" />
-                    Full Academic Session ({termsCount} Terms @ {fmtNaira(feePerStudent * termsCount)}/student)
+                    Full Academic Session ({clearanceSummary?.session_name || "3 Terms"} @ {fmtNaira(feePerStudent * termsCount)}/student)
                   </button>
                 </div>
               </div>
-
-              {/* 70% Minimum Population Policy Banner */}
-              {clearanceSummary && clearanceSummary.is_minimum_coverage_met === false && (
-                <div
-                  style={{
-                    background: "linear-gradient(135deg, rgba(217, 119, 6, 0.08) 0%, rgba(245, 158, 11, 0.14) 100%)",
-                    border: "1.5px solid #F59E0B",
-                    borderRadius: 12,
-                    padding: "14px 20px",
-                    margin: "16px 24px 8px 24px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 16,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div
-                      style={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: "50%",
-                        background: "#F59E0B",
-                        color: "#FFF",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 18,
-                        flexShrink: 0,
-                      }}
-                    >
-                      🛡️
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: 13.5, color: "#92400E" }}>
-                        70% Minimum Population Coverage Required
-                      </div>
-                      <div style={{ fontSize: 12, color: "#78350F", marginTop: 2, lineHeight: 1.4 }}>
-                        Under SchoolProfit policy, schools must clear at least <strong>70% of enrolled students</strong> (minimum{" "}
-                        <strong>{clearanceSummary.minimum_students_required}</strong> of{" "}
-                        <strong>{clearanceSummary.total_students}</strong> students) to activate platform operations for this term.
-                        Currently cleared: <strong>{clearanceSummary.cleared_count}</strong> ({clearanceSummary.coverage_percent}%). Shortfall:{" "}
-                        <strong style={{ color: "#DC2626" }}>{clearanceSummary.shortfall_students} student(s)</strong>.
-                      </div>
-                    </div>
-                  </div>
-                  {(clearanceSummary.shortfall_students || 0) > 0 && (
-                    <button
-                      type="button"
-                      className="btn btn-sm"
-                      style={{
-                        background: "#D97706",
-                        color: "#FFFFFF",
-                        fontWeight: 800,
-                        borderRadius: 8,
-                        padding: "8px 16px",
-                        fontSize: 12,
-                        border: "none",
-                        boxShadow: "0 2px 6px rgba(217, 119, 6, 0.3)",
-                      }}
-                      onClick={handleAutoSelectMinimum70}
-                    >
-                      ⚡ Auto-Select Minimum 70% ({clearanceSummary.shortfall_students} Students)
-                    </button>
-                  )}
-                </div>
-              )}
 
               {/* Selection Bar */}
               <div
@@ -1553,7 +1820,7 @@ export default function BillingPage() {
                   <div style={{ fontSize: 13 }}>
                     <span style={{ opacity: 0.75 }}>Scope: </span>
                     <strong style={{ color: selectedStudentIds.length > 0 ? "#CBD5E1" : "#334155" }}>
-                      {clearanceScope === "session" ? `Full Session (${termsCount} terms)` : "Active Term"}
+                      {clearanceScope === "session" ? `Full Session (${termsCount} terms)` : (clearanceSummary?.term_name || "Active Term")}
                     </strong>
                   </div>
 
@@ -1595,16 +1862,33 @@ export default function BillingPage() {
                       </button>
                     </>
                   ) : (
-                    <button
-                      type="button"
-                      className="db-refresh-btn"
-                      style={{ fontSize: 12.5 }}
-                      onClick={selectAllUnpaidOnPage}
-                      disabled={loadingRoster || rosterStudents.length === 0}
-                    >
-                      <i className="bi bi-check2-square me-1" />
-                      Select All Unpaid on Page
-                    </button>
+                    <div className="d-flex align-items-center gap-2">
+                      {clearanceSummary && clearanceSummary.is_minimum_coverage_met === false && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-warning text-dark fw-bold"
+                          style={{ fontSize: 12, padding: "7px 14px", borderRadius: 8 }}
+                          onClick={handleAutoSelectMinimum70}
+                          disabled={autoSelecting70}
+                        >
+                          {autoSelecting70 ? (
+                            <><span className="spinner-border spinner-border-sm me-1" /> Selecting Across School…</>
+                          ) : (
+                            <><i className="bi bi-lightning-charge-fill me-1" /> Auto-Select 70% Shortfall ({clearanceSummary.shortfall_students})</>
+                          )}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="db-refresh-btn"
+                        style={{ fontSize: 12.5 }}
+                        onClick={selectAllUnpaidOnPage}
+                        disabled={loadingRoster || rosterStudents.length === 0}
+                      >
+                        <i className="bi bi-check2-square me-1" />
+                        Select All Unpaid on Page
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -2264,7 +2548,19 @@ export default function BillingPage() {
                     padding: "6px 10px",
                   }}
                 >
-                  {clearanceModal.studentsList.length === 0 ? (
+                  {clearanceModal.mode === "min_quota" ? (
+                    <div className="text-center py-3 px-2">
+                      <div className="d-inline-flex align-items-center justify-content-center mb-2" style={{ width: 38, height: 38, borderRadius: "50%", background: "#FEF3C7", color: "#D97706", fontSize: 18 }}>
+                        <i className="bi bi-shield-check" />
+                      </div>
+                      <div style={{ fontWeight: 800, color: "#92400E", fontSize: 13.5 }}>
+                        Automated 70% Quota Allocation
+                      </div>
+                      <div className="text-muted small mt-1" style={{ maxWidth: 440, margin: "0 auto", lineHeight: 1.4 }}>
+                        Clearing <strong>{clearanceModal.studentCount} unpaid student(s)</strong> across classes to satisfy the SchoolProfit 70% minimum coverage threshold for <strong>{clearanceSummary?.period_label || 'the current active term'}</strong>.
+                      </div>
+                    </div>
+                  ) : clearanceModal.studentsList.length === 0 ? (
                     <div className="text-center py-3 text-muted small">
                       All {clearanceModal.studentCount} active students in the school will receive clearance.
                     </div>
