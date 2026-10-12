@@ -196,6 +196,15 @@ export default function StudentsPage() {
   const [bulkTargetStatus, setBulkTargetStatus] = useState<"active" | "alumni" | "graduate">("graduate");
   const [processingBulkStatus, setProcessingBulkStatus] = useState(false);
 
+  /* Student Promotion Modal State */
+  const [promoteModalOpen, setPromoteModalOpen] = useState(false);
+  const [promoteTargetStudent, setPromoteTargetStudent] = useState<Student | null>(null);
+  const [promoteMode, setPromoteMode] = useState<"single" | "bulk" | "class">("single");
+  const [promoteFromClassId, setPromoteFromClassId] = useState<number | "">("");
+  const [promoteToClassId, setPromoteToClassId] = useState<number | "">("");
+  const [promotingStudents, setPromotingStudents] = useState(false);
+  const [destinationClasses, setDestinationClasses] = useState<{ id: number; name: string; section?: { name: string } }[]>([]);
+
   /* Profile */
   const [selectedStudent, setSelectedStudent]   = useState<Student | null>(null);
   const [studentDetails, setStudentDetails]     = useState<any>(null);
@@ -294,6 +303,18 @@ export default function StudentsPage() {
     finally { setLoading(false); }
   };
   useEffect(() => { fetchStudents(); }, [page, search, studentStatusFilter, selectedLevelId]);
+
+  useEffect(() => {
+    if (promoteModalOpen && destinationClasses.length === 0) {
+      authApi.get("/getclasses").then((res) => {
+        if (res.data?.all_classes && res.data.all_classes.length > 0) {
+          setDestinationClasses(res.data.all_classes);
+        } else if (res.data?.from_classes && res.data.from_classes.length > 0) {
+          setDestinationClasses(res.data.from_classes);
+        }
+      }).catch(() => {});
+    }
+  }, [promoteModalOpen, destinationClasses.length]);
 
   const downloadStudentTemplate = async (format: "xlsx" | "csv") => {
     setDownloadingTemplate(format);
@@ -456,6 +477,124 @@ export default function StudentsPage() {
       showError(err?.response?.data?.message ?? "Failed to update student status.");
     } finally {
       setProcessingBulkStatus(false);
+    }
+  };
+
+  /* ══════════════════════════════════════
+     STUDENT PROMOTION METHODS
+  ══════════════════════════════════════ */
+  const openSinglePromote = (student: Student) => {
+    setPromoteTargetStudent(student);
+    setPromoteMode("single");
+    setPromoteFromClassId(student.level?.id || "");
+    setPromoteToClassId("");
+    setPromoteModalOpen(true);
+  };
+
+  const openBulkPromote = () => {
+    if (selectedStudentCount === 0) {
+      showError("Please select at least one student to promote.");
+      return;
+    }
+    setPromoteTargetStudent(null);
+    setPromoteMode("bulk");
+    const selected = selectedStudentsList;
+    const firstLevelId = selected[0]?.level?.id;
+    const allSameClass = selected.every((s) => s.level?.id === firstLevelId);
+    setPromoteFromClassId(allSameClass && firstLevelId ? firstLevelId : "");
+    setPromoteToClassId("");
+    setPromoteModalOpen(true);
+  };
+
+  const openClassPromote = (classId?: number | "all") => {
+    const cid = classId && classId !== "all" ? classId : selectedLevelId !== "all" ? selectedLevelId : "";
+    setPromoteTargetStudent(null);
+    setPromoteMode("class");
+    setPromoteFromClassId(cid || "");
+    setPromoteToClassId("");
+    setPromoteModalOpen(true);
+  };
+
+  const destinationClassesList = destinationClasses.length > 0 ? destinationClasses : levels;
+
+  const sourceClassName = useMemo(() => {
+    if (promoteMode === "single" && promoteTargetStudent) {
+      return promoteTargetStudent.level?.name || "Unassigned Class";
+    }
+    if (promoteFromClassId) {
+      const found = levels.find((l) => l.id === Number(promoteFromClassId));
+      return found ? found.name : `Class #${promoteFromClassId}`;
+    }
+    return "Selected Students";
+  }, [promoteMode, promoteTargetStudent, promoteFromClassId, levels]);
+
+  const targetClassName = useMemo(() => {
+    if (!promoteToClassId) return "";
+    const found = destinationClassesList.find((l) => l.id === Number(promoteToClassId));
+    return found ? found.name : `Class #${promoteToClassId}`;
+  }, [promoteToClassId, destinationClassesList]);
+
+  const executePromote = async () => {
+    if (!promoteToClassId) {
+      showError("Please select a destination class.");
+      return;
+    }
+
+    if (promoteFromClassId && Number(promoteFromClassId) === Number(promoteToClassId)) {
+      showError("Destination class must be different from current class.");
+      return;
+    }
+
+    setPromotingStudents(true);
+    try {
+      let payload: any = {
+        to_class: Number(promoteToClassId),
+      };
+
+      if (promoteMode === "single") {
+        if (!promoteTargetStudent) return;
+        if (promoteTargetStudent.level?.id) {
+          payload.from_class = promoteTargetStudent.level.id;
+        }
+        payload.student_ids = [promoteTargetStudent.id];
+      } else if (promoteMode === "bulk") {
+        const ids = Object.entries(selectedStudentIds)
+          .filter(([_, v]) => v)
+          .map(([k]) => Number(k));
+        if (ids.length === 0) {
+          showError("No students selected.");
+          return;
+        }
+        if (promoteFromClassId) {
+          payload.from_class = Number(promoteFromClassId);
+        }
+        payload.student_ids = ids;
+      } else if (promoteMode === "class") {
+        if (!promoteFromClassId) {
+          showError("Please select a source class to promote.");
+          return;
+        }
+        payload.from_class = Number(promoteFromClassId);
+        payload.promote_all = true;
+      }
+
+      const res = await authApi.post("/promote-students", payload);
+      showSuccess(res.data?.message || "Student(s) promoted successfully.");
+      setPromoteModalOpen(false);
+      clearStudentSelection();
+      profileCache.current = {};
+      await fetchStudents();
+      // Also update class roster counts
+      authApi.get("/getclasses").then((clsRes) => {
+        if (clsRes.data?.from_classes) {
+          setLevels(clsRes.data.from_classes);
+        }
+      }).catch(() => {});
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || "Failed to promote student(s).";
+      showError(msg);
+    } finally {
+      setPromotingStudents(false);
     }
   };
 
@@ -1261,6 +1400,8 @@ export default function StudentsPage() {
         .db-action-btn--view:hover { background:rgba(255,200,87,0.28); transform:translateY(-1px); }
         .db-action-btn--withdraw { color:rgb(185,28,28); background:rgba(239,68,68,0.08); border-color:rgba(239,68,68,0.22); }
         .db-action-btn--withdraw:hover { background:rgba(239,68,68,0.18); transform:translateY(-1px); }
+        .db-action-btn--promote { color:#4f46e5; background:rgba(79,70,229,0.08); border-color:rgba(79,70,229,0.22); }
+        .db-action-btn--promote:hover { background:#4f46e5; color:#ffffff; border-color:#4f46e5; transform:translateY(-1px); }
 
         /* Ratings */
         .sp-rating-section { margin-bottom:16px; }
@@ -1355,6 +1496,30 @@ export default function StudentsPage() {
                         Add Student
                       </button>
                     )}
+                    <button
+                      className="db-btn-outline"
+                      type="button"
+                      onClick={() => {
+                        if (selectedStudentCount > 0) {
+                          openBulkPromote();
+                        } else if (selectedLevelId !== "all") {
+                          openClassPromote(selectedLevelId);
+                        } else {
+                          openClassPromote();
+                        }
+                      }}
+                      title="Promote students directly from this page"
+                      style={{ borderColor: "rgba(255, 255, 255, 0.28)", color: "#FFFFFF" }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 13V3M4 7l4-4 4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      {selectedStudentCount > 0
+                        ? `Promote (${selectedStudentCount})`
+                        : selectedLevelId !== "all"
+                        ? `Promote Class`
+                        : `Promote Students`}
+                    </button>
                     <button className="db-btn-outline" onClick={fetchStudents} disabled={loading}>
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
                         style={{ animation: loading ? "spSpin .8s linear infinite" : "none" }}>
@@ -1622,17 +1787,37 @@ export default function StudentsPage() {
                       {` (${levels.find((l) => l.id === selectedLevelId)?.students_count ?? students.length} students)`}
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    className="db-active-filter-clear"
-                    onClick={() => {
-                      setSelectedLevelId("all");
-                      setPage(1);
-                    }}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
-                    Clear Class Filter
-                  </button>
+                  <div className="d-flex align-items-center gap-2">
+                    <button
+                      type="button"
+                      className="db-sm-btn"
+                      style={{
+                        background: "linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)",
+                        color: "#fff",
+                        border: "none",
+                        fontWeight: 600,
+                        boxShadow: "0 2px 6px rgba(79, 70, 229, 0.3)",
+                      }}
+                      onClick={() => openClassPromote(selectedLevelId)}
+                      title="Promote all active students in this class"
+                    >
+                      <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 13V3M4 7l4-4 4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      Promote Entire Class
+                    </button>
+                    <button
+                      type="button"
+                      className="db-active-filter-clear"
+                      onClick={() => {
+                        setSelectedLevelId("all");
+                        setPage(1);
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+                      Clear Class Filter
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -1798,6 +1983,33 @@ export default function StudentsPage() {
                   </div>
 
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      onClick={openBulkPromote}
+                      style={{
+                        background: "linear-gradient(135deg, #4F46E5 0%, #4338CA 100%)",
+                        color: "#FFFFFF",
+                        border: "none",
+                        borderRadius: 8,
+                        padding: "7px 16px",
+                        fontSize: 12.5,
+                        fontWeight: 700,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        cursor: "pointer",
+                        boxShadow: "0 2px 8px rgba(79, 70, 229, 0.4)",
+                      }}
+                      title="Promote selected students to another class"
+                    >
+                      <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 13V3M4 7l4-4 4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      Promote ({selectedStudentCount})
+                    </button>
+
+                    <span style={{ width: 1, height: 20, background: "rgba(255,255,255,0.18)", margin: "0 4px" }} />
+
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em" }}>
                       Change Status To:
                     </span>
@@ -1947,6 +2159,17 @@ export default function StudentsPage() {
                                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
                                   <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
                                   <circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.4"/>
+                                </svg>
+                              </button>
+                              <button
+                                type="button"
+                                className="db-action-btn db-action-btn--promote"
+                                onClick={() => openSinglePromote(s)}
+                                title={`Promote Student: ${fullName(s)}`}
+                                aria-label="Promote Student"
+                              >
+                                <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                                  <path d="M8 13V3M4 7l4-4 4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
                                 </svg>
                               </button>
                               {isAdmin && (
@@ -2766,6 +2989,408 @@ export default function StudentsPage() {
                   </>
                 ) : (
                   `Confirm ${lifecycleLabel(bulkTargetStatus)} (${selectedStudentCount})`
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Student Promotion Modal ── */}
+      {promoteModalOpen && (
+        <div
+          className="wd-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !promotingStudents) {
+              setPromoteModalOpen(false);
+            }
+          }}
+        >
+          <div className="wd-card" style={{ width: "min(520px, 94vw)" }}>
+            <div
+              className="wd-header"
+              style={{
+                background: "linear-gradient(135deg, #0A192F 0%, #1E1B4B 100%)",
+              }}
+            >
+              <div
+                className="wd-header-glow"
+                style={{
+                  background: "radial-gradient(circle, rgba(99, 102, 241, 0.25) 0%, transparent 65%)",
+                }}
+              />
+              <div
+                className="wd-icon-wrap"
+                style={{
+                  background: "rgba(99, 102, 241, 0.18)",
+                  border: "1px solid rgba(99, 102, 241, 0.35)",
+                  color: "#A5B4FC",
+                }}
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <div className="wd-title">
+                {promoteMode === "single"
+                  ? "Promote Student"
+                  : promoteMode === "class"
+                  ? "Promote Entire Class"
+                  : "Bulk Promote Students"}
+              </div>
+              <div className="wd-subtitle">
+                {promoteMode === "single" && promoteTargetStudent
+                  ? `Advancing ${fullName(promoteTargetStudent)} to the next academic level.`
+                  : promoteMode === "class"
+                  ? "Advance all active students in this class to the next grade."
+                  : `Advance ${selectedStudentCount} selected student(s) to a new classroom.`}
+              </div>
+            </div>
+
+            <div className="wd-body">
+              {/* Visual Progression Banner */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "12px 16px",
+                  background: "rgba(99, 102, 241, 0.06)",
+                  border: "1px solid rgba(99, 102, 241, 0.2)",
+                  borderRadius: 10,
+                  marginBottom: 16,
+                  gap: 12,
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span
+                    style={{
+                      fontSize: 10.5,
+                      color: "#64748B",
+                      textTransform: "uppercase",
+                      letterSpacing: ".06em",
+                      fontWeight: 700,
+                      display: "block",
+                      marginBottom: 2,
+                    }}
+                  >
+                    Current Class
+                  </span>
+                  <div
+                    style={{
+                      fontSize: 13.5,
+                      fontWeight: 700,
+                      color: "#0F172A",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                    title={sourceClassName}
+                  >
+                    {sourceClassName}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: "50%",
+                    background: "#EEF2FF",
+                    color: "#4F46E5",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                    fontWeight: 700,
+                  }}
+                >
+                  ➔
+                </div>
+
+                <div style={{ flex: 1, minWidth: 0, textAlign: "right" }}>
+                  <span
+                    style={{
+                      fontSize: 10.5,
+                      color: "#64748B",
+                      textTransform: "uppercase",
+                      letterSpacing: ".06em",
+                      fontWeight: 700,
+                      display: "block",
+                      marginBottom: 2,
+                    }}
+                  >
+                    Destination Class
+                  </span>
+                  <div
+                    style={{
+                      fontSize: 13.5,
+                      fontWeight: 700,
+                      color: targetClassName ? "#4F46E5" : "#94A3B8",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                    title={targetClassName || "Select below"}
+                  >
+                    {targetClassName || "Select below…"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Single Student Card */}
+              {promoteMode === "single" && promoteTargetStudent && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "10px 14px",
+                    background: "#F8FAFC",
+                    border: "1px solid #E2E8F0",
+                    borderRadius: 10,
+                    marginBottom: 16,
+                  }}
+                >
+                  {promoteTargetStudent.photo ? (
+                    <img
+                      src={getPhoto(promoteTargetStudent.photo)}
+                      className="db-avatar"
+                      alt={fullName(promoteTargetStudent)}
+                      style={{ width: 42, height: 42 }}
+                    />
+                  ) : (
+                    <div className="db-avatar-initials" style={{ width: 42, height: 42, fontSize: 13 }}>
+                      {[promoteTargetStudent.firstname?.[0], promoteTargetStudent.surname?.[0]].filter(Boolean).join("").toUpperCase()}
+                    </div>
+                  )}
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13.5, color: "#0F172A" }}>
+                      {fullName(promoteTargetStudent)}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#64748B" }}>
+                      Reg: <span style={{ fontWeight: 600 }}>{promoteTargetStudent.reg_no}</span>
+                      {promoteTargetStudent.level?.name && ` • Class: ${promoteTargetStudent.level.name}`}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Bulk Selected Students Preview */}
+              {promoteMode === "bulk" && (
+                <div style={{ marginBottom: 16 }}>
+                  <div
+                    style={{
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      color: "#64748B",
+                      textTransform: "uppercase",
+                      letterSpacing: ".05em",
+                      marginBottom: 8,
+                      display: "flex",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <span>Selected Students ({selectedStudentCount})</span>
+                    <button
+                      type="button"
+                      onClick={clearStudentSelection}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "#EF4444",
+                        fontSize: 11.5,
+                        cursor: "pointer",
+                        padding: 0,
+                        textDecoration: "underline",
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div
+                    style={{
+                      maxHeight: 130,
+                      overflowY: "auto",
+                      border: "1px solid #E2E8F0",
+                      borderRadius: 10,
+                      padding: 8,
+                      background: "#F8FAFC",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 6,
+                    }}
+                  >
+                    {selectedStudentsList.map((s) => (
+                      <div
+                        key={s.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "6px 10px",
+                          background: "#FFFFFF",
+                          borderRadius: 6,
+                          border: "1px solid #EDF2F7",
+                          fontSize: 12,
+                        }}
+                      >
+                        <span style={{ fontWeight: 600, color: "#0F172A" }}>{fullName(s)}</span>
+                        <span style={{ color: "#64748B", fontSize: 11 }}>
+                          {s.reg_no} • {s.level?.name || "No class"}
+                        </span>
+                      </div>
+                    ))}
+                    {selectedStudentCount > selectedStudentsList.length && (
+                      <div style={{ textAlign: "center", fontSize: 11.5, color: "#64748B", padding: 4 }}>
+                        + {selectedStudentCount - selectedStudentsList.length} more student(s) across pages
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Class Mode Source Class Picker */}
+              {promoteMode === "class" && (
+                <div style={{ marginBottom: 16 }}>
+                  <label
+                    style={{
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                      color: "#334155",
+                      marginBottom: 6,
+                      display: "block",
+                    }}
+                  >
+                    Source Class (Promoting From) <span style={{ color: "#EF4444" }}>*</span>
+                  </label>
+                  <select
+                    className="db-status-select"
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      borderRadius: 8,
+                      fontSize: 13,
+                      border: "1.5px solid #CBD5E1",
+                      background: "#FFFFFF",
+                    }}
+                    value={promoteFromClassId}
+                    onChange={(e) => {
+                      const val = e.target.value ? Number(e.target.value) : "";
+                      setPromoteFromClassId(val);
+                      if (promoteToClassId && Number(val) === Number(promoteToClassId)) {
+                        setPromoteToClassId("");
+                      }
+                    }}
+                  >
+                    <option value="">-- Choose source class to promote --</option>
+                    {levels.map((lvl) => (
+                      <option key={lvl.id} value={lvl.id}>
+                        {lvl.name} {lvl.section?.name ? `(${lvl.section.name})` : ""} — {lvl.students_count ?? 0} active students
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Destination Class Selector */}
+              <div style={{ marginBottom: 16 }}>
+                <label
+                  style={{
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    color: "#334155",
+                    marginBottom: 6,
+                    display: "block",
+                  }}
+                >
+                  Destination Class (Promote To) <span style={{ color: "#EF4444" }}>*</span>
+                </label>
+                <select
+                  className="db-status-select"
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    border: "1.5px solid #4F46E5",
+                    background: "#FFFFFF",
+                  }}
+                  value={promoteToClassId}
+                  onChange={(e) => setPromoteToClassId(e.target.value ? Number(e.target.value) : "")}
+                >
+                  <option value="">-- Choose target class to advance students into --</option>
+                  {destinationClassesList
+                    .filter((lvl) => !promoteFromClassId || Number(lvl.id) !== Number(promoteFromClassId))
+                    .map((lvl) => (
+                      <option key={lvl.id} value={lvl.id}>
+                        {lvl.name} {lvl.section?.name ? `(${lvl.section.name})` : ""}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              {/* Information Note */}
+              <div
+                style={{
+                  background: "#F8FAFC",
+                  border: "1px solid #E2E8F0",
+                  borderRadius: 10,
+                  padding: "12px 14px",
+                  fontSize: 12,
+                  color: "#475569",
+                  lineHeight: 1.5,
+                }}
+              >
+                <div style={{ fontWeight: 600, color: "#1E293B", marginBottom: 3, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span>🛡️</span> Academic Record Integrity & Clearance
+                </div>
+                Student broadsheets, term results, and exam archives remain permanently preserved. Promoted students will immediately appear on their new class roster upon confirmation.
+              </div>
+            </div>
+
+            <div className="wd-footer" style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button
+                type="button"
+                className="wd-btn-cancel"
+                onClick={() => setPromoteModalOpen(false)}
+                disabled={promotingStudents}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="db-btn-gold"
+                style={{
+                  background: "linear-gradient(135deg, #4F46E5 0%, #4338CA 100%)",
+                  borderColor: "transparent",
+                  color: "#FFFFFF",
+                  padding: "9px 20px",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  borderRadius: 8,
+                  cursor: !promoteToClassId || promotingStudents ? "not-allowed" : "pointer",
+                  opacity: !promoteToClassId || promotingStudents ? 0.6 : 1,
+                  boxShadow: "0 2px 10px rgba(79, 70, 229, 0.35)",
+                }}
+                onClick={executePromote}
+                disabled={!promoteToClassId || promotingStudents}
+              >
+                {promotingStudents ? (
+                  <>
+                    <span className="sp-spinner" /> Promoting…
+                  </>
+                ) : (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ display: "inline-block", verticalAlign: "middle", marginRight: 6 }}>
+                      <path d="M8 13V3M4 7l4-4 4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    {promoteMode === "single"
+                      ? "Promote Student"
+                      : promoteMode === "class"
+                      ? "Promote Entire Class"
+                      : `Promote (${selectedStudentCount}) Students`}
+                  </>
                 )}
               </button>
             </div>
