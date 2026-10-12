@@ -469,7 +469,7 @@ export default function SchoolProfitInvoicePaymentPage() {
                                 <i className={`bi ${walletBalance >= payAmount ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill"} me-1`} />
                                 {walletBalance >= payAmount ? "SUFFICIENT WALLET BALANCE" : "LOW WALLET BALANCE"}
                               </span>
-                              <span className="invoice-muted" style={{ fontSize: 11 }}>1-Click Debit</span>
+                              <span className="invoice-muted" style={{ fontSize: 11 }}>Direct Wallet Settlement</span>
                             </div>
 
                             <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 12, padding: 14, marginBottom: 14 }}>

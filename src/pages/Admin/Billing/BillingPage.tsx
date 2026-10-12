@@ -141,12 +141,11 @@ export default function BillingPage() {
   const [rosterLastPage, setRosterLastPage] = useState<number>(1);
   const [clearanceScope, setClearanceScope] = useState<"term" | "session">("term");
   const [clearingSingleId, setClearingSingleId] = useState<number | null>(null);
-  const [autoSelecting70, setAutoSelecting70] = useState(false);
 
   // Clearance Modal state
   const [clearanceModal, setClearanceModal] = useState<{
     isOpen: boolean;
-    mode: "selected" | "term" | "session" | "single" | "min_quota";
+    mode: "selected" | "term" | "session" | "single";
     title: string;
     subtitle: string;
     sessionId?: number | null;
@@ -323,7 +322,7 @@ export default function BillingPage() {
       const res = await authApi.post("/school/clearance/initiate-online", {
         type: data.mode,
         session_id: data.sessionId,
-        term_id: (clearanceScope === "term" || data.mode === "min_quota") ? data.termId : null,
+        term_id: clearanceScope === "term" ? data.termId : null,
         student_ids: studentIds,
         is_full_session: clearanceScope === "session" || data.mode === "session",
       });
@@ -343,82 +342,6 @@ export default function BillingPage() {
       console.warn("Failed to generate Wema virtual account:", err);
       setClearanceModal((prev) => ({ ...prev, loadingOnline: false }));
     }
-  };
-
-  // Helper to auto-select minimum 70% shortfall across all pages and classes
-  const handleAutoSelectMinimum70 = async () => {
-    const shortfall = clearanceSummary?.shortfall_students || 0;
-    if (shortfall <= 0) {
-      showSuccess?.("70% minimum coverage threshold is already met!");
-      return;
-    }
-
-    setAutoSelecting70(true);
-    try {
-      const res = await authApi.get("/school/clearance/unpaid-student-ids", {
-        params: {
-          session_id: clearanceSummary?.session_id,
-          term_id: clearanceScope === "term" ? clearanceSummary?.term_id : undefined,
-          limit: shortfall,
-        },
-      });
-
-      if (res.data?.success && Array.isArray(res.data.student_ids)) {
-        const fetchedIds: number[] = res.data.student_ids;
-        setSelectedStudentIds(fetchedIds);
-        showSuccess?.(
-          `Successfully selected ${fetchedIds.length} student(s) across all classes/pages to satisfy the 70% minimum threshold.`
-        );
-        const rosterEl = document.getElementById("clearance-roster-section");
-        if (rosterEl) {
-          rosterEl.scrollIntoView({ behavior: "smooth" });
-        }
-      } else {
-        showError?.("Could not fetch unpaid students for auto-selection.");
-      }
-    } catch (err: any) {
-      showError?.(err?.response?.data?.message || "Failed to auto-select students across all pages.");
-    } finally {
-      setAutoSelecting70(false);
-    }
-  };
-
-  // 1-Click Fulfill 70% Minimum Policy Quota Modal
-  const openMinQuotaClearanceModal = async () => {
-    if (!clearanceSummary?.session_id || !clearanceSummary?.term_id) {
-      showError?.("Current academic period is not active.");
-      return;
-    }
-    const shortfall = clearanceSummary.shortfall_students || 0;
-    if (shortfall <= 0) {
-      showSuccess?.("Your school has already met or exceeded the 70% minimum clearance policy!");
-      return;
-    }
-    const fee = Number(clearanceSummary.shortfall_fee || (shortfall * feePerStudent));
-    const defaultTab = (clearanceSummary.wallet_balance || 0) >= fee ? "wallet" : "paystack";
-
-    const modalObj = {
-      isOpen: true,
-      mode: "min_quota" as const,
-      title: `Fulfill 70% Minimum Quota (${shortfall} Students)`,
-      subtitle: `Clear ${shortfall} student(s) to meet the mandatory 70% clearance threshold for ${clearanceSummary.period_label || 'Current Term'}.`,
-      sessionId: clearanceSummary.session_id,
-      termId: clearanceSummary.term_id,
-      studentsList: [],
-      studentCount: shortfall,
-      feePerStudent: feePerStudent,
-      totalFee: fee,
-      walletBalance: Number(clearanceSummary.wallet_balance || 0),
-      loadingOnline: false,
-      initiatingPaystack: false,
-      activeTab: defaultTab,
-      virtualAccount: null,
-      invoiceId: null,
-      invoiceNo: null,
-    };
-
-    setClearanceModal(modalObj);
-    fetchWemaVirtualAccount(modalObj);
   };
 
   // Open Checkout Modal for Selected Students
@@ -643,7 +566,7 @@ export default function BillingPage() {
       const res = await authApi.post("/school/clearance/initiate-paystack", {
         type: clearanceModal.mode,
         session_id: clearanceModal.sessionId,
-        term_id: (clearanceScope === "term" || clearanceModal.mode === "min_quota") ? clearanceModal.termId : null,
+        term_id: clearanceScope === "term" ? clearanceModal.termId : null,
         student_ids: studentIds,
         is_full_session: clearanceScope === "session" || clearanceModal.mode === "session",
         callback_url: window.location.origin + window.location.pathname,
@@ -715,12 +638,7 @@ export default function BillingPage() {
     setModalProcessingWallet(true);
     try {
       let res;
-      if (clearanceModal.mode === "min_quota") {
-        res = await authApi.post("/school/clearance/clear-min-quota", {
-          session_id: clearanceModal.sessionId,
-          term_id: clearanceModal.termId,
-        });
-      } else if (clearanceModal.mode === "selected" || clearanceModal.mode === "single") {
+      if (clearanceModal.mode === "selected" || clearanceModal.mode === "single") {
         const ids = clearanceModal.studentsList.map((s) => s.id);
         res = await authApi.post("/school/clearance/clear-selected", {
           student_ids: ids,
@@ -1423,29 +1341,28 @@ export default function BillingPage() {
                   </div>
                 </div>
 
-                {clearanceSummary?.is_minimum_coverage_met === false && (clearanceSummary?.shortfall_students || 0) > 0 && (
+                {(clearanceSummary?.pending_count || 0) > 0 && (
                   <div className="d-flex align-items-center gap-2 flex-wrap">
                     <button
                       type="button"
                       className="db-btn-gold"
                       style={{ padding: "10px 18px", fontSize: 13 }}
-                      onClick={openMinQuotaClearanceModal}
+                      onClick={openTermClearanceModal}
                     >
-                      <i className="bi bi-lightning-charge-fill me-1" />
-                      1-Click Pay 70% Quota ({fmtNaira(clearanceSummary?.shortfall_fee || ((clearanceSummary?.shortfall_students || 0) * feePerStudent))})
+                      <i className="bi bi-shield-check me-1" />
+                      Clear Whole School ({fmtNaira(Number(clearanceSummary?.term_clearance_fee || 0))})
                     </button>
                     <button
                       type="button"
                       className="btn btn-sm btn-outline-dark fw-bold"
                       style={{ padding: "9px 15px", fontSize: 12.5, borderRadius: 10, background: "#FFFFFF" }}
-                      onClick={handleAutoSelectMinimum70}
-                      disabled={autoSelecting70}
+                      onClick={() => {
+                        const el = document.getElementById("clearance-roster-section");
+                        if (el) el.scrollIntoView({ behavior: "smooth" });
+                      }}
                     >
-                      {autoSelecting70 ? (
-                        <><span className="spinner-border spinner-border-sm me-1" /> Selecting Across All Pages…</>
-                      ) : (
-                        <><i className="bi bi-check2-all me-1" /> Auto-Select Shortfall ({clearanceSummary?.shortfall_students})</>
-                      )}
+                      <i className="bi bi-people me-1" />
+                      Select Students Manually
                     </button>
                   </div>
                 )}
@@ -1492,100 +1409,20 @@ export default function BillingPage() {
 
             {/* ===== 3 EXECUTIVE SETTLEMENT PACKAGES ===== */}
             <div className="row g-3 mb-4">
-              {/* PACKAGE 1: 70% Minimum Quota */}
+              {/* PACKAGE 1: 100% Whole School (Current Term) */}
               <div className="col-12 col-lg-4">
                 <div
                   style={{
                     background: "#FFFFFF",
-                    border: clearanceSummary?.is_minimum_coverage_met === false ? "2px solid #F59E0B" : "1px solid #E2E8F0",
+                    border: "2px solid #0F2744",
                     borderRadius: 16,
                     padding: 22,
                     height: "100%",
                     display: "flex",
                     flexDirection: "column",
                     justifyContent: "space-between",
-                    boxShadow: clearanceSummary?.is_minimum_coverage_met === false
-                      ? "0 8px 24px rgba(245, 158, 11, 0.12)"
-                      : "0 4px 12px rgba(15, 39, 68, 0.03)",
+                    boxShadow: "0 8px 24px rgba(15, 39, 68, 0.08)",
                     position: "relative",
-                  }}
-                >
-                  <div>
-                    <div className="d-flex align-items-center justify-content-between mb-2">
-                      <div className="d-flex align-items-center gap-2">
-                        <div
-                          style={{
-                            width: 36,
-                            height: 36,
-                            borderRadius: 10,
-                            background: "rgba(217, 119, 6, 0.12)",
-                            color: "#D97706",
-                            display: "grid",
-                            placeItems: "center",
-                            fontSize: 18,
-                          }}
-                        >
-                          <i className="bi bi-shield-check" />
-                        </div>
-                        <div className="db-strong" style={{ fontSize: 15.5 }}>70% Minimum Quota</div>
-                      </div>
-                      <span
-                        className="db-pill"
-                        style={{
-                          background: clearanceSummary?.is_minimum_coverage_met === false ? "#FEF3C7" : "#ECFDF5",
-                          color: clearanceSummary?.is_minimum_coverage_met === false ? "#92400E" : "#047857",
-                          fontWeight: 800,
-                          fontSize: 11,
-                        }}
-                      >
-                        {clearanceSummary?.is_minimum_coverage_met === false ? "Recommended" : "Completed"}
-                      </span>
-                    </div>
-
-                    <p className="db-muted" style={{ fontSize: 13, margin: "8px 0 14px", lineHeight: 1.5 }}>
-                      Instantly clear the exact shortfall of <strong>{clearanceSummary?.shortfall_students || 0} student(s)</strong> across classes to satisfy policy and unlock platform access for <strong>{clearanceSummary?.period_label || "Active Period"}</strong>.
-                    </p>
-                  </div>
-
-                  <div className="pt-3 border-top d-flex align-items-center justify-content-between flex-wrap gap-2">
-                    <div>
-                      <div className="db-muted" style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 700 }}>
-                        {clearanceSummary?.is_minimum_coverage_met === false ? "Shortfall Payable" : "Quota Status"}
-                      </div>
-                      <div className="db-strong" style={{ fontSize: 18, color: "#D97706" }}>
-                        {clearanceSummary?.is_minimum_coverage_met === false
-                          ? fmtNaira(clearanceSummary?.shortfall_fee || ((clearanceSummary?.shortfall_students || 0) * feePerStudent))
-                          : "Satisfied (₦0)"}
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="db-btn-gold"
-                      style={{ padding: "9px 16px", fontSize: 12.5 }}
-                      onClick={openMinQuotaClearanceModal}
-                      disabled={clearanceSummary?.is_minimum_coverage_met !== false || (clearanceSummary?.shortfall_students || 0) <= 0}
-                    >
-                      <i className="bi bi-lightning-charge-fill me-1" />
-                      {clearanceSummary?.is_minimum_coverage_met === false ? "Pay 70% Quota" : "Policy Met"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* PACKAGE 2: 100% Whole School (Current Term) */}
-              <div className="col-12 col-lg-4">
-                <div
-                  style={{
-                    background: "#FFFFFF",
-                    border: "1px solid #E2E8F0",
-                    borderRadius: 16,
-                    padding: 22,
-                    height: "100%",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                    boxShadow: "0 4px 12px rgba(15, 39, 68, 0.03)",
                   }}
                 >
                   <div>
@@ -1613,33 +1450,33 @@ export default function BillingPage() {
                     </div>
 
                     <p className="db-muted" style={{ fontSize: 13, margin: "8px 0 14px", lineHeight: 1.5 }}>
-                      Clear all <strong>{clearanceSummary?.pending_count || 0} unpaid student(s)</strong> across every class for <strong>{clearanceSummary?.term_name || "the current active term"}</strong>. 100% whole school clearance.
+                      Clear all <strong>{clearanceSummary?.pending_count || 0} unpaid student(s)</strong> across every class for <strong>{clearanceSummary?.term_name || "the current active term"}</strong>. Full 100% school clearance.
                     </p>
                   </div>
 
                   <div className="pt-3 border-top d-flex align-items-center justify-content-between flex-wrap gap-2">
                     <div>
                       <div className="db-muted" style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 700 }}>Total Term Fee</div>
-                      <div className="db-strong" style={{ fontSize: 18, color: "#2563EB" }}>
+                      <div className="db-strong" style={{ fontSize: 18, color: "#0F2744" }}>
                         {fmtNaira(Number(clearanceSummary?.term_clearance_fee || 0))}
                       </div>
                     </div>
 
                     <button
                       type="button"
-                      className="db-btn-outline"
+                      className="db-btn-gold"
                       style={{ padding: "9px 16px", fontSize: 12.5 }}
                       onClick={openTermClearanceModal}
                       disabled={(clearanceSummary?.pending_count || 0) === 0}
                     >
-                      <i className="bi bi-check2-all me-1" />
+                      <i className="bi bi-shield-check me-1" />
                       Clear Whole School
                     </button>
                   </div>
                 </div>
               </div>
 
-              {/* PACKAGE 3: Full Academic Session */}
+              {/* PACKAGE 2: Full Academic Session */}
               <div className="col-12 col-lg-4">
                 <div
                   style={{
@@ -1700,6 +1537,74 @@ export default function BillingPage() {
                     >
                       <i className="bi bi-stars me-1" />
                       Clear Full Year
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* PACKAGE 3: Custom Student Selection */}
+              <div className="col-12 col-lg-4">
+                <div
+                  style={{
+                    background: "#FFFFFF",
+                    border: "1px solid #E2E8F0",
+                    borderRadius: 16,
+                    padding: 22,
+                    height: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    boxShadow: "0 4px 12px rgba(15, 39, 68, 0.03)",
+                  }}
+                >
+                  <div>
+                    <div className="d-flex align-items-center justify-content-between mb-2">
+                      <div className="d-flex align-items-center gap-2">
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 10,
+                            background: "rgba(139, 92, 246, 0.1)",
+                            color: "#8B5CF6",
+                            display: "grid",
+                            placeItems: "center",
+                            fontSize: 18,
+                          }}
+                        >
+                          <i className="bi bi-people-fill" />
+                        </div>
+                        <div className="db-strong" style={{ fontSize: 15.5 }}>Custom Selection</div>
+                      </div>
+                      <span className="db-pill" style={{ background: "#F5F3FF", color: "#6D28D9", fontWeight: 800, fontSize: 11 }}>
+                        Flexible Roster
+                      </span>
+                    </div>
+
+                    <p className="db-muted" style={{ fontSize: 13, margin: "8px 0 14px", lineHeight: 1.5 }}>
+                      Selectively choose specific students or classes using the roster below. Note: Platform policy requires at least <strong>70% active coverage ({clearanceSummary?.minimum_students_required || 0} students)</strong> to unlock broadsheets and results.
+                    </p>
+                  </div>
+
+                  <div className="pt-3 border-top d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div>
+                      <div className="db-muted" style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 700 }}>Rate Per Student</div>
+                      <div className="db-strong" style={{ fontSize: 18, color: "#6D28D9" }}>
+                        {fmtNaira(feePerStudent)} / term
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="db-btn-outline"
+                      style={{ padding: "9px 16px", fontSize: 12.5 }}
+                      onClick={() => {
+                        const el = document.getElementById("clearance-roster-section");
+                        if (el) el.scrollIntoView({ behavior: "smooth" });
+                      }}
+                    >
+                      <i className="bi bi-list-check me-1" />
+                      Select In Roster
                     </button>
                   </div>
                 </div>
@@ -1863,21 +1768,6 @@ export default function BillingPage() {
                     </>
                   ) : (
                     <div className="d-flex align-items-center gap-2">
-                      {clearanceSummary && clearanceSummary.is_minimum_coverage_met === false && (
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-warning text-dark fw-bold"
-                          style={{ fontSize: 12, padding: "7px 14px", borderRadius: 8 }}
-                          onClick={handleAutoSelectMinimum70}
-                          disabled={autoSelecting70}
-                        >
-                          {autoSelecting70 ? (
-                            <><span className="spinner-border spinner-border-sm me-1" /> Selecting Across School…</>
-                          ) : (
-                            <><i className="bi bi-lightning-charge-fill me-1" /> Auto-Select 70% Shortfall ({clearanceSummary.shortfall_students})</>
-                          )}
-                        </button>
-                      )}
                       <button
                         type="button"
                         className="db-refresh-btn"
@@ -2548,19 +2438,7 @@ export default function BillingPage() {
                     padding: "6px 10px",
                   }}
                 >
-                  {clearanceModal.mode === "min_quota" ? (
-                    <div className="text-center py-3 px-2">
-                      <div className="d-inline-flex align-items-center justify-content-center mb-2" style={{ width: 38, height: 38, borderRadius: "50%", background: "#FEF3C7", color: "#D97706", fontSize: 18 }}>
-                        <i className="bi bi-shield-check" />
-                      </div>
-                      <div style={{ fontWeight: 800, color: "#92400E", fontSize: 13.5 }}>
-                        Automated 70% Quota Allocation
-                      </div>
-                      <div className="text-muted small mt-1" style={{ maxWidth: 440, margin: "0 auto", lineHeight: 1.4 }}>
-                        Clearing <strong>{clearanceModal.studentCount} unpaid student(s)</strong> across classes to satisfy the SchoolProfit 70% minimum coverage threshold for <strong>{clearanceSummary?.period_label || 'the current active term'}</strong>.
-                      </div>
-                    </div>
-                  ) : clearanceModal.studentsList.length === 0 ? (
+                  {clearanceModal.studentsList.length === 0 ? (
                     <div className="text-center py-3 text-muted small">
                       All {clearanceModal.studentCount} active students in the school will receive clearance.
                     </div>
@@ -2708,7 +2586,7 @@ export default function BillingPage() {
                       <i className={`bi ${clearanceModal.walletBalance >= clearanceModal.totalFee ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill"} me-1`} />
                       {clearanceModal.walletBalance >= clearanceModal.totalFee ? "SUFFICIENT WALLET BALANCE" : "INSUFFICIENT WALLET BALANCE"}
                     </span>
-                    <span style={{ fontSize: 11.5, color: "#64748B", fontWeight: 700 }}>Instant 1-Click Clearance</span>
+                    <span style={{ fontSize: 11.5, color: "#64748B", fontWeight: 700 }}>Direct Wallet Settlement</span>
                   </div>
 
                   <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 12, padding: 14, marginBottom: 14 }}>
