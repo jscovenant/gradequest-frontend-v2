@@ -205,6 +205,19 @@ export default function StudentsPage() {
   const [promotingStudents, setPromotingStudents] = useState(false);
   const [destinationClasses, setDestinationClasses] = useState<{ id: number; name: string; section?: { name: string } }[]>([]);
 
+  /* Clearance & Wallet State */
+  const [clearanceSummary, setClearanceSummary] = useState<{
+    total_students: number;
+    cleared_count: number;
+    pending_count: number;
+    fee_per_student: number;
+    wallet_balance: number;
+    session_id?: number;
+    term_id?: number;
+  } | null>(null);
+  const [clearingViaWallet, setClearingViaWallet] = useState(false);
+  const [clearingViaPaystack, setClearingViaPaystack] = useState(false);
+
   /* Profile */
   const [selectedStudent, setSelectedStudent]   = useState<Student | null>(null);
   const [studentDetails, setStudentDetails]     = useState<any>(null);
@@ -304,15 +317,55 @@ export default function StudentsPage() {
   };
   useEffect(() => { fetchStudents(); }, [page, search, studentStatusFilter, selectedLevelId]);
 
+  const fetchClearanceSummary = async () => {
+    try {
+      const res = await authApi.get("/school/clearance/summary");
+      if (res.data) {
+        setClearanceSummary(res.data);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   useEffect(() => {
-    if (promoteModalOpen && destinationClasses.length === 0) {
-      authApi.get("/getclasses").then((res) => {
-        if (res.data?.all_classes && res.data.all_classes.length > 0) {
-          setDestinationClasses(res.data.all_classes);
-        } else if (res.data?.from_classes && res.data.from_classes.length > 0) {
-          setDestinationClasses(res.data.from_classes);
-        }
-      }).catch(() => {});
+    fetchClearanceSummary();
+  }, []);
+
+  // Listen for Paystack redirect callback reference to auto-verify clearance
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("reference") || params.get("trxref");
+    if (ref) {
+      authApi.get(`/school/clearance/verify-paystack/${ref}`)
+        .then((res) => {
+          if (res.data?.success) {
+            showSuccess(res.data?.message || "Platform fees cleared successfully!");
+          } else {
+            showError(res.data?.message || "Payment verification incomplete.");
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          window.history.replaceState({}, document.title, window.location.pathname);
+          fetchStudents();
+          fetchClearanceSummary();
+        });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (promoteModalOpen) {
+      fetchClearanceSummary();
+      if (destinationClasses.length === 0) {
+        authApi.get("/getclasses").then((res) => {
+          if (res.data?.all_classes && res.data.all_classes.length > 0) {
+            setDestinationClasses(res.data.all_classes);
+          } else if (res.data?.from_classes && res.data.from_classes.length > 0) {
+            setDestinationClasses(res.data.from_classes);
+          }
+        }).catch(() => {});
+      }
     }
   }, [promoteModalOpen, destinationClasses.length]);
 
@@ -533,6 +586,76 @@ export default function StudentsPage() {
     const found = destinationClassesList.find((l) => l.id === Number(promoteToClassId));
     return found ? found.name : `Class #${promoteToClassId}`;
   }, [promoteToClassId, destinationClassesList]);
+
+  const targetClearanceIds = useMemo(() => {
+    if (promoteMode === "single" && promoteTargetStudent) {
+      return [promoteTargetStudent.id];
+    }
+    if (promoteMode === "bulk") {
+      return Object.entries(selectedStudentIds)
+        .filter(([_, v]) => v)
+        .map(([k]) => Number(k));
+    }
+    return [];
+  }, [promoteMode, promoteTargetStudent, selectedStudentIds]);
+
+  const handleClearFromWallet = async (targetIds: number[]) => {
+    if (!clearanceSummary?.session_id) {
+      showError("Active academic session not detected.");
+      return;
+    }
+    if (!targetIds || targetIds.length === 0) {
+      showError("No students specified for clearance.");
+      return;
+    }
+    setClearingViaWallet(true);
+    try {
+      const res = await authApi.post("/school/clearance/clear-selected", {
+        student_ids: targetIds,
+        session_id: clearanceSummary.session_id,
+        term_id: clearanceSummary.term_id,
+        is_full_session: false,
+      });
+      if (res.data?.success) {
+        showSuccess(res.data?.message || "Platform fees cleared from wallet successfully!");
+        await fetchClearanceSummary();
+        await fetchStudents();
+      } else {
+        showError(res.data?.message || "Failed to clear platform fees.");
+      }
+    } catch (err: any) {
+      showError(err?.response?.data?.message || err?.message || "Failed to clear platform fees.");
+    } finally {
+      setClearingViaWallet(false);
+    }
+  };
+
+  const handleClearViaPaystack = async (targetIds: number[]) => {
+    if (!clearanceSummary?.session_id) {
+      showError("Active academic session not detected.");
+      return;
+    }
+    setClearingViaPaystack(true);
+    try {
+      const res = await authApi.post("/school/clearance/initiate-paystack", {
+        type: targetIds.length > 0 ? "selected" : "term",
+        session_id: clearanceSummary.session_id,
+        term_id: clearanceSummary.term_id,
+        student_ids: targetIds.length > 0 ? targetIds : undefined,
+        is_full_session: false,
+        callback_url: window.location.origin + window.location.pathname,
+      });
+      if (res.data?.success && res.data?.authorization_url) {
+        window.location.href = res.data.authorization_url;
+      } else {
+        showError(res.data?.message || "Failed to initialize Paystack checkout.");
+        setClearingViaPaystack(false);
+      }
+    } catch (err: any) {
+      showError(err?.response?.data?.message || err?.message || "Failed to initialize Paystack checkout.");
+      setClearingViaPaystack(false);
+    }
+  };
 
   const executePromote = async () => {
     if (!promoteToClassId) {
@@ -2008,6 +2131,37 @@ export default function StudentsPage() {
                       Promote ({selectedStudentCount})
                     </button>
 
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const ids = Object.entries(selectedStudentIds)
+                          .filter(([_, v]) => v)
+                          .map(([k]) => Number(k));
+                        if (ids.length > 0) {
+                          handleClearFromWallet(ids);
+                        }
+                      }}
+                      disabled={clearingViaWallet}
+                      style={{
+                        background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
+                        color: "#FFFFFF",
+                        border: "none",
+                        borderRadius: 8,
+                        padding: "7px 14px",
+                        fontSize: 12.5,
+                        fontWeight: 700,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 5,
+                        cursor: clearingViaWallet ? "not-allowed" : "pointer",
+                        boxShadow: "0 2px 8px rgba(5, 150, 105, 0.35)",
+                      }}
+                      title="Clear platform fees for selected students from School Wallet"
+                    >
+                      <span>⚡</span>
+                      {clearingViaWallet ? "Clearing..." : `Clear Fees (${selectedStudentCount})`}
+                    </button>
+
                     <span style={{ width: 1, height: 20, background: "rgba(255,255,255,0.18)", margin: "0 4px" }} />
 
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: ".05em" }}>
@@ -3328,6 +3482,91 @@ export default function StudentsPage() {
                       </option>
                     ))}
                 </select>
+              </div>
+
+              {/* 1-Click Platform Clearance Card */}
+              <div
+                style={{
+                  background: "linear-gradient(135deg, rgba(238, 242, 255, 0.7) 0%, rgba(245, 243, 255, 0.7) 100%)",
+                  border: "1px solid #C7D2FE",
+                  borderRadius: 12,
+                  padding: "14px 16px",
+                  marginBottom: 16,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 16 }}>⚡</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#1E1B4B" }}>
+                      Platform Fee Clearance (₦{(clearanceSummary?.fee_per_student || 1000).toLocaleString()}/student)
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      padding: "3px 8px",
+                      borderRadius: 6,
+                      background: (clearanceSummary?.wallet_balance || 0) > 0 ? "rgba(16, 185, 129, 0.12)" : "rgba(239, 68, 68, 0.1)",
+                      color: (clearanceSummary?.wallet_balance || 0) > 0 ? "#065F46" : "#991B1B",
+                      border: `1px solid ${(clearanceSummary?.wallet_balance || 0) > 0 ? "rgba(16, 185, 129, 0.25)" : "rgba(239, 68, 68, 0.2)"}`,
+                    }}
+                  >
+                    Wallet Balance: ₦{Number(clearanceSummary?.wallet_balance || 0).toLocaleString()}
+                  </div>
+                </div>
+
+                <p style={{ margin: "0 0 10px 0", fontSize: 11.5, color: "#4B5563", lineHeight: 1.45 }}>
+                  Promotion advances class rosters immediately. Platform clearance unlocks Report Card PDF viewing/printing, CBT exams, and Broadsheets for this academic period.
+                </p>
+
+                {targetClearanceIds.length > 0 && (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      disabled={clearingViaWallet || clearingViaPaystack}
+                      onClick={() => handleClearFromWallet(targetClearanceIds)}
+                      style={{
+                        background: "#059669",
+                        color: "#FFFFFF",
+                        border: "none",
+                        borderRadius: 7,
+                        padding: "7px 13px",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: clearingViaWallet || clearingViaPaystack ? "not-allowed" : "pointer",
+                        opacity: clearingViaWallet || clearingViaPaystack ? 0.7 : 1,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 5,
+                      }}
+                    >
+                      {clearingViaWallet ? "Processing..." : `⚡ Clear (${targetClearanceIds.length}) from Wallet`}
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={clearingViaWallet || clearingViaPaystack}
+                      onClick={() => handleClearViaPaystack(targetClearanceIds)}
+                      style={{
+                        background: "#4F46E5",
+                        color: "#FFFFFF",
+                        border: "none",
+                        borderRadius: 7,
+                        padding: "7px 13px",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: clearingViaWallet || clearingViaPaystack ? "not-allowed" : "pointer",
+                        opacity: clearingViaWallet || clearingViaPaystack ? 0.7 : 1,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 5,
+                      }}
+                    >
+                      {clearingViaPaystack ? "Connecting..." : `💳 Pay via Paystack`}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Information Note */}
