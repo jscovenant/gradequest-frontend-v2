@@ -108,6 +108,11 @@ export default function BillingPage() {
     term_clearance_fee: number;
     session_clearance_fee: number;
     wallet_balance: number;
+    minimum_coverage_percent?: number;
+    minimum_students_required?: number;
+    is_minimum_coverage_met?: boolean;
+    shortfall_students?: number;
+    coverage_percent?: number;
     session_id?: number | null;
     term_id?: number | null;
   } | null>(null);
@@ -334,11 +339,36 @@ export default function BillingPage() {
     }
   };
 
+  // Helper to auto-select minimum 70% shortfall
+  const handleAutoSelectMinimum70 = () => {
+    const shortfall = clearanceSummary?.shortfall_students || 0;
+    if (shortfall <= 0) return;
+    const unpaidList = rosterStudents
+      .filter((s) => s.status !== "paid" && s.status !== "override")
+      .map((s) => s.id);
+    const toSelect = unpaidList.slice(0, shortfall);
+    setSelectedStudentIds(toSelect);
+    showSuccess?.(`Selected ${toSelect.length} student(s) to meet the 70% minimum clearance threshold.`);
+  };
+
   // Open Checkout Modal for Selected Students
   const openSelectedClearanceModal = () => {
     if (selectedStudentIds.length === 0) {
       showError?.("Please select at least one student to clear.");
       return;
+    }
+
+    // Guard: Enforce 70% Minimum Population Policy
+    if (clearanceSummary && clearanceSummary.is_minimum_coverage_met === false) {
+      const minReq = clearanceSummary.minimum_students_required || 0;
+      const currentCleared = clearanceSummary.cleared_count || 0;
+      const shortfall = clearanceSummary.shortfall_students || 0;
+      if (currentCleared + selectedStudentIds.length < minReq) {
+        showError?.(
+          `Minimum 70% Population Policy: Your school has ${clearanceSummary.total_students} active students. Under SchoolProfit policy, you must clear at least 70% (minimum ${minReq} students). You selected ${selectedStudentIds.length} student(s). Please select at least ${shortfall} student(s) to meet the 70% threshold.`
+        );
+        return;
+      }
     }
 
     const selectedList: ModalStudentItem[] = selectedStudentIds.map((id) => {
@@ -381,6 +411,16 @@ export default function BillingPage() {
 
   // Open Checkout Modal for Single Student
   const openSingleClearanceModal = (student: ClearanceStudent) => {
+    // Guard: Enforce 70% Minimum Population Policy
+    if (clearanceSummary && clearanceSummary.is_minimum_coverage_met === false) {
+      const minReq = clearanceSummary.minimum_students_required || 0;
+      const shortfall = clearanceSummary.shortfall_students || 0;
+      showError?.(
+        `Single student clearance is disabled until your school meets the 70% minimum population clearance threshold (minimum ${minReq} students; ${shortfall} remaining). Please use Selective Clearance or Clear Full Term.`
+      );
+      return;
+    }
+
     const cost = costPerSelectedStudent;
     const defaultTab = currentWalletBalance >= cost ? "wallet" : "paystack";
 
@@ -1411,6 +1451,74 @@ export default function BillingPage() {
                   </button>
                 </div>
               </div>
+
+              {/* 70% Minimum Population Policy Banner */}
+              {clearanceSummary && clearanceSummary.is_minimum_coverage_met === false && (
+                <div
+                  style={{
+                    background: "linear-gradient(135deg, rgba(217, 119, 6, 0.08) 0%, rgba(245, 158, 11, 0.14) 100%)",
+                    border: "1.5px solid #F59E0B",
+                    borderRadius: 12,
+                    padding: "14px 20px",
+                    margin: "16px 24px 8px 24px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 16,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: "50%",
+                        background: "#F59E0B",
+                        color: "#FFF",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 18,
+                        flexShrink: 0,
+                      }}
+                    >
+                      🛡️
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: 13.5, color: "#92400E" }}>
+                        70% Minimum Population Coverage Required
+                      </div>
+                      <div style={{ fontSize: 12, color: "#78350F", marginTop: 2, lineHeight: 1.4 }}>
+                        Under SchoolProfit policy, schools must clear at least <strong>70% of enrolled students</strong> (minimum{" "}
+                        <strong>{clearanceSummary.minimum_students_required}</strong> of{" "}
+                        <strong>{clearanceSummary.total_students}</strong> students) to activate platform operations for this term.
+                        Currently cleared: <strong>{clearanceSummary.cleared_count}</strong> ({clearanceSummary.coverage_percent}%). Shortfall:{" "}
+                        <strong style={{ color: "#DC2626" }}>{clearanceSummary.shortfall_students} student(s)</strong>.
+                      </div>
+                    </div>
+                  </div>
+                  {(clearanceSummary.shortfall_students || 0) > 0 && (
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      style={{
+                        background: "#D97706",
+                        color: "#FFFFFF",
+                        fontWeight: 800,
+                        borderRadius: 8,
+                        padding: "8px 16px",
+                        fontSize: 12,
+                        border: "none",
+                        boxShadow: "0 2px 6px rgba(217, 119, 6, 0.3)",
+                      }}
+                      onClick={handleAutoSelectMinimum70}
+                    >
+                      ⚡ Auto-Select Minimum 70% ({clearanceSummary.shortfall_students} Students)
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* Selection Bar */}
               <div

@@ -216,6 +216,11 @@ export default function StudentsPage() {
     term_id?: number;
     past_arrears_slots?: number;
     past_arrears_fee?: number;
+    minimum_coverage_percent?: number;
+    minimum_students_required?: number;
+    is_minimum_coverage_met?: boolean;
+    shortfall_students?: number;
+    coverage_percent?: number;
   } | null>(null);
   const [clearingViaWallet, setClearingViaWallet] = useState(false);
   const [clearingViaPaystack, setClearingViaPaystack] = useState(false);
@@ -610,6 +615,20 @@ export default function StudentsPage() {
       showError("No students specified for clearance.");
       return;
     }
+
+    // Guard: Enforce 70% Minimum Population Policy
+    if (clearanceSummary && clearanceSummary.is_minimum_coverage_met === false) {
+      const minReq = clearanceSummary.minimum_students_required || 0;
+      const currentCleared = clearanceSummary.cleared_count || 0;
+      const shortfall = clearanceSummary.shortfall_students || 0;
+      if (currentCleared + targetIds.length < minReq) {
+        showError(
+          `Minimum 70% Population Policy: Your school has ${clearanceSummary.total_students} active students. Under SchoolProfit policy, you must clear at least 70% (minimum ${minReq} students). You selected ${targetIds.length} student(s). Please select at least ${shortfall} student(s) to meet the 70% threshold.`
+        );
+        return;
+      }
+    }
+
     setClearingViaWallet(true);
     try {
       const res = await authApi.post("/school/clearance/clear-selected", {
@@ -637,6 +656,20 @@ export default function StudentsPage() {
       showError("Active academic session not detected.");
       return;
     }
+
+    // Guard: Enforce 70% Minimum Population Policy
+    if (clearanceSummary && clearanceSummary.is_minimum_coverage_met === false) {
+      const minReq = clearanceSummary.minimum_students_required || 0;
+      const currentCleared = clearanceSummary.cleared_count || 0;
+      const shortfall = clearanceSummary.shortfall_students || 0;
+      if (currentCleared + targetIds.length < minReq) {
+        showError(
+          `Minimum 70% Population Policy: Your school has ${clearanceSummary.total_students} active students. Under SchoolProfit policy, you must clear at least 70% (minimum ${minReq} students). You selected ${targetIds.length} student(s). Please select at least ${shortfall} student(s) to meet the 70% threshold.`
+        );
+        return;
+      }
+    }
+
     setClearingViaPaystack(true);
     try {
       const res = await authApi.post("/school/clearance/initiate-paystack", {
@@ -3586,6 +3619,28 @@ export default function StudentsPage() {
                     <span>ℹ️</span>
                     <span>
                       <strong>Past Arrears Protected:</strong> {clearanceSummary?.past_arrears_slots} unpaid past term-slot(s) detected across school history. Genuine dormant/zero-activity periods are auto-waived by SchoolProfit.
+                    </span>
+                  </div>
+                )}
+
+                {clearanceSummary?.is_minimum_coverage_met === false && (
+                  <div
+                    style={{
+                      background: "rgba(239, 68, 68, 0.08)",
+                      border: "1px solid rgba(239, 68, 68, 0.3)",
+                      borderRadius: 8,
+                      padding: "6px 10px",
+                      fontSize: 11.5,
+                      color: "#991B1B",
+                      marginBottom: 10,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <span>🛡️</span>
+                    <span>
+                      <strong>70% Minimum Policy:</strong> Minimum <strong>{clearanceSummary.minimum_students_required} of {clearanceSummary.total_students}</strong> students must be cleared for this term (Currently: {clearanceSummary.cleared_count} cleared, shortfall: {clearanceSummary.shortfall_students}).
                     </span>
                   </div>
                 )}

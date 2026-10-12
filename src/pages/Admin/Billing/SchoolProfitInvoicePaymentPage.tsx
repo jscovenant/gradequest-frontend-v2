@@ -360,7 +360,7 @@ export default function SchoolProfitInvoicePaymentPage() {
                             lineHeight: 1.4,
                           }}
                         >
-                          <strong>💡 Selective Student Clearance:</strong> You don't have to pay for all students at once. You can select only the students who have paid their fees and clear them directly from your school wallet.
+                          <strong>💡 Minimum 70% Coverage Policy:</strong> Under SchoolProfit policy, schools must clear platform fees for at least 70% of enrolled students to activate platform operations for each term. Once the 70% threshold is satisfied, additional students can be cleared selectively or in batches.
                           <div style={{ marginTop: 6 }}>
                             <button
                               type="button"
@@ -368,7 +368,7 @@ export default function SchoolProfitInvoicePaymentPage() {
                               style={{ fontSize: 11.5, fontWeight: 700, borderRadius: 8, padding: "3px 10px" }}
                               onClick={() => navigate("/billing#selective-clearance-section")}
                             >
-                              <i className="bi bi-check2-square me-1" /> Pay For Selected Students Instead
+                              <i className="bi bi-check2-square me-1" /> Pay For Selected Students (70% Min)
                             </button>
                           </div>
                         </div>
