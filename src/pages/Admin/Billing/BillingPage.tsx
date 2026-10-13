@@ -885,6 +885,25 @@ export default function BillingPage() {
         .db-btn-outline:hover { background: rgba(255, 255, 255, 0.18); color: #fff; }
         .db-btn-outline:disabled { opacity: 0.55; cursor: not-allowed; }
 
+        .db-btn-purple {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 9px 18px;
+          font-size: 13px;
+          font-weight: 700;
+          color: #FFFFFF !important;
+          background: #6D28D9;
+          border: 1px solid #6D28D9;
+          border-radius: 10px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          white-space: nowrap;
+          box-shadow: 0 2px 8px rgba(109, 40, 217, 0.25);
+        }
+        .db-btn-purple:hover { background: #5B21B6; border-color: #5B21B6; transform: translateY(-1px); color: #FFFFFF !important; }
+        .db-btn-purple:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
         .db-hero-stat-card {
           background: rgba(255, 255, 255, 0.08);
           border: 1px solid rgba(255, 255, 255, 0.15);
@@ -1599,15 +1618,14 @@ export default function BillingPage() {
 
                     <button
                       type="button"
-                      className="db-btn-outline"
-                      style={{ padding: "9px 16px", fontSize: 12.5 }}
+                      className="db-btn-purple"
                       onClick={() => {
                         const el = document.getElementById("clearance-roster-section");
                         if (el) el.scrollIntoView({ behavior: "smooth" });
                       }}
                     >
-                      <i className="bi bi-list-check me-1" />
-                      Select In Roster
+                      <i className="bi bi-list-check" style={{ fontSize: 16 }} />
+                      Select In Roster &darr;
                     </button>
                   </div>
                 </div>
