@@ -156,6 +156,17 @@ export default function InvestorDashboardPage() {
     fetchDashboardData();
   }, []);
 
+  useEffect(() => {
+    if (selectedDisbursement) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [selectedDisbursement]);
+
   const formatNaira = (val?: number) => {
     return "₦" + Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   };
@@ -173,6 +184,59 @@ export default function InvestorDashboardPage() {
         .sp-investor-card:hover {
           transform: translateY(-2px);
           box-shadow: 0 4px 14px rgba(15, 39, 68, 0.08);
+        }
+
+        /* ── RESPONSIVE MODAL SYSTEM (PINNED FOOTER BUTTONS) ── */
+        .investor-modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: rgba(15, 23, 42, 0.7);
+          backdrop-filter: blur(4px);
+          z-index: 1060;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 16px;
+          overflow-y: auto;
+        }
+        .investor-modal-card {
+          background: #ffffff;
+          border-radius: 18px;
+          width: 100%;
+          max-width: 620px;
+          max-height: 90vh;
+          display: flex;
+          flex-direction: column;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+          overflow: hidden;
+          margin: auto;
+          position: relative;
+        }
+        .investor-modal-lg {
+          max-width: 820px;
+        }
+        .investor-modal-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-shrink: 0;
+        }
+        .investor-modal-body {
+          flex: 1 1 auto;
+          min-height: 0;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+        .investor-modal-footer {
+          flex-shrink: 0;
+          position: sticky;
+          bottom: 0;
+          z-index: 10;
+          background: #f8fafc;
+          border-top: 1px solid #e2e8f0;
         }
       `}</style>
 
@@ -497,119 +561,119 @@ export default function InvestorDashboardPage() {
       {/* ── OFFICIAL PAYMENT SLIP MODAL ── */}
       {selectedDisbursement && (
         <div
-          className="modal show d-block"
-          style={{ backgroundColor: "rgba(15, 23, 42, 0.75)", zIndex: 1050 }}
-          tabIndex={-1}
+          className="investor-modal-overlay"
+          onClick={() => setSelectedDisbursement(null)}
         >
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content shadow-lg border-0 rounded-4 overflow-hidden">
-              <div className="modal-header py-3 px-4 text-white" style={{ background: "#0F2744" }}>
-                <div className="d-flex align-items-center gap-2">
-                  <i className="bi bi-receipt text-warning fs-5" />
-                  <h5 className="modal-title fw-bold text-white mb-0">Official Disbursement Payment Slip</h5>
-                </div>
-                <button
-                  type="button"
-                  className="btn-close btn-close-white"
-                  onClick={() => setSelectedDisbursement(null)}
-                ></button>
+          <div
+            className="investor-modal-card investor-modal-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="investor-modal-header py-3 px-4 text-white" style={{ background: "#0F2744" }}>
+              <div className="d-flex align-items-center gap-2">
+                <i className="bi bi-receipt text-warning fs-5" />
+                <h5 className="modal-title fw-bold text-white mb-0">Official Disbursement Payment Slip</h5>
               </div>
+              <button
+                type="button"
+                className="btn-close btn-close-white"
+                onClick={() => setSelectedDisbursement(null)}
+              ></button>
+            </div>
 
-              <div className="modal-body p-4 bg-white">
-                <div className="border-bottom pb-3 mb-3">
-                  <div className="d-flex justify-content-between align-items-start">
-                    <div>
-                      <h4 className="fw-black text-primary mb-0" style={{ letterSpacing: "0.5px" }}>
-                        SAMARITAN TECHNOLOGIES
-                      </h4>
-                      <div className="text-warning fw-bold text-uppercase small" style={{ fontSize: "0.75rem" }}>
-                        SchoolProfit™ Platform Operators
-                      </div>
-                      <div className="text-muted small" style={{ fontSize: "0.75rem" }}>
-                        Lagos &amp; Ogun State, Nigeria
-                      </div>
+            <div className="investor-modal-body p-4 bg-white">
+              <div className="border-bottom pb-3 mb-3">
+                <div className="d-flex justify-content-between align-items-start">
+                  <div>
+                    <h4 className="fw-black text-primary mb-0" style={{ letterSpacing: "0.5px" }}>
+                      SAMARITAN TECHNOLOGIES
+                    </h4>
+                    <div className="text-warning fw-bold text-uppercase small" style={{ fontSize: "0.75rem" }}>
+                      SchoolProfit™ Platform Operators
                     </div>
-                    <div className="text-end">
-                      <span className="badge bg-success-subtle text-success border border-success fw-bold px-2 py-1 mb-1">
-                        Remittance Completed
-                      </span>
-                      <div className="text-muted small"><strong>Slip Ref:</strong> {selectedDisbursement.reference}</div>
-                      <div className="text-muted small"><strong>Date:</strong> {selectedDisbursement.payment_date}</div>
+                    <div className="text-muted small" style={{ fontSize: "0.75rem" }}>
+                      Lagos &amp; Ogun State, Nigeria
                     </div>
                   </div>
-                </div>
-
-                <div className="bg-light p-3 rounded-3 text-center border mb-3">
-                  <div className="text-muted small fw-bold text-uppercase">Total Disbursed Amount</div>
-                  <h2 className="fw-black text-success mb-0">{formatNaira(selectedDisbursement.amount)}</h2>
-                  <div className="text-dark small fw-semibold mt-1">
-                    {selectedDisbursement.type === "principal_recoup"
-                      ? "Capital Recoup Disbursement (Principal Amortization)"
-                      : "5-Year Equity Dividend Payout (Annual Profit Share)"}
+                  <div className="text-end">
+                    <span className="badge bg-success-subtle text-success border border-success fw-bold px-2 py-1 mb-1">
+                      Remittance Completed
+                    </span>
+                    <div className="text-muted small"><strong>Slip Ref:</strong> {selectedDisbursement.reference}</div>
+                    <div className="text-muted small"><strong>Date:</strong> {selectedDisbursement.payment_date}</div>
                   </div>
-                </div>
-
-                <div className="row g-3 small">
-                  <div className="col-sm-6">
-                    <div className="p-2 border rounded-2 bg-light">
-                      <div className="text-muted">Investor / Partner:</div>
-                      <div className="fw-bold text-dark">{investor?.name}</div>
-                      <div className="text-muted" style={{ fontSize: "0.75rem" }}>Tier: {investor?.tier} TIER</div>
-                    </div>
-                  </div>
-                  <div className="col-sm-6">
-                    <div className="p-2 border rounded-2 bg-light">
-                      <div className="text-muted">Academic Period:</div>
-                      <div className="fw-bold text-dark">{selectedDisbursement.academic_session || "2026/2027"}</div>
-                      <div className="text-muted" style={{ fontSize: "0.75rem" }}>{selectedDisbursement.term || "Term Collections"}</div>
-                    </div>
-                  </div>
-                  <div className="col-sm-6">
-                    <div className="p-2 border rounded-2 bg-light">
-                      <div className="text-muted">Disbursement Method:</div>
-                      <div className="fw-bold text-dark">{selectedDisbursement.payment_method}</div>
-                      <div className="text-muted" style={{ fontSize: "0.75rem" }}>Bank Ref: {selectedDisbursement.bank_reference || "N/A"}</div>
-                    </div>
-                  </div>
-                  <div className="col-sm-6">
-                    <div className="p-2 border rounded-2 bg-light">
-                      <div className="text-muted">Beneficiary Bank Account:</div>
-                      <div className="fw-bold text-dark">{investor?.bank_name} &bull; {investor?.account_number}</div>
-                      <div className="text-muted" style={{ fontSize: "0.75rem" }}>Acct Name: {investor?.account_name || investor?.name}</div>
-                    </div>
-                  </div>
-                </div>
-
-                {selectedDisbursement.notes && (
-                  <div className="mt-3 p-2 bg-light border rounded-2 small text-muted">
-                    <strong>Memo / Notes:</strong> {selectedDisbursement.notes}
-                  </div>
-                )}
-
-                <div className="border-top mt-4 pt-3 text-center text-muted small" style={{ fontSize: "0.75rem" }}>
-                  This payment statement certifies official capital/dividend remittance under Samaritan Technologies Contract Ref:{" "}
-                  <strong>{branding?.proposal_ref || "ST/SP-INV/2026/01"}</strong>.
                 </div>
               </div>
 
-              <div className="modal-footer bg-light py-2 px-4 d-flex justify-content-between">
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary"
-                  style={{ borderRadius: 8 }}
-                  onClick={() => setSelectedDisbursement(null)}
-                >
-                  Close
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-primary d-flex align-items-center gap-1 shadow-sm"
-                  style={{ borderRadius: 8, background: "#0F2744", borderColor: "#0F2744" }}
-                  onClick={() => window.print()}
-                >
-                  <Printer size={14} /> Print / Save PDF
-                </button>
+              <div className="bg-light p-3 rounded-3 text-center border mb-3">
+                <div className="text-muted small fw-bold text-uppercase">Total Disbursed Amount</div>
+                <h2 className="fw-black text-success mb-0">{formatNaira(selectedDisbursement.amount)}</h2>
+                <div className="text-dark small fw-semibold mt-1">
+                  {selectedDisbursement.type === "principal_recoup"
+                    ? "Capital Recoup Disbursement (Principal Amortization)"
+                    : "5-Year Equity Dividend Payout (Annual Profit Share)"}
+                </div>
               </div>
+
+              <div className="row g-3 small">
+                <div className="col-sm-6">
+                  <div className="p-2 border rounded-2 bg-light">
+                    <div className="text-muted">Investor / Partner:</div>
+                    <div className="fw-bold text-dark">{investor?.name}</div>
+                    <div className="text-muted" style={{ fontSize: "0.75rem" }}>Tier: {investor?.tier} TIER</div>
+                  </div>
+                </div>
+                <div className="col-sm-6">
+                  <div className="p-2 border rounded-2 bg-light">
+                    <div className="text-muted">Academic Period:</div>
+                    <div className="fw-bold text-dark">{selectedDisbursement.academic_session || "2026/2027"}</div>
+                    <div className="text-muted" style={{ fontSize: "0.75rem" }}>{selectedDisbursement.term || "Term Collections"}</div>
+                  </div>
+                </div>
+                <div className="col-sm-6">
+                  <div className="p-2 border rounded-2 bg-light">
+                    <div className="text-muted">Disbursement Method:</div>
+                    <div className="fw-bold text-dark">{selectedDisbursement.payment_method}</div>
+                    <div className="text-muted" style={{ fontSize: "0.75rem" }}>Bank Ref: {selectedDisbursement.bank_reference || "N/A"}</div>
+                  </div>
+                </div>
+                <div className="col-sm-6">
+                  <div className="p-2 border rounded-2 bg-light">
+                    <div className="text-muted">Beneficiary Bank Account:</div>
+                    <div className="fw-bold text-dark">{investor?.bank_name} &bull; {investor?.account_number}</div>
+                    <div className="text-muted" style={{ fontSize: "0.75rem" }}>Acct Name: {investor?.account_name || investor?.name}</div>
+                  </div>
+                </div>
+              </div>
+
+              {selectedDisbursement.notes && (
+                <div className="mt-3 p-2 bg-light border rounded-2 small text-muted">
+                  <strong>Memo / Notes:</strong> {selectedDisbursement.notes}
+                </div>
+              )}
+
+              <div className="border-top mt-4 pt-3 text-center text-muted small" style={{ fontSize: "0.75rem" }}>
+                This payment statement certifies official capital/dividend remittance under Samaritan Technologies Contract Ref:{" "}
+                <strong>{branding?.proposal_ref || "ST/SP-INV/2026/01"}</strong>.
+              </div>
+            </div>
+
+            <div className="investor-modal-footer bg-light py-3 px-4 border-top d-flex justify-content-between align-items-center">
+              <button
+                type="button"
+                className="btn btn-outline-secondary px-3"
+                style={{ borderRadius: 8, fontWeight: 600 }}
+                onClick={() => setSelectedDisbursement(null)}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary px-4 d-flex align-items-center gap-2 shadow-sm"
+                style={{ borderRadius: 8, background: "#0F2744", borderColor: "#0F2744", fontWeight: 700 }}
+                onClick={() => window.print()}
+              >
+                <Printer size={16} /> Print / Save PDF
+              </button>
             </div>
           </div>
         </div>

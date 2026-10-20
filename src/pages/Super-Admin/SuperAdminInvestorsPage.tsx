@@ -110,6 +110,17 @@ export default function SuperAdminInvestorsPage() {
     fetchInvestors();
   }, []);
 
+  useEffect(() => {
+    if (showAddModal || showDisburseModal) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [showAddModal, showDisburseModal]);
+
   const handleTierChange = (tier: string) => {
     let cap = 1000000;
     let eq = 7.0;
@@ -208,6 +219,67 @@ export default function SuperAdminInvestorsPage() {
         .sp-filter-card.active {
           border-color: #1D4ED8;
           background: #EFF6FF;
+        }
+
+        /* ── RESPONSIVE MODAL SYSTEM (PINNED FOOTER BUTTONS) ── */
+        .investor-modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: rgba(15, 23, 42, 0.7);
+          backdrop-filter: blur(4px);
+          z-index: 1060;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 16px;
+          overflow-y: auto;
+        }
+        .investor-modal-card {
+          background: #ffffff;
+          border-radius: 18px;
+          width: 100%;
+          max-width: 620px;
+          max-height: 90vh;
+          display: flex;
+          flex-direction: column;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+          overflow: hidden;
+          margin: auto;
+          position: relative;
+        }
+        .investor-modal-lg {
+          max-width: 820px;
+        }
+        .investor-modal-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-shrink: 0;
+        }
+        .investor-modal-form {
+          display: flex;
+          flex-direction: column;
+          flex: 1 1 auto;
+          min-height: 0;
+          overflow: hidden;
+          margin: 0;
+        }
+        .investor-modal-body {
+          flex: 1 1 auto;
+          min-height: 0;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+        .investor-modal-footer {
+          flex-shrink: 0;
+          position: sticky;
+          bottom: 0;
+          z-index: 10;
+          background: #f8fafc;
+          border-top: 1px solid #e2e8f0;
         }
       `}</style>
 
@@ -458,226 +530,236 @@ export default function SuperAdminInvestorsPage() {
       {/* ── ONBOARD NEW INVESTOR MODAL ── */}
       {showAddModal && (
         <div
-          className="modal show d-block"
-          style={{ backgroundColor: "rgba(15, 23, 42, 0.75)", zIndex: 1050 }}
-          tabIndex={-1}
+          className="investor-modal-overlay"
+          onClick={() => setShowAddModal(false)}
         >
-          <div className="modal-dialog modal-dialog-centered modal-lg">
-            <div className="modal-content shadow-lg border-0 rounded-4 overflow-hidden">
-              <div
-                className="modal-header py-3 px-4 text-white"
-                style={{ background: "#0F2744" }}
-              >
-                <div className="d-flex align-items-center gap-2">
-                  <i className="bi bi-person-plus-fill text-warning fs-5" />
-                  <h5 className="modal-title fw-bold text-white mb-0">Onboard New Strategic Partner</h5>
+          <div
+            className="investor-modal-card investor-modal-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="investor-modal-header py-3 px-4 text-white"
+              style={{ background: "#0F2744" }}
+            >
+              <div className="d-flex align-items-center gap-2">
+                <i className="bi bi-person-plus-fill text-warning fs-5" />
+                <h5 className="modal-title fw-bold text-white mb-0">Onboard New Strategic Partner</h5>
+              </div>
+              <button
+                type="button"
+                className="btn-close btn-close-white"
+                onClick={() => setShowAddModal(false)}
+              ></button>
+            </div>
+
+            <form onSubmit={handleAddInvestor} className="investor-modal-form">
+              <div className="investor-modal-body p-4 bg-white">
+                <div className="alert alert-info py-2 small mb-3" style={{ borderRadius: 10 }}>
+                  <strong>Proposal Standard:</strong> Provisions investor terms under SchoolProfit™ Ref: <code>ST/SP-INV/2026/01</code>, calculates 25% termly recoup, and provisions portal credentials.
                 </div>
-                <button
-                  type="button"
-                  className="btn-close btn-close-white"
-                  onClick={() => setShowAddModal(false)}
-                ></button>
+
+                {/* Tier Selection */}
+                <div className="mb-3">
+                  <label className="form-label fw-bold small text-muted text-uppercase">Investment Package Tier</label>
+                  <div className="row g-2">
+                    <div className="col-4">
+                      <div
+                        className={`p-3 border rounded-3 text-center cursor-pointer ${
+                          addForm.tier === "bronze" ? "border-primary bg-primary-subtle" : "bg-light"
+                        }`}
+                        onClick={() => handleTierChange("bronze")}
+                        style={{ cursor: "pointer" }}
+                      >
+                        <div className="fw-bold text-dark">Bronze</div>
+                        <div className="text-muted small">₦500,000</div>
+                        <div className="badge bg-secondary mt-1">5% Profit Share</div>
+                      </div>
+                    </div>
+                    <div className="col-4">
+                      <div
+                        className={`p-3 border rounded-3 text-center cursor-pointer ${
+                          addForm.tier === "silver" ? "border-primary bg-primary-subtle" : "bg-light"
+                        }`}
+                        onClick={() => handleTierChange("silver")}
+                        style={{ cursor: "pointer" }}
+                      >
+                        <div className="fw-bold text-primary">Silver (Rec.)</div>
+                        <div className="text-muted small">₦1,000,000</div>
+                        <div className="badge bg-primary mt-1">7% Profit Share</div>
+                      </div>
+                    </div>
+                    <div className="col-4">
+                      <div
+                        className={`p-3 border rounded-3 text-center cursor-pointer ${
+                          addForm.tier === "gold" ? "border-primary bg-primary-subtle" : "bg-light"
+                        }`}
+                        onClick={() => handleTierChange("gold")}
+                        style={{ cursor: "pointer" }}
+                      >
+                        <div className="fw-bold text-warning">Gold</div>
+                        <div className="text-muted small">₦3,000,000</div>
+                        <div className="badge bg-warning text-dark mt-1">10% Profit Share</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="row g-3">
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold small">Full Legal Name</label>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      required
+                      placeholder="e.g. Engr. Tunde Babalola"
+                      value={addForm.name}
+                      onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold small">Email Address (Login ID)</label>
+                    <input
+                      type="email"
+                      className="form-control form-control-sm"
+                      required
+                      placeholder="e.g. partner@example.com"
+                      value={addForm.email}
+                      onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
+                    />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold small">Phone Number</label>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="e.g. 08012345678"
+                      value={addForm.phone}
+                      onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })}
+                    />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold small">Investment Date</label>
+                    <input
+                      type="date"
+                      className="form-control form-control-sm"
+                      value={addForm.investment_date}
+                      onChange={(e) => setAddForm({ ...addForm, investment_date: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="col-md-4">
+                    <label className="form-label fw-bold small">Capital Invested (₦)</label>
+                    <input
+                      type="number"
+                      className="form-control form-control-sm"
+                      value={addForm.capital_invested}
+                      onChange={(e) => setAddForm({ ...addForm, capital_invested: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label fw-bold small">5-Year Equity %</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      className="form-control form-control-sm"
+                      value={addForm.equity_percentage}
+                      onChange={(e) => setAddForm({ ...addForm, equity_percentage: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label fw-bold small">Termly Recoup %</label>
+                    <input
+                      type="number"
+                      step="1"
+                      className="form-control form-control-sm"
+                      value={addForm.recoup_percentage}
+                      onChange={(e) => setAddForm({ ...addForm, recoup_percentage: Number(e.target.value) })}
+                    />
+                  </div>
+
+                  <div className="col-12">
+                    <hr className="my-2" />
+                    <div className="fw-bold small text-muted text-uppercase mb-2">Settlement Bank Details</div>
+                  </div>
+
+                  <div className="col-md-4">
+                    <label className="form-label small">Bank Name</label>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="e.g. GTBank"
+                      value={addForm.bank_name}
+                      onChange={(e) => setAddForm({ ...addForm, bank_name: e.target.value })}
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label small">Account Number</label>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="10 Digits"
+                      value={addForm.account_number}
+                      onChange={(e) => setAddForm({ ...addForm, account_number: e.target.value })}
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label small">Account Name</label>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="Beneficiary Name"
+                      value={addForm.account_name}
+                      onChange={(e) => setAddForm({ ...addForm, account_name: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="col-12">
+                    <div className="form-check mt-2">
+                      <input
+                        type="checkbox"
+                        className="form-check-input"
+                        id="createUserAccount"
+                        checked={addForm.create_user_account}
+                        onChange={(e) => setAddForm({ ...addForm, create_user_account: e.target.checked })}
+                      />
+                      <label className="form-check-label small" htmlFor="createUserAccount">
+                        Create live portal user login account for this investor (Initial Password:{" "}
+                        <code>{addForm.user_password}</code>)
+                      </label>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <form onSubmit={handleAddInvestor}>
-                <div className="modal-body p-4 bg-white">
-                  <div className="alert alert-info py-2 small mb-3" style={{ borderRadius: 10 }}>
-                    <strong>Proposal Standard:</strong> Provisions investor terms under SchoolProfit™ Ref: <code>ST/SP-INV/2026/01</code>, calculates 25% termly recoup, and provisions portal credentials.
-                  </div>
-
-                  {/* Tier Selection */}
-                  <div className="mb-3">
-                    <label className="form-label fw-bold small text-muted text-uppercase">Investment Package Tier</label>
-                    <div className="row g-2">
-                      <div className="col-4">
-                        <div
-                          className={`p-3 border rounded-3 text-center cursor-pointer ${
-                            addForm.tier === "bronze" ? "border-primary bg-primary-subtle" : "bg-light"
-                          }`}
-                          onClick={() => handleTierChange("bronze")}
-                          style={{ cursor: "pointer" }}
-                        >
-                          <div className="fw-bold text-dark">Bronze</div>
-                          <div className="text-muted small">₦500,000</div>
-                          <div className="badge bg-secondary mt-1">5% Profit Share</div>
-                        </div>
-                      </div>
-                      <div className="col-4">
-                        <div
-                          className={`p-3 border rounded-3 text-center cursor-pointer ${
-                            addForm.tier === "silver" ? "border-primary bg-primary-subtle" : "bg-light"
-                          }`}
-                          onClick={() => handleTierChange("silver")}
-                          style={{ cursor: "pointer" }}
-                        >
-                          <div className="fw-bold text-primary">Silver (Rec.)</div>
-                          <div className="text-muted small">₦1,000,000</div>
-                          <div className="badge bg-primary mt-1">7% Profit Share</div>
-                        </div>
-                      </div>
-                      <div className="col-4">
-                        <div
-                          className={`p-3 border rounded-3 text-center cursor-pointer ${
-                            addForm.tier === "gold" ? "border-primary bg-primary-subtle" : "bg-light"
-                          }`}
-                          onClick={() => handleTierChange("gold")}
-                          style={{ cursor: "pointer" }}
-                        >
-                          <div className="fw-bold text-warning">Gold</div>
-                          <div className="text-muted small">₦3,000,000</div>
-                          <div className="badge bg-warning text-dark mt-1">10% Profit Share</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="row g-3">
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold small">Full Legal Name</label>
-                      <input
-                        type="text"
-                        className="form-control form-control-sm"
-                        required
-                        placeholder="e.g. Engr. Tunde Babalola"
-                        value={addForm.name}
-                        onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold small">Email Address (Login ID)</label>
-                      <input
-                        type="email"
-                        className="form-control form-control-sm"
-                        required
-                        placeholder="e.g. partner@example.com"
-                        value={addForm.email}
-                        onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold small">Phone Number</label>
-                      <input
-                        type="text"
-                        className="form-control form-control-sm"
-                        placeholder="e.g. 08012345678"
-                        value={addForm.phone}
-                        onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })}
-                      />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold small">Investment Date</label>
-                      <input
-                        type="date"
-                        className="form-control form-control-sm"
-                        value={addForm.investment_date}
-                        onChange={(e) => setAddForm({ ...addForm, investment_date: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="col-md-4">
-                      <label className="form-label fw-bold small">Capital Invested (₦)</label>
-                      <input
-                        type="number"
-                        className="form-control form-control-sm"
-                        value={addForm.capital_invested}
-                        onChange={(e) => setAddForm({ ...addForm, capital_invested: Number(e.target.value) })}
-                      />
-                    </div>
-                    <div className="col-md-4">
-                      <label className="form-label fw-bold small">5-Year Equity %</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        className="form-control form-control-sm"
-                        value={addForm.equity_percentage}
-                        onChange={(e) => setAddForm({ ...addForm, equity_percentage: Number(e.target.value) })}
-                      />
-                    </div>
-                    <div className="col-md-4">
-                      <label className="form-label fw-bold small">Termly Recoup %</label>
-                      <input
-                        type="number"
-                        step="1"
-                        className="form-control form-control-sm"
-                        value={addForm.recoup_percentage}
-                        onChange={(e) => setAddForm({ ...addForm, recoup_percentage: Number(e.target.value) })}
-                      />
-                    </div>
-
-                    <div className="col-12">
-                      <hr className="my-2" />
-                      <div className="fw-bold small text-muted text-uppercase mb-2">Settlement Bank Details</div>
-                    </div>
-
-                    <div className="col-md-4">
-                      <label className="form-label small">Bank Name</label>
-                      <input
-                        type="text"
-                        className="form-control form-control-sm"
-                        placeholder="e.g. GTBank"
-                        value={addForm.bank_name}
-                        onChange={(e) => setAddForm({ ...addForm, bank_name: e.target.value })}
-                      />
-                    </div>
-                    <div className="col-md-4">
-                      <label className="form-label small">Account Number</label>
-                      <input
-                        type="text"
-                        className="form-control form-control-sm"
-                        placeholder="10 Digits"
-                        value={addForm.account_number}
-                        onChange={(e) => setAddForm({ ...addForm, account_number: e.target.value })}
-                      />
-                    </div>
-                    <div className="col-md-4">
-                      <label className="form-label small">Account Name</label>
-                      <input
-                        type="text"
-                        className="form-control form-control-sm"
-                        placeholder="Beneficiary Name"
-                        value={addForm.account_name}
-                        onChange={(e) => setAddForm({ ...addForm, account_name: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="col-12">
-                      <div className="form-check mt-2">
-                        <input
-                          type="checkbox"
-                          className="form-check-input"
-                          id="createUserAccount"
-                          checked={addForm.create_user_account}
-                          onChange={(e) => setAddForm({ ...addForm, create_user_account: e.target.checked })}
-                        />
-                        <label className="form-check-label small" htmlFor="createUserAccount">
-                          Create live portal user login account for this investor (Initial Password:{" "}
-                          <code>{addForm.user_password}</code>)
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="modal-footer bg-light py-2 px-4">
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-secondary"
-                    style={{ borderRadius: 8 }}
-                    onClick={() => setShowAddModal(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="btn btn-sm btn-primary"
-                    style={{ borderRadius: 8, background: "#0F2744", borderColor: "#0F2744" }}
-                  >
-                    {saving ? "Saving..." : "Register & Onboard Partner"}
-                  </button>
-                </div>
-              </form>
-            </div>
+              <div className="investor-modal-footer bg-light py-3 px-4 border-top d-flex justify-content-between align-items-center">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary px-3"
+                  style={{ borderRadius: 8, fontWeight: 600 }}
+                  onClick={() => setShowAddModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="btn btn-primary px-4 shadow-sm"
+                  style={{ borderRadius: 8, background: "#0F2744", borderColor: "#0F2744", fontWeight: 700 }}
+                >
+                  {saving ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-check-circle-fill me-1" />
+                      Register &amp; Onboard Partner
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -685,141 +767,151 @@ export default function SuperAdminInvestorsPage() {
       {/* ── RECORD DISBURSEMENT MODAL ── */}
       {showDisburseModal && targetInvestor && (
         <div
-          className="modal show d-block"
-          style={{ backgroundColor: "rgba(15, 23, 42, 0.75)", zIndex: 1050 }}
-          tabIndex={-1}
+          className="investor-modal-overlay"
+          onClick={() => setShowDisburseModal(false)}
         >
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content shadow-lg border-0 rounded-4 overflow-hidden">
-              <div
-                className="modal-header py-3 px-4 text-white"
-                style={{ background: "#0F2744" }}
-              >
-                <div className="d-flex align-items-center gap-2">
-                  <i className="bi bi-cash-stack text-warning fs-5" />
-                  <h5 className="modal-title fw-bold text-white mb-0">Record Remittance / Disbursement</h5>
+          <div
+            className="investor-modal-card"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="investor-modal-header py-3 px-4 text-white"
+              style={{ background: "#0F2744" }}
+            >
+              <div className="d-flex align-items-center gap-2">
+                <i className="bi bi-cash-stack text-warning fs-5" />
+                <h5 className="modal-title fw-bold text-white mb-0">Record Remittance / Disbursement</h5>
+              </div>
+              <button
+                type="button"
+                className="btn-close btn-close-white"
+                onClick={() => setShowDisburseModal(false)}
+              ></button>
+            </div>
+
+            <form onSubmit={handleRecordDisbursement} className="investor-modal-form">
+              <div className="investor-modal-body p-4 bg-white">
+                <div className="p-3 bg-light rounded-3 border mb-3">
+                  <div className="fw-bold text-dark">{targetInvestor.name}</div>
+                  <div className="small text-muted">
+                    {targetInvestor.tier.toUpperCase()} TIER &bull; Capital: {formatNaira(targetInvestor.capital_invested)}
+                  </div>
+                  <div className="small text-success mt-1">
+                    Already Recouped: {formatNaira(targetInvestor.total_principal_repaid)} (Remaining:{" "}
+                    <strong>{formatNaira(targetInvestor.remaining_principal)}</strong>)
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  className="btn-close btn-close-white"
-                  onClick={() => setShowDisburseModal(false)}
-                ></button>
+
+                <div className="mb-3">
+                  <label className="form-label fw-bold small">Disbursement Type</label>
+                  <select
+                    className="form-select form-select-sm"
+                    value={disburseForm.type}
+                    onChange={(e) => setDisburseForm({ ...disburseForm, type: e.target.value })}
+                  >
+                    <option value="principal_recoup">Principal Recoup (25% Termly Repayment)</option>
+                    <option value="dividend_payout">5-Year Equity Dividend Payout</option>
+                  </select>
+                </div>
+
+                <div className="row g-3">
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold small">Disbursed Amount (₦)</label>
+                    <input
+                      type="number"
+                      className="form-control form-control-sm"
+                      required
+                      value={disburseForm.amount}
+                      onChange={(e) => setDisburseForm({ ...disburseForm, amount: Number(e.target.value) })}
+                    />
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label fw-bold small">Payment Date</label>
+                    <input
+                      type="date"
+                      className="form-control form-control-sm"
+                      required
+                      value={disburseForm.payment_date}
+                      onChange={(e) => setDisburseForm({ ...disburseForm, payment_date: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label small">Academic Session</label>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="e.g. 2026/2027"
+                      value={disburseForm.academic_session}
+                      onChange={(e) => setDisburseForm({ ...disburseForm, academic_session: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="col-md-6">
+                    <label className="form-label small">Academic Term</label>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="e.g. First Term"
+                      value={disburseForm.term}
+                      onChange={(e) => setDisburseForm({ ...disburseForm, term: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="col-12">
+                    <label className="form-label small">Bank Transfer Transaction Reference</label>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="e.g. NIP/GTB/20261020/00912"
+                      value={disburseForm.bank_reference}
+                      onChange={(e) => setDisburseForm({ ...disburseForm, bank_reference: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="col-12">
+                    <label className="form-label small">Internal Notes / Memo</label>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="Optional remarks"
+                      value={disburseForm.notes}
+                      onChange={(e) => setDisburseForm({ ...disburseForm, notes: e.target.value })}
+                    />
+                  </div>
+                </div>
               </div>
 
-              <form onSubmit={handleRecordDisbursement}>
-                <div className="modal-body p-4 bg-white">
-                  <div className="p-3 bg-light rounded-3 border mb-3">
-                    <div className="fw-bold text-dark">{targetInvestor.name}</div>
-                    <div className="small text-muted">
-                      {targetInvestor.tier.toUpperCase()} TIER &bull; Capital: {formatNaira(targetInvestor.capital_invested)}
-                    </div>
-                    <div className="small text-success mt-1">
-                      Already Recouped: {formatNaira(targetInvestor.total_principal_repaid)} (Remaining:{" "}
-                      <strong>{formatNaira(targetInvestor.remaining_principal)}</strong>)
-                    </div>
-                  </div>
-
-                  <div className="mb-3">
-                    <label className="form-label fw-bold small">Disbursement Type</label>
-                    <select
-                      className="form-select form-select-sm"
-                      value={disburseForm.type}
-                      onChange={(e) => setDisburseForm({ ...disburseForm, type: e.target.value })}
-                    >
-                      <option value="principal_recoup">Principal Recoup (25% Termly Repayment)</option>
-                      <option value="dividend_payout">5-Year Equity Dividend Payout</option>
-                    </select>
-                  </div>
-
-                  <div className="row g-3">
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold small">Disbursed Amount (₦)</label>
-                      <input
-                        type="number"
-                        className="form-control form-control-sm"
-                        required
-                        value={disburseForm.amount}
-                        onChange={(e) => setDisburseForm({ ...disburseForm, amount: Number(e.target.value) })}
-                      />
-                    </div>
-
-                    <div className="col-md-6">
-                      <label className="form-label fw-bold small">Payment Date</label>
-                      <input
-                        type="date"
-                        className="form-control form-control-sm"
-                        required
-                        value={disburseForm.payment_date}
-                        onChange={(e) => setDisburseForm({ ...disburseForm, payment_date: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="col-md-6">
-                      <label className="form-label small">Academic Session</label>
-                      <input
-                        type="text"
-                        className="form-control form-control-sm"
-                        placeholder="e.g. 2026/2027"
-                        value={disburseForm.academic_session}
-                        onChange={(e) => setDisburseForm({ ...disburseForm, academic_session: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="col-md-6">
-                      <label className="form-label small">Academic Term</label>
-                      <input
-                        type="text"
-                        className="form-control form-control-sm"
-                        placeholder="e.g. First Term"
-                        value={disburseForm.term}
-                        onChange={(e) => setDisburseForm({ ...disburseForm, term: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="col-12">
-                      <label className="form-label small">Bank Transfer Transaction Reference</label>
-                      <input
-                        type="text"
-                        className="form-control form-control-sm"
-                        placeholder="e.g. NIP/GTB/20261020/00912"
-                        value={disburseForm.bank_reference}
-                        onChange={(e) => setDisburseForm({ ...disburseForm, bank_reference: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="col-12">
-                      <label className="form-label small">Internal Notes / Memo</label>
-                      <input
-                        type="text"
-                        className="form-control form-control-sm"
-                        placeholder="Optional remarks"
-                        value={disburseForm.notes}
-                        onChange={(e) => setDisburseForm({ ...disburseForm, notes: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="modal-footer bg-light py-2 px-4">
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-secondary"
-                    style={{ borderRadius: 8 }}
-                    onClick={() => setShowDisburseModal(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="btn btn-sm btn-success"
-                    style={{ borderRadius: 8, fontWeight: 600 }}
-                  >
-                    {saving ? "Recording..." : "Record & Disburse Payment"}
-                  </button>
-                </div>
-              </form>
-            </div>
+              <div className="investor-modal-footer bg-light py-3 px-4 border-top d-flex justify-content-between align-items-center">
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary px-3"
+                  style={{ borderRadius: 8, fontWeight: 600 }}
+                  onClick={() => setShowDisburseModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="btn btn-success px-4 shadow-sm"
+                  style={{ borderRadius: 8, fontWeight: 700 }}
+                >
+                  {saving ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" />
+                      Recording...
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-cash-stack me-1" />
+                      Record &amp; Disburse Payment
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
