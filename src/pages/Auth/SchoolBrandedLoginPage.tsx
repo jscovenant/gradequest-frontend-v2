@@ -134,9 +134,17 @@ export default function SchoolBrandedLoginPage() {
         "sales_representative",
         "sales_rep",
         "salesrep",
+        "investor",
+        "strategic_partner",
+        "partner",
       ];
 
-      if (validRoles.includes(normRole)) {
+      // Route directly based on user role
+      if (["investor", "strategic_partner", "partner"].includes(normRole)) {
+        navigate("/investor/dashboard");
+      } else if (["super_admin", "superadmin"].includes(normRole)) {
+        navigate("/superadmin/dashboard");
+      } else if (validRoles.includes(normRole)) {
         navigate("/dashboard");
       } else {
         navigate("/unauthorized");

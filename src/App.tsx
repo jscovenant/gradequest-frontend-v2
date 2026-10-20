@@ -361,7 +361,7 @@ function App() {
           <Route
             path="/dashboard"
             element={
-              <RequireAuth roles={["Admin", "Teacher", "Super-Admin", "Platform-Staff", "Student", "Parent", "Bursar", "Sales-Representative"]}>
+              <RequireAuth roles={["Admin", "Teacher", "Super-Admin", "Platform-Staff", "Student", "Parent", "Bursar", "Sales-Representative", "Investor", "Strategic_Partner", "Partner"]}>
                 <OnboardingGuard>
                   <Dashboard />
                 </OnboardingGuard>

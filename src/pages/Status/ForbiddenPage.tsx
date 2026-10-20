@@ -9,6 +9,17 @@ export default function ForbiddenPage() {
     logout();
   };
 
+  const handleGoDashboard = () => {
+    const normRole = (user?.normalized_role || user?.role || "").toLowerCase().replace(/[\s-]/g, "_");
+    if (["investor", "strategic_partner", "partner"].includes(normRole)) {
+      navigate("/investor/dashboard");
+    } else if (["super_admin", "superadmin"].includes(normRole)) {
+      navigate("/superadmin/dashboard");
+    } else {
+      navigate("/dashboard");
+    }
+  };
+
   return (
     <main className="gq-status-page">
       <style>{`
@@ -179,7 +190,7 @@ export default function ForbiddenPage() {
         )}
 
         <div className="gq-status-actions">
-          <button className="gq-status-btn-primary" onClick={() => navigate("/dashboard")}>
+          <button className="gq-status-btn-primary" onClick={handleGoDashboard}>
             <i className="bi bi-speedometer2" /> Go to Dashboard
           </button>
           <button className="gq-status-btn-secondary" onClick={handleLogoutAndSwitch}>

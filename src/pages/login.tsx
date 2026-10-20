@@ -6,7 +6,7 @@ import PageTitle from "../components/PageTitle";
 import AiSalesChatWidget from "../components/AiSalesChatWidget";
 import { isCustomPortalHost } from "../utils/portal";
 
-type PortalTab = "school" | "parent" | "platform";
+type PortalTab = "school" | "parent" | "platform" | "investor";
 
 export default function Login() {
   const [buttonLoading, setButtonLoading] = useState(false);
@@ -96,9 +96,17 @@ export default function Login() {
         "sales_representative",
         "sales_rep",
         "salesrep",
+        "investor",
+        "strategic_partner",
+        "partner",
       ];
 
-      if (validRoles.includes(normRole)) {
+      // Route directly based on user role
+      if (["investor", "strategic_partner", "partner"].includes(normRole)) {
+        navigate("/investor/dashboard");
+      } else if (["super_admin", "superadmin"].includes(normRole)) {
+        navigate("/superadmin/dashboard");
+      } else if (validRoles.includes(normRole)) {
         navigate("/dashboard");
       } else {
         navigate("/unauthorized");
@@ -134,6 +142,14 @@ export default function Login() {
       subtitle: "Secure access for platform administrators, support engineers, and managers.",
       inputLabel: "SchoolProfit Staff Email",
       placeholder: "e.g. staff@schoolprofit.ng",
+    },
+    investor: {
+      badge: "Strategic Partners",
+      eyebrow: "Investor & Growth Console",
+      title: "Sign in to Partner Portal",
+      subtitle: "Access real-time capital recoupment tracking, portfolio earnings, and dividend ledgers.",
+      inputLabel: "Partner / Investor Email",
+      placeholder: "e.g. demo.investor@schoolprofit.com",
     },
   }[portalMode];
 
@@ -653,6 +669,13 @@ export default function Login() {
               >
                 HQ & Ops
               </button>
+              <button
+                type="button"
+                className={`gq-portal-tab ${portalMode === "investor" ? "active" : ""}`}
+                onClick={() => { setPortalMode("investor"); setError(""); }}
+              >
+                Investors
+              </button>
             </div>
 
             <h2 className="gq-form-title">{portalMeta.title}</h2>
@@ -673,7 +696,7 @@ export default function Login() {
                 </label>
                 <div className="gq-input-wrap">
                   <span className="gq-input-icon">
-                    <i className={portalMode === "parent" ? "bi bi-phone" : portalMode === "platform" ? "bi bi-shield-lock" : "bi bi-person"} />
+                    <i className={portalMode === "parent" ? "bi bi-phone" : portalMode === "platform" ? "bi bi-shield-lock" : portalMode === "investor" ? "bi bi-graph-up-arrow" : "bi bi-person"} />
                   </span>
                   <input
                     id="identifier"
