@@ -216,6 +216,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
     if ((userRole === "bursar" || userRole === "accountant") && (normAllowed.includes("bursar") || normAllowed.includes("accountant"))) return true;
     if ((userRole === "parent" || userRole === "guardian") && (normAllowed.includes("parent") || normAllowed.includes("guardian"))) return true;
     if ((userRole === "student" || userRole === "pupil") && (normAllowed.includes("student") || normAllowed.includes("pupil"))) return true;
+    if ((userRole === "investor" || userRole === "strategic_partner" || userRole === "partner") && (normAllowed.includes("investor") || normAllowed.includes("partner"))) return true;
     return false;
   };
 
@@ -502,12 +503,27 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
         { label: "Platform Staff", href: "/superadmin/platform-staff", superAdminPermission: "staff" },
         { label: "User Roles & Permissions", href: "/superadmin/users-permissions", superAdminPermission: "staff" },
         { label: "Subscribers", href: "/superadmin/subscribers", superAdminPermission: "billing" },
+        { label: "Strategic Investors", href: "/superadmin/investors", superAdminPermission: "finance" },
         { label: "Billing Policy & Bank Charges", href: "/superadmin/billing-policy", superAdminPermission: "billing" },
         { label: "Twilio WhatsApp", href: "/superadmin/twilio-whatsapp" },
         { label: "Bookings", href: "/demo-bookers", superAdminPermission: "sales" }
       ],
       
       roles: ["Super-Admin", "Platform-Staff"],
+    },
+    {
+      label: "Strategic Investors",
+      icon: "cash-coin",
+      href: "/superadmin/investors",
+      roles: ["Super-Admin", "Platform-Staff"],
+      superAdminPermission: "finance",
+    },
+    // Investor Portal
+    {
+      label: "Investor Portal",
+      icon: "graph-up-arrow",
+      href: "/investor/dashboard",
+      roles: ["investor", "strategic_partner", "partner"],
     },
     {
       label: "Marketing",
