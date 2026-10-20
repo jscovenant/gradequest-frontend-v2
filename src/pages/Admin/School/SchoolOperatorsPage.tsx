@@ -7,6 +7,11 @@ import Loader from "../../../components/ui/dashboardLoader";
 import { useToast } from "../../../contexts/ToastContext";
 import PageTitle from "../../../components/PageTitle";
 
+interface SchoolSection {
+  id: number;
+  name: string;
+}
+
 interface SchoolOperator {
   id: number;
   firstname: string;
@@ -18,6 +23,8 @@ interface SchoolOperator {
   status: number;
   last_login_at?: string | null;
   created_at?: string | null;
+  assigned_sections?: { id: number; name: string }[];
+  assigned_section_ids?: number[];
 }
 
 export default function SchoolOperatorsPage() {
@@ -26,30 +33,48 @@ export default function SchoolOperatorsPage() {
 
   // List state
   const [operators, setOperators] = useState<SchoolOperator[]>([]);
+  const [sections, setSections] = useState<SchoolSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
   // Create Modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [newOp, setNewOp] = useState({
+  const [newOp, setNewOp] = useState<{
+    firstname: string;
+    surname: string;
+    email: string;
+    phone: string;
+    operator_title: string;
+    role: string;
+    section_ids: number[];
+  }>({
     firstname: "",
     surname: "",
     email: "",
     phone: "",
     operator_title: "School Principal / Head Teacher",
     role: "principal",
+    section_ids: [],
   });
   const [createdPasswordModal, setCreatedPasswordModal] = useState<{ name: string; email: string; pass: string; role?: string } | null>(null);
 
   // Edit Modal state
   const [editingOp, setEditingOp] = useState<SchoolOperator | null>(null);
-  const [editForm, setEditForm] = useState({
+  const [editForm, setEditForm] = useState<{
+    firstname: string;
+    surname: string;
+    phone: string;
+    operator_title: string;
+    role: string;
+    section_ids: number[];
+  }>({
     firstname: "",
     surname: "",
     phone: "",
     operator_title: "",
     role: "operator",
+    section_ids: [],
   });
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -70,8 +95,19 @@ export default function SchoolOperatorsPage() {
     }
   };
 
+  const loadSections = async () => {
+    try {
+      const res = await authApi.get("/sections");
+      const list = res.data?.sections || res.data?.data || (Array.isArray(res.data) ? res.data : []);
+      setSections(list);
+    } catch {
+      // silently fallback
+    }
+  };
+
   useEffect(() => {
     loadOperators();
+    loadSections();
   }, []);
 
   const filtered = useMemo(() => {
@@ -116,6 +152,7 @@ export default function SchoolOperatorsPage() {
         phone: "",
         operator_title: "School Principal / Head Teacher",
         role: "principal",
+        section_ids: [],
       });
       loadOperators();
     } catch (err: any) {
@@ -133,6 +170,7 @@ export default function SchoolOperatorsPage() {
       phone: op.phone || "",
       operator_title: op.operator_title || (op.role === "principal" ? "School Principal / Head Teacher" : "Desk Officer"),
       role: op.role || "operator",
+      section_ids: op.assigned_section_ids || (op.assigned_sections ? op.assigned_sections.map((s) => s.id) : []),
     });
   };
 
@@ -495,6 +533,23 @@ export default function SchoolOperatorsPage() {
                                 <span className="text-muted small">
                                   {op.operator_title || (isPrincipal ? "School Principal" : "Desk Officer")}
                                 </span>
+                                {isPrincipal && (
+                                  <div className="mt-1 d-flex flex-wrap gap-1">
+                                    {op.assigned_sections && op.assigned_sections.length > 0 ? (
+                                      op.assigned_sections.map((sec) => (
+                                        <span key={sec.id} className="badge bg-primary-subtle text-primary border border-primary-subtle" style={{ fontSize: "10.5px" }}>
+                                          <i className="bi bi-diagram-3 me-1" />
+                                          {sec.name} Section
+                                        </span>
+                                      ))
+                                    ) : (
+                                      <span className="badge bg-secondary-subtle text-secondary border border-secondary-subtle" style={{ fontSize: "10.5px" }}>
+                                        <i className="bi bi-globe me-1" />
+                                        All Sections (General)
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </td>
                             <td>
@@ -633,6 +688,57 @@ export default function SchoolOperatorsPage() {
                         : "Operators can enroll students, upload continuous assessment scores, and manage exams without access to sensitive proprietor or financial settings."}
                     </div>
                   </div>
+
+                  {newOp.role === "principal" && (
+                    <div className="col-12">
+                      <div className="p-3 rounded-3" style={{ background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
+                        <div className="d-flex justify-content-between align-items-center mb-1">
+                          <label className="form-label fw-bold small m-0 text-dark">
+                            <i className="bi bi-diagram-3-fill text-primary me-1" /> Assigned Section(s) Scope
+                          </label>
+                          <span className="badge bg-light text-primary border" style={{ fontSize: 11 }}>
+                            {newOp.section_ids.length === 0 ? "All Sections (General Principal)" : `${newOp.section_ids.length} selected`}
+                          </span>
+                        </div>
+                        <p className="text-muted small mb-2" style={{ fontSize: "11.5px" }}>
+                          Choose which section(s) this Principal can access and record for (e.g. Primary, Junior Secondary). Leave unselected for <strong>All Sections (General Principal / Head of School)</strong>.
+                        </p>
+                        <div className="d-flex flex-wrap gap-2">
+                          {sections.length === 0 ? (
+                            <span className="text-muted small">No sections found for this school.</span>
+                          ) : (
+                            sections.map((sec) => {
+                              const isSel = newOp.section_ids.includes(sec.id);
+                              return (
+                                <button
+                                  type="button"
+                                  key={sec.id}
+                                  onClick={() => {
+                                    setNewOp((prev) => ({
+                                      ...prev,
+                                      section_ids: isSel
+                                        ? prev.section_ids.filter((id) => id !== sec.id)
+                                        : [...prev.section_ids, sec.id],
+                                    }));
+                                  }}
+                                  className={`btn btn-sm ${isSel ? "btn-primary" : "btn-outline-secondary bg-white"}`}
+                                  style={{ borderRadius: 20, fontSize: 12, padding: "5px 14px" }}
+                                >
+                                  <i className={`bi ${isSel ? "bi-check-circle-fill" : "bi-circle"} me-1`} />
+                                  {sec.name} Section
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                        {newOp.section_ids.length === 0 && (
+                          <div className="small text-muted mt-2" style={{ fontSize: 11 }}>
+                            ℹ️ <em>General Mode:</em> Principal will have academic leadership across all school sections.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="col-md-6">
                     <label className="form-label fw-bold small">First Name *</label>
@@ -782,6 +888,58 @@ export default function SchoolOperatorsPage() {
                       <option value="operator">🖥️ School Operator / Registrar</option>
                     </select>
                   </div>
+
+                  {editForm.role === "principal" && (
+                    <div className="col-12">
+                      <div className="p-3 rounded-3" style={{ background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
+                        <div className="d-flex justify-content-between align-items-center mb-1">
+                          <label className="form-label fw-bold small m-0 text-dark">
+                            <i className="bi bi-diagram-3-fill text-primary me-1" /> Assigned Section(s) Scope
+                          </label>
+                          <span className="badge bg-light text-primary border" style={{ fontSize: 11 }}>
+                            {editForm.section_ids.length === 0 ? "All Sections (General Principal)" : `${editForm.section_ids.length} selected`}
+                          </span>
+                        </div>
+                        <p className="text-muted small mb-2" style={{ fontSize: "11.5px" }}>
+                          Choose which section(s) this Principal can access and record for (e.g. Primary, Junior Secondary). Leave unselected for <strong>All Sections (General Principal / Head of School)</strong>.
+                        </p>
+                        <div className="d-flex flex-wrap gap-2">
+                          {sections.length === 0 ? (
+                            <span className="text-muted small">No sections found for this school.</span>
+                          ) : (
+                            sections.map((sec) => {
+                              const isSel = editForm.section_ids.includes(sec.id);
+                              return (
+                                <button
+                                  type="button"
+                                  key={sec.id}
+                                  onClick={() => {
+                                    setEditForm((prev) => ({
+                                      ...prev,
+                                      section_ids: isSel
+                                        ? prev.section_ids.filter((id) => id !== sec.id)
+                                        : [...prev.section_ids, sec.id],
+                                    }));
+                                  }}
+                                  className={`btn btn-sm ${isSel ? "btn-primary" : "btn-outline-secondary bg-white"}`}
+                                  style={{ borderRadius: 20, fontSize: 12, padding: "5px 14px" }}
+                                >
+                                  <i className={`bi ${isSel ? "bi-check-circle-fill" : "bi-circle"} me-1`} />
+                                  {sec.name} Section
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                        {editForm.section_ids.length === 0 && (
+                          <div className="small text-muted mt-2" style={{ fontSize: 11 }}>
+                            ℹ️ <em>General Mode:</em> Principal will have academic leadership across all school sections.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="col-md-6">
                     <label className="form-label fw-bold small">First Name</label>
                     <input

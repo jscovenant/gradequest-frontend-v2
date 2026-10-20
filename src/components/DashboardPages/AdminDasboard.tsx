@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Chart from "chart.js/auto";
 import { authApi } from "../../utils/axios";
+import { resolveMediaUrl } from "../../utils/apiUrl";
 import TopNav from "../LayoutComponents/TopNav";
 import Sidebar from "../LayoutComponents/Sidebar";
 import Footer from "../LayoutComponents/Footer";
@@ -9,10 +10,39 @@ import { useNavigate } from "react-router-dom";
 import PageTitle from "../PageTitle";
 import { getUser } from "../../utils/token";
 
-interface StatCard { title: string; value: string | number; icon: string; }
+const getPhoto = (photo?: string) => resolveMediaUrl(photo, "/media/profile.jpg");
+
+interface StatCard { title: string; value: string | number; icon: string; subtext?: string; }
 type PerformancePoint = { term: string; average: number };
 type TopStudent = { admission_no: string; name: string; class: string; score: number };
 type TopStudentsResponse = { data: TopStudent[]; total: number; session_used: string; term_used: string };
+
+type DepartmentAttentionStudent = {
+  id: number;
+  name: string;
+  firstname: string;
+  surname: string;
+  third_name?: string;
+  reg_no: string;
+  photo?: string | null;
+  class_id: number;
+  class_name: string;
+  section_id?: number | null;
+  section_name: string;
+  current_department_id?: number | null;
+  current_department_name: string;
+  issue: "unassigned" | "mismatched";
+  issue_label: string;
+  title: string;
+  message: string;
+};
+
+type DepartmentAttentionData = {
+  total_count: number;
+  students: DepartmentAttentionStudent[];
+  senior_departments: { id: number; name: string; description?: string }[];
+  importance_notice: string;
+};
 
 type AlertItem = {
   id: number; type: string; severity: "low" | "medium" | "high"; status: string;
@@ -67,6 +97,77 @@ type ReviewBatch = {
 };
 
 type ReviewBatchResponse = { data: ReviewBatch[] };
+
+interface SchoolFinancialMetrics {
+  gross_billed: number;
+  discounts_granted: number;
+  net_billed: number;
+  total_collected: number;
+  outstanding_balance: number;
+  collection_rate: number;
+  total_students: number;
+  owing_students: number;
+  total_transactions: number;
+}
+
+interface FinancialSectionItem {
+  id: number;
+  name: string;
+}
+
+interface FinancialSectionBreakdown {
+  section_id: number;
+  section_name: string;
+  gross_billed: number;
+  discounts: number;
+  net_billed: number;
+  paid: number;
+  balance: number;
+  total_students: number;
+  owing_students: number;
+  collection_rate: number;
+}
+
+interface RecentSchoolPayment {
+  id: number;
+  reference: string;
+  receipt_number: string;
+  amount: number;
+  current_paid: number;
+  arrears_paid: number;
+  payment_method: string;
+  payer_name: string;
+  created_at: string;
+  student_name: string;
+  admission_no: string;
+  section_name: string;
+  fee_type_name: string;
+}
+
+interface PaymentMethodItem {
+  method: string;
+  total_count: number;
+  total_amount: number;
+}
+
+interface RevenueTrendPoint {
+  date: string;
+  label: string;
+  amount: number;
+  cumulative: number;
+  count: number;
+}
+
+interface RevenueTrendResponse {
+  trend: RevenueTrendPoint[];
+  total_recovered: number;
+  by_section: { section_name: string; section_total: number | string; count: number }[];
+}
+
+function formatNaira(val: number | string | undefined | null): string {
+  const n = Number(val || 0);
+  return `₦${n.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+}
 
 const STAT_META = [
   { color: "#10B981", bg: "rgba(16, 185, 129, 0.12)", label: "enrolled" },
@@ -348,6 +449,33 @@ export default function AdminDashboard() {
     { title: "Results Uploaded", value: "0%", icon: "results" },
   ]);
 
+  // Senior Students Department Attention State
+  const [deptAttention, setDeptAttention] = useState<DepartmentAttentionData | null>(null);
+  const [deptAttentionDismissed, setDeptAttentionDismissed] = useState(false);
+  const [assigningStudentId, setAssigningStudentId] = useState<number | null>(null);
+  const [selectedDeptId, setSelectedDeptId] = useState<Record<number, number>>({});
+
+  const handleQuickAssignDept = async (studentId: number, deptId: number) => {
+    if (!deptId) return;
+    setAssigningStudentId(studentId);
+    try {
+      await authApi.post(`/students/${studentId}/assign-department`, { department_id: deptId });
+      setDeptAttention((prev) => {
+        if (!prev) return null;
+        const updated = prev.students.filter((s) => s.id !== studentId);
+        return {
+          ...prev,
+          total_count: Math.max(0, prev.total_count - 1),
+          students: updated,
+        };
+      });
+    } catch (err: any) {
+      alert(err?.response?.data?.message || "Failed to assign department.");
+    } finally {
+      setAssigningStudentId(null);
+    }
+  };
+
   // Alerts state
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
@@ -383,6 +511,174 @@ export default function AdminDashboard() {
     setPaymentLinkCopied(true);
     setTimeout(() => setPaymentLinkCopied(false), 2000);
   };
+
+  // Financial Records State (Proprietor & School Owner Command Center)
+  const [financeLoading, setFinanceLoading] = useState(false);
+  const [financialMetrics, setFinancialMetrics] = useState<SchoolFinancialMetrics | null>(null);
+  const [availableSections, setAvailableSections] = useState<FinancialSectionItem[]>([]);
+  const [selectedSectionFilter, setSelectedSectionFilter] = useState<string>(""); // "" = Consolidated All Sections
+  const [sectionBreakdowns, setSectionBreakdowns] = useState<FinancialSectionBreakdown[]>([]);
+  const [recentPayments, setRecentPayments] = useState<RecentSchoolPayment[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodItem[]>([]);
+  const [revenueTrendPoints, setRevenueTrendPoints] = useState<RevenueTrendPoint[]>([]);
+  const [totalRecoveredTrend, setTotalRecoveredTrend] = useState<number>(0);
+  const [trendMode, setTrendMode] = useState<"daily" | "cumulative">("daily");
+  const financeChartRef = useRef<HTMLCanvasElement | null>(null);
+  const financeChartInst = useRef<Chart | null>(null);
+
+  const fetchSchoolFinancialRecords = (sectionId?: string) => {
+    setFinanceLoading(true);
+    const params: Record<string, string | number> = {};
+    if (sectionId && sectionId !== "") {
+      params.section_id = sectionId;
+    }
+
+    Promise.allSettled([
+      authApi.get("/bursar-dashboard/summary", { params }),
+      authApi.get("/bursar-dashboard/section-breakdown", { params }),
+      authApi.get("/bursar-dashboard/recent-payments", { params: { limit: 8, ...params } }),
+      authApi.get("/bursar-dashboard/payment-method-breakdown", { params }),
+      authApi.get<RevenueTrendResponse>("/bursar-dashboard/revenue-trend", { params }),
+    ]).then(([summaryRes, sectionRes, recentRes, methodRes, trendRes]) => {
+      if (summaryRes.status === "fulfilled" && summaryRes.value?.data) {
+        const d = summaryRes.value.data;
+        const s = d.metrics || d.summary;
+        if (s) {
+          const gross = Number(s.gross_billed ?? s.total_gross_billed ?? s.total_billed ?? 0);
+          const discounts = Number(s.discounts_granted ?? s.total_discounts_granted ?? 0);
+          const net = Number(s.net_billed ?? s.total_billed ?? gross - discounts);
+          const paid = Number(s.total_collected ?? s.total_paid ?? s.paidAmount ?? 0);
+          const outstanding = Number(s.outstanding_balance ?? s.total_outstanding ?? s.outstandingAmount ?? 0);
+          const txCount = Number(s.total_transactions ?? 0);
+          const rate = Number(s.collection_rate ?? (net > 0 ? Math.round((paid / net) * 1000) / 10 : 0));
+          const paidStudents = Number(s.paid_students_count ?? 0);
+          const owingStudents = Number(s.owing_students_count ?? s.owing_students ?? 0);
+          const totalStudents = Number(s.total_students ?? (paidStudents + owingStudents));
+
+          setFinancialMetrics({
+            gross_billed: gross,
+            discounts_granted: discounts,
+            net_billed: net,
+            total_collected: paid,
+            outstanding_balance: outstanding,
+            collection_rate: rate,
+            total_students: totalStudents,
+            owing_students: owingStudents,
+            total_transactions: txCount,
+          });
+        }
+        if (Array.isArray(d.available_sections) && d.available_sections.length > 0) {
+          setAvailableSections(d.available_sections);
+        }
+      }
+      if (sectionRes.status === "fulfilled" && sectionRes.value?.data?.sections) {
+        setSectionBreakdowns(sectionRes.value.data.sections);
+      }
+      if (recentRes.status === "fulfilled" && recentRes.value?.data?.data) {
+        setRecentPayments(recentRes.value.data.data);
+      }
+      if (methodRes.status === "fulfilled" && methodRes.value?.data?.data) {
+        setPaymentMethods(methodRes.value.data.data);
+      }
+      if (trendRes.status === "fulfilled" && trendRes.value?.data) {
+        setRevenueTrendPoints(trendRes.value.data.trend || []);
+        setTotalRecoveredTrend(Number(trendRes.value.data.total_recovered ?? 0));
+      }
+    }).finally(() => {
+      setFinanceLoading(false);
+    });
+  };
+
+  useEffect(() => {
+    if (!isOperator) {
+      fetchSchoolFinancialRecords(selectedSectionFilter);
+    }
+  }, [selectedSectionFilter, isOperator]);
+
+  useEffect(() => {
+    if (!financeChartRef.current) return;
+    const ctx = financeChartRef.current.getContext("2d");
+    if (!ctx) return;
+
+    financeChartInst.current?.destroy();
+
+    // Prepare trend points
+    const points = revenueTrendPoints.length > 0
+      ? revenueTrendPoints
+      : financialMetrics?.total_collected
+      ? [
+          { date: "Day 1", label: "Initial", amount: 0, cumulative: 0, count: 0 },
+          { date: "Today", label: "Recovered", amount: financialMetrics.total_collected, cumulative: financialMetrics.total_collected, count: financialMetrics.total_transactions }
+        ]
+      : [];
+
+    const labels = points.map((p) => p.label);
+    const dataValues = points.map((p) => (trendMode === "cumulative" ? p.cumulative : p.amount));
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, 240);
+    gradient.addColorStop(0, "rgba(16, 185, 129, 0.35)");
+    gradient.addColorStop(0.7, "rgba(16, 185, 129, 0.05)");
+    gradient.addColorStop(1, "rgba(16, 185, 129, 0.0)");
+
+    financeChartInst.current = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: labels.length > 0 ? labels : ["No Payments"],
+        datasets: [
+          {
+            label: trendMode === "cumulative" ? "Cumulative Recovery (₦)" : "Daily Inflow (₦)",
+            data: dataValues.length > 0 ? dataValues : [0],
+            borderColor: "#10B981",
+            backgroundColor: gradient,
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: "#FFFFFF",
+            pointBorderColor: "#059669",
+            pointBorderWidth: 2.5,
+            pointRadius: 5,
+            pointHoverRadius: 7,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: "#0F2744",
+            titleFont: { size: 12, weight: "bold" },
+            bodyFont: { size: 13 },
+            padding: 10,
+            cornerRadius: 8,
+            callbacks: {
+              label: (context) => ` ${formatNaira(context.parsed.y)}`,
+            },
+          },
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { color: "#64748B", font: { size: 11.5 } },
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: "rgba(226, 232, 240, 0.7)" },
+            ticks: {
+              color: "#64748B",
+              font: { size: 11 },
+              callback: (val) => `₦${Number(val).toLocaleString()}`,
+            },
+          },
+        },
+      },
+    });
+
+    return () => {
+      financeChartInst.current?.destroy();
+    };
+  }, [revenueTrendPoints, trendMode, financialMetrics?.total_collected]);
 
   const fetchAlerts = () => {
     setAlertsLoading(true);
@@ -447,13 +743,23 @@ export default function AdminDashboard() {
       }
       if (countsRes.status === "fulfilled") {
         const c = countsRes.value.data ?? {};
+        const activeStudents = Number(c.students ?? 0);
+        const graduates = Number(c.graduates_count ?? 0);
+        const withdrawn = Number(c.withdrawn_count ?? 0);
+        const studentSubtext = (graduates > 0 || withdrawn > 0)
+          ? `${graduates} graduated · ${withdrawn} withdrawn`
+          : undefined;
+
         setTotalUsers(Number(c.total_users ?? 0));
         setStats([
-          { title: "Total Students", value: Number(c.students ?? 0), icon: "students" },
+          { title: "Total Students", value: activeStudents, icon: "students", subtext: studentSubtext },
           { title: "Teachers", value: Number(c.teachers ?? 0), icon: "teachers" },
           { title: "Total Parents", value: Number(c.parents ?? 0), icon: "parents" },
           { title: "Results Uploaded", value: c.results_uploaded ?? "0%", icon: "results" },
         ]);
+        if (c.department_attention_summary) {
+          setDeptAttention(c.department_attention_summary);
+        }
       }
       if (perfRes.status === "fulfilled") {
         const pts: PerformancePoint[] = Array.isArray(perfRes.value.data.data) ? perfRes.value.data.data : [];
@@ -527,6 +833,252 @@ export default function AdminDashboard() {
           min-height: 100vh;
           font-family: 'Plus Jakarta Sans', sans-serif;
           padding: 24px 28px;
+        }
+
+        /* ── Department Attention Warning Widget ── */
+        .dept-attention-card {
+          background: linear-gradient(135deg, rgba(254, 243, 199, 0.9) 0%, #FFFFFF 100%);
+          border: 1.5px solid #F59E0B;
+          border-radius: 16px;
+          padding: 22px 24px;
+          box-shadow: 0 8px 24px -4px rgba(217, 119, 6, 0.12);
+          margin-bottom: 24px;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .dept-attention-card::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 5px;
+          background: #D97706;
+        }
+
+        .dept-attention-header {
+          display: flex;
+          align-items: flex-start;
+          gap: 16px;
+        }
+
+        .dept-attention-icon-wrap {
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
+          background: rgba(217, 119, 6, 0.15);
+          color: #D97706;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
+          flex-shrink: 0;
+          position: relative;
+        }
+
+        .dept-attention-icon-pulse {
+          position: absolute;
+          inset: -3px;
+          border-radius: 15px;
+          border: 2px solid rgba(217, 119, 6, 0.4);
+          animation: pulse-amber 2s infinite;
+        }
+
+        @keyframes pulse-amber {
+          0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.6); }
+          70% { transform: scale(1.08); box-shadow: 0 0 0 6px rgba(217, 119, 6, 0); }
+          100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(217, 119, 6, 0); }
+        }
+
+        .dept-attention-title {
+          font-size: 17px;
+          font-weight: 800;
+          color: #92400E;
+        }
+
+        .dept-attention-badge {
+          background: #D97706;
+          color: #FFFFFF;
+          font-size: 11.5px;
+          font-weight: 700;
+          padding: 3px 10px;
+          border-radius: 999px;
+          letter-spacing: 0.02em;
+        }
+
+        .dept-attention-desc {
+          font-size: 13px;
+          color: #78350F;
+          line-height: 1.55;
+        }
+
+        .dept-attention-btn-primary {
+          background: #D97706;
+          color: #FFFFFF;
+          border: none;
+          border-radius: 10px;
+          padding: 7px 14px;
+          font-size: 12.5px;
+          font-weight: 700;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          text-decoration: none;
+        }
+
+        .dept-attention-btn-primary:hover {
+          background: #B45309;
+          transform: translateY(-1px);
+          color: #FFFFFF;
+        }
+
+        .dept-attention-dismiss-btn {
+          background: transparent;
+          border: none;
+          color: #92400E;
+          font-size: 14px;
+          cursor: pointer;
+          padding: 4px 8px;
+          border-radius: 6px;
+        }
+
+        .dept-attention-dismiss-btn:hover {
+          background: rgba(217, 119, 6, 0.1);
+        }
+
+        .dept-attention-table-wrap {
+          background: #FFFFFF;
+          border: 1px solid #FDE68A;
+          border-radius: 12px;
+          padding: 14px 16px;
+          margin-top: 14px;
+        }
+
+        .dept-attention-table-header {
+          font-size: 12px;
+          font-weight: 700;
+          color: #92400E;
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 10px;
+          padding-bottom: 6px;
+          border-bottom: 1px solid #FEF3C7;
+        }
+
+        .dept-attention-list {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .dept-attention-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 12px;
+          padding: 8px 10px;
+          border-radius: 8px;
+          background: #FFFDF7;
+          border: 1px solid #FEF3C7;
+          transition: all 0.2s ease;
+        }
+
+        .dept-attention-row:hover {
+          background: #FFFBEB;
+          border-color: #FDE68A;
+        }
+
+        .dept-attention-avatar {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          object-fit: cover;
+        }
+
+        .dept-attention-avatar-initials {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          background: rgba(217, 119, 6, 0.15);
+          color: #B45309;
+          font-weight: 800;
+          font-size: 13px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .dept-attention-avatar-dot {
+          position: absolute;
+          bottom: -1px;
+          right: -1px;
+          width: 10px;
+          height: 10px;
+          background: #EF4444;
+          border-radius: 50%;
+          border: 1.5px solid #FFFFFF;
+        }
+
+        .dept-attention-name {
+          font-size: 13.5px;
+          font-weight: 700;
+          color: #1E293B;
+        }
+
+        .dept-attention-meta {
+          font-size: 12px;
+          color: #64748B;
+        }
+
+        .dept-issue-pill {
+          font-size: 11px;
+          font-weight: 700;
+          padding: 3px 8px;
+          border-radius: 6px;
+          background: rgba(239, 68, 68, 0.1);
+          color: #DC2626;
+          border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .dept-issue-pill--mismatched {
+          background: rgba(217, 119, 6, 0.1);
+          color: #B45309;
+          border-color: rgba(217, 119, 6, 0.25);
+        }
+
+        .dept-select-sm {
+          font-size: 12px;
+          padding: 5px 10px;
+          border-radius: 7px;
+          border: 1px solid #CBD5E1;
+          background: #FFFFFF;
+          color: #1E293B;
+          outline: none;
+        }
+
+        .dept-quick-assign-btn {
+          background: #0F2744;
+          color: #FFFFFF;
+          border: none;
+          border-radius: 7px;
+          padding: 5px 12px;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .dept-quick-assign-btn:hover:not(:disabled) {
+          background: #D97706;
+        }
+
+        .dept-quick-assign-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
 
         /* ── Hero Banner ── */
@@ -1066,6 +1618,534 @@ export default function AdminDashboard() {
           color: #64748B;
         }
 
+        /* ── Proprietor Financial Command Center ── */
+        .pfc-container {
+          background: #F8FAFC;
+          border: 1px solid #E2E8F0;
+          border-radius: 20px;
+          padding: 24px;
+          margin-bottom: 28px;
+          box-shadow: 0 4px 20px rgba(15, 39, 68, 0.04);
+        }
+
+        .pfc-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 16px;
+          margin-bottom: 20px;
+        }
+
+        .pfc-header-icon {
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
+          background: rgba(15, 39, 68, 0.08);
+          color: #0F2744;
+          font-size: 22px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+
+        .pfc-title {
+          font-size: 19px;
+          font-weight: 800;
+          color: #0F2744;
+          margin: 0;
+        }
+
+        .pfc-subtitle {
+          font-size: 12.5px;
+          color: #64748B;
+          margin: 2px 0 0 0;
+        }
+
+        .pfc-badge-live {
+          font-size: 11px;
+          font-weight: 700;
+          padding: 3px 10px;
+          border-radius: 999px;
+          background: rgba(16, 185, 129, 0.12);
+          color: #047857;
+          border: 1px solid rgba(16, 185, 129, 0.25);
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+        }
+
+        .pfc-badge-live .bi-circle-fill {
+          font-size: 7px;
+          color: #10B981;
+          animation: pfcPulse 1.5s infinite;
+        }
+        @keyframes pfcPulse {
+          0% { opacity: 0.4; }
+          50% { opacity: 1; }
+          100% { opacity: 0.4; }
+        }
+
+        .pfc-trend-toggle {
+          display: inline-flex;
+          background: #F1F5F9;
+          border: 1px solid #E2E8F0;
+          border-radius: 10px;
+          padding: 3px;
+          gap: 2px;
+        }
+
+        .pfc-trend-btn {
+          background: transparent;
+          border: none;
+          border-radius: 8px;
+          padding: 6px 13px;
+          font-size: 12px;
+          font-weight: 600;
+          color: #64748B;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          display: inline-flex;
+          align-items: center;
+          white-space: nowrap;
+        }
+
+        .pfc-trend-btn:hover {
+          color: #0F2744;
+        }
+
+        .pfc-trend-btn.active {
+          background: #FFFFFF;
+          color: #0F2744;
+          font-weight: 700;
+          box-shadow: 0 2px 6px rgba(15, 39, 68, 0.08);
+        }
+
+        .pfc-trend-stat-chip {
+          background: rgba(16, 185, 129, 0.08);
+          border: 1px solid rgba(16, 185, 129, 0.25);
+          border-radius: 10px;
+          padding: 5px 12px;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          line-height: 1.2;
+        }
+
+        .pfc-trend-stat-label {
+          font-size: 10px;
+          color: #047857;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
+
+        .pfc-trend-stat-val {
+          font-size: 15px;
+          font-weight: 800;
+        }
+
+        .pfc-chart-container {
+          position: relative;
+          height: 270px;
+          width: 100%;
+          margin-top: 12px;
+        }
+
+        .pfc-btn-primary {
+          background: #0F2744;
+          color: #FFFFFF;
+          border: none;
+          border-radius: 10px;
+          padding: 8px 16px;
+          font-size: 12.5px;
+          font-weight: 700;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .pfc-btn-primary:hover {
+          background: #1E3A8A;
+          transform: translateY(-1px);
+        }
+
+        .pfc-btn-secondary {
+          background: #FFFFFF;
+          color: #0F2744;
+          border: 1px solid #CBD5E1;
+          border-radius: 10px;
+          padding: 8px 14px;
+          font-size: 12.5px;
+          font-weight: 600;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .pfc-btn-secondary:hover {
+          background: #F1F5F9;
+          border-color: #94A3B8;
+        }
+
+        .pfc-filter-bar {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          align-items: center;
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
+          border-radius: 12px;
+          padding: 10px 14px;
+          margin-bottom: 20px;
+        }
+
+        .pfc-filter-label {
+          font-size: 12px;
+          font-weight: 700;
+          color: #64748B;
+          margin-right: 4px;
+        }
+
+        .pfc-filter-pill {
+          background: #F1F5F9;
+          border: 1px solid #E2E8F0;
+          border-radius: 8px;
+          padding: 6px 14px;
+          font-size: 12px;
+          font-weight: 600;
+          color: #334155;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .pfc-filter-pill:hover {
+          background: #E2E8F0;
+          color: #0F2744;
+        }
+
+        .pfc-filter-pill.active {
+          background: #0F2744;
+          color: #FFFFFF;
+          border-color: #0F2744;
+          font-weight: 700;
+          box-shadow: 0 2px 6px rgba(15, 39, 68, 0.2);
+        }
+
+        .pfc-kpi-grid {
+          display: grid;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          gap: 14px;
+          margin-bottom: 20px;
+        }
+
+        @media (max-width: 1399px) { .pfc-kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 991px)  { .pfc-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 575px)  { .pfc-kpi-grid { grid-template-columns: 1fr; } }
+
+        .pfc-kpi-card {
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
+          border-radius: 14px;
+          padding: 18px 16px;
+          position: relative;
+          overflow: hidden;
+          box-shadow: 0 2px 8px rgba(15, 39, 68, 0.02);
+          transition: all 0.2s ease;
+        }
+
+        .pfc-kpi-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(15, 39, 68, 0.06);
+          border-color: #CBD5E1;
+        }
+
+        .pfc-kpi-card::before {
+          content: '';
+          position: absolute;
+          top: 0; left: 0; right: 0;
+          height: 3.5px;
+          background: var(--kpi-accent, #0F2744);
+        }
+
+        .pfc-kpi-top {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+        }
+
+        .pfc-kpi-icon {
+          width: 34px;
+          height: 34px;
+          border-radius: 8px;
+          background: var(--kpi-bg, rgba(15, 39, 68, 0.08));
+          color: var(--kpi-accent, #0F2744);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 16px;
+        }
+
+        .pfc-kpi-tag {
+          font-size: 10.5px;
+          font-weight: 700;
+          padding: 2px 7px;
+          border-radius: 4px;
+          background: #F1F5F9;
+          color: #475569;
+        }
+
+        .pfc-kpi-label {
+          font-size: 12px;
+          font-weight: 600;
+          color: #64748B;
+          margin-bottom: 4px;
+        }
+
+        .pfc-kpi-value {
+          font-size: 20px;
+          font-weight: 800;
+          color: #0F2744;
+          margin-bottom: 4px;
+          letter-spacing: -0.02em;
+        }
+
+        .pfc-kpi-sub {
+          font-size: 11px;
+          color: #94A3B8;
+        }
+
+        .pfc-efficiency-box {
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
+          border-radius: 12px;
+          padding: 14px 18px;
+          margin-bottom: 22px;
+        }
+
+        .pfc-efficiency-title {
+          font-size: 13px;
+          font-weight: 700;
+          color: #0F2744;
+        }
+
+        .pfc-efficiency-rate {
+          font-size: 15px;
+          font-weight: 800;
+          color: #059669;
+        }
+
+        .pfc-efficiency-meta {
+          font-size: 12px;
+          color: #64748B;
+        }
+
+        .pfc-efficiency-track {
+          height: 9px;
+          background: #E2E8F0;
+          border-radius: 999px;
+          overflow: hidden;
+        }
+
+        .pfc-efficiency-fill {
+          height: 100%;
+          background: linear-gradient(90deg, #10B981 0%, #059669 100%);
+          border-radius: 999px;
+          transition: width 0.4s ease;
+        }
+
+        .pfc-panel {
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
+          border-radius: 16px;
+          padding: 20px;
+          box-shadow: 0 2px 8px rgba(15, 39, 68, 0.02);
+        }
+
+        .pfc-panel-head {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 16px;
+        }
+
+        .pfc-panel-head-icon {
+          width: 36px;
+          height: 36px;
+          border-radius: 10px;
+          background: rgba(37, 99, 235, 0.1);
+          color: #2563EB;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 16px;
+        }
+
+        .pfc-panel-title {
+          font-size: 15px;
+          font-weight: 700;
+          color: #0F2744;
+          margin: 0;
+        }
+
+        .pfc-panel-sub {
+          font-size: 12px;
+          color: #64748B;
+          margin: 2px 0 0 0;
+        }
+
+        .pfc-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 12.5px;
+        }
+
+        .pfc-table th {
+          background: #F8FAFC;
+          color: #475569;
+          font-weight: 700;
+          font-size: 11.5px;
+          text-transform: uppercase;
+          letter-spacing: 0.03em;
+          padding: 10px 14px;
+          border-bottom: 1px solid #E2E8F0;
+        }
+
+        .pfc-table td {
+          padding: 12px 14px;
+          border-bottom: 1px solid #F1F5F9;
+          vertical-align: middle;
+        }
+
+        .pfc-tr-active {
+          background: rgba(217, 119, 6, 0.05) !important;
+        }
+
+        .pfc-mini-prog-track {
+          height: 6px;
+          background: #E2E8F0;
+          border-radius: 999px;
+          overflow: hidden;
+          width: 70px;
+        }
+
+        .pfc-mini-prog-fill {
+          height: 100%;
+          border-radius: 999px;
+        }
+
+        .pfc-sm-btn {
+          background: #F1F5F9;
+          border: 1px solid #CBD5E1;
+          border-radius: 6px;
+          padding: 4px 10px;
+          font-size: 11.5px;
+          font-weight: 600;
+          color: #0F2744;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .pfc-sm-btn:hover {
+          background: #0F2744;
+          color: #FFFFFF;
+          border-color: #0F2744;
+        }
+
+        .pfc-sm-btn-active {
+          background: #D97706;
+          color: #FFFFFF;
+          border-color: #D97706;
+        }
+
+        .pfc-grid-two {
+          display: grid;
+          grid-template-columns: 3fr 2fr;
+          gap: 18px;
+        }
+
+        @media (max-width: 991px) { .pfc-grid-two { grid-template-columns: 1fr; } }
+
+        .pfc-link-btn {
+          background: transparent;
+          border: none;
+          color: #2563EB;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          text-decoration: none;
+          padding: 0;
+        }
+
+        .pfc-link-btn:hover {
+          text-decoration: underline;
+        }
+
+        .pfc-method-tag {
+          background: #F1F5F9;
+          border: 1px solid #E2E8F0;
+          border-radius: 6px;
+          padding: 2px 8px;
+          font-size: 11px;
+          font-weight: 600;
+          color: #334155;
+        }
+
+        .pfc-channel-item {
+          padding: 10px 0;
+          border-bottom: 1px solid #F1F5F9;
+        }
+
+        .pfc-channel-name {
+          font-size: 12.5px;
+          font-weight: 600;
+          color: #0F2744;
+        }
+
+        .pfc-shortcuts-box {
+          background: #F8FAFC;
+          border: 1px solid #E2E8F0;
+          border-radius: 12px;
+          padding: 14px;
+        }
+
+        .pfc-shortcuts-title {
+          font-size: 11.5px;
+          font-weight: 700;
+          color: #475569;
+          text-transform: uppercase;
+          letter-spacing: 0.03em;
+          margin-bottom: 10px;
+        }
+
+        .pfc-shortcut-link {
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
+          border-radius: 8px;
+          padding: 8px 12px;
+          font-size: 12px;
+          font-weight: 600;
+          color: #0F2744;
+          display: flex;
+          align-items: center;
+          cursor: pointer;
+          width: 100%;
+          text-align: left;
+          transition: all 0.2s ease;
+        }
+
+        .pfc-shortcut-link:hover {
+          background: #F1F5F9;
+          border-color: #CBD5E1;
+          transform: translateX(2px);
+        }
+
         .rrq-spin { animation: rrqSpin 0.8s linear infinite; }
         @keyframes rrqSpin { to { transform: rotate(360deg); } }
       `}</style>
@@ -1136,9 +2216,113 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+            {/* Senior Students Department Attention Required Banner */}
+            {deptAttention && deptAttention.total_count > 0 && !deptAttentionDismissed && (
+              <div className="dept-attention-card">
+                <div className="dept-attention-header">
+                  <div className="dept-attention-icon-wrap">
+                    <div className="dept-attention-icon-pulse" />
+                    <i className="bi bi-exclamation-triangle-fill" />
+                  </div>
+                  <div className="flex-grow-1">
+                    <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                      <div className="d-flex align-items-center gap-2">
+                        <h3 className="dept-attention-title mb-0">Senior Students Department Attention Required</h3>
+                        <span className="dept-attention-badge">
+                          {deptAttention.total_count} Student{deptAttention.total_count > 1 ? "s" : ""} Need Stream
+                        </span>
+                      </div>
+                      <div className="d-flex align-items-center gap-2">
+                        <button
+                          type="button"
+                          className="dept-attention-btn-primary"
+                          onClick={() => navigate("/students?needs_department=1")}
+                        >
+                          <i className="bi bi-people-fill" /> Review in Student Roster
+                        </button>
+                        <button
+                          type="button"
+                          className="dept-attention-dismiss-btn"
+                          onClick={() => setDeptAttentionDismissed(true)}
+                          title="Dismiss notification for this session"
+                        >
+                          <i className="bi bi-x-lg" />
+                        </button>
+                      </div>
+                    </div>
+                    <p className="dept-attention-desc mt-2 mb-0">
+                      <strong>Why this is critical:</strong> Students promoted or admitted into Senior classes (SS1–SS3) must have their academic stream assigned (Science, Commercial, or Arts/Humanities). Without an assigned senior department, <strong>Continuous Assessment score entry only loads general subjects, CBT examinations cannot be delivered for departmental courses, and official report cards and broadsheets remain incomplete.</strong>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Looped Student Details Table */}
+                {deptAttention.students.length > 0 && (
+                  <div className="dept-attention-table-wrap">
+                    <div className="dept-attention-table-header">
+                      <span>Identified Senior Students Needing Department Assignment:</span>
+                      <span className="small text-muted">Showing {deptAttention.students.length} of {deptAttention.total_count} flagged student{deptAttention.total_count > 1 ? "s" : ""}</span>
+                    </div>
+                    <div className="dept-attention-list">
+                      {deptAttention.students.map((st) => (
+                        <div key={st.id} className="dept-attention-row">
+                          <div className="d-flex align-items-center gap-3">
+                            <div className="position-relative">
+                              {st.photo ? (
+                                <img src={getPhoto(st.photo)} alt={st.name} className="dept-attention-avatar" />
+                              ) : (
+                                <div className="dept-attention-avatar-initials">
+                                  {(st.surname?.[0] || st.firstname?.[0] || "S").toUpperCase()}
+                                </div>
+                              )}
+                              <span className="dept-attention-avatar-dot" title="Department missing or mismatched" />
+                            </div>
+                            <div>
+                              <div className="dept-attention-name">{st.name}</div>
+                              <div className="dept-attention-meta">
+                                <span className="text-secondary">{st.reg_no}</span> · <span className="fw-semibold text-primary">{st.class_name}</span> ({st.section_name})
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="d-flex align-items-center gap-3 flex-wrap">
+                            <span className={`dept-issue-pill ${st.issue === 'mismatched' ? 'dept-issue-pill--mismatched' : ''}`}>
+                              <i className="bi bi-info-circle-fill me-1" />
+                              {st.issue_label}: {st.current_department_name}
+                            </span>
+
+                            <div className="d-flex align-items-center gap-2">
+                              <select
+                                className="dept-select-sm"
+                                value={selectedDeptId[st.id] || ""}
+                                onChange={(e) => setSelectedDeptId({ ...selectedDeptId, [st.id]: Number(e.target.value) })}
+                              >
+                                <option value="">Choose Senior Stream...</option>
+                                {deptAttention.senior_departments.map((d) => (
+                                  <option key={d.id} value={d.id}>{d.name}</option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                className="dept-quick-assign-btn"
+                                disabled={!selectedDeptId[st.id] || assigningStudentId === st.id}
+                                onClick={() => handleQuickAssignDept(st.id, selectedDeptId[st.id])}
+                              >
+                                {assigningStudentId === st.id ? "Assigning..." : "Assign"}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Metric Stat Cards */}
             <div className="db-stats">
-              {stats.map(({title, value}, i) => {
+              {stats.map(({title, value, subtext}, i) => {
                 const m = STAT_META[i];
                 const icons = [
                   <i key="s" className="bi bi-mortarboard-fill" />,
@@ -1153,6 +2337,11 @@ export default function AdminDashboard() {
                     </div>
                     <div className="db-stat-label">{title}</div>
                     <div className="db-stat-val">{value}</div>
+                    {subtext && (
+                      <div style={{ fontSize: "11px", color: "#64748B", marginTop: "4px", fontWeight: 500 }}>
+                        {subtext}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -1177,6 +2366,522 @@ export default function AdminDashboard() {
                 </a>
               ))}
             </div>
+
+            {/* PROPRIETOR FINANCIAL COMMAND CENTER */}
+            {!isOperator && (
+              <div className="pfc-container">
+                {/* Header with Title, Section Filter Tabs, and Actions */}
+                <div className="pfc-header">
+                  <div className="d-flex align-items-center gap-3">
+                    <div className="pfc-header-icon">
+                      <i className="bi bi-bank2" />
+                    </div>
+                    <div>
+                      <div className="d-flex align-items-center gap-2 flex-wrap">
+                        <h2 className="pfc-title">
+                          {isPrincipal ? "Section Financial Records & Revenue Command" : "School Financial Records & Revenue Command"}
+                        </h2>
+                        <span className="pfc-badge-live">
+                          <i className="bi bi-circle-fill" /> Live Audit
+                        </span>
+                      </div>
+                      <p className="pfc-subtitle">
+                        {isPrincipal
+                          ? `Financial audit, collections and debtor records isolated to your assigned section${availableSections.length > 1 ? "s" : ""}`
+                          : "Consolidated revenue audit, concessions, cashflow collections & section debtors"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="d-flex align-items-center gap-2 flex-wrap">
+                    {/* Refresh Button */}
+                    <button
+                      type="button"
+                      className="pfc-btn-secondary"
+                      onClick={() => fetchSchoolFinancialRecords(selectedSectionFilter)}
+                      disabled={financeLoading}
+                      title="Refresh Financial Records"
+                    >
+                      <i className={`bi bi-arrow-clockwise ${financeLoading ? "rrq-spin" : ""}`} />
+                      <span>{financeLoading ? "Syncing..." : "Sync Records"}</span>
+                    </button>
+
+                    {/* Quick Action: Student Payments */}
+                    <button
+                      type="button"
+                      className="pfc-btn-primary"
+                      onClick={() => navigate("/fees/payments")}
+                    >
+                      <i className="bi bi-wallet2" />
+                      <span>Payment Ledger</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Section Filter Pills */}
+                <div className="pfc-filter-bar">
+                  <span className="pfc-filter-label">
+                    <i className="bi bi-funnel-fill me-1" /> View Scope:
+                  </span>
+                  {!isPrincipal && (
+                    <button
+                      type="button"
+                      className={`pfc-filter-pill ${selectedSectionFilter === "" ? "active" : ""}`}
+                      onClick={() => setSelectedSectionFilter("")}
+                    >
+                      <i className="bi bi-building me-1" />
+                      All Sections (Consolidated)
+                    </button>
+                  )}
+                  {isPrincipal && availableSections.length > 1 && (
+                    <button
+                      type="button"
+                      className={`pfc-filter-pill ${selectedSectionFilter === "" ? "active" : ""}`}
+                      onClick={() => setSelectedSectionFilter("")}
+                    >
+                      <i className="bi bi-building me-1" />
+                      Assigned Sections (Consolidated)
+                    </button>
+                  )}
+                  {availableSections.map((sec) => (
+                    <button
+                      key={sec.id}
+                      type="button"
+                      className={`pfc-filter-pill ${(selectedSectionFilter === String(sec.id) || (isPrincipal && availableSections.length === 1)) ? "active" : ""}`}
+                      onClick={() => setSelectedSectionFilter(String(sec.id))}
+                    >
+                      <i className="bi bi-check-circle-fill me-1" />
+                      {sec.name} Section {isPrincipal ? "(Assigned)" : ""}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 5-Metric Financial KPI Grid */}
+                <div className="pfc-kpi-grid">
+                  {/* 1. Gross Tuition & Levies */}
+                  <div className="pfc-kpi-card" style={{ "--kpi-accent": "#D97706", "--kpi-bg": "rgba(217, 119, 6, 0.08)" } as React.CSSProperties}>
+                    <div className="pfc-kpi-top">
+                      <div className="pfc-kpi-icon"><i className="bi bi-file-earmark-text-fill" /></div>
+                      <span className="pfc-kpi-tag">Gross Invoiced</span>
+                    </div>
+                    <div className="pfc-kpi-label">Gross Tuition & Levies</div>
+                    <div className="pfc-kpi-value">{formatNaira(financialMetrics?.gross_billed)}</div>
+                    <div className="pfc-kpi-sub">Standard published tuition fees</div>
+                  </div>
+
+                  {/* 2. Concessions & Scholarships */}
+                  <div className="pfc-kpi-card" style={{ "--kpi-accent": "#7C3AED", "--kpi-bg": "rgba(124, 58, 237, 0.08)" } as React.CSSProperties}>
+                    <div className="pfc-kpi-top">
+                      <div className="pfc-kpi-icon"><i className="bi bi-percent" /></div>
+                      <span className="pfc-kpi-tag" style={{ color: "#7C3AED", background: "rgba(124, 58, 237, 0.12)" }}>Approved Relief</span>
+                    </div>
+                    <div className="pfc-kpi-label">Discounts & Concessions</div>
+                    <div className="pfc-kpi-value" style={{ color: "#7C3AED" }}>
+                      -{formatNaira(financialMetrics?.discounts_granted)}
+                    </div>
+                    <div className="pfc-kpi-sub">Staff children, sibling & scholarships</div>
+                  </div>
+
+                  {/* 3. Net Realizable Revenue */}
+                  <div className="pfc-kpi-card" style={{ "--kpi-accent": "#2563EB", "--kpi-bg": "rgba(37, 99, 235, 0.08)" } as React.CSSProperties}>
+                    <div className="pfc-kpi-top">
+                      <div className="pfc-kpi-icon"><i className="bi bi-cash-stack" /></div>
+                      <span className="pfc-kpi-tag" style={{ color: "#2563EB", background: "rgba(37, 99, 235, 0.12)" }}>Net Payable</span>
+                    </div>
+                    <div className="pfc-kpi-label">Net Realizable Revenue</div>
+                    <div className="pfc-kpi-value">{formatNaira(financialMetrics?.net_billed)}</div>
+                    <div className="pfc-kpi-sub">Actual payable after concessions</div>
+                  </div>
+
+                  {/* 4. Total Cash & Bank Collected */}
+                  <div className="pfc-kpi-card" style={{ "--kpi-accent": "#10B981", "--kpi-bg": "rgba(16, 185, 129, 0.08)" } as React.CSSProperties}>
+                    <div className="pfc-kpi-top">
+                      <div className="pfc-kpi-icon"><i className="bi bi-check-circle-fill" /></div>
+                      <span className="pfc-kpi-tag" style={{ color: "#059669", background: "rgba(16, 185, 129, 0.12)" }}>Cashflow</span>
+                    </div>
+                    <div className="pfc-kpi-label">Total Amount Collected</div>
+                    <div className="pfc-kpi-value" style={{ color: "#059669" }}>{formatNaira(financialMetrics?.total_collected)}</div>
+                    <div className="pfc-kpi-sub">Verified payments into school bank/cash</div>
+                  </div>
+
+                  {/* 5. Outstanding Debt / Arrears */}
+                  <div className="pfc-kpi-card" style={{ "--kpi-accent": "#EF4444", "--kpi-bg": "rgba(239, 68, 68, 0.08)" } as React.CSSProperties}>
+                    <div className="pfc-kpi-top">
+                      <div className="pfc-kpi-icon"><i className="bi bi-exclamation-triangle-fill" /></div>
+                      <span className="pfc-kpi-tag" style={{ color: "#DC2626", background: "rgba(239, 68, 68, 0.12)" }}>Pending</span>
+                    </div>
+                    <div className="pfc-kpi-label">Outstanding Debt Balance</div>
+                    <div className="pfc-kpi-value" style={{ color: (financialMetrics?.outstanding_balance ?? 0) > 0 ? "#DC2626" : "#64748B" }}>
+                      {formatNaira(financialMetrics?.outstanding_balance)}
+                    </div>
+                    <div className="pfc-kpi-sub">
+                      {financialMetrics ? `${financialMetrics.owing_students} students with unpaid balance` : "Active debtors"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Collection Recovery Efficiency Bar */}
+                {financialMetrics && (
+                  <div className="pfc-efficiency-box">
+                    <div className="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                      <div className="d-flex align-items-center gap-2">
+                        <span className="pfc-efficiency-title">Overall Fee Recovery Efficiency:</span>
+                        <strong className="pfc-efficiency-rate">{financialMetrics.collection_rate}%</strong>
+                      </div>
+                      <div className="pfc-efficiency-meta">
+                        <span>{financialMetrics.total_students} Total Enrolled Students</span>
+                        <span className="mx-2">•</span>
+                        <span className="text-danger fw-semibold">{financialMetrics.owing_students} Debtors</span>
+                        <span className="mx-2">•</span>
+                        <span className="text-success fw-semibold">{financialMetrics.total_students - financialMetrics.owing_students} Fully Cleared</span>
+                      </div>
+                    </div>
+                    <div className="pfc-efficiency-track">
+                      <div
+                        className="pfc-efficiency-fill"
+                        style={{ width: `${Math.min(100, Math.max(0, financialMetrics.collection_rate))}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Revenue Collection & Debt Recovery Trajectory Line Graph */}
+                <div className="pfc-panel mb-4">
+                  <div className="pfc-panel-head flex-wrap gap-2">
+                    <div className="d-flex align-items-center gap-2">
+                      <div className="pfc-panel-head-icon" style={{ background: "rgba(16, 185, 129, 0.12)", color: "#10B981" }}>
+                        <i className="bi bi-graph-up-arrow" />
+                      </div>
+                      <div>
+                        <h3 className="pfc-panel-title">Revenue Collection & Debt Recovery Trajectory</h3>
+                        <p className="pfc-panel-sub">
+                          Continuous timeline of verified fee receipts and cumulative cashflow recovery
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="d-flex align-items-center gap-2 flex-wrap">
+                      <div className="pfc-trend-toggle">
+                        <button
+                          type="button"
+                          className={`pfc-trend-btn ${trendMode === "daily" ? "active" : ""}`}
+                          onClick={() => setTrendMode("daily")}
+                        >
+                          <i className="bi bi-bar-chart-line me-1" /> Daily Inflow
+                        </button>
+                        <button
+                          type="button"
+                          className={`pfc-trend-btn ${trendMode === "cumulative" ? "active" : ""}`}
+                          onClick={() => setTrendMode("cumulative")}
+                        >
+                          <i className="bi bi-graph-up me-1" /> Cumulative Trajectory
+                        </button>
+                      </div>
+
+                      <div className="pfc-trend-stat-chip">
+                        <span className="pfc-trend-stat-label">Total Recovered</span>
+                        <strong className="pfc-trend-stat-val text-success">
+                          {formatNaira(totalRecoveredTrend || financialMetrics?.total_collected)}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pfc-chart-container">
+                    <canvas ref={financeChartRef} />
+                  </div>
+                </div>
+
+                {/* Comparative Section Revenue & Recovery Breakdown Table */}
+                <div className="pfc-panel mb-4">
+                  <div className="pfc-panel-head">
+                    <div className="d-flex align-items-center gap-2">
+                      <div className="pfc-panel-head-icon">
+                        <i className="bi bi-bar-chart-steps" />
+                      </div>
+                      <div>
+                        <h3 className="pfc-panel-title">
+                          {isPrincipal ? "Assigned Section Revenue & Recovery Breakdown" : "Comparative Section Revenue & Recovery Breakdown"}
+                        </h3>
+                        <p className="pfc-panel-sub">
+                          {isPrincipal
+                            ? "Revenue performance, fee concessions & debtor recovery isolated to your assigned section"
+                            : "Multi-section audit breakdown: Section revenue performance, fee concessions & debtor recovery"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="overflow-auto">
+                    <table className="pfc-table">
+                      <thead>
+                        <tr>
+                          <th>Section</th>
+                          <th>Gross Billed</th>
+                          <th>Concessions</th>
+                          <th>Net Payable</th>
+                          <th>Collected (Cash)</th>
+                          <th>Outstanding Arrears</th>
+                          <th>Recovery Rate</th>
+                          <th style={{ textAlign: "right" }}>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {financeLoading && sectionBreakdowns.length === 0 ? (
+                          <tr>
+                            <td colSpan={8} className="text-center py-4 text-muted">
+                              <i className="bi bi-arrow-clockwise rrq-spin me-2" />
+                              Loading section financial reconciliation data...
+                            </td>
+                          </tr>
+                        ) : sectionBreakdowns.length === 0 ? (
+                          <tr>
+                            <td colSpan={8} className="text-center py-4 text-muted">
+                              No section revenue records found for this academic period.
+                            </td>
+                          </tr>
+                        ) : (
+                          sectionBreakdowns.map((s) => {
+                            const isFiltered = selectedSectionFilter === String(s.section_id);
+                            return (
+                              <tr key={s.section_id} className={isFiltered ? "pfc-tr-active" : ""}>
+                                <td>
+                                  <div className="fw-bold text-dark">{s.section_name} Section</div>
+                                  <div className="text-muted" style={{ fontSize: "11.5px" }}>
+                                    {s.total_students} students ({s.owing_students} owing)
+                                  </div>
+                                </td>
+                                <td className="fw-medium">{formatNaira(s.gross_billed)}</td>
+                                <td style={{ color: "#7C3AED", fontWeight: 500 }}>
+                                  {s.discounts > 0 ? `-${formatNaira(s.discounts)}` : "—"}
+                                </td>
+                                <td className="fw-semibold text-dark">{formatNaira(s.net_billed)}</td>
+                                <td style={{ color: "#059669", fontWeight: 700 }}>{formatNaira(s.paid)}</td>
+                                <td style={{ color: s.balance > 0 ? "#DC2626" : "#64748B", fontWeight: 600 }}>
+                                  {formatNaira(s.balance)}
+                                </td>
+                                <td>
+                                  <div className="d-flex align-items-center gap-2">
+                                    <span className="fw-bold" style={{ fontSize: "12px", minWidth: "38px" }}>
+                                      {s.collection_rate}%
+                                    </span>
+                                    <div className="pfc-mini-prog-track">
+                                      <div
+                                        className="pfc-mini-prog-fill"
+                                        style={{
+                                          width: `${Math.min(100, Math.max(0, s.collection_rate))}%`,
+                                          background: s.collection_rate >= 80 ? "#10B981" : s.collection_rate >= 50 ? "#D97706" : "#EF4444"
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                </td>
+                                <td style={{ textAlign: "right" }}>
+                                  <button
+                                    type="button"
+                                    className={`pfc-sm-btn ${isFiltered ? "pfc-sm-btn-active" : ""}`}
+                                    onClick={() => setSelectedSectionFilter(isFiltered ? "" : String(s.section_id))}
+                                  >
+                                    {isFiltered ? "Reset View" : "Isolate Section →"}
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Two Column Grid: Recent Payments Ledger & Payment Channels Breakdown */}
+                <div className="pfc-grid-two">
+                  {/* Column 1: Recent Fee Payments */}
+                  <div className="pfc-panel">
+                    <div className="pfc-panel-head">
+                      <div className="d-flex align-items-center gap-2">
+                        <div className="pfc-panel-head-icon" style={{ background: "rgba(16, 185, 129, 0.12)", color: "#10B981" }}>
+                          <i className="bi bi-clock-history" />
+                        </div>
+                        <div>
+                          <h4 className="pfc-panel-title">Recent Fee Payments Stream</h4>
+                          <p className="pfc-panel-sub">Live audit trail of verified receipts</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="pfc-link-btn"
+                        onClick={() => navigate("/fees/payments")}
+                      >
+                        View All Payments →
+                      </button>
+                    </div>
+
+                    <div className="overflow-auto">
+                      <table className="pfc-table">
+                        <thead>
+                          <tr>
+                            <th>Student & Admission No</th>
+                            <th>Fee Description</th>
+                            <th>Channel</th>
+                            <th>Amount Paid</th>
+                            <th>Receipt No / Time</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {financeLoading && recentPayments.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="text-center py-4 text-muted">
+                                Loading recent payments...
+                              </td>
+                            </tr>
+                          ) : recentPayments.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="text-center py-4 text-muted">
+                                No payment transactions recorded yet.
+                              </td>
+                            </tr>
+                          ) : (
+                            recentPayments.map((p) => (
+                              <tr key={p.id}>
+                                <td>
+                                  <div className="fw-semibold text-dark">{p.student_name}</div>
+                                  <div className="text-muted" style={{ fontSize: "11px" }}>{p.admission_no} • {p.section_name}</div>
+                                </td>
+                                <td>
+                                  <div className="text-dark" style={{ fontSize: "12px", fontWeight: 500 }}>{p.fee_type_name}</div>
+                                  {p.payer_name && <div className="text-muted" style={{ fontSize: "11px" }}>Paid by: {p.payer_name}</div>}
+                                </td>
+                                <td>
+                                  <span className="pfc-method-tag">{p.payment_method || "Cash"}</span>
+                                </td>
+                                <td>
+                                  <strong className="text-success">{formatNaira(p.amount)}</strong>
+                                </td>
+                                <td>
+                                  <div className="fw-medium text-dark" style={{ fontSize: "11.5px" }}>{p.receipt_number || p.reference}</div>
+                                  <div className="text-muted" style={{ fontSize: "10.5px" }}>
+                                    {p.created_at ? new Date(p.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Column 2: Payment Channels Breakdown & Quick Bursary Links */}
+                  <div className="pfc-panel d-flex flex-column">
+                    <div className="pfc-panel-head">
+                      <div className="d-flex align-items-center gap-2">
+                        <div className="pfc-panel-head-icon" style={{ background: "rgba(99, 102, 241, 0.12)", color: "#6366F1" }}>
+                          <i className="bi bi-pie-chart-fill" />
+                        </div>
+                        <div>
+                          <h4 className="pfc-panel-title">Revenue by Channel</h4>
+                          <p className="pfc-panel-sub">Payment gateway & cash intake</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pfc-channel-list flex-grow-1">
+                      {paymentMethods.length === 0 ? (
+                        <div className="text-center py-4 text-muted">
+                          No channel breakdown recorded yet.
+                        </div>
+                      ) : (
+                        paymentMethods.map((m) => {
+                          const totalAll = paymentMethods.reduce((acc, curr) => acc + curr.total_amount, 0);
+                          const pct = totalAll > 0 ? Math.round((m.total_amount / totalAll) * 100) : 0;
+                          return (
+                            <div key={m.method} className="pfc-channel-item">
+                              <div className="d-flex justify-content-between align-items-center mb-1">
+                                <span className="pfc-channel-name">
+                                  <i className={`bi me-2 ${
+                                    m.method.toLowerCase().includes("bank") ? "bi-bank" :
+                                    m.method.toLowerCase().includes("pos") ? "bi-credit-card-2-front" :
+                                    m.method.toLowerCase().includes("online") ? "bi-globe" : "bi-cash-coin"
+                                  }`} />
+                                  {m.method}
+                                </span>
+                                <span className="fw-bold text-dark">{formatNaira(m.total_amount)}</span>
+                              </div>
+                              <div className="d-flex justify-content-between align-items-center text-muted" style={{ fontSize: "11.5px", marginBottom: "4px" }}>
+                                <span>{m.total_count} transactions</span>
+                                <span>{pct}% share</span>
+                              </div>
+                              <div className="pfc-mini-prog-track">
+                                <div className="pfc-mini-prog-fill" style={{ width: `${pct}%`, background: "#3B82F6" }} />
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* Financial Navigation Shortcut Box */}
+                    <div className="pfc-shortcuts-box mt-3">
+                      <div className="pfc-shortcuts-title">
+                        {isPrincipal ? "Section Financial Quick Links" : "Proprietor Financial Quick Links"}
+                      </div>
+                      <div className="d-grid gap-2">
+                        <button
+                          type="button"
+                          className="pfc-shortcut-link"
+                          onClick={() => navigate("/fees/payments")}
+                        >
+                          <i className="bi bi-wallet2 me-2 text-primary" />
+                          <span>Student Payment Ledger & Collection Records</span>
+                          <i className="bi bi-chevron-right ms-auto text-muted" />
+                        </button>
+                        <button
+                          type="button"
+                          className="pfc-shortcut-link"
+                          onClick={() => navigate("/fees/receipts/approval")}
+                        >
+                          <i className="bi bi-check2-circle me-2 text-success" />
+                          <span>Verify & Approve Bank Teller Receipts</span>
+                          <i className="bi bi-chevron-right ms-auto text-muted" />
+                        </button>
+                        {!isPrincipal && (
+                          <>
+                            <button
+                              type="button"
+                              className="pfc-shortcut-link"
+                              onClick={() => navigate("/fees/structure")}
+                            >
+                              <i className="bi bi-journal-text me-2 text-primary" />
+                              <span>Manage School Fee Structure & Tariffs</span>
+                              <i className="bi bi-chevron-right ms-auto text-muted" />
+                            </button>
+                            <button
+                              type="button"
+                              className="pfc-shortcut-link"
+                              onClick={() => navigate("/fees/concessions")}
+                            >
+                              <i className="bi bi-shield-check me-2" style={{ color: "#7C3AED" }} />
+                              <span>Authorize Fee Concessions & Waivers</span>
+                              <i className="bi bi-chevron-right ms-auto text-muted" />
+                            </button>
+                            <button
+                              type="button"
+                              className="pfc-shortcut-link"
+                              onClick={() => navigate("/bursar")}
+                            >
+                              <i className="bi bi-person-badge-fill me-2 text-warning" />
+                              <span>Assign Sections to Bursars</span>
+                              <i className="bi bi-chevron-right ms-auto text-muted" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Result Review Queue (Principal & Proprietor Only) */}
             {!isOperator && (

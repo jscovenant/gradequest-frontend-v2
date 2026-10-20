@@ -6,6 +6,7 @@ import SuperAdminDashboard from "../components/DashboardPages/SuperAdminDashboar
 import ParentDashboardPage from "./Admin/Parent/ParentDashboardPage";
 import BursarDashboard from "../components/DashboardPages/BursarDashboard";
 import SalesDashboardPage from "./Sales/SalesDashboardPage";
+import InvestorDashboardPage from "./Investor/InvestorDashboardPage";
 
 export default function Dashboard() {
   const user = getUser();
@@ -87,6 +88,11 @@ export default function Dashboard() {
           <SalesDashboardPage />
         </div>
       );
+
+    case "investor":
+    case "strategic_partner":
+    case "partner":
+      return <InvestorDashboardPage />;
 
     default:
       return (

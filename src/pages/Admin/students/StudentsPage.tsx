@@ -8,9 +8,11 @@ import Sidebar from "../../../components/LayoutComponents/Sidebar";
 import Footer from "../../../components/LayoutComponents/Footer";
 import Loader from "../../../components/ui/dashboardLoader";
 import { useToast } from "../../../contexts/ToastContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import PageTitle from "../../../components/PageTitle";
 import { getUser } from "../../../utils/token";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 
 /**
  * StudentsPage.tsx — wired to Bootstrap Sass variables
@@ -49,6 +51,10 @@ interface Student {
   religion?: string | null; nationality?: string | null;
   username?: string | null; school_id?: number;
   student_status?: string;
+  needs_department_update?: boolean;
+  department_issue?: "unassigned" | "mismatched" | null;
+  department_issue_label?: string | null;
+  department_issue_message?: string | null;
 }
 
 interface CachedProfile {
@@ -84,9 +90,32 @@ type ModalTab = "overview" | "sessions" | "performance" | "ratings" | "security"
 
 /* ========================= HELPERS ========================= */
 const capitalize = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "";
-const fullName   = (s?: any) =>
-  [capitalize(s?.firstname ?? ""), capitalize(s?.third_name ?? ""), capitalize(s?.surname ?? "")]
-    .filter(Boolean).join(" ").trim();
+
+/**
+ * Format student name as standard Nigerian convention: (Surname, firstname, othername)
+ */
+const fullName = (s?: any) => {
+  if (!s) return "";
+  const surname = s.surname ? capitalize(String(s.surname).trim()) : "";
+  const firstname = s.firstname ? capitalize(String(s.firstname).trim()) : "";
+  const othername = (s.third_name || s.othername || s.middlename)
+    ? capitalize(String(s.third_name || s.othername || s.middlename).trim())
+    : "";
+
+  if (surname && firstname && othername) {
+    return `${surname}, ${firstname}, ${othername}`;
+  }
+  if (surname && firstname) {
+    return `${surname}, ${firstname}`;
+  }
+  if (surname) {
+    return othername ? `${surname}, ${othername}` : surname;
+  }
+  if (firstname) {
+    return othername ? `${firstname}, ${othername}` : firstname;
+  }
+  return othername || "N/A";
+};
 
 const lifecycleLabel = (status?: string | null) => {
   const normalized = (status || "active").toLowerCase();
@@ -195,6 +224,53 @@ export default function StudentsPage() {
   const [bulkStatusModalOpen, setBulkStatusModalOpen] = useState(false);
   const [bulkTargetStatus, setBulkTargetStatus] = useState<"active" | "alumni" | "graduate">("graduate");
   const [processingBulkStatus, setProcessingBulkStatus] = useState(false);
+
+  /* Export State */
+  const [exportingType, setExportingType] = useState<"excel" | "pdf" | null>(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  /* Department Stream Attention State */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [needsDepartmentFilter, setNeedsDepartmentFilter] = useState<boolean>(searchParams.get("needs_department") === "1");
+  const [deptAttentionCount, setDeptAttentionCount] = useState<number>(0);
+  const [seniorDepartments, setSeniorDepartments] = useState<Array<{ id: number; name: string }>>([]);
+  const [quickAssignModalStudent, setQuickAssignModalStudent] = useState<Student | null>(null);
+  const [quickAssignDeptId, setQuickAssignDeptId] = useState<string>("");
+  const [assigningStream, setAssigningStream] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (searchParams.get("needs_department") === "1") {
+      setNeedsDepartmentFilter(true);
+    }
+  }, [searchParams]);
+
+  const toggleNeedsDepartmentFilter = (active: boolean) => {
+    setNeedsDepartmentFilter(active);
+    setPage(1);
+    const newParams = new URLSearchParams(searchParams);
+    if (active) {
+      newParams.set("needs_department", "1");
+    } else {
+      newParams.delete("needs_department");
+    }
+    setSearchParams(newParams, { replace: true });
+  };
+
+  const handleOpenQuickAssign = (student: Student) => {
+    setQuickAssignModalStudent(student);
+    setQuickAssignDeptId(student.department?.id ? String(student.department.id) : "");
+  };
 
   /* Student Promotion Modal State */
   const [promoteModalOpen, setPromoteModalOpen] = useState(false);
@@ -306,12 +382,21 @@ export default function StudentsPage() {
       if (selectedLevelId !== "all") {
         params.class_id = selectedLevelId;
       }
+      if (needsDepartmentFilter) {
+        params.needs_department = 1;
+      }
       const res = await authApi.get("/all-students", { params });
       const d = res.data.students;
       setStudents(d?.data || d || []);
       setTotalPages(d?.last_page || 1);
       if (res.data.levels) {
         setLevels(res.data.levels);
+      }
+      if (typeof res.data.department_attention_count === "number") {
+        setDeptAttentionCount(res.data.department_attention_count);
+      }
+      if (Array.isArray(res.data.senior_departments)) {
+        setSeniorDepartments(res.data.senior_departments);
       }
       setStatusCounts({
         active: Number(res.data.status_counts?.active ?? 0),
@@ -322,7 +407,40 @@ export default function StudentsPage() {
     } catch (err: any) { showError(err?.response?.data?.message ?? "Failed to load students"); }
     finally { setLoading(false); }
   };
-  useEffect(() => { fetchStudents(); }, [page, search, studentStatusFilter, selectedLevelId]);
+  useEffect(() => { fetchStudents(); }, [page, search, studentStatusFilter, selectedLevelId, needsDepartmentFilter]);
+
+  const handleSaveQuickDepartment = async () => {
+    if (!quickAssignModalStudent || !quickAssignDeptId) return;
+    try {
+      setAssigningStream(true);
+      const res = await authApi.post(`/students/${quickAssignModalStudent.id}/assign-department`, {
+        department_id: Number(quickAssignDeptId),
+      });
+      showSuccess(res.data?.message || "Senior department assigned successfully!");
+      setQuickAssignModalStudent(null);
+      setQuickAssignDeptId("");
+      fetchStudents();
+      if (selectedStudent && selectedStudent.id === quickAssignModalStudent.id) {
+        const assignedDept = seniorDepartments.find(d => d.id === Number(quickAssignDeptId));
+        setSelectedStudent(prev => prev ? { ...prev, department: assignedDept, needs_department_update: false } : prev);
+        setStudentDetails((prev: any) => {
+          if (!prev || !prev.student) return prev;
+          return {
+            ...prev,
+            student: {
+              ...prev.student,
+              department: assignedDept,
+              needs_department_update: false,
+            },
+          };
+        });
+      }
+    } catch (err: any) {
+      showError(err?.response?.data?.message || "Failed to assign department.");
+    } finally {
+      setAssigningStream(false);
+    }
+  };
 
   const fetchClearanceSummary = async () => {
     try {
@@ -395,6 +513,218 @@ export default function StudentsPage() {
       showError(err?.response?.data?.message ?? "Could not download template");
     } finally {
       setDownloadingTemplate(null);
+    }
+  };
+
+  /* ─── Export Students Logic (Excel & PDF) ─── */
+  const handleExportExcel = async (scope: "all" | "filtered" = "all") => {
+    try {
+      setExportingType("excel");
+      const params: any = {};
+      if (scope === "filtered") {
+        if (selectedLevelId !== "all") params.class_id = selectedLevelId;
+        if (studentStatusFilter !== "all") params.student_status = studentStatusFilter;
+        if (search.trim()) params.search = search.trim();
+      } else {
+        params.student_status = "all";
+      }
+
+      const res = await authApi.get("/students/export-all", { params });
+      const data = res.data;
+      const list: any[] = data.students || [];
+
+      if (!list || list.length === 0) {
+        showWarning?.("No student records found to export.");
+        return;
+      }
+
+      const headers = [
+        "S/N",
+        "Admission / Reg No",
+        "Surname",
+        "First Name",
+        "Other Name",
+        "Full Name (Surname, Firstname, Othername)",
+        "Gender",
+        "Class",
+        "Section",
+        "Department",
+        "Lifecycle Status",
+        "Phone",
+        "Email",
+        "Address",
+        "Registration Date",
+      ];
+
+      const csvEscape = (val: any) => `"${String(val ?? "").replace(/"/g, '""')}"`;
+
+      const rows = list.map((s: any, idx: number) => [
+        idx + 1,
+        s.reg_no || "N/A",
+        s.surname || "",
+        s.firstname || "",
+        s.third_name || "",
+        s.full_name || `${s.surname}, ${s.firstname}`,
+        s.gender || "N/A",
+        s.class_name || "Unassigned",
+        s.section_name || "N/A",
+        s.department_name || "N/A",
+        lifecycleLabel(s.student_status),
+        s.phone || "N/A",
+        s.email || "N/A",
+        s.address || "N/A",
+        s.created_at || "N/A",
+      ]);
+
+      const csvContent = "\uFEFF" + [headers.map(csvEscape).join(","), ...rows.map(r => r.map(csvEscape).join(","))].join("\r\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const cleanSchoolName = String(data.school_name || "SchoolProfit").replace(/[^a-zA-Z0-9_-]/g, "_");
+      const dateStr = new Date().toISOString().slice(0, 10);
+      link.href = url;
+      link.setAttribute("download", `${cleanSchoolName}_Students_Register_${dateStr}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      showSuccess?.(`Successfully exported ${list.length} student records to Excel (.csv)!`);
+    } catch (err: any) {
+      showError?.(err?.response?.data?.message || "Failed to export students.");
+    } finally {
+      setExportingType(null);
+      setShowExportMenu(false);
+    }
+  };
+
+  const handleExportPDF = async (scope: "all" | "filtered" = "all") => {
+    try {
+      setExportingType("pdf");
+      const params: any = {};
+      if (scope === "filtered") {
+        if (selectedLevelId !== "all") params.class_id = selectedLevelId;
+        if (studentStatusFilter !== "all") params.student_status = studentStatusFilter;
+        if (search.trim()) params.search = search.trim();
+      } else {
+        params.student_status = "all";
+      }
+
+      const res = await authApi.get("/students/export-all", { params });
+      const data = res.data;
+      const list: any[] = data.students || [];
+
+      if (!list || list.length === 0) {
+        showWarning?.("No student records found to export.");
+        return;
+      }
+
+      const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const schoolName = String(data.school_name || "SchoolProfit Partner School").toUpperCase();
+      const schoolAddress = data.school_address || "";
+      const schoolPhone = data.school_phone ? `Tel: ${data.school_phone}` : "";
+
+      // Top Header Banner
+      doc.setFillColor(15, 23, 42); // #0f172a
+      doc.rect(0, 0, pageWidth, 55, "F");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(255, 255, 255);
+      doc.text(schoolName, pageWidth / 2, 25, { align: "center" });
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(203, 213, 225);
+      const subLine = [schoolAddress, schoolPhone].filter(Boolean).join(" • ");
+      if (subLine) {
+        doc.text(subLine, pageWidth / 2, 42, { align: "center" });
+      }
+
+      // Title & Metadata
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(15, 23, 42);
+      doc.text("OFFICIAL STUDENTS REGISTER", 36, 80);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(100, 116, 139);
+      const nowFormatted = new Date().toLocaleString("en-GB", {
+        day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
+      });
+      const filterSummary = scope === "filtered"
+        ? `Scope: Filtered (${selectedLevelId !== "all" ? levels.find(l => l.id === selectedLevelId)?.name : "All Classes"} • ${lifecycleLabel(studentStatusFilter)})`
+        : "Scope: All Enrolled Students";
+      doc.text(`${filterSummary}   |   Total Count: ${list.length} Students   |   Printed: ${nowFormatted}`, 36, 95);
+
+      const tableHeaders = [["S/N", "Reg No", "Student Name (Surname First)", "Gender", "Class", "Section", "Status"]];
+      const tableRows = list.map((s: any, idx: number) => [
+        idx + 1,
+        s.reg_no || "N/A",
+        s.full_name || `${s.surname}, ${s.firstname}`,
+        s.gender || "—",
+        s.class_name || "—",
+        s.section_name || "—",
+        lifecycleLabel(s.student_status),
+      ]);
+
+      autoTable(doc, {
+        head: tableHeaders,
+        body: tableRows,
+        startY: 105,
+        margin: { left: 36, right: 36, bottom: 45 },
+        styles: {
+          font: "helvetica",
+          fontSize: 8.5,
+          cellPadding: 5,
+          textColor: [15, 23, 42],
+          lineColor: [226, 232, 240],
+          lineWidth: 0.5,
+        },
+        headStyles: {
+          fillColor: [15, 23, 42],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+          halign: "left",
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+        columnStyles: {
+          0: { cellWidth: 32, halign: "center" },
+          1: { cellWidth: 70, fontStyle: "bold" },
+          2: { cellWidth: "auto", fontStyle: "bold" },
+          3: { cellWidth: 50, halign: "center" },
+          4: { cellWidth: 65 },
+          5: { cellWidth: 75 },
+          6: { cellWidth: 60, halign: "center" },
+        },
+        didDrawPage: (dataHook) => {
+          const currentPage = dataHook.pageNumber;
+          doc.setFontSize(8);
+          doc.setTextColor(148, 163, 184);
+          doc.text(
+            `SchoolProfit • Certified School Register • Page ${currentPage}`,
+            pageWidth / 2,
+            pageHeight - 20,
+            { align: "center" }
+          );
+        },
+      });
+
+      const cleanSchoolName = String(data.school_name || "SchoolProfit").replace(/[^a-zA-Z0-9_-]/g, "_");
+      const dateStr = new Date().toISOString().slice(0, 10);
+      doc.save(`${cleanSchoolName}_Students_Register_${dateStr}.pdf`);
+
+      showSuccess?.(`Successfully generated PDF register for ${list.length} students!`);
+    } catch (err: any) {
+      showError?.(err?.response?.data?.message || "Failed to generate PDF.");
+    } finally {
+      setExportingType(null);
+      setShowExportMenu(false);
     }
   };
 
@@ -1619,6 +1949,325 @@ export default function StudentsPage() {
         .sp-empty { padding:52px 20px; text-align:center; }
         .sp-empty-title { font-family:'Playfair Display',serif; font-size:15px; font-weight:700; color:#4a4a5a; margin-bottom:5px; }
         .sp-empty-sub { font-size:13px; color:#b5a090; }
+
+        /* ── Department Stream Attention Styles ── */
+        .db-avatar-container { position: relative; display: inline-block; }
+        .db-avatar-badge-warning {
+          position: absolute;
+          top: -4px;
+          right: -4px;
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+          border: 2px solid #FFFFFF;
+          color: #FFFFFF;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          box-shadow: 0 2px 6px rgba(217, 119, 6, 0.45);
+          z-index: 2;
+          animation: deptBadgePulse 2s infinite ease-in-out;
+        }
+        .sp-modal-avatar-badge-warning {
+          position: absolute;
+          top: -4px;
+          right: -4px;
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+          border: 2px solid #FFFFFF;
+          color: #FFFFFF;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          box-shadow: 0 2px 8px rgba(217, 119, 6, 0.5);
+          z-index: 2;
+          animation: deptBadgePulse 2s infinite ease-in-out;
+        }
+        .db-dept-pill-warning {
+          background: #FEF3C7;
+          color: #92400E;
+          border: 1px solid #FCD34D;
+          font-size: 11px;
+          font-weight: 700;
+          padding: 2px 7px;
+          border-radius: 6px;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          transition: background .15s;
+        }
+        .db-dept-pill-warning:hover {
+          background: #FDE68A;
+        }
+        .db-dept-inline-btn {
+          background: rgba(217, 119, 6, 0.1);
+          color: #B45309;
+          border: 1px solid rgba(217, 119, 6, 0.25);
+          font-size: 11px;
+          font-weight: 600;
+          padding: 2px 8px;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: all .15s;
+        }
+        .db-dept-inline-btn:hover {
+          background: #D97706;
+          color: #FFFFFF;
+          border-color: #D97706;
+        }
+        .db-action-btn--stream {
+          color: #D97706;
+          background: rgba(217, 119, 6, 0.12);
+          border-color: rgba(217, 119, 6, 0.3);
+        }
+        .db-action-btn--stream:hover {
+          background: #D97706;
+          color: #FFFFFF;
+          border-color: #D97706;
+          transform: translateY(-1px);
+        }
+        .db-filter-tab--dept-attention {
+          color: #B45309;
+          border-color: rgba(217, 119, 6, 0.3);
+          background: #FFFBEB;
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+        }
+        .db-filter-tab--dept-attention:hover {
+          background: #FEF3C7;
+          border-color: #F59E0B;
+        }
+        .db-dept-tab-pulse {
+          display: inline-block;
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: #D97706;
+          animation: deptBadgePulse 1.8s infinite ease-in-out;
+        }
+        .db-filter-tab--active-warning {
+          background: linear-gradient(135deg, #D97706 0%, #B45309 100%) !important;
+          color: #FFFFFF !important;
+          border-color: transparent !important;
+          box-shadow: 0 2px 8px rgba(217, 119, 6, 0.35) !important;
+        }
+        .db-filter-tab--active-warning .db-dept-tab-pulse {
+          background: #FFFFFF;
+        }
+        .db-dept-banner {
+          background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%);
+          border: 1px solid #FCD34D;
+          border-radius: 12px;
+          padding: 14px 18px;
+          margin-bottom: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          flex-wrap: wrap;
+          box-shadow: 0 2px 8px rgba(217, 119, 6, 0.08);
+        }
+        .db-dept-banner-icon {
+          width: 36px;
+          height: 36px;
+          border-radius: 10px;
+          background: rgba(217, 119, 6, 0.15);
+          color: #B45309;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .db-dept-banner-title {
+          font-weight: 700;
+          font-size: 13.5px;
+          color: #92400E;
+          margin-bottom: 2px;
+        }
+        .db-dept-banner-sub {
+          font-size: 12px;
+          color: #78350F;
+          line-height: 1.45;
+        }
+        .db-dept-banner-clear {
+          background: #FFFFFF;
+          border: 1px solid #FCD34D;
+          color: #92400E;
+          font-size: 12px;
+          font-weight: 600;
+          padding: 6px 14px;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all .15s;
+          white-space: nowrap;
+        }
+        .db-dept-banner-clear:hover {
+          background: #FEF3C7;
+          border-color: #F59E0B;
+        }
+        .sp-modal-dept-alert {
+          background: #FFFBEB;
+          border: 1px solid #FCD34D;
+          border-radius: 10px;
+          padding: 12px 16px;
+        }
+        .sp-modal-dept-alert-title {
+          font-weight: 700;
+          font-size: 13px;
+          color: #92400E;
+        }
+        .sp-modal-dept-alert-sub {
+          font-size: 12px;
+          color: #B45309;
+          line-height: 1.4;
+        }
+        .sp-modal-dept-alert-btn {
+          background: #D97706;
+          color: #FFFFFF;
+          border: none;
+          border-radius: 7px;
+          padding: 7px 14px;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: background .15s;
+          white-space: nowrap;
+        }
+        .sp-modal-dept-alert-btn:hover {
+          background: #B45309;
+        }
+        .db-modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          width: 100vw;
+          height: 100vh;
+          background: rgba(15, 23, 42, 0.75);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          z-index: 99999;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+          overflow-y: auto;
+        }
+        .db-quick-assign-card {
+          background: #FFFFFF;
+          border-radius: 16px;
+          width: 100%;
+          max-width: 540px;
+          box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+          overflow: hidden;
+          animation: spModalIn .2s ease;
+          position: relative;
+          z-index: 100000;
+          margin: auto;
+        }
+        .db-quick-assign-header {
+          padding: 18px 24px;
+          background: linear-gradient(135deg, #0F2744 0%, #1E3A8A 100%);
+          color: #FFFFFF;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+        .db-quick-assign-icon {
+          width: 40px;
+          height: 40px;
+          border-radius: 10px;
+          background: rgba(217, 119, 6, 0.2);
+          color: #F59E0B;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .db-quick-assign-title {
+          font-size: 16px;
+          font-weight: 700;
+          color: #FFFFFF;
+        }
+        .db-quick-assign-sub {
+          font-size: 12px;
+          color: rgba(255, 255, 255, 0.7);
+        }
+        .db-quick-assign-close {
+          background: transparent;
+          border: none;
+          color: rgba(255, 255, 255, 0.7);
+          font-size: 18px;
+          cursor: pointer;
+          padding: 4px 8px;
+          border-radius: 6px;
+        }
+        .db-quick-assign-close:hover {
+          color: #FFFFFF;
+          background: rgba(255, 255, 255, 0.1);
+        }
+        .db-quick-assign-body {
+          padding: 22px 24px;
+        }
+        .db-quick-assign-alert {
+          background: #FFFBEB;
+          border: 1px solid #FCD34D;
+          border-radius: 10px;
+          padding: 12px 14px;
+          margin-bottom: 18px;
+        }
+        .db-quick-assign-label {
+          display: block;
+          font-size: 12.5px;
+          font-weight: 600;
+          color: #334155;
+          margin-bottom: 6px;
+        }
+        .db-quick-assign-select {
+          width: 100%;
+          border: 1.5px solid #CBD5E1;
+          border-radius: 8px;
+          padding: 10px 14px;
+          font-size: 13.5px;
+          color: #0F172A;
+          outline: none;
+          transition: border-color .2s;
+          background: #FFFFFF;
+        }
+        .db-quick-assign-select:focus {
+          border-color: #D97706;
+          box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
+        }
+        .db-quick-assign-current {
+          font-size: 12px;
+          color: #64748B;
+          padding: 8px 12px;
+          background: #F8FAFC;
+          border-radius: 6px;
+          border: 1px dashed #CBD5E1;
+        }
+        .db-quick-assign-footer {
+          padding: 14px 24px;
+          background: #F8FAFC;
+          border-top: 1px solid #E2E8F0;
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 10px;
+        }
+        @keyframes deptBadgePulse {
+          0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.6); }
+          50% { transform: scale(1.12); box-shadow: 0 0 0 5px rgba(217, 119, 6, 0); }
+        }
       `}</style>
 
       <TopNav sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
@@ -1917,6 +2566,104 @@ export default function StudentsPage() {
                     </svg>
                     Refresh
                   </button>
+
+                  {/* Export Students Dropdown (Excel & PDF) */}
+                  <div className="position-relative" ref={exportMenuRef}>
+                    <button
+                      className="db-sm-btn"
+                      type="button"
+                      onClick={() => setShowExportMenu(v => !v)}
+                      disabled={!!exportingType}
+                      style={{
+                        background: "#fff",
+                        border: "1px solid #cbd5e1",
+                        color: "#0f172a",
+                        fontWeight: 600,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                      title="Download or export students register as Excel (.csv) or PDF"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 2v9M4 8l4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M2 13h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                      </svg>
+                      {exportingType === "excel" ? "Exporting Excel..." : exportingType === "pdf" ? "Generating PDF..." : "Export Register ▾"}
+                    </button>
+
+                    {showExportMenu && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "100%",
+                          right: 0,
+                          marginTop: 6,
+                          background: "#ffffff",
+                          borderRadius: 12,
+                          boxShadow: "0 10px 30px rgba(15, 23, 42, 0.16), 0 2px 8px rgba(15, 23, 42, 0.08)",
+                          border: "1px solid #e2e8f0",
+                          padding: "8px 0",
+                          minWidth: 230,
+                          zIndex: 1050,
+                          animation: "spFadeUp .2s ease both",
+                        }}
+                      >
+                        <div style={{ padding: "6px 14px", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                          Full School Register
+                        </div>
+                        <button
+                          type="button"
+                          className="dropdown-item d-flex align-items-center gap-2"
+                          style={{ padding: "9px 16px", fontSize: 13, fontWeight: 600, color: "#16a34a", cursor: "pointer", border: "none", background: "none", width: "100%", textAlign: "left" }}
+                          onClick={() => handleExportExcel("all")}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M5.884 6.68a.5.5 0 1 0-.768.64L7.349 10l-2.233 2.68a.5.5 0 0 0 .768.64L8 10.748l2.116 2.572a.5.5 0 0 0 .768-.64L8.651 10l2.233-2.68a.5.5 0 0 0-.768-.64L8 9.252 5.884 6.68z"/>
+                            <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2zM9.5 1.5 13 5h-3.5V1.5zM3 2a1 1 0 0 1 1-1h5v4.5A1.5 1.5 0 0 0 10.5 7H14v7a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2z"/>
+                          </svg>
+                          <span>Export to Excel (.csv)</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="dropdown-item d-flex align-items-center gap-2"
+                          style={{ padding: "9px 16px", fontSize: 13, fontWeight: 600, color: "#dc2626", cursor: "pointer", border: "none", background: "none", width: "100%", textAlign: "left" }}
+                          onClick={() => handleExportPDF("all")}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2zM9.5 1.5 13 5h-3.5V1.5zM3 2a1 1 0 0 1 1-1h5v4.5A1.5 1.5 0 0 0 10.5 7H14v7a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2z"/>
+                            <path d="M4.603 14.087a.81.81 0 0 1-.438-.42c-.195-.388-.13-.776.08-1.127.125-.21.317-.443.572-.7.424-.424.96-.86 1.6-1.306.47-.328 1.01-.63 1.616-.905.782-.354 1.565-.63 2.348-.828.328-.083.654-.15.978-.201.203.498.375 1.02.513 1.564.137.544.207 1.096.207 1.656 0 .428-.08.828-.24 1.2a1.6 1.6 0 0 1-.72.8 2.05 2.05 0 0 1-1.04.28 1.95 1.95 0 0 1-1.36-.54c-.387-.36-.673-.836-.858-1.428a15.4 15.4 0 0 1-.43-1.636c-.52.285-1.07.575-1.65.87-.58.295-1.13.585-1.65.87z"/>
+                          </svg>
+                          <span>Export to PDF Document</span>
+                        </button>
+
+                        {(selectedLevelId !== "all" || studentStatusFilter !== "all" || search.trim()) && (
+                          <>
+                            <div style={{ margin: "6px 0", borderTop: "1px solid #f1f5f9" }} />
+                            <div style={{ padding: "6px 14px", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                              Filtered View
+                            </div>
+                            <button
+                              type="button"
+                              className="dropdown-item d-flex align-items-center gap-2"
+                              style={{ padding: "8px 16px", fontSize: 12.5, fontWeight: 500, color: "#334155", cursor: "pointer", border: "none", background: "none", width: "100%", textAlign: "left" }}
+                              onClick={() => handleExportExcel("filtered")}
+                            >
+                              <span>Export Filtered to Excel</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="dropdown-item d-flex align-items-center gap-2"
+                              style={{ padding: "8px 16px", fontSize: 12.5, fontWeight: 500, color: "#334155", cursor: "pointer", border: "none", background: "none", width: "100%", textAlign: "left" }}
+                              onClick={() => handleExportPDF("filtered")}
+                            >
+                              <span>Export Filtered to PDF</span>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   {isAdmin && (
                     <>
                       <button className="db-sm-btn" onClick={() => setShowImportPanel(v => !v)}>
@@ -1988,14 +2735,61 @@ export default function StudentsPage() {
                 ].map(([value, label]) => (
                   <button
                     key={value}
-                    className={`db-filter-tab ${studentStatusFilter === value ? "db-filter-tab--active" : ""}`}
-                    onClick={() => { setStudentStatusFilter(value as any); setPage(1); }}
+                    className={`db-filter-tab ${!needsDepartmentFilter && studentStatusFilter === value ? "db-filter-tab--active" : ""}`}
+                    onClick={() => {
+                      if (needsDepartmentFilter) toggleNeedsDepartmentFilter(false);
+                      setStudentStatusFilter(value as any);
+                      setPage(1);
+                    }}
                     type="button"
                   >
                     {label}
                   </button>
                 ))}
+
+                {(deptAttentionCount > 0 || needsDepartmentFilter) && (
+                  <button
+                    type="button"
+                    className={`db-filter-tab db-filter-tab--dept-attention ${needsDepartmentFilter ? "db-filter-tab--active-warning" : ""}`}
+                    onClick={() => toggleNeedsDepartmentFilter(!needsDepartmentFilter)}
+                    title="Senior students requiring academic stream assignment (Science, Commercial, Humanity)"
+                  >
+                    <span className="db-dept-tab-pulse" />
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style={{ display: "inline-block", verticalAlign: "middle", marginRight: 4 }}>
+                      <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+                    </svg>
+                    Needs Stream ({deptAttentionCount})
+                  </button>
+                )}
               </div>
+
+              {/* Department Stream Attention Banner */}
+              {needsDepartmentFilter && (
+                <div className="db-dept-banner">
+                  <div className="d-flex align-items-center gap-3">
+                    <div className="db-dept-banner-icon">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="db-dept-banner-title">
+                        Displaying Senior Secondary Students Missing Academic Stream
+                      </div>
+                      <div className="db-dept-banner-sub">
+                        Students promoted or admitted into Senior classes (SS1–SS3) must be assigned to their specific department (Science, Commercial, Arts/Humanities) so Continuous Assessment scores and broadsheet calculations load correctly.
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="db-dept-banner-clear"
+                    onClick={() => toggleNeedsDepartmentFilter(false)}
+                  >
+                    ✕ Clear Filter
+                  </button>
+                </div>
+              )}
 
               {showImportPanel && (
                 <div className="db-import-panel">
@@ -2320,13 +3114,52 @@ export default function StudentsPage() {
                           </td>
                           <td>
                             <div className="d-flex align-items-center gap-3">
-                              {s.photo
-                                ? <img src={getPhoto(s.photo)} className="db-avatar" alt={fullName(s)} />
-                                : <div className="db-avatar-initials">{initials}</div>
-                              }
+                              <div className="position-relative flex-shrink-0" style={{ display: "inline-block" }}>
+                                {s.photo
+                                  ? <img src={getPhoto(s.photo)} className="db-avatar" alt={fullName(s)} />
+                                  : <div className="db-avatar-initials">{initials}</div>
+                                }
+                                {s.needs_department_update && (
+                                  <span
+                                    className="db-avatar-badge-warning"
+                                    title={s.department_issue_message || "Senior academic stream required (Science/Commercial/Arts)"}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenQuickAssign(s);
+                                    }}
+                                  >
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                                      <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+                                    </svg>
+                                  </span>
+                                )}
+                              </div>
                               <div>
-                                <div className="db-student-name">{fullName(s)}</div>
-                                <div className="db-student-dept">{s.department?.name || "—"}</div>
+                                <div className="db-student-name d-flex align-items-center gap-2 flex-wrap">
+                                  <span>{fullName(s)}</span>
+                                  {s.needs_department_update && (
+                                    <span
+                                      className="db-dept-pill-warning"
+                                      onClick={() => handleOpenQuickAssign(s)}
+                                      title={s.department_issue_message || "Action Needed: Assign Senior Academic Stream"}
+                                    >
+                                      ⚠️ Needs Stream
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="db-student-dept d-flex align-items-center gap-2 flex-wrap">
+                                  <span>{s.department?.name || "—"}</span>
+                                  {s.needs_department_update && (
+                                    <button
+                                      type="button"
+                                      className="db-dept-inline-btn"
+                                      onClick={() => handleOpenQuickAssign(s)}
+                                      title="Assign Senior Stream"
+                                    >
+                                      Assign Stream ⚙️
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </td>
@@ -2339,6 +3172,19 @@ export default function StudentsPage() {
                           </td>
                           <td style={{ textAlign: "right" }}>
                             <div className="d-flex align-items-center justify-content-end gap-2">
+                              {s.needs_department_update && (
+                                <button
+                                  type="button"
+                                  className="db-action-btn db-action-btn--stream"
+                                  onClick={() => handleOpenQuickAssign(s)}
+                                  title={`Assign Senior Stream for ${fullName(s)}`}
+                                  aria-label="Assign Senior Stream"
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                </button>
+                              )}
                               <button
                                 className="db-action-btn db-action-btn--view"
                                 onClick={() => openStudent(s)}
@@ -2440,6 +3286,17 @@ export default function StudentsPage() {
                         </div>
                     }
                     {modalLifecycle === "active" && <div className="sp-online-dot" />}
+                    {modalStudent?.needs_department_update && (
+                      <span
+                        className="sp-modal-avatar-badge-warning"
+                        title={modalStudent.department_issue_message || "Senior department stream required"}
+                        onClick={() => handleOpenQuickAssign(modalStudent)}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+                        </svg>
+                      </span>
+                    )}
                   </div>
 
                   <div className="sp-header-info">
@@ -2540,6 +3397,31 @@ export default function StudentsPage() {
                   {/* ═══ OVERVIEW ═══ */}
                   {activeProfileTab === "overview" && (
                     <>
+                      {modalStudent?.needs_department_update && (
+                        <div className="sp-modal-dept-alert mb-3">
+                          <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div className="d-flex align-items-center gap-2">
+                              <span style={{ fontSize: 20 }}>⚠️</span>
+                              <div>
+                                <div className="sp-modal-dept-alert-title">
+                                  Senior Academic Stream Missing or Mismatched
+                                </div>
+                                <div className="sp-modal-dept-alert-sub">
+                                  {modalStudent.department_issue_message || "This senior student requires an academic stream (Science, Commercial, Humanity) so CA subject entries, CBT tests, and broadsheets function properly."}
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              className="sp-modal-dept-alert-btn"
+                              onClick={() => handleOpenQuickAssign(modalStudent)}
+                            >
+                              Assign Stream Now ⚡
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="sp-summary-grid">
                         <div className="sp-summary-card">
                           <div className="sp-summary-icon" style={{ background: "var(--sp-accent-dim)", color: "rgb(180,83,9)" }}>
@@ -2947,7 +3829,7 @@ export default function StudentsPage() {
         </div>
         <div className="wd-title">Withdraw Student</div>
         <div className="wd-subtitle">
-          {[withdrawingStudent.firstname, withdrawingStudent.third_name, withdrawingStudent.surname].filter(Boolean).map(n => n?.charAt(0).toUpperCase()! + n?.slice(1).toLowerCase()!).join(" ")} · {withdrawingStudent.reg_no}
+          {fullName(withdrawingStudent)} · {withdrawingStudent.reg_no}
         </div>
       </div>
 
@@ -3794,6 +4676,181 @@ export default function StudentsPage() {
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════
+          QUICK ASSIGN DEPARTMENT STREAM MODAL
+      ══════════════════════════════════════ */}
+      {quickAssignModalStudent && (
+        <div
+          className="db-modal-overlay"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(15, 23, 42, 0.75)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            zIndex: 99999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+            overflowY: "auto",
+          }}
+          onClick={() => {
+            if (!assigningStream) {
+              setQuickAssignModalStudent(null);
+              setQuickAssignDeptId("");
+            }
+          }}
+        >
+          <div
+            className="db-quick-assign-card"
+            style={{
+              position: "relative",
+              zIndex: 100000,
+              margin: "auto",
+              maxWidth: 540,
+              width: "100%",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="db-quick-assign-header">
+              <div className="d-flex align-items-center gap-3">
+                <div className="db-quick-assign-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="db-quick-assign-title mb-0">Assign Senior Academic Stream</h4>
+                  <p className="db-quick-assign-sub mb-0">
+                    {fullName(quickAssignModalStudent)} · <span style={{ color: "rgba(255,255,255,0.85)" }}>{quickAssignModalStudent.reg_no}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="db-quick-assign-close"
+                onClick={() => {
+                  if (!assigningStream) {
+                    setQuickAssignModalStudent(null);
+                    setQuickAssignDeptId("");
+                  }
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="db-quick-assign-body">
+              <div className="db-quick-assign-alert">
+                <div className="d-flex align-items-start gap-2">
+                  <span style={{ fontSize: 18, lineHeight: 1 }}>⚠️</span>
+                  <div>
+                    <strong style={{ color: "#92400E", fontSize: 13 }}>Why assigning an academic stream is required:</strong>
+                    <p className="mb-1 mt-1" style={{ fontSize: 12.5, lineHeight: 1.45, color: "#78350F" }}>
+                      This student is enrolled in <strong>{quickAssignModalStudent.level?.name || "Senior Secondary"}</strong>. Senior students must have their academic stream designated (Science, Commercial, or Humanities). Without this:
+                    </p>
+                    <ul className="mb-0 ps-3" style={{ fontSize: 12, color: "#92400E", lineHeight: 1.45 }}>
+                      <li>Continuous Assessment (CA) score entry only displays general core subjects, hiding stream courses.</li>
+                      <li>Computer Based Tests (CBT) cannot be delivered for departmental subjects.</li>
+                      <li>End-of-term broadsheets and official report cards will remain incomplete.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-3">
+                <label className="db-quick-assign-label">
+                  Select Senior Department / Stream <span className="text-danger">*</span>
+                </label>
+                <select
+                  className="db-quick-assign-select"
+                  value={quickAssignDeptId}
+                  onChange={(e) => setQuickAssignDeptId(e.target.value)}
+                  disabled={assigningStream}
+                >
+                  <option value="">-- Choose Senior Academic Stream --</option>
+                  {seniorDepartments.map((dept) => (
+                    <option key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </option>
+                  ))}
+                </select>
+                {seniorDepartments.length === 0 && (
+                  <p className="text-danger small mt-1">
+                    No senior departments found. Please configure Science, Commercial, or Humanities in School Settings.
+                  </p>
+                )}
+              </div>
+
+              {quickAssignModalStudent.department && (
+                <div className="db-quick-assign-current">
+                  <span>Current department on record:</span> <strong>{quickAssignModalStudent.department.name}</strong>
+                  {quickAssignModalStudent.department_issue === "mismatched" && (
+                    <span className="badge bg-warning text-dark ms-2">Junior Mismatch</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="db-quick-assign-footer">
+              <button
+                type="button"
+                className="wd-btn-cancel"
+                onClick={() => {
+                  setQuickAssignModalStudent(null);
+                  setQuickAssignDeptId("");
+                }}
+                disabled={assigningStream}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="db-btn-gold"
+                style={{
+                  background: !quickAssignDeptId || assigningStream ? "#94A3B8" : "linear-gradient(135deg, #D97706 0%, #B45309 100%)",
+                  color: "#FFFFFF",
+                  padding: "9px 22px",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  borderRadius: 8,
+                  border: "none",
+                  cursor: !quickAssignDeptId || assigningStream ? "not-allowed" : "pointer",
+                  boxShadow: !quickAssignDeptId || assigningStream ? "none" : "0 2px 10px rgba(217, 119, 6, 0.35)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+                onClick={handleSaveQuickDepartment}
+                disabled={!quickAssignDeptId || assigningStream}
+              >
+                {assigningStream ? (
+                  <>
+                    <span className="sp-spinner" /> Saving Stream…
+                  </>
+                ) : (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                      <path d="M2 8l4 4 8-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Assign Department Stream
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

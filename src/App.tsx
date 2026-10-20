@@ -81,6 +81,7 @@ const StoreSalesPage = lazyWithRetry(() => import("./pages/Admin/Store/StoreSale
 const FeeMethodsPage = lazyWithRetry(() => import("./pages/Admin/Fees/FeeMethodsPage"));
 const FeeStructurePage = lazyWithRetry(() => import("./pages/Admin/Fees/FeeStructurePage"));
 const StudentFeePaymentPage = lazyWithRetry(() => import("./pages/Admin/Fees/StudentFeePaymentPage"));
+const PublicReceiptVerificationPage = lazyWithRetry(() => import("./pages/PublicReceiptVerificationPage"));
 const ReceiptApprovalPage = lazyWithRetry(() => import("./pages/Admin/Fees/ReceiptApprovalPage"));
 const SchoolFeesReportPage = lazyWithRetry(() => import("./pages/Admin/Fees/FeesReport"));
 const SettingsPage = lazyWithRetry(() => import("./pages/Admin/School/SettingsPage"));
@@ -147,6 +148,7 @@ const AiCreditsPage = lazyWithRetry(() => import("./pages/Admin/School/AiCredits
 const AiLessonPlanPage = lazyWithRetry(() => import("./pages/Admin/School/AiLessonPlanPage"));
 const AiFeeCollectionAssistantPage = lazyWithRetry(() => import("./pages/Admin/Fees/AiFeeCollectionAssistantPage"));
 const FeePolicyPage = lazyWithRetry(() => import("./pages/Admin/Fees/FeePolicyPage"));
+const ConcessionApprovalsPage = lazyWithRetry(() => import("./pages/Admin/Fees/ConcessionApprovalsPage"));
 const OnlinePayFeesPage = lazyWithRetry(() => import("./pages/Admin/Billing/OnlinePayFeesPage"));
 const PublicFeePaymentPage = lazyWithRetry(() => import("./pages/PublicFeePaymentPage"));
 const PublicCbtAccessPage = lazyWithRetry(() => import("./pages/PublicCbtAccessPage"));
@@ -172,6 +174,8 @@ const PublicSchoolWebsitePage = lazyWithRetry(() => import("./pages/PublicSchool
 const PublicAdmissionFormPage = lazyWithRetry(() => import("./pages/PublicAdmissionFormPage"));
 const PublicAdmissionStatusPage = lazyWithRetry(() => import("./pages/PublicAdmissionStatusPage"));
 const SchoolBrandedLoginPage = lazyWithRetry(() => import("./pages/Auth/SchoolBrandedLoginPage"));
+const InvestorDashboardPage = lazyWithRetry(() => import("./pages/Investor/InvestorDashboardPage"));
+const SuperAdminInvestorsPage = lazyWithRetry(() => import("./pages/Super-Admin/SuperAdminInvestorsPage"));
 
 function CustomDomainBrandSync() {
   useEffect(() => {
@@ -225,6 +229,9 @@ function App() {
           <Route path="/check-term-result" element={<CheckResultPage />} />
           <Route path="/student/check-result" element={<CheckResultPage />} />
           <Route path="/verify-result" element={<VerifyResultPage />} />
+          <Route path="/verify-receipt" element={<PublicReceiptVerificationPage />} />
+          <Route path="/verify-receipt/:token" element={<PublicReceiptVerificationPage />} />
+          <Route path="/receipt/verify/:token" element={<PublicReceiptVerificationPage />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
           <Route path="/payment-instructions/" element={<PaymentInstructionsPage />} />
           <Route path="/pay-school-fee" element={<Navigate to="/pay-fees" replace />} />
@@ -571,7 +578,7 @@ function App() {
              <Route
             path="/result/monitor"
             element={
-              <RequireAuth roles={["Admin", "Teacher", "Principal", "Operator", "Super-Admin", "Platform-Staff"]}>
+              <RequireAuth roles={["Admin", "Teacher", "Principal", "Super-Admin", "Platform-Staff"]}>
                 <OnboardingGuard>
                   <ResultMonitoringPage />
                 </OnboardingGuard>
@@ -582,7 +589,7 @@ function App() {
           <Route
             path="/results/review"
             element={
-              <RequireAuth roles={["Admin", "Teacher", "Principal", "Operator", "Super-Admin", "Platform-Staff"]}>
+              <RequireAuth roles={["Admin", "Teacher", "Principal", "Super-Admin", "Platform-Staff"]}>
                 <OnboardingGuard>
                   <AdminResultReviewPage />
                 </OnboardingGuard>
@@ -615,7 +622,7 @@ function App() {
           <Route
             path="/admin/result-monitoring"
             element={
-              <RequireAuth roles={["Admin", "Teacher", "Principal", "Operator", "Super-Admin", "Platform-Staff"]}>
+              <RequireAuth roles={["Admin", "Teacher", "Principal", "Super-Admin", "Platform-Staff"]}>
                 <OnboardingGuard>
                   <Navigate to="/result/monitor" replace />
                 </OnboardingGuard>
@@ -626,7 +633,7 @@ function App() {
           <Route
             path="/admin/academic-alerts"
             element={
-              <RequireAuth roles={["Admin", "Teacher", "Principal", "Operator", "Super-Admin", "Platform-Staff"]}>
+              <RequireAuth roles={["Admin", "Teacher", "Principal", "Super-Admin", "Platform-Staff"]}>
                 <OnboardingGuard>
                   <Navigate to="/result/monitor" replace />
                 </OnboardingGuard>
@@ -648,7 +655,7 @@ function App() {
           <Route
             path="/students/results/show"
             element={
-              <RequireAuth roles={["Admin", "Teacher", "Student", "Parent", "Super Admin", "SuperAdmin"]}>
+              <RequireAuth roles={["Admin", "Principal", "Proprietor", "Teacher", "Student", "Parent", "Super Admin", "SuperAdmin"]}>
                 <OnboardingGuard>
                   <ShowResult />
                 </OnboardingGuard>
@@ -658,7 +665,7 @@ function App() {
           <Route
             path="/show-result"
             element={
-              <RequireAuth roles={["Admin", "Teacher", "Student", "Parent", "Super Admin", "SuperAdmin"]}>
+              <RequireAuth roles={["Admin", "Principal", "Proprietor", "Teacher", "Student", "Parent", "Super Admin", "SuperAdmin"]}>
                 <OnboardingGuard>
                   <ShowResult />
                 </OnboardingGuard>
@@ -668,7 +675,7 @@ function App() {
           <Route
             path="/results/show"
             element={
-              <RequireAuth roles={["Admin", "Teacher", "Student", "Parent", "Super Admin", "SuperAdmin"]}>
+              <RequireAuth roles={["Admin", "Principal", "Proprietor", "Teacher", "Student", "Parent", "Super Admin", "SuperAdmin"]}>
                 <OnboardingGuard>
                   <ShowResult />
                 </OnboardingGuard>
@@ -678,7 +685,7 @@ function App() {
           <Route
             path="/results/show-result"
             element={
-              <RequireAuth roles={["Admin", "Teacher", "Student", "Parent", "Super Admin", "SuperAdmin"]}>
+              <RequireAuth roles={["Admin", "Principal", "Proprietor", "Teacher", "Student", "Parent", "Super Admin", "SuperAdmin"]}>
                 <OnboardingGuard>
                   <ShowResult />
                 </OnboardingGuard>
@@ -722,7 +729,7 @@ function App() {
           <Route
             path="/cbt/exams"
             element={
-              <RequireAuth roles={["Admin", "Teacher"]}>
+              <RequireAuth roles={["Admin", "Teacher", "Operator"]}>
                 <OnboardingGuard>
                   <CbtExamsPage />
                 </OnboardingGuard>
@@ -920,6 +927,17 @@ function App() {
           />
 
           <Route
+            path="/fees/concessions"
+            element={
+              <RequireAuth roles={["Admin", "Super-Admin", "Platform-Staff"]}>
+                <OnboardingGuard>
+                  <ConcessionApprovalsPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
             path="/fees/report"
             element={
               <RequireAuth roles={["Admin", "Bursar"]}>
@@ -1091,7 +1109,7 @@ function App() {
           <Route
             path="/teacher-subjects"
             element={
-              <RequireAuth roles={["Admin", "Operator"]}>
+              <RequireAuth roles={["Admin"]}>
                 <OnboardingGuard>
                   <TeacherSubjectsPage />
                 </OnboardingGuard>
@@ -1566,6 +1584,36 @@ function App() {
                 </OnboardingGuard>
               </RequireAuth>
             }
+          />
+
+          {/* SchoolProfit Investor & Capital Management (SuperAdmin) */}
+          <Route
+            path="/superadmin/investors"
+            element={
+              <RequireAuth roles={["Super-Admin", "Platform-Staff"]} permissions={["finance", "owner"]}>
+                <OnboardingGuard>
+                  <SuperAdminInvestorsPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/super-admin/investors"
+            element={<Navigate to="/superadmin/investors" replace />}
+          />
+
+          {/* SchoolProfit Investor Portal (Live Partner Dashboard) */}
+          <Route
+            path="/investor/dashboard"
+            element={
+              <RequireAuth roles={["investor", "strategic_partner", "partner", "Super-Admin"]}>
+                <InvestorDashboardPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/investor"
+            element={<Navigate to="/investor/dashboard" replace />}
           />
 
           {/* Student */}

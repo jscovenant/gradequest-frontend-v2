@@ -223,6 +223,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
     const href = child.href || "";
 
     if (isOperator && (
+      href.includes("/teacher-subjects") ||
       href.includes("/billing") ||
       href.includes("/wallet") ||
       href.includes("/bank-account") ||
@@ -237,6 +238,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
     }
 
     if (isPrincipal && (
+      href.includes("/attendance/settings") ||
       href.includes("/billing") ||
       href.includes("/wallet") ||
       href.includes("/bank-account") ||
@@ -401,10 +403,10 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       lockIfNoFeature: true,
       hideIfNoFeature: true,
       children: [
-        { label: "CBT Exams", href: "/cbt/exams", roles: ["Admin", "Teacher"], featureKey: "cbt_online", hideIfNoFeature: true },
-        { label: "Offline CBT Runner", href: "/cbt/offline-runner", roles: ["Admin"], featureKey: "cbt_online", hideIfNoFeature: true },
+        { label: "CBT Exams", href: "/cbt/exams", roles: ["Admin", "Teacher", "Operator"], featureKey: "cbt_online", hideIfNoFeature: true },
+        { label: "Offline CBT Runner", href: "/cbt/offline-runner", roles: ["Admin", "Operator"], featureKey: "cbt_online", hideIfNoFeature: true },
       ],
-      roles: ["Admin", "Teacher"],
+      roles: ["Admin", "Teacher", "Operator"],
     },
 
     {
@@ -447,7 +449,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
         { label: "Student Payments", href: "/fees/payments" },
         { label: "Fee Policy & Installments", href: "/fees/policy" },
         { label: "Receipt Approvals", href: "/fees/receipts/approval" },
-        { label: "Financial Records", href: "/fees/report" },
+        { label: "Concession Approvals", href: "/fees/concessions", roles: ["Admin"] },
         { label: "AI Fee Collection", href: "/fees/ai-collection", roles: ["Admin", "Bursar"], featureKey: "ai_fee_collection_assistant", hideIfNoFeature: true },
       ],
       roles: ["Admin", "Bursar"],
@@ -883,23 +885,39 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
             <ul className="nav flex-column gap-1">
               {menuItems
                 .filter((item) => {
-                  if (isOperator && (
-                    item.collapseId === "billingMenu_admin" ||
-                    item.collapseId === "settingsMenu" ||
-                    item.collapseId === "operatorsMenu" ||
-                    item.collapseId === "accountMenu" ||
-                    item.collapseId === "feesMenu" ||
-                    item.collapseId === "staffAttendanceMenu"
-                  )) {
-                    return false;
+                  if (isOperator) {
+                    const allowedOperatorKeys = [
+                      "/dashboard",
+                      "studentsMenu",
+                      "/admin/admissions",
+                      "parentsMenu",
+                      "teachersMenu",
+                      "cbtMenu",
+                      "/announcements",
+                      "reportsMenu",
+                    ];
+                    const itemKey = item.collapseId || item.href || "";
+                    if (!allowedOperatorKeys.includes(itemKey)) {
+                      return false;
+                    }
                   }
 
-                  if (isPrincipal && (
-                    item.collapseId === "billingMenu_admin" ||
-                    item.collapseId === "operatorsMenu" ||
-                    item.collapseId === "accountMenu"
-                  )) {
-                    return false;
+                  if (isPrincipal) {
+                    const allowedPrincipalKeys = [
+                      "/dashboard",
+                      "studentsMenu",
+                      "teachersMenu",
+                      "parentsMenu",
+                      "/admin/admissions",
+                      "/results",
+                      "staffAttendanceMenu",
+                      "/announcements",
+                      "reportsMenu",
+                    ];
+                    const itemKey = item.collapseId || item.href || "";
+                    if (!allowedPrincipalKeys.includes(itemKey)) {
+                      return false;
+                    }
                   }
 
                   const isItemAllowed = checkRole(item.roles);

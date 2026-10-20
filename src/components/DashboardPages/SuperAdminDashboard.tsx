@@ -1354,6 +1354,9 @@ export default function SuperAdminDashboard() {
                   <button className="sa-btn sa-btn-soft" onClick={() => navigate("/superadmin/subscribers")}>
                     <i className="bi bi-buildings" /> School Tenants Registry
                   </button>
+                  <button className="sa-btn sa-btn-soft" onClick={() => navigate("/superadmin/investors")}>
+                    <i className="bi bi-cash-coin" /> Strategic Investors & Capital
+                  </button>
                 </div>
               </section>
 

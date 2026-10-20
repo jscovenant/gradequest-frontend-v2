@@ -437,6 +437,7 @@ const mixHexWithWhite = (color: string, whitePercent = 82) => {
   const term_result = data.term_result;
   const summary = data.average;
   const isV2 = data.source === "v2";
+  const isUnpublished = Boolean(data?.is_preview || (data?.result_status && data.result_status !== "published"));
   const resultTemplate = data.result_template || {};
   const displayOptions = {
     show_position: true,
@@ -683,27 +684,73 @@ const mixHexWithWhite = (color: string, whitePercent = 82) => {
           background: themeBg,
           padding: "10px",
           display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
           gap: "10px",
           boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
           borderBottom: `2px solid ${themePrimary}`,
+          marginBottom: "12px",
         }}
       >
-        <button
-          onClick={downloadPDF}
-          disabled={loading}
-          style={{
-            padding: "8px 14px",
-            background: themePrimary,
-            color: headerTextColor,
-            border: `1px solid ${themeSecondary}`,
-            borderRadius: "6px",
-            cursor: "pointer",
-            fontSize: "13px",
-            fontWeight: 700,
-          }}
-        >
-          {loading ? "Downloading..." : "Download PDF"}
-        </button>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <button
+            onClick={() => navigate(-1)}
+            style={{
+              padding: "8px 14px",
+              background: "#ffffff",
+              color: "#374151",
+              border: "1px solid #d1d5db",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontSize: "13px",
+              fontWeight: 600,
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+          >
+            <i className="bi bi-arrow-left" /> Back
+          </button>
+          <button
+            onClick={downloadPDF}
+            disabled={loading}
+            style={{
+              padding: "8px 14px",
+              background: themePrimary,
+              color: headerTextColor,
+              border: `1px solid ${themeSecondary}`,
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontSize: "13px",
+              fontWeight: 700,
+            }}
+          >
+            {loading ? "Downloading..." : "Download PDF"}
+          </button>
+        </div>
+
+        {isUnpublished && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              background: "#fffbeb",
+              border: "1px solid #fde68a",
+              padding: "6px 12px",
+              borderRadius: "8px",
+              color: "#92400e",
+              fontSize: "12px",
+              fontWeight: 600,
+            }}
+          >
+            <i className="bi bi-shield-check" style={{ color: "#d97706", fontSize: "15px" }} />
+            <span>
+              Unpublished Preview ({String(data?.result_status || "Draft").toUpperCase()}) — Not visible to parents/students
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Result Sheet */}
@@ -746,6 +793,26 @@ const mixHexWithWhite = (color: string, whitePercent = 82) => {
         )}
 
         <div style={{ position: "relative", zIndex: 1 }}>
+          {isUnpublished && (
+            <div
+              style={{
+                background: "rgba(245, 158, 11, 0.12)",
+                border: "1px dashed #d97706",
+                color: "#92400e",
+                borderRadius: "6px",
+                padding: "5px 10px",
+                marginBottom: "10px",
+                textAlign: "center",
+                fontSize: "11px",
+                fontWeight: 800,
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+              }}
+            >
+              ⚠ Pre-Publish Verification Preview — Confidential School Document
+            </div>
+          )}
+
           {/* HEADER */}
           <div
             style={{

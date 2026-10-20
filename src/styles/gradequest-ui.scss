@@ -47,7 +47,9 @@ body {
 .cbt-main,
 .scbt-main,
 .rd-main,
-.teacher-db-main {
+.teacher-db-main,
+.sp-fee-page-main,
+.sp-dash-main {
   background: var(--gq-light) !important;
   min-height: 100vh;
   padding-top: calc(var(--gq-topnav-height) + 24px) !important;
@@ -66,7 +68,9 @@ body {
   .cbt-main,
   .scbt-main,
   .rd-main,
-  .teacher-db-main {
+  .teacher-db-main,
+  .sp-fee-page-main,
+  .sp-dash-main {
     padding-left: 28px !important;
     padding-right: 28px !important;
     width: calc(100% - var(--gq-sidebar-width)) !important;
@@ -85,7 +89,9 @@ body {
   .gq-sidebar-collapsed .cbt-main,
   .gq-sidebar-collapsed .scbt-main,
   .gq-sidebar-collapsed .rd-main,
-  .gq-sidebar-collapsed .teacher-db-main {
+  .gq-sidebar-collapsed .teacher-db-main,
+  .gq-sidebar-collapsed .sp-fee-page-main,
+  .gq-sidebar-collapsed .sp-dash-main {
     width: calc(100% - var(--gq-sidebar-collapsed-width)) !important;
     max-width: calc(100% - var(--gq-sidebar-collapsed-width)) !important;
   }

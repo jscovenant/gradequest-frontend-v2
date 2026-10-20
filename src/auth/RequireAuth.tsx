@@ -35,6 +35,7 @@ export default function RequireAuth({ children, roles = [], permissions = [] }: 
       const isBursarRole = ["bursar", "accountant"].includes(normRole) || ["bursar", "accountant"].includes(rawRole);
       const isSalesRep = ["sales-representative", "sales_representative", "salesrep"].includes(normRole) || ["sales-representative", "sales_representative", "salesrep"].includes(rawRole);
       const isPlatformStaff = ["platform-staff", "platform_staff", "staff"].includes(normRole) || ["platform-staff", "platform_staff", "staff"].includes(rawRole);
+      const isInvestor = ["investor", "strategic_partner", "partner"].includes(normRole) || ["investor", "strategic_partner", "partner"].includes(rawRole);
 
       const normalizedRoles = roles.map((r) => r.toLowerCase().trim().replace(/[\s-]/g, "_"));
 
@@ -65,6 +66,10 @@ export default function RequireAuth({ children, roles = [], permissions = [] }: 
       }
 
       if (!roleMatches && isPlatformStaff && (normalizedRoles.includes("platform_staff") || normalizedRoles.includes("staff"))) {
+        roleMatches = true;
+      }
+
+      if (!roleMatches && isInvestor && (normalizedRoles.includes("investor") || normalizedRoles.includes("partner"))) {
         roleMatches = true;
       }
 

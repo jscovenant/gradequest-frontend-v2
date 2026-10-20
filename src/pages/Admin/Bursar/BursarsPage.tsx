@@ -19,8 +19,15 @@ interface Bursar {
   status?: number;
   school_id?: number;
   default_password?: string;
+  assigned_sections?: { id: number; name: string }[];
+  assigned_section_ids?: number[];
   created_at?: string;
   updated_at?: string;
+}
+
+interface SchoolSection {
+  id: number;
+  name: string;
 }
 
 type ModalTab = "overview" | "edit" | "security";
@@ -69,6 +76,9 @@ export default function BursarsPage() {
 const [passwordVisible, setPasswordVisible] = useState(false);
 const [decryptingPassword, setDecryptingPassword] = useState(false);
 
+  /* Sections */
+  const [sections, setSections] = useState<SchoolSection[]>([]);
+
   /* Create */
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -78,6 +88,7 @@ const [decryptingPassword, setDecryptingPassword] = useState(false);
     email: "",
     phone: "",
     address: "",
+    section_ids: [] as number[],
   });
   const [createdPassword, setCreatedPassword] = useState("");
 
@@ -96,10 +107,21 @@ const [decryptingPassword, setDecryptingPassword] = useState(false);
     phone: "",
     address: "",
     status: "1",
-     password: "",
+    password: "",
+    section_ids: [] as number[],
   });
 
   /* ========================= FETCH ========================= */
+  const fetchSections = async () => {
+    try {
+      const res = await authApi.get("/sections");
+      const list = res.data?.sections || res.data?.data || (Array.isArray(res.data) ? res.data : []);
+      setSections(list);
+    } catch {
+      // silently ignore
+    }
+  };
+
   const fetchBursars = async () => {
     setLoading(true);
     try {
@@ -114,6 +136,7 @@ const [decryptingPassword, setDecryptingPassword] = useState(false);
 
   useEffect(() => {
     fetchBursars();
+    fetchSections();
   }, []);
 
   /* ========================= DERIVED ========================= */
@@ -181,6 +204,7 @@ const [decryptingPassword, setDecryptingPassword] = useState(false);
       email: "",
       phone: "",
       address: "",
+      section_ids: [],
     });
     setCreatedPassword("");
   };
@@ -216,6 +240,7 @@ const [decryptingPassword, setDecryptingPassword] = useState(false);
         email: "",
         phone: "",
         address: "",
+        section_ids: [],
       });
     } catch (err: any) {
       showError(err?.response?.data?.message || "Failed to create bursar");
@@ -236,6 +261,9 @@ const [decryptingPassword, setDecryptingPassword] = useState(false);
   try {
     const res = await authApi.get(`/bursars/${bursar.id}`);
     const details = res.data?.bursar;
+    const secIds = details?.assigned_section_ids || 
+      (details?.assigned_sections ? details.assigned_sections.map((s: any) => s.id) : 
+      (details?.section_id ? [details.section_id] : []));
     setSelectedBursar(details);
     setEditedBursar({
       firstname: details?.firstname || "",
@@ -245,6 +273,7 @@ const [decryptingPassword, setDecryptingPassword] = useState(false);
       address: details?.address || "",
       status: String(details?.status ?? "1"),
       password: "",
+      section_ids: secIds,
     });
   } catch (err: any) {
     showError(err?.response?.data?.message || "Failed to load bursar details");
@@ -269,6 +298,9 @@ const [decryptingPassword, setDecryptingPassword] = useState(false);
     try {
       const res = await authApi.get(`/bursars/${selectedBursar.id}/edit`);
       const b = res.data?.bursar;
+      const secIds = b?.assigned_section_ids || 
+        (b?.assigned_sections ? b.assigned_sections.map((s: any) => s.id) : 
+        (b?.section_id ? [b.section_id] : (selectedBursar?.assigned_section_ids || [])));
       setSelectedBursar((prev) => ({ ...(prev || {}), ...b }));
       setEditedBursar({
         firstname: b?.firstname || "",
@@ -277,7 +309,8 @@ const [decryptingPassword, setDecryptingPassword] = useState(false);
         phone: b?.phone || "",
         address: b?.address || "",
         status: String(b?.status ?? selectedBursar?.status ?? "1"),
-         password: "",
+        password: "",
+        section_ids: secIds,
       });
       setEditMode(true);
       setActiveTab("edit");
@@ -300,6 +333,7 @@ const saveBursar = async () => {
       phone: editedBursar.phone,
       address: editedBursar.address,
       status: Number(editedBursar.status),
+      section_ids: editedBursar.section_ids,
     };
 
     if (editedBursar.password.trim()) {
@@ -1121,6 +1155,7 @@ const copyPassword = async (password?: string) => {
                   <thead>
                     <tr>
                       <th>Bursar</th>
+                      <th>Section Scope</th>
                       <th>Email</th>
                       <th>Phone</th>
                       <th>Status</th>
@@ -1131,7 +1166,7 @@ const copyPassword = async (password?: string) => {
                     {loading ? (
                       Array.from({ length: 5 }).map((_, i) => (
                         <tr key={i}>
-                          <td colSpan={5} style={{ padding: "16px" }}>
+                          <td colSpan={6} style={{ padding: "16px" }}>
                             <div
                               style={{
                                 height: 14,
@@ -1147,7 +1182,7 @@ const copyPassword = async (password?: string) => {
                       ))
                     ) : paginatedBursars.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="db-table-empty">
+                        <td colSpan={6} className="db-table-empty">
                           No bursars found.
                         </td>
                       </tr>
@@ -1164,6 +1199,21 @@ const copyPassword = async (password?: string) => {
                                   <div className="db-user-sub">Bursar · ID #{b.id}</div>
                                 </div>
                               </div>
+                            </td>
+                            <td>
+                              {(!b.assigned_sections || b.assigned_sections.length === 0) ? (
+                                <span className="db-badge db-badge--violet" title="Access across all school sections">
+                                  All Sections
+                                </span>
+                              ) : (
+                                <div className="d-flex flex-wrap gap-1">
+                                  {b.assigned_sections.map((s) => (
+                                    <span key={s.id} className="db-badge db-badge--blue">
+                                      {s.name}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </td>
                             <td>
                               <span className="db-badge db-badge--blue">{b.email}</span>
@@ -1375,6 +1425,65 @@ const copyPassword = async (password?: string) => {
                       />
                     </div>
                   </div>
+                </div>
+              </div>
+
+              <div className="sp-content-card mt-3">
+                <div className="sp-content-card-head">
+                  <div>
+                    <div className="sp-content-card-title">Section Scope Assignment</div>
+                    <div className="sp-content-card-sub">
+                      Assign this bursar to specific section(s) (e.g. Primary Bursar vs Secondary Bursar).
+                    </div>
+                  </div>
+                </div>
+                <div style={{ padding: "16px 20px" }}>
+                  <p style={{ fontSize: 12.5, color: "#64748b", marginBottom: 12 }}>
+                    Bursars assigned to specific sections will only see students, fees, and payments within those sections.
+                    Leave unselected for <strong>All Sections (Consolidated / Chief Bursar)</strong> access.
+                  </p>
+                  <div className="d-flex flex-wrap gap-2">
+                    {sections.length === 0 ? (
+                      <span style={{ fontSize: 12.5, color: "#94a3b8" }}>No school sections found.</span>
+                    ) : (
+                      sections.map((sec) => {
+                        const isSelected = newBursar.section_ids.includes(sec.id);
+                        return (
+                          <button
+                            key={sec.id}
+                            type="button"
+                            onClick={() => {
+                              setNewBursar((prev) => ({
+                                ...prev,
+                                section_ids: isSelected
+                                  ? prev.section_ids.filter((id) => id !== sec.id)
+                                  : [...prev.section_ids, sec.id],
+                              }));
+                            }}
+                            style={{
+                              padding: "7px 14px",
+                              borderRadius: "20px",
+                              fontSize: "12.5px",
+                              fontWeight: 500,
+                              cursor: "pointer",
+                              border: isSelected ? "1.5px solid #2563eb" : "1.5px solid #e2e8f0",
+                              background: isSelected ? "rgba(37,99,235,0.08)" : "#fff",
+                              color: isSelected ? "#1d4ed8" : "#475569",
+                              transition: "all 0.15s ease",
+                            }}
+                          >
+                            {isSelected ? "✓ " : "+ "}
+                            {sec.name}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                  {newBursar.section_ids.length === 0 && (
+                    <div style={{ marginTop: 10, fontSize: 12, color: "#7c3aed" }}>
+                      ℹ️ All Sections Mode: Bursar will have consolidated access across all sections.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1669,6 +1778,25 @@ const copyPassword = async (password?: string) => {
                               value={Number(selectedBursar.status) === 1 ? "Active" : "Inactive"}
                             />
                           </div>
+
+                          <div style={{ gridColumn: "1 / -1", marginTop: 8, paddingTop: 12, borderTop: "1px solid var(--sp-border)" }}>
+                            <div className="sp-info-label" style={{ marginBottom: 6 }}>Assigned Section Scope</div>
+                            <div className="sp-info-val">
+                              {(!selectedBursar.assigned_sections || selectedBursar.assigned_sections.length === 0) ? (
+                                <span className="db-badge db-badge--violet">
+                                  All Sections (Consolidated / Chief Bursar)
+                                </span>
+                              ) : (
+                                <div className="d-flex flex-wrap gap-2">
+                                  {selectedBursar.assigned_sections.map((s) => (
+                                    <span key={s.id} className="db-badge db-badge--blue" style={{ fontSize: "12px", padding: "4px 12px" }}>
+                                      {s.name} Section
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </>
@@ -1741,6 +1869,51 @@ const copyPassword = async (password?: string) => {
                               <option value="1">Active</option>
                               <option value="0">Inactive</option>
                             </select>
+                          </div>
+
+                          <div className="sp-form-full">
+                            <label className="sp-label">Section Scoping</label>
+                            <p style={{ fontSize: 12, color: "#64748b", margin: "4px 0 10px" }}>
+                              Choose which sections this bursar can access. Leave unselected for All Sections (Chief Bursar / Consolidated).
+                            </p>
+                            <div className="d-flex flex-wrap gap-2">
+                              {sections.map((sec) => {
+                                const isSelected = editedBursar.section_ids.includes(sec.id);
+                                return (
+                                  <button
+                                    key={sec.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setEditedBursar((prev) => ({
+                                        ...prev,
+                                        section_ids: isSelected
+                                          ? prev.section_ids.filter((id) => id !== sec.id)
+                                          : [...prev.section_ids, sec.id],
+                                      }));
+                                    }}
+                                    style={{
+                                      padding: "6px 14px",
+                                      borderRadius: "20px",
+                                      fontSize: "12px",
+                                      fontWeight: 500,
+                                      cursor: "pointer",
+                                      border: isSelected ? "1.5px solid #2563eb" : "1.5px solid #e2e8f0",
+                                      background: isSelected ? "rgba(37,99,235,0.08)" : "#fff",
+                                      color: isSelected ? "#1d4ed8" : "#475569",
+                                      transition: "all 0.15s ease",
+                                    }}
+                                  >
+                                    {isSelected ? "✓ " : "+ "}
+                                    {sec.name}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            {editedBursar.section_ids.length === 0 && (
+                              <div style={{ marginTop: 8, fontSize: 11.5, color: "#7c3aed" }}>
+                                ℹ️ Unrestricted: Bursar has access to All Sections.
+                              </div>
+                            )}
                           </div>
                           <div className="sp-form-full">
                         <label className="sp-label">
