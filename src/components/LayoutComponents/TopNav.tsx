@@ -8,6 +8,7 @@ import {
   markInvoiceNotificationRead,
   type InvoiceNote,
 } from "../../api/invoiceNotificationsApi";
+import MobileAppShell from "../Mobile/MobileAppShell";
 
 interface TopNavProps {
   sidebarOpen?: boolean;
@@ -258,7 +259,23 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
 
       {/* RIGHT: Search, Notifications + Profile */}
       <div className="d-flex align-items-center gap-2 gap-md-3">
-     
+        <Link
+          to="/mobile-app"
+          className="btn btn-sm d-none d-sm-inline-flex align-items-center gap-1 fw-bold"
+          style={{
+            background: "linear-gradient(135deg, #0F2744 0%, #059669 100%)",
+            color: "#FFFFFF",
+            borderRadius: "999px",
+            padding: "5px 12px",
+            fontSize: "0.76rem",
+            border: "none",
+            boxShadow: "0 2px 8px rgba(5, 150, 105, 0.25)",
+          }}
+          title="Switch to Mobile Pocket App View"
+        >
+          <i className="bi bi-phone-fill text-warning" />
+          <span>Pocket App</span>
+        </Link>
 
         {/* Notifications */}
         <div className="dropdown">
@@ -603,6 +620,7 @@ export default function TopNav({ sidebarOpen = true, setSidebarOpen, toggleSideb
         </div>
       </div>
     </nav>
+    <MobileAppShell />
     </>
   );
 }

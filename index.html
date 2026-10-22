@@ -6,6 +6,12 @@
     <link rel="alternate icon" type="image/png" href="/media/logo/schoolprofit-logo.png?v=sp3" />
     <link rel="shortcut icon" href="/favicon.svg?v=sp3" />
     <link rel="apple-touch-icon" href="/media/logo/schoolprofit-logo.png?v=sp3" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#0F2744" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SchoolProfit" />
     <link rel="stylesheet" href="/css/bootstrap.css">
     <link rel="stylesheet" href="/css/auth.css">
     <link rel="stylesheet" href="/css/frontendloader.css">
@@ -18,7 +24,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
   
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>SchoolProfit - The School Growth and Profit Operating System</title>
     <meta name="description" content="SchoolProfit is the all-in-one school growth and profit operating system. Stop fee debts with automated installment control and instant multi-bank settlements, scale admissions, and empower teachers with 1-click broadsheets, offline CBT, and AI lesson planning." />
     <meta name="keywords" content="SchoolProfit, school management software Nigeria, school profit software, fee debt recovery, school fee collection, instant bank settlement, school portal software, master broadsheet compiler, report card generator, CBT exam software Nigeria, AI lesson plan generator" />
@@ -144,11 +150,18 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script src="/js/bootstrap.bundle.min.js"></script>
-
-    <!-- <div class="chat-float">
-  <a href="https://wa.me/234XXXXXXXXXX" target="_blank" class="chat-btn">
-    <i class="bi bi-chat-dots-fill"></i>
-  </a>
-</div> -->
+    <script>
+      window.__deferredPwaPrompt = null;
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        window.__deferredPwaPrompt = e;
+        window.dispatchEvent(new CustomEvent('pwa-install-available'));
+      });
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js').catch(function () {});
+        });
+      }
+    </script>
   </body>
 </html>

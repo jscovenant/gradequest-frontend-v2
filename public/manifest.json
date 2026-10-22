@@ -1,0 +1,48 @@
+{
+  "name": "SchoolProfit — School Owner, Teacher & Parent App",
+  "short_name": "SchoolProfit",
+  "description": "The all-in-one mobile operating system for School Owners, Teachers, and Parents. Track fee collections, enter student scores, scan QR attendance, and view report cards.",
+  "start_url": "/login?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0A192F",
+  "theme_color": "#0F2744",
+  "categories": ["education", "finance", "productivity"],
+  "icons": [
+    {
+      "src": "/media/logo/schoolprofit-logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/media/logo/schoolprofit-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Pocket Mode Hub",
+      "short_name": "Pocket Hub",
+      "description": "Open mobile-first workspace for Owners, Teachers & Parents",
+      "url": "/mobile-app",
+      "icons": [{ "src": "/media/logo/schoolprofit-logo.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Go to main dashboard",
+      "url": "/dashboard",
+      "icons": [{ "src": "/media/logo/schoolprofit-logo.png", "sizes": "192x192" }]
+    }
+  ]
+}

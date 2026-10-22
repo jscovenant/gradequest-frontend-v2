@@ -176,6 +176,7 @@ const PublicAdmissionStatusPage = lazyWithRetry(() => import("./pages/PublicAdmi
 const SchoolBrandedLoginPage = lazyWithRetry(() => import("./pages/Auth/SchoolBrandedLoginPage"));
 const InvestorDashboardPage = lazyWithRetry(() => import("./pages/Investor/InvestorDashboardPage"));
 const SuperAdminInvestorsPage = lazyWithRetry(() => import("./pages/Super-Admin/SuperAdminInvestorsPage"));
+const MobileCompanionHubPage = lazyWithRetry(() => import("./pages/Mobile/MobileCompanionHubPage"));
 
 function CustomDomainBrandSync() {
   useEffect(() => {
@@ -364,6 +365,17 @@ function App() {
               <RequireAuth roles={["Admin", "Teacher", "Super-Admin", "Platform-Staff", "Student", "Parent", "Bursar", "Sales-Representative", "Investor", "Strategic_Partner", "Partner"]}>
                 <OnboardingGuard>
                   <Dashboard />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/mobile-app"
+            element={
+              <RequireAuth roles={["Admin", "Teacher", "Super-Admin", "Platform-Staff", "Student", "Parent", "Bursar", "Sales-Representative", "Investor", "Strategic_Partner", "Partner"]}>
+                <OnboardingGuard>
+                  <MobileCompanionHubPage />
                 </OnboardingGuard>
               </RequireAuth>
             }

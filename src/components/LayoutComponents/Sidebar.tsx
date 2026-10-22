@@ -295,6 +295,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       roles: ["Admin", "Teacher", "Student", "Parent", "Bursar", "Sales-Representative"],
     },
     {
+      label: "Mobile Pocket App",
+      icon: "phone",
+      href: "/mobile-app",
+      roles: ["Admin", "Teacher", "Parent", "Bursar", "Super-Admin", "Platform-Staff"],
+    },
+    {
       label: "Support",
       icon: "life-preserver",
       href: "/support",
@@ -904,6 +910,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
                   if (isOperator) {
                     const allowedOperatorKeys = [
                       "/dashboard",
+                      "/mobile-app",
                       "studentsMenu",
                       "/admin/admissions",
                       "parentsMenu",
@@ -921,6 +928,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
                   if (isPrincipal) {
                     const allowedPrincipalKeys = [
                       "/dashboard",
+                      "/mobile-app",
                       "studentsMenu",
                       "teachersMenu",
                       "parentsMenu",

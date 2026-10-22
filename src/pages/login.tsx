@@ -101,11 +101,30 @@ export default function Login() {
         "partner",
       ];
 
-      // Route directly based on user role
+      // Route directly based on user role and device form-factor
+      const isMobileOrPwa =
+        window.innerWidth < 992 ||
+        window.matchMedia("(display-mode: standalone)").matches ||
+        searchParams.get("source") === "pwa";
+
+      const isPocketRole = [
+        "admin",
+        "proprietor",
+        "owner",
+        "principal",
+        "teacher",
+        "class_teacher",
+        "subject_teacher",
+        "parent",
+        "guardian",
+      ].includes(normRole);
+
       if (["investor", "strategic_partner", "partner"].includes(normRole)) {
         navigate("/investor/dashboard");
       } else if (["super_admin", "superadmin"].includes(normRole)) {
         navigate("/superadmin/dashboard");
+      } else if (isMobileOrPwa && isPocketRole) {
+        navigate("/mobile-app");
       } else if (validRoles.includes(normRole)) {
         navigate("/dashboard");
       } else {
@@ -783,6 +802,43 @@ export default function Login() {
               <Link to="/cbt/access" className="gq-quick-btn">
                 💻 CBT Exam Room
               </Link>
+            </div>
+
+            {/* Install Mobile App Banner */}
+            <div style={{ marginTop: 12 }}>
+              <button
+                type="button"
+                onClick={async () => {
+                  const p = (window as any).__deferredPwaPrompt;
+                  if (p) {
+                    p.prompt();
+                    await p.userChoice;
+                    (window as any).__deferredPwaPrompt = null;
+                  } else {
+                    alert(
+                      "To install the SchoolProfit Mobile App:\n\n• On Android (Chrome): Tap the 3-dot menu (⋮) → 'Install App'\n• On iPhone (Safari): Tap Share → 'Add to Home Screen'"
+                    );
+                  }
+                }}
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  borderRadius: 12,
+                  border: "1px solid #A7F3D0",
+                  background: "linear-gradient(90deg, #ECFDF5 0%, #F0FDF4 100%)",
+                  color: "#065F46",
+                  fontSize: "12.5px",
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  cursor: "pointer",
+                }}
+              >
+                <i className="bi bi-phone-fill text-success" />
+                <span>Install Mobile App (Owners, Teachers &amp; Parents)</span>
+              </button>
             </div>
 
             {/* Register Footer */}
