@@ -140,39 +140,63 @@ export default function MobileCompanionHubPage() {
     (async () => {
       try {
         if (activeRoleMode === "owner") {
-          const [dashRes, walletRes] = await Promise.allSettled([
-            authApi.get("/dashboard"),
-            authApi.get("/wallet"),
+          const [countsRes, bursarRes, finRes, walletRes, receiptsRes] = await Promise.allSettled([
+            authApi.get("/dashboard/counts"),
+            authApi.get("/bursar-dashboard/summary"),
+            authApi.get("/finance/dashboard"),
+            authApi.get("/user/wallet"),
+            authApi.get("/receipts"),
           ]);
 
           if (!mounted) return;
 
-          const dashData = dashRes.status === "fulfilled" ? dashRes.value.data : {};
+          const countsData = countsRes.status === "fulfilled" ? countsRes.value.data : {};
+          const bursarSummary =
+            bursarRes.status === "fulfilled"
+              ? bursarRes.value.data?.summary || bursarRes.value.data || {}
+              : {};
+          const finKpi =
+            finRes.status === "fulfilled"
+              ? finRes.value.data?.kpi || finRes.value.data || {}
+              : {};
           const walletData = walletRes.status === "fulfilled" ? walletRes.value.data : {};
-
-          const cards: Array<{ title?: string; value?: any }> = Array.isArray(dashData?.stats)
-            ? dashData.stats
-            : [];
-
-          const findCardVal = (keyword: string) => {
-            const match = cards.find((c) => (c.title || "").toLowerCase().includes(keyword));
-            if (!match) return 0;
-            const num = Number(String(match.value || "0").replace(/[^0-9.-]+/g, ""));
-            return Number.isFinite(num) ? num : 0;
-          };
+          const receiptsRaw =
+            receiptsRes.status === "fulfilled"
+              ? receiptsRes.value.data?.data || receiptsRes.value.data || []
+              : [];
+          const pendingReceipts = Array.isArray(receiptsRaw)
+            ? receiptsRaw.filter((r: any) => {
+                const st = String(r.status || "").toLowerCase();
+                return st === "pending" || st === "submitted" || st === "unverified";
+              }).length
+            : 0;
 
           setOwnerStats({
-            totalStudents: findCardVal("student") || Number(dashData?.total_students || 0),
-            totalTeachers: findCardVal("teacher") || Number(dashData?.total_teachers || 0),
-            totalParents: findCardVal("parent") || Number(dashData?.total_parents || 0),
-            walletBalance: Number(walletData?.balance ?? walletData?.data?.balance ?? dashData?.wallet_balance ?? 0),
-            termCollected: findCardVal("paid") || findCardVal("revenue") || findCardVal("collect") || Number(dashData?.total_fees_paid || 0),
-            termOutstanding: findCardVal("debt") || findCardVal("outstanding") || findCardVal("balance") || Number(dashData?.total_fees_outstanding || 0),
-            pendingApprovals: Number(dashData?.pending_approvals || 0),
+            totalStudents: Number(
+              countsData?.active_students ??
+                countsData?.students ??
+                countsData?.total_students ??
+                bursarSummary?.total_students ??
+                0
+            ),
+            totalTeachers: Number(countsData?.teachers ?? countsData?.total_teachers ?? 0),
+            totalParents: Number(countsData?.parents ?? countsData?.total_parents ?? 0),
+            walletBalance: Number(walletData?.balance ?? walletData?.data?.balance ?? 0),
+            termCollected: Number(
+              bursarSummary?.total_collected ??
+                finKpi?.total_income ??
+                0
+            ),
+            termOutstanding: Number(
+              bursarSummary?.outstanding_balance ??
+                bursarSummary?.total_outstanding ??
+                0
+            ),
+            pendingApprovals: pendingReceipts,
           });
         } else if (activeRoleMode === "teacher") {
           const [tDashRes, tPerfRes] = await Promise.allSettled([
-            authApi.get("/dashboard"),
+            authApi.get("/teacher/dashboard/counts"),
             authApi.get("/teacher/student-performance"),
           ]);
 
@@ -180,18 +204,17 @@ export default function MobileCompanionHubPage() {
 
           const tDash = tDashRes.status === "fulfilled" ? tDashRes.value.data : {};
           const tPerf = tPerfRes.status === "fulfilled" ? tPerfRes.value.data : {};
-          const cards: Array<{ title?: string; value?: any }> = Array.isArray(tDash?.stats) ? tDash.stats : [];
-
-          const findVal = (kw: string) => {
-            const m = cards.find((c) => (c.title || "").toLowerCase().includes(kw));
-            return m ? Number(String(m.value || "0").replace(/[^0-9.-]+/g, "")) || 0 : 0;
-          };
 
           setTeacherStats({
-            classesCount: findVal("class") || 3,
-            subjectsCount: findVal("subject") || 4,
-            studentsCount: Number(tPerf?.summary?.tracked_students || findVal("student") || 42),
-            classAverage: Number(tPerf?.summary?.class_average || 71.4),
+            classesCount: Number(tDash?.classes_count ?? tDash?.total_classes ?? tDash?.classes ?? 0),
+            subjectsCount: Number(tDash?.subjects_count ?? tDash?.total_subjects ?? tDash?.subjects ?? 0),
+            studentsCount: Number(
+              tDash?.students_count ??
+                tDash?.total_students ??
+                tPerf?.summary?.tracked_students ??
+                0
+            ),
+            classAverage: Number(tPerf?.summary?.class_average ?? tDash?.class_average ?? 0),
           });
         } else if (activeRoleMode === "parent") {
           const pRes = await authApi.get("/parent/dashboard").catch(() => null);

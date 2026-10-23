@@ -352,17 +352,14 @@ export default function BillingPage() {
       return;
     }
 
-    // Guard: Enforce 70% Minimum Population Policy
-    if (clearanceSummary && clearanceSummary.is_minimum_coverage_met === false) {
-      const minReq = clearanceSummary.minimum_students_required || 0;
-      const currentCleared = clearanceSummary.cleared_count || 0;
-      const shortfall = clearanceSummary.shortfall_students || 0;
-      if (currentCleared + selectedStudentIds.length < minReq) {
-        showError?.(
-          `Minimum 70% Population Policy: Your school has ${clearanceSummary.total_students} active students. Under SchoolProfit policy, you must clear at least 70% (minimum ${minReq} students). You selected ${selectedStudentIds.length} student(s). Please select at least ${shortfall} student(s) to meet the 70% threshold.`
-        );
-        return;
-      }
+    // Flexible Clearance Policy: Minimum ₦5,000 threshold if school has >10 students
+    const totalSchoolStudents = clearanceSummary?.total_students || 0;
+    if (totalSchoolStudents > 10 && totalSelectivePayable < 5000) {
+      const minNeeded = Math.ceil(5000 / Math.max(1, costPerSelectedStudent));
+      showError?.(
+        `Flexible Clearance Policy: For schools with more than 10 students, the minimum clearance selection fee is ₦5,000. Your current selection is ${fmtNaira(totalSelectivePayable)}. Please select at least ${minNeeded} student(s) to meet the ₦5,000 minimum threshold.`
+      );
+      return;
     }
 
     const selectedList: ModalStudentItem[] = selectedStudentIds.map((id) => {
@@ -405,17 +402,17 @@ export default function BillingPage() {
 
   // Open Checkout Modal for Single Student
   const openSingleClearanceModal = (student: ClearanceStudent) => {
-    // Guard: Enforce 70% Minimum Population Policy
-    if (clearanceSummary && clearanceSummary.is_minimum_coverage_met === false) {
-      const minReq = clearanceSummary.minimum_students_required || 0;
-      const shortfall = clearanceSummary.shortfall_students || 0;
+    // Flexible Policy: If school has >10 students, single student clearance must be at least ₦5,000 or batched
+    const totalSchoolStudents = clearanceSummary?.total_students || 0;
+    const cost = costPerSelectedStudent;
+    if (totalSchoolStudents > 10 && cost < 5000) {
+      const minNeeded = Math.ceil(5000 / Math.max(1, cost));
       showError?.(
-        `Single student clearance is disabled until your school meets the 70% minimum population clearance threshold (minimum ${minReq} students; ${shortfall} remaining). Please use Selective Clearance or Clear Full Term.`
+        `Flexible Clearance Policy: For schools with more than 10 students, the minimum clearance selection is ₦5,000. Please use the Selective Clearance checkboxes below to select at least ${minNeeded} students.`
       );
       return;
     }
 
-    const cost = costPerSelectedStudent;
     const defaultTab = currentWalletBalance >= cost ? "wallet" : "paystack";
 
     const modalObj = {
@@ -1172,7 +1169,7 @@ export default function BillingPage() {
 
                     <div className="db-hero-stat-item">
                       <span className="db-hero-stat-label">Coverage</span>
-                      <span className="db-hero-stat-val" style={{ color: (clearanceSummary?.coverage_percent || 0) >= 70 ? "#10B981" : "#F59E0B" }}>
+                      <span className="db-hero-stat-val" style={{ color: (clearanceSummary?.coverage_percent || 0) > 0 ? "#10B981" : "#F59E0B" }}>
                         {clearanceSummary?.coverage_percent || 0}% ({clearanceSummary?.cleared_count || 0}/{clearanceSummary?.total_students || 0})
                       </span>
                     </div>
@@ -1254,13 +1251,13 @@ export default function BillingPage() {
                   </span>
                   <span
                     className={`badge ${
-                      (clearanceSummary?.coverage_percent || 0) >= 70
+                      (clearanceSummary?.cleared_count || 0) > 0
                         ? "bg-success-subtle text-success"
                         : "bg-warning-subtle text-warning-emphasis"
                     } fw-bold`}
                     style={{ fontSize: 11 }}
                   >
-                    {(clearanceSummary?.coverage_percent || 0) >= 70 ? "70% Quota Met" : "Shortfall"}
+                    {(clearanceSummary?.cleared_count || 0) > 0 ? "Active Coverage" : "Pending"}
                   </span>
                 </div>
               </div>
@@ -1289,13 +1286,11 @@ export default function BillingPage() {
               </div>
             </div>
 
-            {/* ===== EXECUTIVE 70% COMPLIANCE & OPERATIONS METER ===== */}
+            {/* ===== EXECUTIVE FLEXIBLE CLEARANCE & OPERATIONS METER ===== */}
             <div
               style={{
-                background: clearanceSummary?.is_minimum_coverage_met === false
-                  ? "linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)"
-                  : "linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)",
-                border: clearanceSummary?.is_minimum_coverage_met === false ? "1.5px solid #F59E0B" : "1.5px solid #86EFAC",
+                background: "linear-gradient(135deg, #F8FAFC 0%, #F0FDF4 100%)",
+                border: "1.5px solid #86EFAC",
                 borderRadius: 16,
                 padding: "20px 24px",
                 marginBottom: 24,
@@ -1309,24 +1304,22 @@ export default function BillingPage() {
                       width: 44,
                       height: 44,
                       borderRadius: 12,
-                      background: clearanceSummary?.is_minimum_coverage_met === false ? "#D97706" : "#16A34A",
+                      background: "#16A34A",
                       color: "#FFFFFF",
                       display: "grid",
                       placeItems: "center",
                       fontSize: 22,
                       flexShrink: 0,
-                      boxShadow: clearanceSummary?.is_minimum_coverage_met === false
-                        ? "0 4px 10px rgba(217, 119, 6, 0.3)"
-                        : "0 4px 10px rgba(22, 163, 74, 0.3)",
+                      boxShadow: "0 4px 10px rgba(22, 163, 74, 0.25)",
                     }}
                   >
-                    <i className={`bi ${clearanceSummary?.is_minimum_coverage_met === false ? "bi-shield-lock-fill" : "bi-shield-check"}`} />
+                    <i className="bi bi-shield-check" />
                   </div>
                   <div>
                     <div className="d-flex align-items-center gap-2 flex-wrap mb-1">
                       <span
                         style={{
-                          background: clearanceSummary?.is_minimum_coverage_met === false ? "#B45309" : "#15803D",
+                          background: "#15803D",
                           color: "#FFFFFF",
                           fontSize: 10.5,
                           fontWeight: 800,
@@ -1336,7 +1329,7 @@ export default function BillingPage() {
                           textTransform: "uppercase",
                         }}
                       >
-                        {clearanceSummary?.is_minimum_coverage_met === false ? "70% Minimum Policy Required" : "Platform Active • 70% Quota Met"}
+                        {(clearanceSummary?.pending_count || 0) === 0 ? "Full School Cleared" : "Flexible Clearance Active"}
                       </span>
                       <span style={{ fontSize: 12, color: "#64748B", fontWeight: 700 }}>
                         {clearanceSummary?.period_label || "Current Billing Cycle"}
@@ -1344,21 +1337,13 @@ export default function BillingPage() {
                     </div>
 
                     <h4 style={{ fontSize: 17, fontWeight: 800, color: "#0F2744", margin: "2px 0 6px" }}>
-                      {clearanceSummary?.is_minimum_coverage_met === false
-                        ? `Shortfall: ${clearanceSummary?.shortfall_students || 0} student(s) required to satisfy 70% threshold`
-                        : `Compliance Satisfied (${clearanceSummary?.coverage_percent || 0}% Cleared)`}
+                      {(clearanceSummary?.pending_count || 0) === 0
+                        ? "All Students Cleared for this Period"
+                        : `Platform Clearance: ${clearanceSummary?.cleared_count || 0} of ${clearanceSummary?.total_students || 0} Students Cleared (${clearanceSummary?.coverage_percent || 0}%)`}
                     </h4>
 
-                    <p style={{ fontSize: 13, color: clearanceSummary?.is_minimum_coverage_met === false ? "#78350F" : "#166534", margin: 0, lineHeight: 1.5 }}>
-                      {clearanceSummary?.is_minimum_coverage_met === false ? (
-                        <>
-                          Under SchoolProfit operational policy, schools must clear at least <strong>70% of enrolled students</strong> (minimum <strong>{clearanceSummary?.minimum_students_required || 0}</strong> of <strong>{clearanceSummary?.total_students || 0}</strong> students) to unlock official term report cards and CBT examination modules. You have cleared <strong>{clearanceSummary?.cleared_count || 0} students ({clearanceSummary?.coverage_percent || 0}%)</strong>.
-                        </>
-                      ) : (
-                        <>
-                          Your school has met or exceeded the 70% coverage quota for this billing cycle. Platform examinations and report card modules are fully accessible for all cleared students. You can clear any remaining <strong>{clearanceSummary?.pending_count || 0}</strong> students at any time.
-                        </>
-                      )}
+                    <p style={{ fontSize: 13, color: "#166534", margin: 0, lineHeight: 1.5 }}>
+                      Clearance operates on a flexible per-student model. You can selectively clear individual students or classes as school fees are collected. Cleared students immediately unlock broadsheet, CBT examination modules, and official term report cards.{(clearanceSummary?.total_students || 0) > 10 ? " For schools with more than 10 students, minimum selective clearance is ₦5,000." : ""}
                     </p>
                   </div>
                 </div>
@@ -1396,8 +1381,8 @@ export default function BillingPage() {
                   <span style={{ color: "#0F2744" }}>
                     Clearance Progress: <strong>{clearanceSummary?.cleared_count || 0} of {clearanceSummary?.total_students || 0} Students</strong> ({clearanceSummary?.coverage_percent || 0}%)
                   </span>
-                  <span style={{ color: (clearanceSummary?.coverage_percent || 0) >= 70 ? "#16A34A" : "#D97706" }}>
-                    Target: 70% ({clearanceSummary?.minimum_students_required || 0} Students)
+                  <span style={{ color: (clearanceSummary?.pending_count || 0) === 0 ? "#16A34A" : "#64748B" }}>
+                    {clearanceSummary?.pending_count || 0} Remaining
                   </span>
                 </div>
                 <div style={{ width: "100%", height: 10, background: "rgba(0,0,0,0.08)", borderRadius: 999, overflow: "hidden", position: "relative" }}>
@@ -1405,25 +1390,10 @@ export default function BillingPage() {
                     style={{
                       height: "100%",
                       width: `${Math.min(100, clearanceSummary?.coverage_percent || 0)}%`,
-                      background: (clearanceSummary?.coverage_percent || 0) >= 70
-                        ? "linear-gradient(90deg, #10B981, #059669)"
-                        : "linear-gradient(90deg, #F59E0B, #D97706)",
+                      background: "linear-gradient(90deg, #10B981, #059669)",
                       transition: "width 0.5s ease",
                       borderRadius: 999,
                     }}
-                  />
-                  {/* 70% Indicator Marker */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      left: "70%",
-                      top: 0,
-                      bottom: 0,
-                      width: 2,
-                      background: "#0F2744",
-                      zIndex: 2,
-                    }}
-                    title="70% Policy Requirement Marker"
                   />
                 </div>
               </div>
@@ -1604,7 +1574,7 @@ export default function BillingPage() {
                     </div>
 
                     <p className="db-muted" style={{ fontSize: 13, margin: "8px 0 14px", lineHeight: 1.5 }}>
-                      Selectively choose specific students or classes using the roster below. Note: Platform policy requires at least <strong>70% active coverage ({clearanceSummary?.minimum_students_required || 0} students)</strong> to unlock broadsheets and results.
+                      Selectively choose specific students or classes using the roster below. Flexible payment policy allows you to clear students individually as they pay school fees{(clearanceSummary?.total_students || 0) > 10 ? " (minimum selection: ₦5,000)" : ""}.
                     </p>
                   </div>
 
