@@ -307,6 +307,8 @@ export default function AddResultV2Page() {
   const [term, setTerm] = useState<string>(urlTerm || "");
   const [session, setSession] = useState<string>(urlSession || "");
   const [department, setDepartment] = useState<string>("");
+  const [availableTerms, setAvailableTerms] = useState<string[]>(["First Term", "Second Term", "Third Term"]);
+  const [availableSessions, setAvailableSessions] = useState<string[]>([]);
 
   // Scoring config
   const [scoreType, setScoreType] = useState(SCORE_TYPES[0].value);
@@ -383,7 +385,6 @@ export default function AddResultV2Page() {
 
   // Submission state
   const [saving, setSaving] = useState(false);
-  const [computing, setComputing] = useState(false);
 
   // LocalStorage keys
   const DRAFT_KEY = "gq_result_draft_v2";
@@ -411,16 +412,20 @@ export default function AddResultV2Page() {
   // -----------------------------
   // Initialize Page & Load Classes
   // -----------------------------
+  // Initialize Page & Load Classes, Terms, and Sessions
+  // -----------------------------
   useEffect(() => {
     let mounted = true;
 
     async function init() {
       setPageLoading(true);
       try {
-        const [classesRes, currentRes, creditsRes] = await Promise.allSettled([
+        const [classesRes, currentRes, creditsRes, termsRes, sessionsRes] = await Promise.allSettled([
           authApi.get("/fstudent-classes"),
           authApi.get("/current-session-term"),
           authApi.get("/admin/ai/credits"),
+          authApi.get("/fterms"),
+          authApi.get("/facademic-sessions"),
         ]);
 
         if (!mounted) return;
@@ -429,6 +434,16 @@ export default function AddResultV2Page() {
           const payload = classesRes.value.data;
           const clsList: ClassOption[] = Array.isArray(payload) ? payload : payload?.classes ?? [];
           setClasses(clsList);
+        }
+
+        if (termsRes.status === "fulfilled" && Array.isArray(termsRes.value.data)) {
+          const tList = termsRes.value.data.map((t: any) => t.name).filter(Boolean);
+          if (tList.length > 0) setAvailableTerms(tList);
+        }
+
+        if (sessionsRes.status === "fulfilled" && Array.isArray(sessionsRes.value.data)) {
+          const sList = sessionsRes.value.data.map((s: any) => s.name).filter(Boolean);
+          if (sList.length > 0) setAvailableSessions(sList);
         }
 
         if (currentRes.status === "fulfilled") {
@@ -456,19 +471,26 @@ export default function AddResultV2Page() {
   // -----------------------------
   // Load Class Students Roster
   // -----------------------------
-  const loadClassRoster = async (classId: number, targetBatchId?: number | null) => {
+  const loadClassRoster = async (
+    classId: number,
+    targetBatchId?: number | null,
+    overrideTerm?: string,
+    overrideSession?: string
+  ) => {
     if (!classId) return;
     setLoadingStudents(true);
     try {
+      const activeTerm = overrideTerm || term;
+      const activeSession = overrideSession || session;
       let bId = targetBatchId || null;
 
-      // If batchId is not known yet, resolve or fetch specifically for this class
-      if (!bId && term && session) {
+      // Always resolve specifically for this class, active term, and active session
+      if (!bId && activeTerm && activeSession) {
         try {
           const resolveRes = await authApi.post("/result-batches/resolve", {
             class_id: classId,
-            term,
-            session,
+            term: activeTerm,
+            session: activeSession,
           });
           bId = resolveRes.data?.batch?.id || null;
           if (bId) setBatchId(bId);
@@ -695,8 +717,8 @@ export default function AddResultV2Page() {
       setBatchId(resolvedBId || bId);
       if (st.level?.id) setSelectedClassId(st.level.id);
 
-      if (data.term) setTerm(data.term);
-      if (data.session) setSession(data.session);
+      if (!term && data.term) setTerm(data.term);
+      if (!session && data.session) setSession(data.session);
       setDepartment(st.department?.name || data.student?.department?.name || "");
 
       setReportColumnPolicy(data.report_column_policy ?? null);
@@ -748,18 +770,13 @@ export default function AddResultV2Page() {
         init[s.name] = {
           subject_id: s.id,
           ca: row?.ca ?? {},
-          exam: row?.exam ?? undefined,
-          total: row?.total ?? undefined,
+          exam: row?.exam !== null && row?.exam !== undefined ? Number(row.exam) : undefined,
+          total: row?.total !== null && row?.total !== undefined ? Number(row.total) : (Object.keys(row?.ca ?? {}).length > 0 || row?.exam !== undefined ? calcTotal(row?.ca ?? {}, row?.exam) : undefined),
           grade: row?.grade || auto.grade,
           remark: row?.remark || auto.remark,
           carry_over: row?.carry_over ?? undefined,
         };
       }
-
-      // Recompute totals
-      Object.keys(init).forEach((k) => {
-        init[k].total = calcTotal(init[k].ca, init[k].exam);
-      });
 
       setScores(init);
 
@@ -769,33 +786,42 @@ export default function AddResultV2Page() {
         setAutoAttendance(null);
       }
 
+      const cleanSummary = {
+        total_grade: "",
+        principal_comment: "",
+        class_teacher_comment: "",
+        general_remark: "",
+        position: "",
+        class_teacher: "",
+        class_size: String(classStudents.length || ""),
+        meta: {
+          resumption_date: "",
+          school_open: data.attendance?.available ? String(data.attendance.total_open) : "",
+          school_close: "",
+          no_present: data.attendance?.available ? String(data.attendance.present) : "",
+          no_absent: data.attendance?.available ? String(data.attendance.absent) : "",
+        },
+      };
+
       if (data.existing?.summary) {
         const exMeta = data.existing.summary.meta ?? {};
-        setSummary((p) => ({
-          ...p,
+        setSummary({
+          ...cleanSummary,
           ...data.existing.summary,
           meta: {
-            ...p.meta,
+            ...cleanSummary.meta,
             ...exMeta,
-            no_present: exMeta.no_present ?? (data.attendance?.available ? String(data.attendance.present) : p.meta.no_present),
-            no_absent: exMeta.no_absent ?? (data.attendance?.available ? String(data.attendance.absent) : p.meta.no_absent),
-            school_open: exMeta.school_open ?? (data.attendance?.available ? String(data.attendance.total_open) : p.meta.school_open),
+            no_present: exMeta.no_present ?? (data.attendance?.available ? String(data.attendance.present) : ""),
+            no_absent: exMeta.no_absent ?? (data.attendance?.available ? String(data.attendance.absent) : ""),
+            school_open: exMeta.school_open ?? (data.attendance?.available ? String(data.attendance.total_open) : ""),
           },
-        }));
-      } else if (data.attendance?.available) {
-        setSummary((p) => ({
-          ...p,
-          meta: {
-            ...p.meta,
-            no_present: String(data.attendance.present),
-            no_absent: String(data.attendance.absent),
-            school_open: String(data.attendance.total_open),
-          },
-        }));
+        });
+      } else {
+        setSummary(cleanSummary);
       }
 
       setStep(2);
-      loadClassRoster(st.level?.id || Number(selectedClassId), bId);
+      loadClassRoster(st.level?.id || Number(selectedClassId), resolvedBId || bId);
     } catch (e: any) {
       showError(e?.response?.data?.message || "Failed to load student result form.");
     } finally {
@@ -812,7 +838,12 @@ export default function AddResultV2Page() {
 
     setSearching(true);
     try {
-      const res = await authApi.get(`/search-stu/${adm}`);
+      const res = await authApi.get(`/search-stu/${adm}`, {
+        params: {
+          term: term || undefined,
+          session: session || undefined,
+        },
+      });
       const data = res.data;
 
       const st: Student = data.student;
@@ -1261,22 +1292,6 @@ export default function AddResultV2Page() {
     }
   };
 
-  // -----------------------------
-  // Compute Batch
-  // -----------------------------
-  const handleComputeBatch = async () => {
-    if (!batchId) return showWarning("No active batch selected.");
-    setComputing(true);
-    try {
-      await authApi.post(`/result-batches/${batchId}/compute`);
-      showSuccess("Batch compilation completed! Rankings and averages calculated. ✅");
-    } catch (e: any) {
-      showError(e?.response?.data?.message || "Failed to compute batch");
-    } finally {
-      setComputing(false);
-    }
-  };
-
   // Filtered roster students
   const filteredRoster = useMemo(() => {
     if (!studentFilterText.trim()) return classStudents;
@@ -1609,16 +1624,6 @@ export default function AddResultV2Page() {
                   <i className="bi bi-file-earmark-spreadsheet-fill me-1" />
                   Upload Excel Scores
                 </button>
-                {batchId && (
-                  <button
-                    className="btn btn-warning btn-sm"
-                    style={{ borderRadius: 8, fontWeight: 700, color: "#0F172A" }}
-                    onClick={handleComputeBatch}
-                    disabled={computing}
-                  >
-                    {computing ? "Computing..." : "⚡ 1-Click Compute Batch"}
-                  </button>
-                )}
               </div>
             </div>
 
@@ -1987,6 +1992,68 @@ export default function AddResultV2Page() {
                         </div>
 
                         <div className="p-4">
+                          <div className="row g-2 mb-3">
+                            <div className="col-md-6">
+                              <label className="form-label fw-bold text-dark small">Academic Session</label>
+                              <select
+                                className="form-select form-select-sm"
+                                style={{ padding: "8px 12px", borderRadius: 8, fontWeight: 700 }}
+                                value={session}
+                                onChange={(e) => {
+                                  const newS = e.target.value;
+                                  setSession(newS);
+                                  setBatchId(null);
+                                  setStudent(null);
+                                  if (selectedClassId) {
+                                    loadClassRoster(Number(selectedClassId), null, term, newS);
+                                  }
+                                }}
+                              >
+                                {availableSessions.length > 0 ? (
+                                  availableSessions.map((s) => (
+                                    <option key={s} value={s}>
+                                      {s}
+                                    </option>
+                                  ))
+                                ) : (
+                                  <option value={session || "2026/2027"}>{session || "2026/2027"}</option>
+                                )}
+                              </select>
+                            </div>
+
+                            <div className="col-md-6">
+                              <label className="form-label fw-bold text-dark small">Academic Term</label>
+                              <select
+                                className="form-select form-select-sm"
+                                style={{ padding: "8px 12px", borderRadius: 8, fontWeight: 700 }}
+                                value={term}
+                                onChange={(e) => {
+                                  const newT = e.target.value;
+                                  setTerm(newT);
+                                  setBatchId(null);
+                                  setStudent(null);
+                                  if (selectedClassId) {
+                                    loadClassRoster(Number(selectedClassId), null, newT, session);
+                                  }
+                                }}
+                              >
+                                {availableTerms.length > 0 ? (
+                                  availableTerms.map((t) => (
+                                    <option key={t} value={t}>
+                                      {t}
+                                    </option>
+                                  ))
+                                ) : (
+                                  <>
+                                    <option value="First Term">First Term</option>
+                                    <option value="Second Term">Second Term</option>
+                                    <option value="Third Term">Third Term</option>
+                                  </>
+                                )}
+                              </select>
+                            </div>
+                          </div>
+
                           <div className="mb-3">
                             <label className="form-label fw-bold text-dark small">Select Your Class</label>
                             <select
@@ -1996,6 +2063,7 @@ export default function AddResultV2Page() {
                               onChange={(e) => {
                                 const val = e.target.value ? Number(e.target.value) : "";
                                 setSelectedClassId(val);
+                                setBatchId(null);
                                 setStudent(null);
                               }}
                             >
@@ -2086,9 +2154,12 @@ export default function AddResultV2Page() {
                         </div>
 
                         <div className="p-4">
-                          <p className="small text-muted mb-3">
+                          <p className="small text-muted mb-2">
                             Want to enter or edit a single student without selecting a whole class? Search by admission number:
                           </p>
+                          <div className="p-2 px-3 rounded-2 bg-light border small text-muted mb-3">
+                            Target: <strong className="text-dark">{term || "Current Term"}</strong> • <strong className="text-dark">{session || "Active Session"}</strong>
+                          </div>
 
                           <div className="mb-3">
                             <label className="form-label fw-bold text-dark small">Admission Number</label>
@@ -2837,8 +2908,8 @@ export default function AddResultV2Page() {
                   <span style={{ fontSize: 54 }}>🎉</span>
                 </div>
                 <h2 className="fw-bold text-dark mb-2">Result Saved Successfully!</h2>
-                <p className="text-muted mb-4" style={{ maxWidth: 520, margin: "0 auto" }}>
-                  The result record for <strong>{student.firstname} {student.surname}</strong> ({student.reg_no}) has been securely recorded.
+                <p className="text-muted mb-4" style={{ maxWidth: 540, margin: "0 auto" }}>
+                  The result record for <strong>{student.firstname} {student.surname}</strong> ({student.reg_no}) for <strong>{term} • {session}</strong> has been saved. It is now ready for the Principal to review and approve.
                 </p>
 
                 <div className="d-flex justify-content-center gap-3 flex-wrap">
