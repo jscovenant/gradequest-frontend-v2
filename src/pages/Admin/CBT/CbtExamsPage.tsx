@@ -7,6 +7,7 @@ import Loader from "../../../components/ui/dashboardLoader";
 import PageTitle from "../../../components/PageTitle";
 import CbtHtml from "../../../components/cbt/CbtHtml";
 import CbtRichEditor from "../../../components/cbt/CbtRichEditor";
+import ClassCbtSettingsModal from "../../../components/cbt/ClassCbtSettingsModal";
 import { authApi } from "../../../utils/axios";
 import { getUser, getToken } from "../../../utils/token";
 import { getApiBaseUrl } from "../../../utils/apiUrl";
@@ -41,6 +42,8 @@ type CbtExam = {
   access_code_required?: boolean | number;
   access_code?: string;
   calculator_enabled?: boolean | number;
+  include_theory?: boolean | number;
+  theory_instructions?: string;
   schedules?: CbtSchedule[];
   general_instructions?: string;
   questions_count?: number;
@@ -66,6 +69,19 @@ type SchoolClass = {
 type SchoolSection = {
   id: number;
   name: string;
+};
+
+type AcademicSessionItem = {
+  id: number;
+  name: string;
+  is_current?: boolean | number;
+};
+
+type TermItem = {
+  id: number;
+  name: string;
+  is_current?: boolean | number;
+  academic_session_id?: number;
 };
 
 type Department = {
@@ -134,6 +150,7 @@ type CbtQuestion = {
   question_type: string;
   question_text: string;
   marks: number;
+  diagram_url?: string | null;
   options?: CbtOption[];
 };
 
@@ -239,6 +256,8 @@ type WordImportResult = {
 
 const emptyExam = {
   title: "",
+  academic_session_id: "",
+  term_id: "",
   subject_id: "",
   class_id: "",
   section_id: "",
@@ -253,6 +272,8 @@ const emptyExam = {
   access_code_required: false,
   access_code: "",
   calculator_enabled: false,
+  include_theory: false,
+  theory_instructions: "",
   schedule: {
     exam_date: "",
     starts_at: "",
@@ -284,6 +305,7 @@ const emptyQuestion = {
   marks: 1,
   difficulty: "normal",
   explanation: "",
+  diagram_url: "",
   options: [
     { label: "A", option_text: "", is_correct: true },
     { label: "B", option_text: "", is_correct: false },
@@ -304,13 +326,51 @@ export default function CbtExamsPage() {
   const [sections, setSections] = useState<SchoolSection[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [sessions, setSessions] = useState<AcademicSessionItem[]>([]);
+  const [terms, setTerms] = useState<TermItem[]>([]);
+  const [reuseModalOpen, setReuseModalOpen] = useState(false);
+  const [reuseSourceExam, setReuseSourceExam] = useState<CbtExam | null>(null);
+  const [reusing, setReusing] = useState(false);
+  const [reuseForm, setReuseForm] = useState({
+    title: "",
+    academic_session_id: "",
+    term_id: "",
+    class_id: "",
+    duration_minutes: 60,
+    pass_mark: 50,
+    schedule: {
+      exam_date: "",
+      starts_at: "",
+      ends_at: "",
+      venue: "",
+    },
+  });
   const [form, setForm] = useState(emptyExam);
+  const [filterSessionId, setFilterSessionId] = useState<string>("");
+  const [filterTermId, setFilterTermId] = useState<string>("");
+  const [filterClassId, setFilterClassId] = useState<string>("");
+  const [filterSubjectId, setFilterSubjectId] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterSearch, setFilterSearch] = useState<string>("");
   const [settingsForm, setSettingsForm] = useState(emptyExam);
   const [selectedExamId, setSelectedExamId] = useState<number | null>(null);
   const [examDetail, setExamDetail] = useState<CbtExamDetail | null>(null);
   const [sectionForm, setSectionForm] = useState(emptySection);
   const [groupForm, setGroupForm] = useState(emptyGroup);
   const [questionForm, setQuestionForm] = useState(emptyQuestion);
+  const [builderTab, setBuilderTab] = useState<"objective" | "theory">("objective");
+  const emptyTheoryQuestion = {
+    question_text: "",
+    marks: 10,
+    diagram_url: "",
+    explanation: "",
+  };
+  const [theoryForm, setTheoryForm] = useState(emptyTheoryQuestion);
+  const [theoryInstructionsDraft, setTheoryInstructionsDraft] = useState("");
+  const [savingTheoryInstructions, setSavingTheoryInstructions] = useState(false);
+  const [theoryDiagramUploading, setTheoryDiagramUploading] = useState(false);
+  const [theoryDiagramFileName, setTheoryDiagramFileName] = useState("");
+  const [showDiagramUrlInput, setShowDiagramUrlInput] = useState(false);
   const [licenseDays] = useState(365);
   const [offlineLicense, setOfflineLicense] = useState<any>(null);
   const [syncFile, setSyncFile] = useState<File | null>(null);
@@ -319,6 +379,7 @@ export default function CbtExamsPage() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [classCbtModalOpen, setClassCbtModalOpen] = useState(false);
   const [licenseModalOpen, setLicenseModalOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [questionImportModalOpen, setQuestionImportModalOpen] = useState(false);
@@ -368,6 +429,14 @@ export default function CbtExamsPage() {
       return true;
     });
   }, [examDetail]);
+
+  const objectiveQuestions = useMemo(() => {
+    return questions.filter((q) => q.question_type !== "theory");
+  }, [questions]);
+
+  const theoryQuestions = useMemo(() => {
+    return questions.filter((q) => q.question_type === "theory");
+  }, [questions]);
 
   const readList = <T,>(value: any): T[] => {
     if (Array.isArray(value)) return value;
@@ -439,22 +508,36 @@ export default function CbtExamsPage() {
 
   const examPayload = (values: typeof emptyExam) => ({
     ...values,
+    academic_session_id: values.academic_session_id ? Number(values.academic_session_id) : null,
+    term_id: values.term_id ? Number(values.term_id) : null,
+    include_theory: Boolean(values.include_theory),
+    theory_instructions: values.theory_instructions || "",
     subject_id: values.subject_id ? Number(values.subject_id) : null,
     class_id: values.class_id ? Number(values.class_id) : null,
     section_id: values.section_id ? Number(values.section_id) : null,
     department_id: values.department_id ? Number(values.department_id) : null,
     access_code: values.access_code_required ? values.access_code : null,
+    schedule: values.schedule?.exam_date?.trim()
+      ? {
+          exam_date: values.schedule.exam_date,
+          starts_at: values.schedule.starts_at || null,
+          ends_at: values.schedule.ends_at || null,
+          venue: values.schedule.venue || null,
+        }
+      : null,
   });
 
   async function load() {
     setLoading(true);
     try {
-      const [examRes, classRes, sectionRes, departmentRes, subjectRes] = await Promise.all([
-        authApi.get("/cbt/exams"),
+      const [examRes, classRes, sectionRes, departmentRes, subjectRes, sessionRes, termRes] = await Promise.all([
+        authApi.get("/cbt/exams", { params: { all_periods: 1, per_page: 250 } }),
         authApi.get("/levels"),
         authApi.get("/sections"),
         authApi.get("/departments"),
-        authApi.get("/subjects/list").catch(() => authApi.get("/subjects")),
+        authApi.get(isTeacher ? "/subjects/list?for_cbt=1" : "/subjects/list").catch(() => authApi.get(isTeacher ? "/subjects?for_cbt=1" : "/subjects")),
+        authApi.get("/sessions").catch(() => ({ data: [] })),
+        authApi.get("/terms").catch(() => ({ data: [] })),
       ]);
       const departmentList = readList<Department>(departmentRes.data);
       const sectionList = readList<SchoolSection>(sectionRes.data);
@@ -493,22 +576,23 @@ export default function CbtExamsPage() {
           assignments
             .filter((a: any) => Number(a.teacher_id) === Number(user?.id))
             .forEach((a: any) => {
-              if (a.subject?.id) {
-                const sub = a.subject;
-                const secId = sub.section_id ? Number(sub.section_id) : null;
-                const deptId = sub.department_id ? Number(sub.department_id) : null;
-                const clsId = sub.class_id ? Number(sub.class_id) : null;
-                teacherSubjectMap.set(Number(sub.id), {
-                  id: Number(sub.id),
-                  name: String(sub.name || ""),
-                  subject_id: sub.subject_id || null,
+              const subId = Number(a.subject_id || a.subject?.id || a.id);
+              if (subId) {
+                const subName = String(a.subject_name || a.subject?.name || a.name || "");
+                const secId = a.section_id ? Number(a.section_id) : (a.subject?.section_id ? Number(a.subject.section_id) : null);
+                const deptId = a.department_id ? Number(a.department_id) : (a.subject?.department_id ? Number(a.subject.department_id) : null);
+                const clsId = a.class_id ? Number(a.class_id) : (a.subject?.class_id ? Number(a.subject.class_id) : null);
+                teacherSubjectMap.set(subId, {
+                  id: subId,
+                  name: subName,
+                  subject_id: a.subject_id || null,
                   department_id: deptId,
                   section_id: secId,
                   class_id: clsId,
-                  section_name: sub.section_name || sub.section?.name || (secId ? sectionMap.get(secId) : null) || null,
-                  department_name: sub.department_name || sub.department?.name || (deptId ? deptMap.get(deptId) : null) || null,
-                  section: sub.section || (secId ? { id: secId, name: sectionMap.get(secId) || "" } : null),
-                  department: sub.department || (deptId ? { id: deptId, name: deptMap.get(deptId) || "" } : null),
+                  section_name: a.section_name || a.subject?.section_name || (secId ? sectionMap.get(secId) : null) || null,
+                  department_name: a.department_name || a.subject?.department_name || (deptId ? deptMap.get(deptId) : null) || null,
+                  section: secId ? { id: secId, name: a.section_name || sectionMap.get(secId) || "" } : null,
+                  department: deptId ? { id: deptId, name: a.department_name || deptMap.get(deptId) || "" } : null,
                 });
               }
             });
@@ -520,11 +604,38 @@ export default function CbtExamsPage() {
         finalSubjects = allSubjects;
       }
 
-      setExams(Array.isArray(examRes.data?.exams?.data) ? examRes.data.exams.data : []);
+      const rawExams = examRes.data?.exams?.data ?? examRes.data?.exams ?? [];
+      setExams(Array.isArray(rawExams) ? rawExams : []);
       setClasses(classList);
       setSections(sectionList);
       setDepartments(departmentList);
       setSubjects(finalSubjects);
+      const rawSessions = readList<any>(sessionRes?.data);
+      const rawTerms = readList<any>(termRes?.data);
+      const mappedSessions = rawSessions.map((s: any) => ({
+        id: Number(s.id),
+        name: String(s.name || s.session_name || `Session #${s.id}`),
+        is_current: Boolean(s.is_current),
+      }));
+      const mappedTerms = rawTerms.map((t: any) => ({
+        id: Number(t.id),
+        name: String(t.name || t.term_name || `Term #${t.id}`),
+        is_current: Boolean(t.is_current),
+        academic_session_id: t.academic_session_id ? Number(t.academic_session_id) : undefined,
+      }));
+      setSessions(mappedSessions);
+      setTerms(mappedTerms);
+
+      const activeSess = mappedSessions.find((s: any) => s.is_current) || mappedSessions[0];
+      const activeT = mappedTerms.find((t: any) => t.is_current) || mappedTerms[0];
+      if (activeSess) {
+        setFilterSessionId((p) => p || String(activeSess.id));
+        setForm((p) => ({ ...p, academic_session_id: p.academic_session_id || String(activeSess.id) }));
+      }
+      if (activeT) {
+        setFilterTermId((p) => p || String(activeT.id));
+        setForm((p) => ({ ...p, term_id: p.term_id || String(activeT.id) }));
+      }
       authApi.get("/admin/ai/credits").then((r) => setAiCreditSummary(r.data?.data || null)).catch(() => undefined);
     } catch (e: any) {
       showError(e?.response?.data?.message || "Unable to load CBT exams.");
@@ -542,6 +653,8 @@ export default function CbtExamsPage() {
       setExamDetail(exam);
       if (exam) {
         setSettingsForm({
+          academic_session_id: exam.academic_session_id ? String(exam.academic_session_id) : "",
+          term_id: exam.term_id ? String(exam.term_id) : "",
           title: exam.title || "",
           subject_id: exam.subject_id ? String(exam.subject_id) : "",
           class_id: exam.class_id ? String(exam.class_id) : "",
@@ -557,6 +670,8 @@ export default function CbtExamsPage() {
           access_code_required: Boolean(exam.access_code_required),
           access_code: exam.access_code || "",
           calculator_enabled: Boolean(exam.calculator_enabled),
+          include_theory: Boolean(exam.include_theory),
+          theory_instructions: exam.theory_instructions || "",
           schedule: {
             exam_date: (exam.schedules?.[0]?.exam_date || "").slice(0, 10),
             starts_at: (exam.schedules?.[0]?.starts_at || "").slice(0, 5),
@@ -569,6 +684,13 @@ export default function CbtExamsPage() {
       setSectionForm(emptySection);
       setGroupForm(emptyGroup);
       setQuestionForm(emptyQuestion);
+      setTheoryForm(emptyTheoryQuestion);
+      if (exam) {
+        setTheoryInstructionsDraft(exam.theory_instructions || "");
+        if (!exam.include_theory) {
+          setBuilderTab("objective");
+        }
+      }
     } catch (e: any) {
       showError(e?.response?.data?.message || "Unable to open CBT builder.");
     } finally {
@@ -588,12 +710,84 @@ export default function CbtExamsPage() {
     setQuestionImportModalOpen(true);
   }
 
+  function openReuseModal(exam: CbtExam) {
+    setReuseSourceExam(exam);
+    const activeSession = sessions.find((s) => s.is_current) || sessions[0];
+    const activeTerm = terms.find((t) => t.is_current) || terms[0];
+    setReuseForm({
+      title: `${exam.title} (Copy)`,
+      academic_session_id: activeSession ? String(activeSession.id) : "",
+      term_id: activeTerm ? String(activeTerm.id) : "",
+      class_id: exam.class_id ? String(exam.class_id) : "",
+      duration_minutes: Number(exam.duration_minutes || 60),
+      pass_mark: Number(exam.pass_mark || 50),
+      schedule: {
+        exam_date: "",
+        starts_at: "",
+        ends_at: "",
+        venue: "",
+      },
+    });
+    setReuseModalOpen(true);
+  }
+
+  async function handleReuseExam(e: FormEvent) {
+    e.preventDefault();
+    if (!reuseSourceExam) return;
+    if (!reuseForm.academic_session_id) {
+      showError("Please select the target academic session.");
+      return;
+    }
+    if (!reuseForm.term_id) {
+      showError("Please select the target term.");
+      return;
+    }
+
+    setReusing(true);
+    try {
+      const payload = {
+        academic_session_id: Number(reuseForm.academic_session_id),
+        term_id: Number(reuseForm.term_id),
+        class_id: reuseForm.class_id ? Number(reuseForm.class_id) : null,
+        title: reuseForm.title.trim() || undefined,
+        duration_minutes: Number(reuseForm.duration_minutes) || 60,
+        pass_mark: Number(reuseForm.pass_mark) || 50,
+        schedule: reuseForm.schedule.exam_date?.trim()
+          ? {
+              exam_date: reuseForm.schedule.exam_date,
+              starts_at: reuseForm.schedule.starts_at || null,
+              ends_at: reuseForm.schedule.ends_at || null,
+              venue: reuseForm.schedule.venue || null,
+            }
+          : null,
+      };
+
+      const res = await authApi.post(`/cbt/exams/${reuseSourceExam.id}/reuse`, payload);
+      showSuccess(res.data?.message || "Exam copied successfully to target academic session!");
+      setReuseModalOpen(false);
+      setReuseSourceExam(null);
+      await load();
+      const newExamId = Number(res.data?.exam?.id);
+      if (newExamId) {
+        await loadExam(newExamId);
+      }
+    } catch (err: any) {
+      showError(err?.response?.data?.message || "Failed to reuse exam for academic session.");
+    } finally {
+      setReusing(false);
+    }
+  }
+
   useEffect(() => {
     void load();
   }, []);
 
   async function createExam(e: FormEvent) {
     e.preventDefault();
+    if (!form.subject_id) {
+      showError("Please select an assigned subject for this CBT exam.");
+      return;
+    }
     setSaving(true);
     try {
       const res = await authApi.post("/cbt/exams", examPayload(form));
@@ -716,6 +910,96 @@ export default function CbtExamsPage() {
     }
   }
 
+  async function saveTheoryInstructions() {
+    if (!selectedExamId) return;
+    setSavingTheoryInstructions(true);
+    try {
+      await authApi.put(`/cbt/exams/${selectedExamId}`, {
+        ...examPayload(settingsForm),
+        theory_instructions: theoryInstructionsDraft,
+      });
+      setExamDetail((p) => p ? { ...p, theory_instructions: theoryInstructionsDraft } : p);
+      showSuccess("Theory section instructions saved.");
+      await load();
+    } catch (err: any) {
+      showError(err?.response?.data?.message || "Failed to save theory instructions.");
+    } finally {
+      setSavingTheoryInstructions(false);
+    }
+  }
+
+  async function handleTheoryDiagramFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !selectedExamId) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      showError("Image file size exceeds the 5MB limit. Please choose a smaller image.");
+      return;
+    }
+
+    setTheoryDiagramFileName(file.name);
+    setTheoryDiagramUploading(true);
+
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const base64Data = ev.target?.result as string;
+      if (base64Data) {
+        setTheoryForm((p) => ({ ...p, diagram_url: base64Data }));
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append("image", file);
+        const res = await authApi.post(`/cbt/exams/${selectedExamId}/questions/images`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        if (res.data?.url) {
+          setTheoryForm((p) => ({ ...p, diagram_url: res.data.url }));
+          showSuccess("Diagram uploaded successfully.");
+        }
+      } catch {
+        showSuccess("Diagram image selected.");
+      } finally {
+        setTheoryDiagramUploading(false);
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  }
+
+  async function addTheoryQuestion(e: FormEvent) {
+    e.preventDefault();
+    if (!selectedExamId) return showError("Select an exam first.");
+    const plainText = theoryForm.question_text.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+    if (!plainText && !theoryForm.question_text.includes("<img")) {
+      return showError("Enter the theory question before saving.");
+    }
+    setSaving(true);
+    try {
+      const isBase64 = Boolean(theoryForm.diagram_url?.startsWith("data:image/"));
+      const payload: any = {
+        question_type: "theory",
+        question_text: theoryForm.question_text,
+        marks: Number(theoryForm.marks) || 10,
+        diagram_url: isBase64 ? null : (theoryForm.diagram_url || null),
+        diagram_base64: isBase64 ? theoryForm.diagram_url : null,
+        explanation: theoryForm.explanation || "",
+        options: [],
+      };
+      await authApi.post(`/cbt/exams/${selectedExamId}/questions`, payload);
+      setTheoryForm(emptyTheoryQuestion);
+      setTheoryDiagramFileName("");
+      setShowDiagramUrlInput(false);
+      showSuccess("Theory question added.");
+      await load();
+      await loadExam(selectedExamId);
+    } catch (e: any) {
+      showError(e?.response?.data?.message || "Unable to add theory question.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function addQuestion(e: FormEvent) {
     e.preventDefault();
     if (!selectedExamId) return showError("Select an exam first.");
@@ -725,12 +1009,14 @@ export default function CbtExamsPage() {
     }
 
     const usesOptions = objectiveTypes.includes(questionForm.question_type);
+    const isTheory = questionForm.question_type === "theory";
     const payload: any = {
       ...questionForm,
       section_id: questionForm.section_id ? Number(questionForm.section_id) : null,
       question_group_id: questionForm.question_group_id ? Number(questionForm.question_group_id) : null,
       marks: Number(questionForm.marks),
-      options: usesOptions ? questionForm.options.filter((option) => option.option_text.trim()) : [],
+      diagram_url: questionForm.diagram_url || null,
+      options: isTheory ? [] : (usesOptions ? questionForm.options.filter((option) => option.option_text.trim()) : []),
     };
 
     if (questionForm.question_type === "true_false") {
@@ -993,10 +1279,7 @@ export default function CbtExamsPage() {
     }
   }
   async function prepareAndDownloadOfflineBundle() {
-    if (isTeacher) {
-      showError("Teachers do not have permission to download offline CBT packages.");
-      return;
-    }
+    // Allow staff/teachers to manage offline CBT
     setSaving(true);
     setOfflineLicense(null);
     setSyncResult(null);
@@ -1028,11 +1311,38 @@ export default function CbtExamsPage() {
     }
   }
 
-  async function downloadOfflineBundle() {
-    if (isTeacher) {
-      showError("Teachers do not have permission to download offline CBT packages.");
-      return;
+  
+  async function fetchLicenses() {
+    try {
+      const res = await authApi.get("/cbt/offline/licenses");
+      const list = res.data?.licenses?.data || (Array.isArray(res.data?.licenses) ? res.data.licenses : []);
+      if (list.length > 0) {
+        const active = list.find((item: any) => item.status === 'active') || list[0];
+        setOfflineLicense(active);
+      }
+    } catch (e: any) {
+      console.warn("Could not fetch offline licenses:", e);
     }
+  }
+
+  async function generateFreshLicense() {
+    setSaving(true);
+    try {
+      const res = await authApi.post("/cbt/offline/licenses", { days: licenseDays });
+      const lic = res.data?.license;
+      if (lic) {
+        setOfflineLicense(lic);
+        showSuccess("New offline license generated! Copy the license key below.");
+      }
+    } catch (e: any) {
+      showError(e?.response?.data?.message || "Failed to generate offline license.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function downloadOfflineBundle() {
+    // Allow staff/teachers to manage offline CBT
     if (!offlineLicense?.id) {
       showError("Generate an offline license first.");
       return;
@@ -1063,10 +1373,7 @@ export default function CbtExamsPage() {
   }
 
   async function downloadOfflineInstaller() {
-    if (isTeacher) {
-      showError("Teachers do not have permission to download offline CBT packages or apps.");
-      return;
-    }
+    // Allow staff/teachers to manage offline CBT
     setSaving(true);
     try {
       const token = getToken?.() || "";
@@ -1086,6 +1393,31 @@ export default function CbtExamsPage() {
       a.remove();
     } catch (e: any) {
       showError(e?.message || "Unable to start offline CBT download.");
+    } finally {
+      setTimeout(() => setSaving(false), 2000);
+    }
+  }
+
+  async function downloadStudentClient() {
+    setSaving(true);
+    try {
+      const token = getToken?.() || "";
+      const base = getApiBaseUrl().replace(/\/+$/, "");
+      const isGradeQuest = typeof window !== "undefined" && window.location.hostname.toLowerCase().includes("gradequest");
+      const appName = isGradeQuest ? "GradeQuest" : "SchoolProfit";
+      const fileName = `${appName}StudentClientSetup.exe`;
+      const directUrl = `${base}/public/cbt/offline/student-client/download?token=${encodeURIComponent(token)}`;
+
+      showSuccess(`Downloading ${appName} Student Client Setup (2 MB)... Run this on student PCs.`);
+
+      const a = document.createElement("a");
+      a.href = directUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e: any) {
+      showError(e?.message || "Unable to start student client download.");
     } finally {
       setTimeout(() => setSaving(false), 2000);
     }
@@ -1146,6 +1478,48 @@ export default function CbtExamsPage() {
   }
 
   const selectedIsPublished = examDetail?.status === "published";
+  const filteredExams = useMemo(() => {
+    if (!Array.isArray(exams)) return [];
+    return exams.filter((exam) => {
+      if (filterSessionId && filterSessionId !== "all") {
+        if (Number(exam.academic_session_id) !== Number(filterSessionId)) {
+          return false;
+        }
+      }
+      if (filterTermId && filterTermId !== "all") {
+        if (Number(exam.term_id) !== Number(filterTermId)) {
+          return false;
+        }
+      }
+      if (filterClassId) {
+        if (Number(exam.class_id) !== Number(filterClassId)) {
+          return false;
+        }
+      }
+      if (filterSubjectId) {
+        if (Number(exam.subject_id) !== Number(filterSubjectId)) {
+          return false;
+        }
+      }
+      if (filterStatus && filterStatus !== "all") {
+        if (String(exam.status || "").toLowerCase() !== filterStatus.toLowerCase()) {
+          return false;
+        }
+      }
+      if (filterSearch && filterSearch.trim()) {
+        const q = filterSearch.trim().toLowerCase();
+        const titleMatch = (exam.title || "").toLowerCase().includes(q);
+        const codeMatch = (exam.exam_code || "").toLowerCase().includes(q);
+        const subjectMatch = (exam.subject?.name || "").toLowerCase().includes(q);
+        const classMatch = (exam.class?.name || "").toLowerCase().includes(q);
+        if (!titleMatch && !codeMatch && !subjectMatch && !classMatch) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [exams, filterSessionId, filterTermId, filterClassId, filterSubjectId, filterStatus, filterSearch]);
+
   const draftCount = exams.filter((exam) => exam.status === "draft").length;
   const publishedCount = exams.filter((exam) => exam.status === "published").length;
   const scheduledCount = exams.filter((exam) => (exam.schedules || []).length > 0).length;
@@ -1165,7 +1539,7 @@ export default function CbtExamsPage() {
 
   const scheduleLabel = (exam: CbtExam) => {
     const schedule = exam.schedules?.[0];
-    if (!schedule?.exam_date) return "Set timetable";
+    if (!schedule?.exam_date) return "Unscheduled / On-demand";
     const date = new Date(schedule.exam_date).toLocaleDateString(undefined, { day: "numeric", month: "short" });
     const start = schedule.starts_at?.slice(0, 5) || "--:--";
     const end = schedule.ends_at?.slice(0, 5) || "--:--";
@@ -1191,12 +1565,13 @@ export default function CbtExamsPage() {
         .cbt-hero {
           background: linear-gradient(135deg, #0A192F 0%, #0F2744 60%, #1E3A8A 100%);
           color: #fff;
-          border-radius: 18px;
-          padding: 32px 36px;
-          display: grid;
-          grid-template-columns: minmax(0,1fr) auto;
-          gap: 24px;
-          align-items: end;
+          border-radius: 16px;
+          padding: 24px 28px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 18px 24px;
           box-shadow: 0 10px 30px -5px rgba(15, 39, 68, 0.15);
           position: relative;
           overflow: hidden;
@@ -1224,22 +1599,29 @@ export default function CbtExamsPage() {
           border: 1px solid rgba(217, 119, 6, 0.35);
           border-radius: 100px;
           padding: 4px 12px;
-          margin-bottom: 12px;
+          margin-bottom: 10px;
+        }
+        .cbt-hero-text {
+          flex: 1 1 480px;
+          min-width: 280px;
+          position: relative;
+          z-index: 1;
         }
         .cbt-hero h1 {
           font-weight: 800;
-          margin: 4px 0 8px;
-          font-size: 26px;
+          margin: 0 0 6px;
+          font-size: 24px;
           color: #fff;
+          line-height: 1.25;
         }
         .cbt-hero p {
           margin: 0;
           color: #CBD5E1;
-          max-width: 780px;
-          line-height: 1.6;
+          max-width: 100%;
+          line-height: 1.55;
           font-size: 13.5px;
         }
-        .cbt-hero-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; position: relative; z-index: 1; }
+        .cbt-hero-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; align-items: center; position: relative; z-index: 1; }
         .cbt-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
         .cbt-stat {
           background: #fff;
@@ -1317,6 +1699,26 @@ export default function CbtExamsPage() {
         .cbt-ghost:hover:not(:disabled) { background: #E2E8F0; color: #0F2744; border-color: #94A3B8; }
         .cbt-danger { background: #FEE2E2; color: #991B1B; border: 1px solid #FECACA; font-weight: 700; }
         .cbt-danger:hover:not(:disabled) { background: #FCA5A5; color: #7F1D1D; }
+        .cbt-btn-reuse { background: #EEF2FF; color: #4338CA; border: 1px solid #C7D2FE; font-weight: 700; }
+        .cbt-btn-reuse:hover:not(:disabled) { background: #4338CA; color: #FFFFFF; border-color: #4338CA; }
+        .cbt-table td:last-child { min-width: 460px; }
+        .cbt-table th:last-child {
+          position: sticky;
+          right: 0;
+          background: #F8FAFC;
+          z-index: 2;
+          box-shadow: -4px 0 8px rgba(15, 39, 68, 0.06);
+        }
+        .cbt-table td:last-child {
+          position: sticky;
+          right: 0;
+          background: #FFFFFF;
+          z-index: 1;
+          box-shadow: -4px 0 8px rgba(15, 39, 68, 0.06);
+        }
+        .cbt-table tr:hover td:last-child {
+          background: #F8FAFC;
+        }
         .cbt-table-wrap { overflow: auto; }
         .cbt-table { width: 100%; min-width: 920px; border-collapse: separate; border-spacing: 0; }
         .cbt-table th { background: #F8FAFC; color: #64748B; text-transform: uppercase; font-size: 11.5px; font-weight: 700; letter-spacing: .04em; padding: 12px 14px; border-bottom: 1px solid #E2E8F0; }
@@ -1390,6 +1792,10 @@ export default function CbtExamsPage() {
         .cbt-html img, .cbt-rich-content img { max-width: 100%; height: auto; border-radius: 10px; border: 1px solid #E2E8F0; margin: 8px 0; }
         .cbt-html ul, .cbt-html ol { padding-left: 20px; margin: 8px 0; }
         .cbt-html blockquote { border-left: 4px solid #D97706; padding-left: 12px; color: #475569; }
+        .cbt-section-switcher { display: flex; gap: 10px; border-bottom: 2px solid #E2E8F0; padding-bottom: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        .cbt-tab-btn { border: 1px solid #CBD5E1; background: #F8FAFC; color: #475569; padding: 10px 20px; border-radius: 10px; font-weight: 700; font-size: 13.5px; display: inline-flex; align-items: center; cursor: pointer; transition: all 0.2s ease; }
+        .cbt-tab-btn:hover { background: #E2E8F0; color: #0F2744; }
+        .cbt-tab-btn.active { background: #0F2744; border-color: #0F2744; color: #fff; box-shadow: 0 4px 14px rgba(15, 39, 68, 0.18); }
         .cbt-builder-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
         .cbt-selected-strip { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; padding: 14px 20px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; }
         .cbt-selected-strip div { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px; }
@@ -1469,17 +1875,40 @@ export default function CbtExamsPage() {
             <div className="cbt-shell">
               <section className="cbt-hero">
                 <div className="cbt-hero-glow" />
-                <div style={{ position: 'relative', zIndex: 1 }}>
+                <div className="cbt-hero-text">
                   <span className="cbt-eyebrow"><i className="bi bi-pc-display-horizontal me-1" /> Online and Offline CBT</span>
                   <h1>Computer Based Tests</h1>
                   <p>Manage exam setup, scheduling, question banks, student access, and offline CBT licensing from one workspace.</p>
                 </div>
                 <div className="cbt-hero-actions">
+                  <button
+                    className="cbt-btn cbt-gold"
+                    type="button"
+                    onClick={() => {
+                      setLicenseModalOpen(true);
+                      fetchLicenses();
+                    }}
+                    title="View Offline CBT License and package options"
+                  >
+                    <i className="bi bi-router" /> Offline Package & License
+                  </button>
                   <a className="cbt-btn cbt-soft" href={publicAccessUrl} target="_blank" rel="noreferrer"><i className="bi bi-box-arrow-up-right" /> Public Access</a>
                   <button className="cbt-btn cbt-soft" type="button" onClick={() => setManualOpen(true)}><i className="bi bi-question-circle" /> CBT Manual</button>
-                  {!isTeacher && (
-                    <button className="cbt-btn cbt-soft" type="button" disabled={saving} onClick={downloadOfflineInstaller}><i className="bi bi-windows" /> Download Offline App</button>
-                  )}
+                  <button className="cbt-btn cbt-soft" type="button" disabled={saving} onClick={downloadOfflineInstaller} title="Download Server stack for host/teacher PC"><i className="bi bi-server" /> Download Offline Server</button>
+                  <button className="cbt-btn cbt-primary" type="button" disabled={saving} onClick={downloadStudentClient} title="Download lightweight client installer for student computers"><i className="bi bi-laptop" /> Download Student CBT App</button>
+                  <button
+                    className="cbt-btn cbt-btn-reuse"
+                    type="button"
+                    disabled={exams.length === 0}
+                    onClick={() => {
+                      const cur = exams.find((e) => e.id === selectedExamId) || exams[0];
+                      if (cur) openReuseModal(cur);
+                    }}
+                    title="Reuse an existing exam in another academic session"
+                  >
+                    <i className="bi bi-copy" /> Reuse Exam
+                  </button>
+                  <button className="cbt-btn cbt-gold" type="button" onClick={() => setClassCbtModalOpen(true)} title="Configure which classes participate in CBT and adjust platform fees"><i className="bi bi-sliders2 me-1" /> Class CBT & Fee Settings</button>
                   <button className="cbt-btn cbt-primary" type="button" onClick={() => setCreateModalOpen(true)}><i className="bi bi-plus-circle" /> New Exam</button>
                   <button className="cbt-btn cbt-gold" onClick={load}><i className="bi bi-arrow-repeat" /> Refresh</button>
                 </div>
@@ -1499,8 +1928,40 @@ export default function CbtExamsPage() {
                     <div className="cbt-section-label">Basics</div>
                     <div className="cbt-form-grid">
                       <div className="cbt-field cbt-field-full">
-                        <label className="cbt-label">Exam title</label>
+                        <label className="cbt-label">Exam title <span className="text-danger">*</span></label>
                         <input className="cbt-input" value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} required placeholder="e.g. English Language CBT" />
+                      </div>
+                      <div className="cbt-field">
+                        <label className="cbt-label">Academic Session <span className="text-danger">*</span></label>
+                        <select
+                          className="cbt-select"
+                          value={form.academic_session_id}
+                          required
+                          onChange={(e) => setForm((p) => ({ ...p, academic_session_id: e.target.value }))}
+                        >
+                          <option value="">Select Academic Session</option>
+                          {sessions.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.name} {item.is_current ? "(Active)" : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="cbt-field">
+                        <label className="cbt-label">Academic Term <span className="text-danger">*</span></label>
+                        <select
+                          className="cbt-select"
+                          value={form.term_id}
+                          required
+                          onChange={(e) => setForm((p) => ({ ...p, term_id: e.target.value }))}
+                        >
+                          <option value="">Select Term</option>
+                          {terms.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.name} {item.is_current ? "(Active)" : ""}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       <div className="cbt-field">
                         <label className="cbt-label">Section</label>
@@ -1611,9 +2072,22 @@ export default function CbtExamsPage() {
                       <div className="cbt-field">
                         <label className="cbt-label">End time</label>
                         <input className="cbt-input" type="time" value={form.schedule.ends_at} onChange={(e) => setForm((p) => ({ ...p, schedule: { ...p.schedule, ends_at: e.target.value } }))} />
+                </div>
+                <div className="cbt-field-full d-flex justify-content-between align-items-center mb-2">
+                  <p className="cbt-help mb-0">Optional: leave empty for on-demand / unscheduled examination.</p>
+                  {form.schedule.exam_date && (
+                    <button
+                      type="button"
+                      className="cbt-btn cbt-ghost text-danger btn-sm py-1 px-2"
+                      style={{ fontSize: "11px" }}
+                      onClick={() => setForm((p) => ({ ...p, schedule: { exam_date: "", starts_at: "", ends_at: "", venue: "" } }))}
+                    >
+                      <i className="bi bi-x-circle me-1" /> Clear Timetable
+                    </button>
+                  )}
                       </div>
                     </div>
-                    <p className="cbt-help">If a timetable is set, students can only access this exam during this date and time.</p>
+
 
                     <div className="cbt-section-label">Exam rules</div>
                     <label className="cbt-toggle">
@@ -1643,6 +2117,48 @@ export default function CbtExamsPage() {
                       <span><strong>Allow scientific calculator</strong><span>Students can open an in-page calculator during this exam.</span></span>
                     </label>
 
+                    <div className="cbt-section-label">Theory / Essay Questions</div>
+                    <div className="cbt-field cbt-field-full mb-3" style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: "14px 16px" }}>
+                      <label className="cbt-label" style={{ fontWeight: 700, color: "#0F2744", fontSize: 13, marginBottom: 8, display: "block" }}>
+                        Do you want to include theory/essay questions in this examination?
+                      </label>
+                      <div style={{ display: "flex", gap: 16, marginTop: 4, flexWrap: "wrap" }}>
+                        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13, color: !form.include_theory ? "#0F2744" : "#64748B" }}>
+                          <input
+                            type="radio"
+                            name="overview_include_theory"
+                            checked={!form.include_theory}
+                            onChange={() => setForm((p) => ({ ...p, include_theory: false }))}
+                          />
+                          <span>No – Objective Questions Only</span>
+                        </label>
+                        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13, color: form.include_theory ? "#0F2744" : "#64748B" }}>
+                          <input
+                            type="radio"
+                            name="overview_include_theory"
+                            checked={Boolean(form.include_theory)}
+                            onChange={() => setForm((p) => ({ ...p, include_theory: true }))}
+                          />
+                          <span>Yes – Include Theory Questions</span>
+                        </label>
+                      </div>
+                      {form.include_theory && (
+                        <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #E2E8F0" }}>
+                          <label className="cbt-label" style={{ fontWeight: 600 }}>Theory Section Instructions (Section B)</label>
+                          <textarea
+                            className="cbt-textarea"
+                            style={{ minHeight: 70 }}
+                            placeholder="e.g. Read the questions below and write answers on your physical answer paper."
+                            value={form.theory_instructions}
+                            onChange={(e) => setForm((p) => ({ ...p, theory_instructions: e.target.value }))}
+                          />
+                          <small style={{ color: "#64748B", display: "block", marginTop: 4 }}>
+                            ℹ️ Students will read these questions on their screen and answer manually on paper using a pen. Teachers will enter marks later in Result Entry.
+                          </small>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="cbt-field">
                       <label className="cbt-label">General instructions</label>
                       <textarea className="cbt-textarea" value={form.general_instructions} onChange={(e) => setForm((p) => ({ ...p, general_instructions: e.target.value }))} placeholder="Instructions shown before students start." />
@@ -1658,22 +2174,166 @@ export default function CbtExamsPage() {
                         <h2>Exam workspace</h2>
                         <p>{scheduledCount} scheduled exam(s). Share: {publicAccessUrl}</p>
                       </div>
-                      <span className="cbt-pill cbt-pill-neutral">{exams.length} total</span>
+                      <div className="d-flex align-items-center gap-2">
+                        <span className="cbt-pill cbt-pill-neutral">{filteredExams.length} showing / {exams.length} total</span>
+                      </div>
                     </div>
+
+                    {/* Filter toolbar */}
+                    <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px 16px', margin: '0 16px 16px 16px' }}>
+                      <div className="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-2">
+                        <div className="d-flex align-items-center gap-2">
+                          <i className="bi bi-funnel text-primary fw-bold" />
+                          <span style={{ fontWeight: 700, fontSize: '13px', color: '#0F2744' }}>Filter Examinations</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="cbt-btn cbt-ghost py-1 px-2"
+                          style={{ fontSize: '12px' }}
+                          onClick={() => {
+                            const activeS = sessions.find((s) => s.is_current) || sessions[0];
+                            const activeT = terms.find((t) => t.is_current) || terms[0];
+                            setFilterSessionId(activeS ? String(activeS.id) : "");
+                            setFilterTermId(activeT ? String(activeT.id) : "");
+                            setFilterClassId("");
+                            setFilterSubjectId("");
+                            setFilterStatus("all");
+                            setFilterSearch("");
+                          }}
+                        >
+                          <i className="bi bi-arrow-counterclockwise me-1" /> Reset to Current Period
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
+                        <div>
+                          <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748B', display: 'block', marginBottom: '3px' }}>Session</label>
+                          <select
+                            className="cbt-select"
+                            style={{ padding: '6px 10px', fontSize: '12px' }}
+                            value={filterSessionId}
+                            onChange={(e) => setFilterSessionId(e.target.value)}
+                          >
+                            <option value="all">All Sessions</option>
+                            {sessions.map((s) => (
+                              <option key={s.id} value={s.id}>{s.name} {s.is_current ? "★" : ""}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748B', display: 'block', marginBottom: '3px' }}>Term</label>
+                          <select
+                            className="cbt-select"
+                            style={{ padding: '6px 10px', fontSize: '12px' }}
+                            value={filterTermId}
+                            onChange={(e) => setFilterTermId(e.target.value)}
+                          >
+                            <option value="all">All Terms</option>
+                            {terms.map((t) => (
+                              <option key={t.id} value={t.id}>{t.name} {t.is_current ? "★" : ""}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748B', display: 'block', marginBottom: '3px' }}>Class</label>
+                          <select
+                            className="cbt-select"
+                            style={{ padding: '6px 10px', fontSize: '12px' }}
+                            value={filterClassId}
+                            onChange={(e) => setFilterClassId(e.target.value)}
+                          >
+                            <option value="">All Classes</option>
+                            {classes.map((c) => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748B', display: 'block', marginBottom: '3px' }}>Subject</label>
+                          <select
+                            className="cbt-select"
+                            style={{ padding: '6px 10px', fontSize: '12px' }}
+                            value={filterSubjectId}
+                            onChange={(e) => setFilterSubjectId(e.target.value)}
+                          >
+                            <option value="">All Subjects</option>
+                            {subjects.map((sub) => (
+                              <option key={sub.id} value={sub.id}>{sub.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748B', display: 'block', marginBottom: '3px' }}>Status</label>
+                          <select
+                            className="cbt-select"
+                            style={{ padding: '6px 10px', fontSize: '12px' }}
+                            value={filterStatus}
+                            onChange={(e) => setFilterStatus(e.target.value)}
+                          >
+                            <option value="all">All Statuses</option>
+                            <option value="draft">Draft</option>
+                            <option value="published">Published</option>
+                            <option value="closed">Closed</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748B', display: 'block', marginBottom: '3px' }}>Search</label>
+                          <input
+                            className="cbt-input"
+                            style={{ padding: '6px 10px', fontSize: '12px' }}
+                            placeholder="Title or code..."
+                            value={filterSearch}
+                            onChange={(e) => setFilterSearch(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="cbt-table-wrap">
                       <table className="cbt-table">
                         <thead><tr><th>Exam</th><th>Audience</th><th>Schedule</th><th>Access</th><th>Status</th><th>Questions</th><th>Actions</th></tr></thead>
                         <tbody>
-                          {exams.length === 0 ? (
-                            <tr><td colSpan={7} className="text-muted">No CBT exam has been created yet.</td></tr>
-                          ) : exams.map((exam) => (
+                          {filteredExams.length === 0 ? (
+                            <tr><td colSpan={7} className="text-muted text-center py-4">No examination matches the current period or filter selection.</td></tr>
+                          ) : filteredExams.map((exam) => (
                             <tr key={exam.id}>
                               <td>
                                 <div className="cbt-exam-name">
                                   <span className="cbt-exam-icon"><i className="bi bi-journal-check" /></span>
                                   <div>
                                     <div className="cbt-title cbt-title-lg">{exam.title}</div>
-                                    <div className="cbt-sub">{exam.exam_code || `Exam #${exam.id}`} - {exam.duration_minutes} mins - {exam.delivery_mode}</div>
+                                    <div className="cbt-sub d-flex align-items-center gap-1 flex-wrap mt-1">
+                                        <span className="badge bg-primary text-white" style={{ fontSize: '10.5px', padding: '2px 7px' }}>
+                                          {exam.academic_session?.name || "Session"} • {exam.term?.name || "Term"}
+                                        </span>
+                                        <span>{exam.exam_code || `Exam #${exam.id}`}</span>
+                                        <span>&bull;</span>
+                                        <span>{exam.duration_minutes} mins</span>
+                                        <span>&bull;</span>
+                                        <span className="text-capitalize">{exam.delivery_mode}</span>
+                                      </div>
+                                    <div className="mt-2 d-flex gap-2 align-items-center flex-wrap">
+                                      <button
+                                        className="cbt-btn cbt-btn-reuse"
+                                        type="button"
+                                        disabled={saving}
+                                        title="Reuse this exam for another academic session or term"
+                                        onClick={() => openReuseModal(exam)}
+                                        style={{ padding: '3px 10px', fontSize: '11.5px', borderRadius: '6px' }}
+                                      >
+                                        <i className="bi bi-copy me-1" /> Reuse Exam
+                                      </button>
+                                      <button
+                                        className="cbt-btn cbt-secondary"
+                                        type="button"
+                                        disabled={saving}
+                                        title="Open Question Builder for this exam"
+                                        onClick={() => loadExam(exam.id)}
+                                        style={{ padding: '3px 10px', fontSize: '11.5px', borderRadius: '6px' }}
+                                      >
+                                        <i className="bi bi-pencil-square me-1" /> Builder
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
                               </td>
@@ -1697,6 +2357,8 @@ export default function CbtExamsPage() {
                               <td>
                                 <div className="cbt-row-actions">
                                   <button className="cbt-btn cbt-secondary" type="button" disabled={saving} onClick={() => loadExam(exam.id)}><i className="bi bi-pencil-square" /> Builder</button>
+                                  <button className="cbt-btn cbt-soft" type="button" disabled={saving} title="View Offline CBT License & Package" onClick={() => { setSelectedExamId(exam.id); setLicenseModalOpen(true); fetchLicenses(); }}><i className="bi bi-router" /> Offline</button>
+                             <button className="cbt-btn cbt-btn-reuse" type="button" disabled={saving} title="Reuse this exam in another academic session or term" onClick={() => openReuseModal(exam)}><i className="bi bi-copy" /> Reuse</button>
                                   <button className="cbt-btn cbt-primary" type="button" disabled={saving || exam.status === "published"} title={exam.status === "published" ? "Reopen this exam before importing questions." : "Import questions from Word or Excel"} onClick={() => openWordImport(exam.id)}><i className="bi bi-file-earmark-arrow-up" /> Import File</button>
                                   <button className="cbt-btn cbt-secondary" type="button" disabled={saving} onClick={() => previewExam(exam.id)}><i className="bi bi-eye" /> Preview</button>
                                   {exam.status === "draft" ? (
@@ -1737,6 +2399,17 @@ export default function CbtExamsPage() {
                       <p>{examDetail ? `${questions.length} question(s) added. ${selectedIsPublished ? "Published exams cannot be edited." : "Draft exam is editable."}` : "Select Builder beside an exam to start adding questions."}</p>
                     </div>
                     <div className="cbt-work-actions">
+                      {examDetail && (
+                        <button
+                          className="cbt-btn cbt-btn-reuse"
+                          type="button"
+                          disabled={saving}
+                          onClick={() => openReuseModal(examDetail)}
+                          title="Reuse this exam for another academic session or term"
+                        >
+                          <i className="bi bi-copy" /> Reuse Exam
+                        </button>
+                      )}
                       <button className="cbt-btn cbt-secondary" type="button" disabled={!examDetail || saving} onClick={() => downloadQuestionTemplate("docx")}>
                         <i className="bi bi-file-earmark-word" /> Word Template
                       </button>
@@ -1767,6 +2440,7 @@ export default function CbtExamsPage() {
                       <div><span>Subject</span><strong>{examDetail.subject?.name || "No subject"}</strong></div>
                       <div><span>Schedule</span><strong>{selectedSchedule?.exam_date ? `${String(selectedSchedule.exam_date).slice(0, 10)} ${selectedSchedule.starts_at?.slice(0, 5) || ""}` : "Not set"}</strong></div>
                       <div><span>Access</span><strong>{examDetail.access_code_required ? "Code required" : "Open access"}</strong></div>
+                      <div><span>Format</span><strong style={{ color: examDetail.include_theory ? "#2563EB" : "#0F2744" }}>{examDetail.include_theory ? "Obj + Theory (Sec A & B)" : "Objective Only"}</strong></div>
                     </div>
                   )}
                   <div className="cbt-body">
@@ -1846,162 +2520,503 @@ export default function CbtExamsPage() {
                             </div>
                           </div>
                         )}
-                        <div className="cbt-import-box">
-                          <div className="cbt-import-top">
-                            <label className="cbt-import-file">
-                              <i className="bi bi-file-earmark-arrow-up" />
-                              <span>
-                                <strong>{questionImportFile ? questionImportFile.name : "Import questions from Word or Excel"}</strong>
-                                <span>.docx, .xlsx, .xls, or .csv. Use A-D options and answer labels.</span>
+                        {Boolean(examDetail.include_theory) && (
+                          <div className="cbt-section-switcher">
+                            <button
+                              type="button"
+                              className={`cbt-tab-btn ${builderTab === 'objective' ? 'active' : ''}`}
+                              onClick={() => setBuilderTab('objective')}
+                            >
+                              <i className="bi bi-ui-checks-grid me-2" />
+                              Section A: Objective Questions
+                              <span className={`badge rounded-pill ms-2 ${builderTab === 'objective' ? 'bg-primary text-white' : 'bg-light text-dark border'}`} style={{ fontSize: 11 }}>
+                                {objectiveQuestions.length}
                               </span>
-                              <input
-                                type="file"
-                                accept=".docx,.xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
-                                disabled={selectedIsPublished || questionImporting}
-                                onChange={(e) => {
-                                  setQuestionImportFile(e.target.files?.[0] || null);
-                                  setQuestionImportResult(null);
-                                }}
-                              />
-                            </label>
-                            <div className="cbt-import-actions">
-                              <button className="cbt-btn cbt-ghost" type="button" disabled={!questionImportFile || selectedIsPublished || questionImporting} onClick={() => importQuestionFile(true)}>
-                                <i className="bi bi-search" /> Check File
-                              </button>
-                              <button className="cbt-btn cbt-primary" type="button" disabled={!questionImportFile || selectedIsPublished || questionImporting || Boolean((questionImportResult?.summary?.errors_count || 0) > 0)} onClick={() => importQuestionFile(false)}>
-                                <i className="bi bi-cloud-upload" /> Import Questions
-                              </button>
-                            </div>
+                            </button>
+                            <button
+                              type="button"
+                              className={`cbt-tab-btn ${builderTab === 'theory' ? 'active' : ''}`}
+                              onClick={() => setBuilderTab('theory')}
+                            >
+                              <i className="bi bi-pen me-2" />
+                              Section B: Theory / Essay Questions
+                              <span className={`badge rounded-pill ms-2 ${builderTab === 'theory' ? 'bg-primary text-white' : 'bg-light text-dark border'}`} style={{ fontSize: 11 }}>
+                                {theoryQuestions.length}
+                              </span>
+                            </button>
                           </div>
-                          <div className="cbt-import-guide">
-                            <code>SECTION: Objective Questions<br />TYPE: single_choice</code>
-                            <code>1. Question text<br />A. Option<br />ANSWER: A</code>
-                            <code>PASSAGE: Text here<br />END PASSAGE</code>
-                          </div>
+                        )}
 
-                          {questionImportResult && (
-                            <div className="cbt-import-result">
-                              <div className="cbt-import-summary">
-                                <div><span>Questions</span><strong>{questionImportResult.summary?.questions_detected || 0}</strong></div>
-                                <div><span>Sections</span><strong>{questionImportResult.summary?.sections_detected || 0}</strong></div>
-                                <div><span>Passages</span><strong>{questionImportResult.summary?.passages_detected || 0}</strong></div>
-                                <div><span>Errors</span><strong>{questionImportResult.summary?.errors_count || 0}</strong></div>
-                              </div>
-                              {(questionImportResult.errors || []).length > 0 ? (
-                                <div className="cbt-import-errors">
-                                  {(questionImportResult.errors || []).slice(0, 8).map((error, index) => <div key={`${error}-${index}`}>{error}</div>)}
+                        {(!examDetail.include_theory || builderTab === "objective") && (
+                          <>
+                            <div className="cbt-import-box">
+                              <div className="cbt-import-top">
+                                <label className="cbt-import-file">
+                                  <i className="bi bi-file-earmark-arrow-up" />
+                                  <span>
+                                    <strong>{questionImportFile ? questionImportFile.name : "Import questions from Word or Excel"}</strong>
+                                    <span>.docx, .xlsx, .xls, or .csv. Use A-D options and answer labels.</span>
+                                  </span>
+                                  <input
+                                    type="file"
+                                    accept=".docx,.xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+                                    disabled={selectedIsPublished || questionImporting}
+                                    onChange={(e) => {
+                                      setQuestionImportFile(e.target.files?.[0] || null);
+                                      setQuestionImportResult(null);
+                                    }}
+                                  />
+                                </label>
+                                <div className="cbt-import-actions">
+                                  <button className="cbt-btn cbt-ghost" type="button" disabled={!questionImportFile || selectedIsPublished || questionImporting} onClick={() => importQuestionFile(true)}>
+                                    <i className="bi bi-search" /> Check File
+                                  </button>
+                                  <button className="cbt-btn cbt-primary" type="button" disabled={!questionImportFile || selectedIsPublished || questionImporting || Boolean((questionImportResult?.summary?.errors_count || 0) > 0)} onClick={() => importQuestionFile(false)}>
+                                    <i className="bi bi-cloud-upload" /> Import Questions
+                                  </button>
                                 </div>
-                              ) : (
-                                <div className="cbt-import-preview">
-                                  {(questionImportResult.questions || []).slice(0, 8).map((question) => (
-                                    <div className="cbt-import-preview-item" key={`${question.number}-${question.text}`}>
-                                      <strong>{question.number}. {question.text}</strong>
-                                      <span className="cbt-pill">{String(question.type || "").replace(/_/g, " ")}</span>
-                                      <span className="cbt-pill cbt-pill-neutral">{question.options || 0} option(s)</span>
-                                      {question.has_passage && <span className="cbt-pill cbt-pill-gold">Passage</span>}
+                              </div>
+                              <div className="cbt-import-guide">
+                                <code>SECTION: Objective Questions<br />TYPE: single_choice</code>
+                                <code>1. Question text<br />A. Option<br />ANSWER: A</code>
+                                <code>PASSAGE: Text here<br />END PASSAGE</code>
+                              </div>
+
+                              {questionImportResult && (
+                                <div className="cbt-import-result">
+                                  <div className="cbt-import-summary">
+                                    <div><span>Questions</span><strong>{questionImportResult.summary?.questions_detected || 0}</strong></div>
+                                    <div><span>Sections</span><strong>{questionImportResult.summary?.sections_detected || 0}</strong></div>
+                                    <div><span>Passages</span><strong>{questionImportResult.summary?.passages_detected || 0}</strong></div>
+                                    <div><span>Errors</span><strong>{questionImportResult.summary?.errors_count || 0}</strong></div>
+                                  </div>
+                                  {(questionImportResult.errors || []).length > 0 ? (
+                                    <div className="cbt-import-errors">
+                                      {(questionImportResult.errors || []).slice(0, 8).map((error, index) => <div key={`${error}-${index}`}>{error}</div>)}
+                                    </div>
+                                  ) : (
+                                    <div className="cbt-import-preview">
+                                      {(questionImportResult.questions || []).slice(0, 8).map((question) => (
+                                        <div className="cbt-import-preview-item" key={`${question.number}-${question.text}`}>
+                                          <strong>{question.number}. {question.text}</strong>
+                                          <span className="cbt-pill">{String(question.type || "").replace(/_/g, " ")}</span>
+                                          <span className="cbt-pill cbt-pill-neutral">{question.options || 0} option(s)</span>
+                                          {question.has_passage && <span className="cbt-pill cbt-pill-gold">Passage</span>}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            <form onSubmit={addQuestion}>
+                              <div className="row g-2">
+                                <div className="col-md-4">
+                                  <label className="cbt-label">Section</label>
+                                  <select className="cbt-select" value={questionForm.section_id} disabled={selectedIsPublished} onChange={(e) => setQuestionForm((p) => ({ ...p, section_id: e.target.value }))}>
+                                    <option value="">General</option>
+                                    {(examDetail.sections || []).map((section) => <option key={section.id} value={section.id}>{section.title}</option>)}
+                                  </select>
+                                </div>
+                                <div className="col-md-4">
+                                  <label className="cbt-label">Instruction or passage</label>
+                                  <select className="cbt-select" value={questionForm.question_group_id} disabled={selectedIsPublished} onChange={(e) => setQuestionForm((p) => ({ ...p, question_group_id: e.target.value }))}>
+                                    <option value="">None</option>
+                                    {groups.map((group: any) => <option key={group.id} value={group.id}>{group.title || group.group_type} - {group.sectionTitle}</option>)}
+                                  </select>
+                                </div>
+                                <div className="col-md-4">
+                                  <label className="cbt-label">Question type</label>
+                                  <select className="cbt-select" value={questionForm.question_type} disabled={selectedIsPublished} onChange={(e) => setQuestionForm((p) => ({ ...p, question_type: e.target.value }))}>
+                                    <option value="single_choice">Single choice</option>
+                                    <option value="multiple_choice">Multiple choice</option>
+                                    <option value="true_false">True / False</option>
+                                    <option value="fill_blank">Fill in the blank</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              <label className="cbt-label">Question</label>
+                              <CbtRichEditor
+                                value={questionForm.question_text}
+                                disabled={selectedIsPublished}
+                                examId={selectedExamId}
+                                placeholder="Type the objective question here. You can add tables and upload diagrams."
+                                onChange={(value) => setQuestionForm((p) => ({ ...p, question_text: value }))}
+                              />
+
+                              <div className="row g-2">
+                                <div className="col-md-4">
+                                  <label className="cbt-label">Marks</label>
+                                  <input className="cbt-input" type="number" min={0} value={questionForm.marks} disabled={selectedIsPublished} onChange={(e) => setQuestionForm((p) => ({ ...p, marks: Number(e.target.value) }))} />
+                                </div>
+                                <div className="col-md-8">
+                                  <label className="cbt-label">Explanation</label>
+                                  <input className="cbt-input" value={questionForm.explanation} disabled={selectedIsPublished} onChange={(e) => setQuestionForm((p) => ({ ...p, explanation: e.target.value }))} placeholder="Optional marking note or answer explanation." />
+                                </div>
+                              </div>
+
+                              {objectiveTypes.includes(questionForm.question_type) && questionForm.question_type !== "true_false" && (
+                                <div>
+                                  <label className="cbt-label">Options</label>
+                                  {questionForm.options.map((option, index) => (
+                                    <div className="cbt-option-row" key={option.label}>
+                                      <input className="cbt-input mb-0" value={option.label} disabled={selectedIsPublished} onChange={(e) => setQuestionForm((p) => ({ ...p, options: p.options.map((item, i) => i === index ? { ...item, label: e.target.value } : item) }))} />
+                                      <input className="cbt-input mb-0" value={option.option_text} disabled={selectedIsPublished} onChange={(e) => setQuestionForm((p) => ({ ...p, options: p.options.map((item, i) => i === index ? { ...item, option_text: e.target.value } : item) }))} placeholder={`Option ${option.label}`} />
+                                      <label className="cbt-option-check">
+                                        <input type={questionForm.question_type === "multiple_choice" ? "checkbox" : "radio"} name="correct_option" checked={Boolean(option.is_correct)} disabled={selectedIsPublished} onChange={(e) => setQuestionForm((p) => ({ ...p, options: p.options.map((item, i) => questionForm.question_type === "multiple_choice" ? (i === index ? { ...item, is_correct: e.target.checked } : item) : { ...item, is_correct: i === index }) }))} />
+                                        Correct
+                                      </label>
                                     </div>
                                   ))}
                                 </div>
                               )}
-                            </div>
-                          )}
-                        </div>
-                        <form onSubmit={addQuestion}>
-                          <div className="row g-2">
-                            <div className="col-md-4">
-                              <label className="cbt-label">Section</label>
-                              <select className="cbt-select" value={questionForm.section_id} disabled={selectedIsPublished} onChange={(e) => setQuestionForm((p) => ({ ...p, section_id: e.target.value }))}>
-                                <option value="">General</option>
-                                {(examDetail.sections || []).map((section) => <option key={section.id} value={section.id}>{section.title}</option>)}
-                              </select>
-                            </div>
-                            <div className="col-md-4">
-                              <label className="cbt-label">Instruction or passage</label>
-                              <select className="cbt-select" value={questionForm.question_group_id} disabled={selectedIsPublished} onChange={(e) => setQuestionForm((p) => ({ ...p, question_group_id: e.target.value }))}>
-                                <option value="">None</option>
-                                {groups.map((group: any) => <option key={group.id} value={group.id}>{group.title || group.group_type} - {group.sectionTitle}</option>)}
-                              </select>
-                            </div>
-                            <div className="col-md-4">
-                              <label className="cbt-label">Question type</label>
-                              <select className="cbt-select" value={questionForm.question_type} disabled={selectedIsPublished} onChange={(e) => setQuestionForm((p) => ({ ...p, question_type: e.target.value }))}>
-                                <option value="single_choice">Single choice</option>
-                                <option value="multiple_choice">Multiple choice</option>
-                                <option value="true_false">True / False</option>
-                                <option value="fill_blank">Fill in the blank</option>
-                                <option value="theory">Theory</option>
-                              </select>
-                            </div>
-                          </div>
 
-                          <label className="cbt-label">Question</label>
-                          <CbtRichEditor
-                            value={questionForm.question_text}
-                            disabled={selectedIsPublished}
-                            examId={selectedExamId}
-                            placeholder="Type the question here. You can add tables and upload diagrams."
-                            onChange={(value) => setQuestionForm((p) => ({ ...p, question_text: value }))}
-                          />
-
-                          <div className="row g-2">
-                            <div className="col-md-4">
-                              <label className="cbt-label">Marks</label>
-                              <input className="cbt-input" type="number" min={0} value={questionForm.marks} disabled={selectedIsPublished} onChange={(e) => setQuestionForm((p) => ({ ...p, marks: Number(e.target.value) }))} />
-                            </div>
-                            <div className="col-md-8">
-                              <label className="cbt-label">Explanation</label>
-                              <input className="cbt-input" value={questionForm.explanation} disabled={selectedIsPublished} onChange={(e) => setQuestionForm((p) => ({ ...p, explanation: e.target.value }))} placeholder="Optional marking note or answer explanation." />
-                            </div>
-                          </div>
-
-                          {objectiveTypes.includes(questionForm.question_type) && questionForm.question_type !== "true_false" && (
-                            <div>
-                              <label className="cbt-label">Options</label>
-                              {questionForm.options.map((option, index) => (
-                                <div className="cbt-option-row" key={option.label}>
-                                  <input className="cbt-input mb-0" value={option.label} disabled={selectedIsPublished} onChange={(e) => setQuestionForm((p) => ({ ...p, options: p.options.map((item, i) => i === index ? { ...item, label: e.target.value } : item) }))} />
-                                  <input className="cbt-input mb-0" value={option.option_text} disabled={selectedIsPublished} onChange={(e) => setQuestionForm((p) => ({ ...p, options: p.options.map((item, i) => i === index ? { ...item, option_text: e.target.value } : item) }))} placeholder={`Option ${option.label}`} />
-                                  <label className="cbt-option-check">
-                                    <input type={questionForm.question_type === "multiple_choice" ? "checkbox" : "radio"} name="correct_option" checked={Boolean(option.is_correct)} disabled={selectedIsPublished} onChange={(e) => setQuestionForm((p) => ({ ...p, options: p.options.map((item, i) => questionForm.question_type === "multiple_choice" ? (i === index ? { ...item, is_correct: e.target.checked } : item) : { ...item, is_correct: i === index }) }))} />
-                                    Correct
-                                  </label>
+                              {questionForm.question_type === "true_false" && (
+                                <div className="mb-3">
+                                  <label className="cbt-label">Correct answer</label>
+                                  <select className="cbt-select" disabled={selectedIsPublished} value={questionForm.options[0]?.is_correct ? "true" : "false"} onChange={(e) => setQuestionForm((p) => ({ ...p, options: [{ ...p.options[0], is_correct: e.target.value === "true" }, ...p.options.slice(1)] }))}>
+                                    <option value="true">True</option>
+                                    <option value="false">False</option>
+                                  </select>
                                 </div>
-                              ))}
-                            </div>
-                          )}
+                              )}
 
-                          {questionForm.question_type === "true_false" && (
-                            <div className="mb-3">
-                              <label className="cbt-label">Correct answer</label>
-                              <select className="cbt-select" disabled={selectedIsPublished} value={questionForm.options[0]?.is_correct ? "true" : "false"} onChange={(e) => setQuestionForm((p) => ({ ...p, options: [{ ...p.options[0], is_correct: e.target.value === "true" }, ...p.options.slice(1)] }))}>
-                                <option value="true">True</option>
-                                <option value="false">False</option>
-                              </select>
-                            </div>
-                          )}
+                              <button className="cbt-btn cbt-primary" disabled={saving || selectedIsPublished}><i className="bi bi-plus-circle" /> Add Question</button>
+                            </form>
 
-                          <button className="cbt-btn cbt-primary" disabled={saving || selectedIsPublished}><i className="bi bi-plus-circle" /> Add Question</button>
-                        </form>
-
-                        <hr />
-                        {questions.length === 0 ? <div className="cbt-empty">No questions yet. Add the first question above.</div> : questions.map((question, index) => (
-                          <div className="cbt-question-card" key={question.id}>
-                            <h3>{index + 1}.</h3>
-                            <CbtHtml html={question.question_text} />
-                            <div className="cbt-question-meta">
-                              <span className="cbt-pill">{question.question_type.replace(/_/g, " ")}</span>
-                              <span className="cbt-pill">{question.marks} mark(s)</span>
+                            <hr />
+                            <div className="d-flex align-items-center justify-content-between mb-3">
+                              <h3 style={{ fontSize: 16, fontWeight: 700, color: "#0F2744", margin: 0 }}>
+                                {examDetail.include_theory ? `Section A: Objective Questions (${objectiveQuestions.length})` : `Exam Questions (${objectiveQuestions.length})`}
+                              </h3>
+                              <span className="cbt-pill cbt-pill-green">
+                                Total Objective Marks: {objectiveQuestions.reduce((sum, q) => sum + (Number(q.marks) || 0), 0)} marks
+                              </span>
                             </div>
-                            {(question.options || []).length > 0 && (
-                              <div className="mt-2">
-                                {(question.options || []).map((option) => (
-                                  <div className="cbt-sub" key={`${question.id}-${option.label}`}><strong>{option.label}.</strong> <CbtHtml html={option.option_text} className="d-inline" /> {option.is_correct ? "(Correct)" : ""}</div>
-                                ))}
+
+                            {objectiveQuestions.length === 0 ? <div className="cbt-empty">No objective questions yet. Add the first question above.</div> : objectiveQuestions.map((question, index) => (
+                              <div className="cbt-question-card" key={question.id}>
+                                <h3>{index + 1}.</h3>
+                                <CbtHtml html={question.question_text} />
+                                {question.diagram_url && (
+                                  <div className="my-2 p-2 bg-light rounded text-center border">
+                                    <img
+                                      src={question.diagram_url}
+                                      alt="Question diagram"
+                                      style={{ maxHeight: 220, maxWidth: "100%", objectFit: "contain", borderRadius: 6 }}
+                                    />
+                                  </div>
+                                )}
+                                <div className="cbt-question-meta">
+                                  <span className="cbt-pill">{question.question_type.replace(/_/g, " ")}</span>
+                                  <span className="cbt-pill">{question.marks} mark(s)</span>
+                                </div>
+                                {(question.options || []).length > 0 && (
+                                  <div className="mt-2">
+                                    {(question.options || []).map((option) => (
+                                      <div className="cbt-sub" key={`${question.id}-${option.label}`}><strong>{option.label}.</strong> <CbtHtml html={option.option_text} className="d-inline" /> {option.is_correct ? "(Correct)" : ""}</div>
+                                    ))}
+                                  </div>
+                                )}
+                                {!selectedIsPublished && <button className="cbt-btn cbt-danger mt-2" type="button" disabled={saving} onClick={() => deleteQuestion(question.id)}><i className="bi bi-trash" /> Remove</button>}
                               </div>
-                            )}
-                            {!selectedIsPublished && <button className="cbt-btn cbt-danger mt-2" type="button" disabled={saving} onClick={() => deleteQuestion(question.id)}><i className="bi bi-trash" /> Remove</button>}
-                          </div>
-                        ))}
+                            ))}
+                          </>
+                        )}
+
+                        {Boolean(examDetail.include_theory) && builderTab === "theory" && (
+                          <>
+                            {/* Section B Theory Instructions Box */}
+                            <div className="cbt-panel mb-4" style={{ border: "1px solid #BFDBFE", background: "#EFF6FF", borderRadius: 14 }}>
+                              <div className="cbt-head" style={{ borderBottom: "1px solid #DBEAFE", padding: "14px 18px" }}>
+                                <div>
+                                  <h2 style={{ color: "#1E40AF", fontSize: 16, margin: 0 }}>
+                                    <i className="bi bi-pen me-2" /> Section B: Theory / Essay Instructions
+                                  </h2>
+                                  <p style={{ color: "#3B82F6", margin: "4px 0 0", fontSize: 12.5 }}>
+                                    Students read these instructions and questions on their screens and write their answers on physical answer sheets using a pen.
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="cbt-body" style={{ padding: "16px 18px" }}>
+                                <label className="cbt-label" style={{ fontWeight: 700, color: "#1E3A8A" }}>
+                                  Section B Instructions (Displayed at the top of Section B to students)
+                                </label>
+                                <textarea
+                                  className="cbt-textarea mb-2"
+                                  style={{ minHeight: 75, background: "#fff", borderColor: "#BFDBFE" }}
+                                  disabled={selectedIsPublished || savingTheoryInstructions}
+                                  placeholder="e.g. Answer any THREE (3) questions in this section. All questions carry equal marks. Show all working clearly on your answer script."
+                                  value={theoryInstructionsDraft}
+                                  onChange={(e) => setTheoryInstructionsDraft(e.target.value)}
+                                />
+                                {!selectedIsPublished && (
+                                  <div className="d-flex justify-content-end">
+                                    <button
+                                      type="button"
+                                      className="cbt-btn cbt-primary btn-sm"
+                                      disabled={savingTheoryInstructions}
+                                      onClick={saveTheoryInstructions}
+                                    >
+                                      <i className="bi bi-save me-1" /> Save Section Instructions
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Dedicated Theory Question Creator Form */}
+                            <form onSubmit={addTheoryQuestion} className="cbt-panel mb-4" style={{ border: "1px solid #E2E8F0", borderRadius: 14 }}>
+                              <div className="cbt-head" style={{ padding: "14px 18px" }}>
+                                <div>
+                                  <h2 style={{ fontSize: 16 }}>Add Theory Question (Question {theoryQuestions.length + 1})</h2>
+                                  <p style={{ margin: 0, fontSize: 12.5 }}>Enter the question text, allocated marks, and optional diagram or illustration.</p>
+                                </div>
+                              </div>
+                              <div className="cbt-body" style={{ padding: "16px 18px" }}>
+                                <label className="cbt-label" style={{ fontWeight: 700 }}>
+                                  Theory Question Text <span className="text-danger">*</span>
+                                </label>
+                                <CbtRichEditor
+                                  value={theoryForm.question_text}
+                                  disabled={selectedIsPublished}
+                                  examId={selectedExamId}
+                                  placeholder="Type the theory question here. You can format text, add bullet points, and create tables (e.g. 1a, 1b, 1c)."
+                                  onChange={(value) => setTheoryForm((p) => ({ ...p, question_text: value }))}
+                                />
+
+                                {/* Dedicated Diagram / Illustration Upload Box */}
+                                <div className="mt-3 mb-3 p-3 bg-white rounded border" style={{ borderColor: "#CBD5E1" }}>
+                                  <div className="d-flex align-items-center justify-content-between mb-2">
+                                    <label className="cbt-label mb-0" style={{ fontWeight: 700, fontSize: 13, color: "#0F2744" }}>
+                                      <i className="bi bi-image text-primary me-1" /> Question Diagram / Illustration (Optional)
+                                    </label>
+                                    {theoryForm.diagram_url && (
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm btn-outline-danger py-0 px-2"
+                                        style={{ fontSize: 11 }}
+                                        onClick={() => {
+                                          setTheoryForm((p) => ({ ...p, diagram_url: "" }));
+                                          setTheoryDiagramFileName("");
+                                        }}
+                                      >
+                                        <i className="bi bi-trash me-1" /> Remove Diagram
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  <input
+                                    type="file"
+                                    id="theory-direct-file-input"
+                                    className="d-none"
+                                    accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                                    disabled={selectedIsPublished || theoryDiagramUploading}
+                                    onChange={handleTheoryDiagramFile}
+                                  />
+
+                                  {!theoryForm.diagram_url ? (
+                                    <>
+                                      {/* Clickable Drag & Drop / Upload Area */}
+                                      <div
+                                        style={{
+                                          border: "2px dashed #93C5FD",
+                                          borderRadius: 12,
+                                          padding: "20px 16px",
+                                          textAlign: "center",
+                                          background: "#F8FAFC",
+                                          cursor: "pointer",
+                                          transition: "background 0.2s ease",
+                                        }}
+                                        onClick={() => {
+                                          if (!theoryDiagramUploading && !selectedIsPublished) {
+                                            document.getElementById("theory-direct-file-input")?.click();
+                                          }
+                                        }}
+                                      >
+                                        {theoryDiagramUploading ? (
+                                          <div className="py-2">
+                                            <div className="spinner-border spinner-border-sm text-primary me-2" role="status" />
+                                            <strong style={{ color: "#1E40AF", fontSize: 13 }}>Processing diagram upload...</strong>
+                                          </div>
+                                        ) : (
+                                          <div>
+                                            <i className="bi bi-cloud-arrow-up text-primary" style={{ fontSize: 34, display: "block", marginBottom: 6 }} />
+                                            <strong style={{ display: "block", color: "#0F2744", fontSize: 14 }}>
+                                              Click to choose diagram image from your computer / phone
+                                            </strong>
+                                            <span style={{ color: "#64748B", fontSize: 12 }}>
+                                              Select any PNG, JPG, JPEG, WEBP or GIF file &bull; No online web link needed
+                                            </span>
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      <div className="d-flex justify-content-between align-items-center mt-2 px-1 flex-wrap gap-2">
+                                        <span className="text-muted" style={{ fontSize: 11.5 }}>
+                                          Use for math geometry, science apparatus, geography maps, charts, or past-question diagrams.
+                                        </span>
+                                        <button
+                                          type="button"
+                                          className="btn btn-link btn-sm p-0 text-decoration-none"
+                                          style={{ fontSize: 11.5 }}
+                                          onClick={() => setShowDiagramUrlInput(!showDiagramUrlInput)}
+                                        >
+                                          {showDiagramUrlInput ? "Hide web link option" : "Have an online web link instead?"}
+                                        </button>
+                                      </div>
+
+                                      {showDiagramUrlInput && (
+                                        <div className="mt-2 pt-2 border-top">
+                                          <label className="cbt-label" style={{ fontSize: 11.5 }}>Web Image Link (URL)</label>
+                                          <input
+                                            type="text"
+                                            className="cbt-input mb-0"
+                                            placeholder="https://example.com/diagram.png"
+                                            value={theoryForm.diagram_url || ""}
+                                            disabled={selectedIsPublished}
+                                            onChange={(e) => setTheoryForm((p) => ({ ...p, diagram_url: e.target.value }))}
+                                          />
+                                        </div>
+                                      )}
+                                    </>
+                                  ) : (
+                                    /* Attached Image Preview Card */
+                                    <div className="p-3 bg-light rounded border">
+                                      <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                                        <div className="d-flex align-items-center gap-2">
+                                          <span className="cbt-pill cbt-pill-green">
+                                            <i className="bi bi-check-circle-fill me-1" /> Diagram Attached
+                                          </span>
+                                          {theoryDiagramFileName && (
+                                            <span className="text-muted small" style={{ fontWeight: 600 }}>{theoryDiagramFileName}</span>
+                                          )}
+                                        </div>
+                                        <div className="d-flex gap-2">
+                                          <button
+                                            type="button"
+                                            className="cbt-btn cbt-soft btn-sm"
+                                            disabled={selectedIsPublished || theoryDiagramUploading}
+                                            onClick={() => document.getElementById("theory-direct-file-input")?.click()}
+                                          >
+                                            <i className="bi bi-arrow-repeat me-1" /> Change Image
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="cbt-btn cbt-danger btn-sm"
+                                            disabled={selectedIsPublished || theoryDiagramUploading}
+                                            onClick={() => {
+                                              setTheoryForm((p) => ({ ...p, diagram_url: "" }));
+                                              setTheoryDiagramFileName("");
+                                            }}
+                                          >
+                                            <i className="bi bi-trash me-1" /> Remove
+                                          </button>
+                                        </div>
+                                      </div>
+                                      <div className="text-center p-2 bg-white rounded border">
+                                        <img
+                                          src={theoryForm.diagram_url}
+                                          alt="Theory Diagram Preview"
+                                          style={{ maxHeight: 240, maxWidth: "100%", objectFit: "contain", borderRadius: 8 }}
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="row g-2 mb-3">
+                                  <div className="col-md-4">
+                                    <label className="cbt-label" style={{ fontWeight: 700 }}>Allocated Marks *</label>
+                                    <input
+                                      className="cbt-input"
+                                      type="number"
+                                      min={1}
+                                      required
+                                      value={theoryForm.marks}
+                                      disabled={selectedIsPublished}
+                                      onChange={(e) => setTheoryForm((p) => ({ ...p, marks: Number(e.target.value) }))}
+                                    />
+                                  </div>
+                                  <div className="col-md-8">
+                                    <label className="cbt-label">Marking Guide / Explanation (Optional)</label>
+                                    <input
+                                      className="cbt-input"
+                                      value={theoryForm.explanation}
+                                      disabled={selectedIsPublished}
+                                      onChange={(e) => setTheoryForm((p) => ({ ...p, explanation: e.target.value }))}
+                                      placeholder="Optional marking notes, sample solution, or grading rubric for teachers."
+                                    />
+                                  </div>
+                                </div>
+
+                                <button className="cbt-btn cbt-primary" disabled={saving || selectedIsPublished}>
+                                  <i className="bi bi-plus-circle" /> Add Theory Question
+                                </button>
+                              </div>
+                            </form>
+
+                            {/* Section B Theory Questions List */}
+                            <div className="mt-4">
+                              <div className="d-flex align-items-center justify-content-between mb-3">
+                                <h3 style={{ fontSize: 16, fontWeight: 700, color: "#0F2744", margin: 0 }}>
+                                  Section B: Theory Questions ({theoryQuestions.length})
+                                </h3>
+                                <span className="cbt-pill cbt-pill-green">
+                                  Total Theory Marks: {theoryQuestions.reduce((sum, q) => sum + (Number(q.marks) || 0), 0)} marks
+                                </span>
+                              </div>
+
+                              {theoryQuestions.length === 0 ? (
+                                <div className="cbt-empty">
+                                  <i className="bi bi-pencil-square" style={{ fontSize: 32, display: "block", marginBottom: 8, color: "#94A3B8" }} />
+                                  <strong>No theory questions added yet.</strong>
+                                  <p style={{ margin: "4px 0 0", fontSize: 13 }}>Use the form above to add Theory Question 1, Question 2, etc.</p>
+                                </div>
+                              ) : (
+                                theoryQuestions.map((question, index) => (
+                                  <div className="cbt-question-card" key={question.id} style={{ borderLeft: "4px solid #2563EB" }}>
+                                    <div className="d-flex align-items-center justify-content-between mb-2">
+                                      <h3 style={{ margin: 0, color: "#1E40AF" }}>Theory Question {index + 1}</h3>
+                                      <span className="cbt-pill" style={{ background: "#DBEAFE", color: "#1E40AF", fontWeight: 700 }}>
+                                        {question.marks} mark(s)
+                                      </span>
+                                    </div>
+                                    <CbtHtml html={question.question_text} />
+                                    {question.diagram_url && (
+                                      <div className="my-2 p-2 bg-light rounded text-center border">
+                                        <img
+                                          src={question.diagram_url}
+                                          alt={`Question ${index + 1} diagram`}
+                                          style={{ maxHeight: 240, maxWidth: "100%", objectFit: "contain", borderRadius: 6 }}
+                                        />
+                                      </div>
+                                    )}
+                                    {question.explanation && (
+                                      <div className="cbt-note mt-2 mb-2" style={{ fontSize: 12 }}>
+                                        <strong>Marking guide:</strong> {question.explanation}
+                                      </div>
+                                    )}
+                                    {!selectedIsPublished && (
+                                      <div className="mt-2 text-end">
+                                        <button
+                                          className="cbt-btn cbt-danger btn-sm"
+                                          type="button"
+                                          disabled={saving}
+                                          onClick={() => deleteQuestion(question.id)}
+                                        >
+                                          <i className="bi bi-trash" /> Remove Question
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </>
+                        )}
                       </>
                     )}
                   </div>
@@ -2176,8 +3191,7 @@ export default function CbtExamsPage() {
                     </button>
                   </div>
 
-                  {!isTeacher && (
-                    <div className="cbt-side-card">
+                  <div className="cbt-side-card">
                       <h3>Offline CBT</h3>
                       <p>Download the Windows server app, then prepare a signed exam package for school WiFi exams.</p>
                       <div className="d-flex flex-column gap-2">
@@ -2189,7 +3203,6 @@ export default function CbtExamsPage() {
                         </button>
                       </div>
                     </div>
-                  )}
 
                   <form className="cbt-panel" onSubmit={addSection}>
                     <div className="cbt-head"><h2>Add section</h2><p>Use sections for Paper 1, Essay, Objectives, or subject parts.</p></div>
@@ -2239,6 +3252,11 @@ export default function CbtExamsPage() {
               <button className="cbt-btn cbt-soft" type="button" onClick={() => setCreateModalOpen(false)}><i className="bi bi-x-lg" /> Close</button>
             </div>
             <div className="cbt-modal-body">
+              {isTeacher && subjects.length === 0 && (
+                <div style={{ padding: "12px 14px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, color: "#991b1b", fontSize: 13, marginBottom: 16 }}>
+                  <strong>⚠️ No Assigned Subjects:</strong> You do not have any assigned teaching subjects. CBT examinations can only be created for subjects assigned to you by the school administrator.
+                </div>
+              )}
               <div className="cbt-section-label">Basics</div>
               <div className="cbt-form-grid">
                 <div className="cbt-field cbt-field-full">
@@ -2355,6 +3373,19 @@ export default function CbtExamsPage() {
                   <label className="cbt-label">End time</label>
                   <input className="cbt-input" type="time" value={form.schedule.ends_at} onChange={(e) => setForm((p) => ({ ...p, schedule: { ...p.schedule, ends_at: e.target.value } }))} />
                 </div>
+                <div className="cbt-field-full d-flex justify-content-between align-items-center mb-2">
+                  <p className="cbt-help mb-0">Optional: leave empty for on-demand / unscheduled examination.</p>
+                  {form.schedule.exam_date && (
+                    <button
+                      type="button"
+                      className="cbt-btn cbt-ghost text-danger btn-sm py-1 px-2"
+                      style={{ fontSize: "11px" }}
+                      onClick={() => setForm((p) => ({ ...p, schedule: { exam_date: "", starts_at: "", ends_at: "", venue: "" } }))}
+                    >
+                      <i className="bi bi-x-circle me-1" /> Clear Timetable
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="cbt-section-label">Exam rules</div>
@@ -2366,6 +3397,48 @@ export default function CbtExamsPage() {
                 <label className="cbt-toggle"><input type="checkbox" checked={form.access_code_required} onChange={(e) => setForm((p) => ({ ...p, access_code_required: e.target.checked }))} /><span><strong>Access code</strong><span>Require exam code.</span></span></label>
                 {form.access_code_required && <div className="cbt-field"><label className="cbt-label">Access code</label><input className="cbt-input" value={form.access_code} onChange={(e) => setForm((p) => ({ ...p, access_code: e.target.value }))} placeholder="e.g. ENG-2026" /></div>}
               </div>
+              <div className="cbt-section-label">Theory / Essay Questions</div>
+              <div className="cbt-field cbt-field-full mb-3" style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: "14px 16px" }}>
+                <label className="cbt-label" style={{ fontWeight: 700, color: "#0F2744", fontSize: 13, marginBottom: 8, display: "block" }}>
+                  Do you want to include theory/essay questions in this examination?
+                </label>
+                <div style={{ display: "flex", gap: 16, marginTop: 4, flexWrap: "wrap" }}>
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13, color: !form.include_theory ? "#0F2744" : "#64748B" }}>
+                    <input
+                      type="radio"
+                      name="modal_include_theory"
+                      checked={!form.include_theory}
+                      onChange={() => setForm((p) => ({ ...p, include_theory: false }))}
+                    />
+                    <span>No – Objective Questions Only</span>
+                  </label>
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13, color: form.include_theory ? "#0F2744" : "#64748B" }}>
+                    <input
+                      type="radio"
+                      name="modal_include_theory"
+                      checked={Boolean(form.include_theory)}
+                      onChange={() => setForm((p) => ({ ...p, include_theory: true }))}
+                    />
+                    <span>Yes – Include Theory Questions</span>
+                  </label>
+                </div>
+                {form.include_theory && (
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #E2E8F0" }}>
+                    <label className="cbt-label" style={{ fontWeight: 600 }}>Theory Section Instructions (Section B)</label>
+                    <textarea
+                      className="cbt-textarea"
+                      style={{ minHeight: 70 }}
+                      placeholder="e.g. Read the questions below and write answers on your physical answer paper."
+                      value={form.theory_instructions}
+                      onChange={(e) => setForm((p) => ({ ...p, theory_instructions: e.target.value }))}
+                    />
+                    <small style={{ color: "#64748B", display: "block", marginTop: 4 }}>
+                      ℹ️ Students will read these questions on their screen and answer manually on paper using a pen. Teachers will enter marks later in Result Entry.
+                    </small>
+                  </div>
+                )}
+              </div>
+
               <div className="cbt-field">
                 <label className="cbt-label">General instructions</label>
                 <textarea className="cbt-textarea" value={form.general_instructions} onChange={(e) => setForm((p) => ({ ...p, general_instructions: e.target.value }))} placeholder="Instructions shown before students start." />
@@ -2481,6 +3554,19 @@ export default function CbtExamsPage() {
                 <div className="cbt-field"><label className="cbt-label">Venue</label><input className="cbt-input" value={settingsForm.schedule.venue} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, schedule: { ...p.schedule, venue: e.target.value } }))} /></div>
                 <div className="cbt-field"><label className="cbt-label">Start time</label><input className="cbt-input" type="time" value={settingsForm.schedule.starts_at} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, schedule: { ...p.schedule, starts_at: e.target.value } }))} /></div>
                 <div className="cbt-field"><label className="cbt-label">End time</label><input className="cbt-input" type="time" value={settingsForm.schedule.ends_at} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, schedule: { ...p.schedule, ends_at: e.target.value } }))} /></div>
+                <div className="cbt-field-full d-flex justify-content-between align-items-center mb-2">
+                  <p className="cbt-help mb-0">Optional: leave blank or clear for on-demand / unscheduled examination.</p>
+                  {settingsForm.schedule.exam_date && !selectedIsPublished && (
+                    <button
+                      type="button"
+                      className="cbt-btn cbt-ghost text-danger btn-sm py-1 px-2"
+                      style={{ fontSize: "11px" }}
+                      onClick={() => setSettingsForm((p) => ({ ...p, schedule: { exam_date: "", starts_at: "", ends_at: "", venue: "" } }))}
+                    >
+                      <i className="bi bi-x-circle me-1" /> Clear Timetable
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="cbt-section-label">Exam rules</div>
               <div className="cbt-form-grid">
@@ -2491,6 +3577,96 @@ export default function CbtExamsPage() {
                 <label className="cbt-toggle"><input type="checkbox" checked={Boolean(settingsForm.access_code_required)} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, access_code_required: e.target.checked }))} /><span><strong>Access code</strong><span>Require exam code.</span></span></label>
                 {settingsForm.access_code_required && <div className="cbt-field"><label className="cbt-label">Access code</label><input className="cbt-input" value={settingsForm.access_code} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, access_code: e.target.value }))} /></div>}
               </div>
+              <div className="cbt-section-label">Theory / Essay Questions</div>
+
+              <div className="cbt-field cbt-field-full mb-3" style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 12, padding: "14px 16px" }}>
+
+                <label className="cbt-label" style={{ fontWeight: 700, color: "#0F2744", fontSize: 13, marginBottom: 8, display: "block" }}>
+
+                  Do you want to include theory/essay questions in this examination?
+
+                </label>
+
+                <div style={{ display: "flex", gap: 16, marginTop: 4, flexWrap: "wrap" }}>
+
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13, color: !settingsForm.include_theory ? "#0F2744" : "#64748B" }}>
+
+                    <input
+
+                      type="radio"
+
+                      name="settings_modal_include_theory"
+
+                      disabled={selectedIsPublished}
+
+                      checked={!settingsForm.include_theory}
+
+                      onChange={() => setSettingsForm((p) => ({ ...p, include_theory: false }))}
+
+                    />
+
+                    <span>No – Objective Questions Only</span>
+
+                  </label>
+
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: 600, fontSize: 13, color: settingsForm.include_theory ? "#0F2744" : "#64748B" }}>
+
+                    <input
+
+                      type="radio"
+
+                      name="settings_modal_include_theory"
+
+                      disabled={selectedIsPublished}
+
+                      checked={Boolean(settingsForm.include_theory)}
+
+                      onChange={() => setSettingsForm((p) => ({ ...p, include_theory: true }))}
+
+                    />
+
+                    <span>Yes – Include Theory Questions</span>
+
+                  </label>
+
+                </div>
+
+                {settingsForm.include_theory && (
+
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #E2E8F0" }}>
+
+                    <label className="cbt-label" style={{ fontWeight: 600 }}>Theory Section Instructions (Section B)</label>
+
+                    <textarea
+
+                      className="cbt-textarea"
+
+                      style={{ minHeight: 70 }}
+
+                      disabled={selectedIsPublished}
+
+                      placeholder="e.g. Read the questions below and write answers on your physical answer paper."
+
+                      value={settingsForm.theory_instructions}
+
+                      onChange={(e) => setSettingsForm((p) => ({ ...p, theory_instructions: e.target.value }))}
+
+                    />
+
+                    <small style={{ color: "#64748B", display: "block", marginTop: 4 }}>
+
+                      ℹ️ Students will read these questions on their screen and answer manually on paper using a pen. Teachers will enter marks later in Result Entry.
+
+                    </small>
+
+                  </div>
+
+                )}
+
+              </div>
+
+
+
               <div className="cbt-field"><label className="cbt-label">General instructions</label><textarea className="cbt-textarea" value={settingsForm.general_instructions} disabled={selectedIsPublished} onChange={(e) => setSettingsForm((p) => ({ ...p, general_instructions: e.target.value }))} /></div>
             </div>
             <div className="cbt-modal-head">
@@ -2501,7 +3677,178 @@ export default function CbtExamsPage() {
         </div>
       )}
 
-      {licenseModalOpen && !isTeacher && (
+      {reuseModalOpen && reuseSourceExam && (
+        <div className="cbt-modal-backdrop" role="dialog" aria-modal="true">
+          <form className="cbt-modal" onSubmit={handleReuseExam}>
+            <div className="cbt-modal-head">
+              <div>
+                <h2>Reuse Exam Across Academic Sessions</h2>
+                <p>Create a fresh, independent copy of this exam for a new session or term while preserving all past student records and attempts.</p>
+              </div>
+              <button className="cbt-btn cbt-soft" type="button" onClick={() => setReuseModalOpen(false)}>
+                <i className="bi bi-x-lg" /> Close
+              </button>
+            </div>
+            <div className="cbt-modal-body">
+              <div className="alert alert-info py-2 px-3 mb-3 small" style={{ borderRadius: "10px" }}>
+                <i className="bi bi-info-circle-fill me-1" />
+                <strong>Source:</strong> {reuseSourceExam.title} ({reuseSourceExam.subject?.name || "No subject"}) &bull; {reuseSourceExam.questions_count ?? 0} questions &bull; {reuseSourceExam.attempts_count ?? 0} historical attempts kept safe.
+              </div>
+
+              <div className="cbt-section-label">Target Academic Period</div>
+              <div className="cbt-form-grid">
+                <div className="cbt-field">
+                  <label className="cbt-label">Target Academic Session *</label>
+                  <select
+                    className="cbt-select"
+                    value={reuseForm.academic_session_id}
+                    required
+                    onChange={(e) => setReuseForm((p) => ({ ...p, academic_session_id: e.target.value }))}
+                  >
+                    <option value="">Select Target Session</option>
+                    {sessions.map((sess) => (
+                      <option key={sess.id} value={sess.id}>
+                        {sess.name} {sess.is_current ? "(Current Session)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="cbt-field">
+                  <label className="cbt-label">Target Academic Term *</label>
+                  <select
+                    className="cbt-select"
+                    value={reuseForm.term_id}
+                    required
+                    onChange={(e) => setReuseForm((p) => ({ ...p, term_id: e.target.value }))}
+                  >
+                    <option value="">Select Target Term</option>
+                    {terms
+                      .filter((t) => !reuseForm.academic_session_id || !t.academic_session_id || t.academic_session_id === Number(reuseForm.academic_session_id))
+                      .map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name} {t.is_current ? "(Current Term)" : ""}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="cbt-section-label">Exam Copy Details</div>
+              <div className="cbt-form-grid">
+                <div className="cbt-field cbt-field-full">
+                  <label className="cbt-label">Exam Title in Target Session</label>
+                  <input
+                    className="cbt-input"
+                    value={reuseForm.title}
+                    required
+                    onChange={(e) => setReuseForm((p) => ({ ...p, title: e.target.value }))}
+                    placeholder="e.g. 1st Term Basic Science CBT Examination"
+                  />
+                </div>
+                <div className="cbt-field">
+                  <label className="cbt-label">Target Class</label>
+                  <select
+                    className="cbt-select"
+                    value={reuseForm.class_id}
+                    onChange={(e) => setReuseForm((p) => ({ ...p, class_id: e.target.value }))}
+                  >
+                    <option value="">All classes in subject section</option>
+                    {classes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="cbt-field">
+                  <label className="cbt-label">Duration (Minutes)</label>
+                  <input
+                    className="cbt-input"
+                    type="number"
+                    min={1}
+                    value={reuseForm.duration_minutes}
+                    onChange={(e) => setReuseForm((p) => ({ ...p, duration_minutes: Number(e.target.value) }))}
+                  />
+                </div>
+                <div className="cbt-field">
+                  <label className="cbt-label">Pass Mark (%)</label>
+                  <input
+                    className="cbt-input"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={reuseForm.pass_mark}
+                    onChange={(e) => setReuseForm((p) => ({ ...p, pass_mark: Number(e.target.value) }))}
+                  />
+                </div>
+              </div>
+
+              <div className="cbt-section-label">Timetable for Target Session (Optional)</div>
+              <div className="cbt-form-grid">
+                <div className="cbt-field">
+                  <label className="cbt-label">Exam Date</label>
+                  <input
+                    className="cbt-input"
+                    type="date"
+                    value={reuseForm.schedule.exam_date}
+                    onChange={(e) => setReuseForm((p) => ({ ...p, schedule: { ...p.schedule, exam_date: e.target.value } }))}
+                  />
+                </div>
+                <div className="cbt-field">
+                  <label className="cbt-label">Venue</label>
+                  <input
+                    className="cbt-input"
+                    value={reuseForm.schedule.venue}
+                    onChange={(e) => setReuseForm((p) => ({ ...p, schedule: { ...p.schedule, venue: e.target.value } }))}
+                    placeholder="e.g. CBT Hall / ICT Center"
+                  />
+                </div>
+                <div className="cbt-field">
+                  <label className="cbt-label">Start Time</label>
+                  <input
+                    className="cbt-input"
+                    type="time"
+                    value={reuseForm.schedule.starts_at}
+                    onChange={(e) => setReuseForm((p) => ({ ...p, schedule: { ...p.schedule, starts_at: e.target.value } }))}
+                  />
+                </div>
+                <div className="cbt-field">
+                  <label className="cbt-label">End Time</label>
+                  <input
+                    className="cbt-input"
+                    type="time"
+                    value={reuseForm.schedule.ends_at}
+                    onChange={(e) => setReuseForm((p) => ({ ...p, schedule: { ...p.schedule, ends_at: e.target.value } }))}
+                  />
+                </div>
+                <div className="cbt-field-full d-flex justify-content-between align-items-center mb-2">
+                  <p className="cbt-help mb-0">Optional: leave empty for on-demand / unscheduled examination.</p>
+                  {reuseForm.schedule.exam_date && (
+                    <button
+                      type="button"
+                      className="cbt-btn cbt-ghost text-danger btn-sm py-1 px-2"
+                      style={{ fontSize: "11px" }}
+                      onClick={() => setReuseForm((p) => ({ ...p, schedule: { exam_date: "", starts_at: "", ends_at: "", venue: "" } }))}
+                    >
+                      <i className="bi bi-x-circle me-1" /> Clear Timetable
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="cbt-modal-head">
+              <button className="cbt-btn cbt-soft" type="button" onClick={() => setReuseModalOpen(false)}>
+                Cancel
+              </button>
+              <button className="cbt-btn cbt-primary" disabled={reusing}>
+                <i className="bi bi-copy" /> {reusing ? "Copying Exam..." : "Reuse in Target Session"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {licenseModalOpen && (
         <div className="cbt-modal-backdrop" role="dialog" aria-modal="true">
           <div className="cbt-modal cbt-modal-sm">
             <div className="cbt-modal-head">
@@ -2509,18 +3856,69 @@ export default function CbtExamsPage() {
               <button className="cbt-btn cbt-soft" type="button" onClick={() => setLicenseModalOpen(false)}><i className="bi bi-x-lg" /> Close</button>
             </div>
             <div className="cbt-modal-body">
+              <div className="cbt-license-card mb-3 p-3 bg-light rounded border border-primary">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <h4 className="m-0 text-primary fw-bold" style={{ fontSize: "1rem" }}>
+                    <i className="bi bi-key-fill me-1" /> Offline CBT Server License
+                  </h4>
+                  <button
+                    className="cbt-btn cbt-soft btn-sm"
+                    type="button"
+                    onClick={generateFreshLicense}
+                    disabled={saving}
+                  >
+                    <i className="bi bi-arrow-clockwise me-1" /> {offlineLicense?.license_key ? "Generate New Key" : "Generate Key"}
+                  </button>
+                </div>
+
+                {offlineLicense?.license_key ? (
+                  <div>
+                    <div className="d-flex gap-2 align-items-center mb-2">
+                      <input
+                        className="cbt-input fw-bold text-primary font-monospace flex-grow-1"
+                        style={{ fontSize: "1.1rem", letterSpacing: "1px", background: "#fff" }}
+                        readOnly
+                        value={offlineLicense.license_key}
+                      />
+                      <button
+                        className="cbt-btn cbt-primary"
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(offlineLicense.license_key);
+                          showSuccess("License Key copied to clipboard: " + offlineLicense.license_key);
+                        }}
+                      >
+                        <i className="bi bi-clipboard-check me-1" /> Copy Key
+                      </button>
+                    </div>
+                    <div className="small text-muted">
+                      <strong>How to connect:</strong> Open the Offline CBT Server software on your school PC at <code>http://localhost:8088/cbt/offline-runner</code>, paste this license key into <strong>Cloud Direct Sync</strong>, and click <strong>⬇️ Pull Exams</strong>.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-2">
+                    <p className="text-muted small mb-2">No active offline license key. Click below to generate one immediately.</p>
+                    <button className="cbt-btn cbt-primary" type="button" onClick={generateFreshLicense} disabled={saving}>
+                      <i className="bi bi-plus-circle me-1" /> Generate License Key Now
+                    </button>
+                  </div>
+                )}
+              </div>
               <div className="cbt-import-guide mb-3">
-                <code><strong>1. Install</strong><br />Install the Windows offline CBT app on the server computer.</code>
-                <code><strong>2. Package</strong><br />Download published offline/hybrid exams with the latest fee access snapshot.</code>
-                <code><strong>3. Results</strong><br />Upload the completed result JSON exported from the offline server.</code>
+                <code><strong>1. Host Server</strong><br />Install Offline Server on host PC & click Pull Exams (Direct LAN).</code>
+                <code><strong>2. Student PCs</strong><br />Install Student CBT App on lab PCs (1-click desktop launcher).</code>
+                <code><strong>3. Auto Push Results</strong><br />Click Push Results on host to save OBJ marks to report cards.</code>
               </div>
               <div className="alert alert-info mb-3">
                 Download a fresh bundle close to exam time. The offline server uses the bundle snapshot to know which students are allowed to write.
               </div>
 
               <div className="cbt-work-actions">
+                <button className="cbt-btn cbt-primary" type="button" disabled={saving} onClick={downloadStudentClient} style={{ background: "#2563EB" }}>
+                  <i className="bi bi-laptop" /> Download Student CBT App (Client PCs - 2 MB)
+                </button>
                 <button className="cbt-btn cbt-gold" type="button" disabled={saving} onClick={downloadOfflineInstaller}>
-                  <i className="bi bi-windows" /> Download Windows App
+                  <i className="bi bi-server" /> Download Offline Server (Host PC - 120 MB)
                 </button>
                 <button className="cbt-btn cbt-primary" type="button" disabled={saving} onClick={prepareAndDownloadOfflineBundle}>
                   <i className="bi bi-download" /> Download Offline Package
@@ -2587,9 +3985,8 @@ export default function CbtExamsPage() {
               <div className="cbt-work-actions mb-3">
                 <a className="cbt-btn cbt-primary" href={cbtManualUrl} target="_blank" rel="noreferrer"><i className="bi bi-file-earmark-pdf" /> Download PDF Manual</a>
                 <a className="cbt-btn cbt-soft" href={publicAccessUrl} target="_blank" rel="noreferrer"><i className="bi bi-box-arrow-up-right" /> Open Online Access Page</a>
-                {!isTeacher && (
-                  <button className="cbt-btn cbt-soft" type="button" disabled={saving} onClick={downloadOfflineInstaller}><i className="bi bi-windows" /> Download Offline App</button>
-                )}
+                <button className="cbt-btn cbt-soft" type="button" disabled={saving} onClick={downloadOfflineInstaller} title="Download Server stack for host/teacher PC"><i className="bi bi-server" /> Download Offline Server</button>
+                  <button className="cbt-btn cbt-primary" type="button" disabled={saving} onClick={downloadStudentClient} title="Download lightweight client installer for student computers"><i className="bi bi-laptop" /> Download Student CBT App</button>
               </div>
               <div className="cbt-manual-grid">
                 <div className="cbt-manual-card">
@@ -2917,29 +4314,139 @@ export default function CbtExamsPage() {
                 </div>
               )}
 
-              {questions.length === 0 ? (
-                <div className="cbt-empty">No questions have been added to this exam yet.</div>
-              ) : questions.map((question, index) => (
-                <div className="cbt-preview-question" key={`preview-${question.id}`}>
-                  <h3>{index + 1}.</h3>
-                  <CbtHtml html={question.question_text} />
-                  <div className="cbt-question-meta mb-2">
-                    <span className="cbt-pill">{question.question_type.replace(/_/g, " ")}</span>
-                    <span className="cbt-pill">{question.marks} mark(s)</span>
-                  </div>
-                  {(question.options || []).map((option) => (
-                    <div className="cbt-preview-option" key={`preview-${question.id}-${option.label}`}>
-                      <strong>{option.label}.</strong>
-                      <CbtHtml html={option.option_text} />
-                      {option.is_correct ? <span className="cbt-pill">Answer</span> : null}
+              {examDetail.include_theory ? (
+                <>
+                  {/* Section A: Objective Questions */}
+                  <div className="mb-4">
+                    <div className="d-flex align-items-center justify-content-between p-2 px-3 mb-3 bg-light rounded border">
+                      <h3 className="m-0" style={{ fontSize: 15, fontWeight: 700, color: "#0F2744" }}>
+                        Section A: Objective Questions ({objectiveQuestions.length})
+                      </h3>
+                      <span className="cbt-pill cbt-pill-green">
+                        Total: {objectiveQuestions.reduce((sum, q) => sum + (Number(q.marks) || 0), 0)} marks
+                      </span>
                     </div>
-                  ))}
-                </div>
-              ))}
+                    {objectiveQuestions.length === 0 ? (
+                      <div className="cbt-empty mb-3">No objective questions in Section A.</div>
+                    ) : (
+                      objectiveQuestions.map((question, index) => (
+                        <div className="cbt-preview-question" key={`preview-${question.id}`}>
+                          <h3>{index + 1}.</h3>
+                          <CbtHtml html={question.question_text} />
+                          {question.diagram_url && (
+                            <div className="my-2 p-2 bg-light rounded text-center border">
+                              <img
+                                src={question.diagram_url}
+                                alt="Question diagram"
+                                style={{ maxHeight: 240, maxWidth: "100%", objectFit: "contain", borderRadius: 6 }}
+                              />
+                            </div>
+                          )}
+                          <div className="cbt-question-meta mb-2">
+                            <span className="cbt-pill">{question.question_type.replace(/_/g, " ")}</span>
+                            <span className="cbt-pill">{question.marks} mark(s)</span>
+                          </div>
+                          {(question.options || []).map((option) => (
+                            <div className="cbt-preview-option" key={`preview-${question.id}-${option.label}`}>
+                              <strong>{option.label}.</strong>
+                              <CbtHtml html={option.option_text} />
+                              {option.is_correct ? <span className="cbt-pill">Answer</span> : null}
+                            </div>
+                          ))}
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Section B: Theory Questions */}
+                  <div className="mb-4">
+                    <div className="p-3 mb-3 rounded border" style={{ background: "#EFF6FF", borderColor: "#BFDBFE" }}>
+                      <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                        <div>
+                          <h3 className="m-0" style={{ fontSize: 16, fontWeight: 800, color: "#1E40AF" }}>
+                            Section B: Theory / Essay Questions ({theoryQuestions.length})
+                          </h3>
+                          <p className="m-0 small" style={{ color: "#3B82F6" }}>
+                            Paper-based answering. Students write answers manually on physical answer sheets.
+                          </p>
+                        </div>
+                        <span className="cbt-pill" style={{ background: "#DBEAFE", color: "#1E40AF", fontWeight: 700 }}>
+                          Total: {theoryQuestions.reduce((sum, q) => sum + (Number(q.marks) || 0), 0)} marks
+                        </span>
+                      </div>
+                      {examDetail.theory_instructions && (
+                        <div className="mt-2 pt-2 border-top small" style={{ borderColor: "#BFDBFE", color: "#1E3A8A" }}>
+                          <strong>Instructions:</strong> {examDetail.theory_instructions}
+                        </div>
+                      )}
+                    </div>
+
+                    {theoryQuestions.length === 0 ? (
+                      <div className="cbt-empty mb-3">No theory questions in Section B yet.</div>
+                    ) : (
+                      theoryQuestions.map((question, index) => (
+                        <div className="cbt-preview-question" key={`preview-theory-${question.id}`} style={{ borderLeft: "4px solid #2563EB" }}>
+                          <div className="d-flex align-items-center justify-content-between mb-2">
+                            <h3 className="m-0" style={{ color: "#1E40AF" }}>Theory Question {index + 1}</h3>
+                            <span className="cbt-pill" style={{ background: "#DBEAFE", color: "#1E40AF", fontWeight: 700 }}>
+                              {question.marks} mark(s)
+                            </span>
+                          </div>
+                          <CbtHtml html={question.question_text} />
+                          {question.diagram_url && (
+                            <div className="my-2 p-2 bg-light rounded text-center border">
+                              <img
+                                src={question.diagram_url}
+                                alt={`Theory Question ${index + 1} Diagram`}
+                                style={{ maxHeight: 240, maxWidth: "100%", objectFit: "contain", borderRadius: 6 }}
+                              />
+                            </div>
+                          )}
+                          {question.explanation && (
+                            <div className="cbt-note mt-2" style={{ fontSize: 12 }}>
+                              <strong>Marking guide:</strong> {question.explanation}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </>
+              ) : (
+                questions.length === 0 ? (
+                  <div className="cbt-empty">No questions have been added to this exam yet.</div>
+                ) : questions.map((question, index) => (
+                  <div className="cbt-preview-question" key={`preview-${question.id}`}>
+                    <h3>{index + 1}.</h3>
+                    <CbtHtml html={question.question_text} />
+                    {question.diagram_url && (
+                      <div className="my-2 p-2 bg-light rounded text-center border">
+                        <img
+                          src={question.diagram_url}
+                          alt="Question diagram"
+                          style={{ maxHeight: 240, maxWidth: "100%", objectFit: "contain", borderRadius: 6 }}
+                        />
+                      </div>
+                    )}
+                    <div className="cbt-question-meta mb-2">
+                      <span className="cbt-pill">{question.question_type.replace(/_/g, " ")}</span>
+                      <span className="cbt-pill">{question.marks} mark(s)</span>
+                    </div>
+                    {(question.options || []).map((option) => (
+                      <div className="cbt-preview-option" key={`preview-${question.id}-${option.label}`}>
+                        <strong>{option.label}.</strong>
+                        <CbtHtml html={option.option_text} />
+                        {option.is_correct ? <span className="cbt-pill">Answer</span> : null}
+                      </div>
+                    ))}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
       )}
+      <ClassCbtSettingsModal isOpen={classCbtModalOpen} onClose={() => setClassCbtModalOpen(false)} onSaved={load} />
     </>
   );
 }

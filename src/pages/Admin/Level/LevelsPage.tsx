@@ -8,6 +8,7 @@ import { authApi } from "../../../utils/axios";
 import { useToast } from "../../../contexts/ToastContext";
 import PageTitle from "../../../components/PageTitle";
 import { getUser } from "../../../utils/token";
+import ClassCbtSettingsModal from "../../../components/cbt/ClassCbtSettingsModal";
 
 /* =========================
    TYPES
@@ -104,6 +105,7 @@ export default function LevelsPage() {
   // layout
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  const [showCbtSettingsModal, setShowCbtSettingsModal] = useState(false);
 
   // loading
   const [loadingPage, setLoadingPage] = useState(true);
@@ -662,6 +664,17 @@ export default function LevelsPage() {
                   </p>
 
                   <div className="d-flex flex-wrap gap-2">
+                    <button
+                      className="db-btn-gold"
+                      style={{ background: "#033987", color: "#FFFFFF", borderColor: "#033987" }}
+                      onClick={() => setShowCbtSettingsModal(true)}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                        <path d="M9 1L3 9h5l-1 6 6-8h-5l1-6z" fill="#FEC602" />
+                      </svg>
+                      CBT & Fee Settings
+                    </button>
+
                     <button
                       className="db-btn-gold"
                       onClick={() => {
@@ -1773,6 +1786,13 @@ export default function LevelsPage() {
                 </div>
               </div>
             )}
+
+            {/* Class-Level CBT & Fee Settings Modal */}
+            <ClassCbtSettingsModal
+              isOpen={showCbtSettingsModal}
+              onClose={() => setShowCbtSettingsModal(false)}
+              onUpdated={fetchLevels}
+            />
           </main>
         </div>
       </div>

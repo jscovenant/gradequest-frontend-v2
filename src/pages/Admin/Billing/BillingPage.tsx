@@ -8,6 +8,7 @@ import Loader from "../../../components/ui/dashboardLoader";
 import { authApi } from "../../../utils/axios";
 import { useToast } from "../../../contexts/ToastContext";
 import PageTitle from "../../../components/PageTitle";
+import ClassCbtSettingsModal from "../../../components/cbt/ClassCbtSettingsModal";
 
 type Plan = {
   id: number | null;
@@ -33,6 +34,16 @@ type PaymentRow = {
   plan?: Plan | null;
 };
 
+type ArrearsItem = {
+  entitlement_id: number;
+  session_id: number;
+  session_name: string;
+  term_id: number;
+  term_name: string;
+  label: string;
+  amount: number;
+};
+
 type ClearanceStudent = {
   id: number;
   firstname: string;
@@ -47,6 +58,12 @@ type ClearanceStudent = {
   total_terms_count: number;
   covered_at?: string | null;
   grace_until?: string | null;
+  current_term_fee?: number;
+  previous_outstanding_balance?: number;
+  total_amount_payable?: number;
+  has_past_arrears?: boolean;
+  arrears_terms_count?: number;
+  arrears_breakdown?: ArrearsItem[];
 };
 
 type ClassItem = {
@@ -97,6 +114,7 @@ export default function BillingPage() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showCbtSettingsModal, setShowCbtSettingsModal] = useState(false);
 
   // Billing & Clearance summaries
   const [clearanceSummary, setClearanceSummary] = useState<{
@@ -183,6 +201,19 @@ export default function BillingPage() {
     activeTab: "paystack",
   });
 
+  // Dedicated Payment Confirmation Modal state
+  const [paymentConfirmation, setPaymentConfirmation] = useState<{
+    isOpen: boolean;
+    status: string;
+    reference: string;
+    amount: number;
+    channel: string;
+    schoolName?: string;
+    paidAt?: string;
+    clearedCount?: number;
+    students?: Array<{ id: number; firstname?: string; surname?: string; reg_no?: string }>;
+  } | null>(null);
+
   const [modalCopied, setModalCopied] = useState(false);
   const [modalProcessingWallet, setModalProcessingWallet] = useState(false);
   const [verifyingWema, setVerifyingWema] = useState(false);
@@ -246,6 +277,17 @@ export default function BillingPage() {
           const res = await authApi.get(`/school/clearance/verify-paystack/${ref}`);
           if (res.data?.success) {
             showSuccess?.(res.data?.message || "Payment verified successfully! Clearance updated.");
+            setPaymentConfirmation({
+              isOpen: true,
+              status: "Successful",
+              reference: ref,
+              amount: res.data?.total_fee || res.data?.payment?.amount || 0,
+              channel: res.data?.payment?.channel || "Paystack",
+              schoolName: res.data?.payment?.school_name,
+              paidAt: res.data?.payment?.paid_at,
+              clearedCount: res.data?.cleared_students_count || res.data?.payment?.cleared_students_count || 1,
+              students: res.data?.payment?.students || [],
+            });
           } else {
             showError?.(res.data?.message || "Payment verification could not be completed.");
           }
@@ -278,7 +320,13 @@ export default function BillingPage() {
   const feePerStudent = Number(clearanceSummary?.fee_per_student || 500);
   const termsCount = Number(clearanceSummary?.terms_count || 3);
   const costPerSelectedStudent = clearanceScope === "session" ? feePerStudent * termsCount : feePerStudent;
-  const totalSelectivePayable = selectedStudentIds.length * costPerSelectedStudent;
+  const totalSelectivePayable = useMemo(() => {
+    return selectedStudentIds.reduce((sum, id) => {
+      const found = rosterStudents.find((s) => s.id === id);
+      const studentCost = found?.total_amount_payable !== undefined ? found.total_amount_payable : costPerSelectedStudent;
+      return sum + studentCost;
+    }, 0);
+  }, [selectedStudentIds, rosterStudents, costPerSelectedStudent]);
   const currentWalletBalance = Number(clearanceSummary?.wallet_balance || 0);
   const hasSufficientWallet = currentWalletBalance >= totalSelectivePayable;
 
@@ -404,7 +452,7 @@ export default function BillingPage() {
   const openSingleClearanceModal = (student: ClearanceStudent) => {
     // Flexible Policy: If school has >10 students, single student clearance must be at least ₦5,000 or batched
     const totalSchoolStudents = clearanceSummary?.total_students || 0;
-    const cost = costPerSelectedStudent;
+    const cost = student.total_amount_payable !== undefined ? student.total_amount_payable : costPerSelectedStudent;
     if (totalSchoolStudents > 10 && cost < 5000) {
       const minNeeded = Math.ceil(5000 / Math.max(1, cost));
       showError?.(
@@ -568,7 +616,7 @@ export default function BillingPage() {
         term_id: isFullSession ? null : (clearanceModal.termId || selectedTermId),
         student_ids: studentIds,
         is_full_session: isFullSession,
-        callback_url: window.location.origin + window.location.pathname,
+        callback_url: window.location.origin + "/billing",
       });
 
       if (res.data?.success && res.data?.authorization_url) {
@@ -592,7 +640,18 @@ export default function BillingPage() {
     try {
       const res = await authApi.get(`/school/clearance/verify-wema/${ref}`);
       if (res.data?.success) {
-        showSuccess?.(res.data.message || `₦${fmtNaira(res.data.total_fee || clearanceModal.totalFee)} payment confirmed! Student clearance activated.`);
+        showSuccess?.(res.data.message || `Payment confirmed! Student clearance activated.`);
+        setPaymentConfirmation({
+          isOpen: true,
+          status: "Successful",
+          reference: ref,
+          amount: res.data?.total_fee || res.data?.payment?.amount || clearanceModal.totalFee,
+          channel: "Wema Bank Transfer",
+          schoolName: res.data?.payment?.school_name,
+          paidAt: res.data?.payment?.paid_at,
+          clearedCount: res.data?.cleared_students_count || clearanceModal.studentCount,
+          students: res.data?.payment?.students || clearanceModal.studentsList,
+        });
         setClearanceModal((prev) => ({ ...prev, isOpen: false }));
         setSelectedStudentIds([]);
         loadBillingData();
@@ -658,6 +717,17 @@ export default function BillingPage() {
       }
 
       showSuccess?.(res.data?.message || "Clearance completed successfully!");
+      setPaymentConfirmation({
+        isOpen: true,
+        status: "Successful",
+        reference: res.data?.reference || res.data?.payment?.reference || "WALLET-" + Date.now(),
+        amount: res.data?.total_fee || res.data?.payment?.amount || clearanceModal.totalFee,
+        channel: "SchoolProfit Wallet",
+        schoolName: res.data?.school_name || res.data?.payment?.school_name,
+        paidAt: res.data?.paid_at || new Date().toISOString(),
+        clearedCount: res.data?.cleared_students_count || clearanceModal.studentCount,
+        students: res.data?.payment?.students || clearanceModal.studentsList,
+      });
       setSelectedStudentIds([]);
       setClearanceModal((prev) => ({ ...prev, isOpen: false }));
       await Promise.all([loadBillingData(false), loadRoster(rosterPage)]);
@@ -1399,6 +1469,71 @@ export default function BillingPage() {
               </div>
             </div>
 
+            {/* Class CBT & Fee Control Banner */}
+            <div
+              style={{
+                background: "linear-gradient(135deg, #EFF6FF 0%, #F8FAFC 100%)",
+                border: "1.5px solid #BFDBFE",
+                borderRadius: 16,
+                padding: "16px 20px",
+                marginBottom: 20,
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 12,
+                    background: "#033987",
+                    display: "grid",
+                    placeItems: "center",
+                    color: "#FEC602",
+                    fontSize: 20,
+                    fontWeight: "bold",
+                    flexShrink: 0,
+                  }}
+                >
+                  ⚡
+                </div>
+                <div>
+                  <div style={{ fontSize: 14.5, fontWeight: 800, color: "#033987" }}>
+                    Class-Level CBT & Platform Fee Control
+                  </div>
+                  <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>
+                    Mixed examination structures supported: classes with CBT disabled automatically fall back to the ₦500 Basic Plan rate.
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowCbtSettingsModal(true)}
+                style={{
+                  background: "#033987",
+                  color: "#FFFFFF",
+                  border: "none",
+                  borderRadius: 10,
+                  padding: "9px 18px",
+                  fontSize: 12.5,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  boxShadow: "0 4px 12px rgba(3, 57, 135, 0.2)",
+                }}
+              >
+                <span>⚡ Configure Class CBT Coverage</span>
+                <span>→</span>
+              </button>
+            </div>
+
             {/* ===== 3 EXECUTIVE SETTLEMENT PACKAGES ===== */}
             <div className="row g-3 mb-4">
               {/* PACKAGE 1: 100% Whole School (Current Term) */}
@@ -1968,6 +2103,31 @@ export default function BillingPage() {
                                   <i className="bi bi-exclamation-circle-fill me-1" /> Pending Clearance
                                 </span>
                               )}
+                              {s.has_past_arrears && (
+                                <div style={{ marginTop: 4 }}>
+                                  <span
+                                    className="badge"
+                                    style={{
+                                      background: "#FEF3C7",
+                                      color: "#92400E",
+                                      border: "1px solid #FCD34D",
+                                      fontSize: "10.5px",
+                                      fontWeight: 600,
+                                      padding: "3px 7px",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 4,
+                                    }}
+                                  >
+                                    <i className="bi bi-clock-history" /> Arrears: {fmtNaira(s.previous_outstanding_balance || 0)}
+                                    {s.arrears_breakdown && s.arrears_breakdown.length > 0 && (
+                                      <span style={{ opacity: 0.85, fontSize: "10px" }}>
+                                        ({s.arrears_breakdown.map((a) => a.label).join(", ")})
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
+                              )}
                             </td>
 
                             <td>
@@ -2020,7 +2180,7 @@ export default function BillingPage() {
                                   disabled={clearingSingleId === s.id}
                                 >
                                   <i className="bi bi-wallet2 me-1" />
-                                  Clear ({fmtNaira(costPerSelectedStudent)})
+                                  Clear ({fmtNaira(s.total_amount_payable !== undefined ? s.total_amount_payable : (s.previous_outstanding_balance || 0) + costPerSelectedStudent)})
                                 </button>
                               )}
                             </td>
@@ -2407,6 +2567,123 @@ export default function BillingPage() {
 
             {/* Modal Body */}
             <div style={{ padding: "20px 26px" }}>
+              {/* Carry-Forward / Outstanding Platform Fee Statement */}
+              {clearanceModal.mode === "single" && clearanceModal.studentsList[0] && (() => {
+                const std = rosterStudents.find((s) => s.id === clearanceModal.studentsList[0].id);
+                const prevDebt = std?.previous_outstanding_balance || 0;
+                const currFee = std?.current_term_fee ?? (std?.is_term_cleared ? 0 : costPerSelectedStudent);
+                const totalPayable = std?.total_amount_payable ?? clearanceModal.totalFee;
+                return (
+                  <div className="mb-3">
+                    <div style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", color: "#64748B", marginBottom: 6 }}>
+                      Fee Statement &amp; Carry-Forward Breakdown
+                    </div>
+                    <div className="table-responsive">
+                      <table className="table table-sm table-bordered mb-0" style={{ fontSize: "12.5px" }}>
+                        <thead className="table-light">
+                          <tr>
+                            <th>Description</th>
+                            <th className="text-end">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {std?.has_past_arrears && std?.arrears_breakdown && std.arrears_breakdown.length > 0 ? (
+                            std.arrears_breakdown.map((arr, i) => (
+                              <tr key={i}>
+                                <td>
+                                  <span className="badge bg-warning text-dark me-2">Previous Term Arrears</span>
+                                  Outstanding balance from <strong>{arr.label}</strong>
+                                </td>
+                                <td className="text-end fw-semibold text-danger">{fmtNaira(arr.amount)}</td>
+                              </tr>
+                            ))
+                          ) : prevDebt > 0 ? (
+                            <tr>
+                              <td>
+                                <span className="badge bg-warning text-dark me-2">Previous Term Arrears</span>
+                                Outstanding balance from previous academic period
+                              </td>
+                              <td className="text-end fw-semibold text-danger">{fmtNaira(prevDebt)}</td>
+                            </tr>
+                          ) : null}
+                          <tr>
+                            <td>
+                              <span className="badge bg-primary me-2">Current Term</span>
+                              Current term platform fee ({clearanceSummary?.period_label || 'Current Period'})
+                            </td>
+                            <td className="text-end fw-semibold text-dark">{fmtNaira(currFee)}</td>
+                          </tr>
+                          <tr className="table-primary fw-bold">
+                            <td>Total Amount Payable</td>
+                            <td className="text-end text-primary" style={{ fontSize: "14px" }}>{fmtNaira(totalPayable)}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {clearanceModal.mode !== "single" && (() => {
+                let prevArrearsTotal = 0;
+                let currentFeeTotal = 0;
+                let grandTotal = 0;
+
+                if (clearanceModal.mode === "selected") {
+                  clearanceModal.studentsList.forEach((st) => {
+                    const std = rosterStudents.find((s) => s.id === st.id);
+                    prevArrearsTotal += (std?.previous_outstanding_balance || 0);
+                    currentFeeTotal += (std?.current_term_fee ?? clearanceModal.feePerStudent);
+                    grandTotal += (std?.total_amount_payable || ((std?.previous_outstanding_balance || 0) + (std?.current_term_fee ?? clearanceModal.feePerStudent)));
+                  });
+                } else {
+                  prevArrearsTotal = Number(clearanceSummary?.past_arrears_fee || 0);
+                  currentFeeTotal = Number(clearanceSummary?.term_clearance_fee || 0);
+                  grandTotal = prevArrearsTotal + currentFeeTotal;
+                }
+
+                if (prevArrearsTotal > 0) {
+                  return (
+                    <div className="mb-3">
+                      <div style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", color: "#64748B", marginBottom: 6 }}>
+                        Platform Fee Summary (Including Carried-Forward Arrears)
+                      </div>
+                      <div className="table-responsive">
+                        <table className="table table-sm table-bordered mb-0" style={{ fontSize: "12.5px" }}>
+                          <thead className="table-light">
+                            <tr>
+                              <th>Description</th>
+                              <th className="text-end">Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td>
+                                <span className="badge bg-warning text-dark me-2">Previous Arrears</span>
+                                Previous terms outstanding balances carried forward
+                              </td>
+                              <td className="text-end fw-semibold text-danger">{fmtNaira(prevArrearsTotal)}</td>
+                            </tr>
+                            <tr>
+                              <td>
+                                <span className="badge bg-primary me-2">Current Term</span>
+                                Current term platform fee
+                              </td>
+                              <td className="text-end fw-semibold text-dark">{fmtNaira(currentFeeTotal)}</td>
+                            </tr>
+                            <tr className="table-primary fw-bold">
+                              <td>Total Amount Payable</td>
+                              <td className="text-end text-primary" style={{ fontSize: "14px" }}>{fmtNaira(grandTotal || clearanceModal.totalFee)}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
               {/* STUDENT LIST BREAKDOWN / PREVIEW (Explicit Specification) */}
               <div style={{ marginBottom: 18 }}>
                 <div className="d-flex justify-content-between align-items-center mb-2">
@@ -2874,6 +3151,176 @@ export default function BillingPage() {
           </div>
         </div>
       )}
+
+      {/* ===== PAYMENT CONFIRMATION MODAL ===== */}
+      {paymentConfirmation?.isOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 10000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+            background: "rgba(10, 25, 47, 0.8)",
+            backdropFilter: "blur(6px)",
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 520,
+              background: "#FFFFFF",
+              borderRadius: 18,
+              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.35)",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                background: "linear-gradient(135deg, #065F46 0%, #059669 100%)",
+                padding: "24px 28px",
+                color: "#FFFFFF",
+                textAlign: "center",
+              }}
+            >
+              <div
+                style={{
+                  width: 58,
+                  height: 58,
+                  borderRadius: "50%",
+                  background: "rgba(255,255,255,0.2)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 30,
+                  margin: "0 auto 12px",
+                  border: "2px solid rgba(255,255,255,0.4)",
+                }}
+              >
+                ✓
+              </div>
+              <h4 style={{ margin: 0, fontWeight: 800, fontSize: 20 }}>Payment Confirmed!</h4>
+              <p style={{ margin: "6px 0 0", fontSize: 13, color: "rgba(255,255,255,0.9)" }}>
+                Platform fee payment successfully recorded and student clearance updated.
+              </p>
+            </div>
+
+            <div style={{ padding: "24px 28px" }}>
+              <div
+                style={{
+                  background: "#F8FAFC",
+                  border: "1px solid #E2E8F0",
+                  borderRadius: 12,
+                  padding: "16px",
+                  textAlign: "center",
+                  marginBottom: 18,
+                }}
+              >
+                <div style={{ fontSize: 11.5, textTransform: "uppercase", letterSpacing: 0.8, color: "#64748B", fontWeight: 600 }}>
+                  Amount Paid
+                </div>
+                <div style={{ fontSize: 26, fontWeight: 800, color: "#059669", marginTop: 4 }}>
+                  ₦{fmtNaira(paymentConfirmation.amount)}
+                </div>
+                <span
+                  style={{
+                    display: "inline-block",
+                    marginTop: 6,
+                    padding: "3px 10px",
+                    borderRadius: 12,
+                    background: "#D1FAE5",
+                    color: "#065F46",
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                  }}
+                >
+                  ● Status: {paymentConfirmation.status}
+                </span>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 13, marginBottom: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "#64748B" }}>Reference:</span>
+                  <code style={{ background: "#F1F5F9", padding: "2px 6px", borderRadius: 4, fontWeight: 600, color: "#0F172A", fontSize: 12 }}>
+                    {paymentConfirmation.reference}
+                  </code>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "#64748B" }}>Payment Method:</span>
+                  <span style={{ fontWeight: 600, color: "#0F172A", textTransform: "capitalize" }}>
+                    {paymentConfirmation.channel}
+                  </span>
+                </div>
+                {paymentConfirmation.schoolName && (
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "#64748B" }}>School:</span>
+                    <span style={{ fontWeight: 600, color: "#0F172A" }}>
+                      {paymentConfirmation.schoolName}
+                    </span>
+                  </div>
+                )}
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "#64748B" }}>Students Cleared:</span>
+                  <span style={{ fontWeight: 700, color: "#059669" }}>
+                    {paymentConfirmation.clearedCount || 1} Student(s)
+                  </span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "#64748B" }}>Date & Time:</span>
+                  <span style={{ color: "#334155" }}>
+                    {paymentConfirmation.paidAt ? new Date(paymentConfirmation.paidAt).toLocaleString() : new Date().toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  type="button"
+                  style={{
+                    flex: 1,
+                    padding: "12px",
+                    background: "#059669",
+                    color: "#FFFFFF",
+                    border: "none",
+                    borderRadius: 10,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    fontSize: 14,
+                  }}
+                  onClick={() => setPaymentConfirmation(null)}
+                >
+                  Done / Close
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    padding: "12px 18px",
+                    background: "#F1F5F9",
+                    color: "#334155",
+                    border: "1px solid #CBD5E1",
+                    borderRadius: 10,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    fontSize: 13.5,
+                  }}
+                  onClick={() => window.print()}
+                >
+                  Print
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Class-Level CBT & Fee Settings Modal */}
+      <ClassCbtSettingsModal
+        isOpen={showCbtSettingsModal}
+        onClose={() => setShowCbtSettingsModal(false)}
+        onUpdated={loadBillingData}
+      />
     </>
   );
 }
