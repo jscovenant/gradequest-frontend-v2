@@ -161,6 +161,8 @@ const OnlinePayFeesPage = lazyWithRetry(() => import("./pages/Admin/Billing/Onli
 const PublicFeePaymentPage = lazyWithRetry(() => import("./pages/PublicFeePaymentPage"));
 const PublicCbtAccessPage = lazyWithRetry(() => import("./pages/PublicCbtAccessPage"));
 const OfflineCbtRunnerPage = lazyWithRetry(() => import("./pages/OfflineCbtRunnerPage"));
+const StudentCbtClientPage = lazyWithRetry(() => import("./pages/StudentCbtClientPage"));
+const OfflineCbtServerPage = lazyWithRetry(() => import("./pages/OfflineCbtServerPage"));
 const SalesLeadsPage = lazyWithRetry(() => import("./pages/Sales/SalesLeadsPage"));
 const SalesCommissionsPage = lazyWithRetry(() => import("./pages/Sales/SalesCommissionsPage"));
 const SalesPayoutSettingsPage = lazyWithRetry(() => import("./pages/Sales/SalesPayoutSettingsPage"));
@@ -248,7 +250,10 @@ function App() {
           <Route path="/school/:slugOrId/pay-fees" element={<PublicFeePaymentPage />} />
           <Route path="/school/:slugOrId/fee-payment" element={<PublicFeePaymentPage />} />
           <Route path="/cbt/access" element={<PublicCbtAccessPage />} />
-          <Route path="/cbt/offline-runner" element={<OfflineCbtRunnerPage />} />
+          <Route path="/cbt/offline-runner" element={<StudentCbtClientPage />} />
+          <Route path="/cbt/student" element={<StudentCbtClientPage />} />
+          <Route path="/cbt/offline-server" element={<OfflineCbtServerPage />} />
+          <Route path="/cbt/server" element={<OfflineCbtServerPage />} />
           <Route path="/book-demo" element={<BookDemo />} />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/terms-and-conditions" element={<TermsAndConditionsPage />} />
