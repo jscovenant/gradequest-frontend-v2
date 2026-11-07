@@ -228,8 +228,14 @@ export default function OfflineCbtRunnerPage() {
   const eventThrottleRef = useRef<Record<string, number>>({});
   const forcedSubmitRef = useRef(false);
 
-  const isServerConsole = ["localhost", "127.0.0.1"].includes(window.location.hostname) || window.location.search.includes("server=1");
-  const [consoleView, setConsoleView] = useState<"student" | "invigilator">("student");
+  const searchParams = new URLSearchParams(window.location.search);
+  const isStudentApp = searchParams.get("app") === "student";
+  const isServerApp = !isStudentApp && (
+    searchParams.get("app") === "server" ||
+    searchParams.get("server") === "1" ||
+    window.location.pathname.includes("/cbt/offline-server") ||
+    ["localhost", "127.0.0.1"].includes(window.location.hostname)
+  );
 
   const [cloudUrl, setCloudUrl] = useState<string>("https://gradequestschool.com.ng");
   const [licenseKeyInput, setLicenseKeyInput] = useState<string>("");
@@ -700,7 +706,15 @@ export default function OfflineCbtRunnerPage() {
 
   return (
     <>
-      <PageTitle title={student ? `${student.name} - CBT Examination` : "Student CBT Offline Portal"} />
+      <PageTitle
+        title={
+          isServerApp
+            ? "GradeQuest Offline CBT"
+            : student
+            ? `${student.name} - GradeQuest Student CBT`
+            : "GradeQuest Student CBT"
+        }
+      />
 
       <style>{`
         /* ========================================================
@@ -1049,15 +1063,6 @@ export default function OfflineCbtRunnerPage() {
           padding: 24px;
         }
 
-        .cbt-top-toggle-bar {
-          background: #021B3D;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-          padding: 8px 16px;
-          display: flex;
-          justify-content: flex-end;
-          gap: 10px;
-        }
-
         /* Existing Examination Engine & Question Paper Styles (PRESERVED) */
         .offline-paper{margin-top:16px;background:#fff;border:1px solid #e5e7eb;border-radius:18px;overflow:hidden}.offline-paper-head{padding:18px 20px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;gap:12px;align-items:flex-start;position:sticky;top:0;background:#fff;z-index:20}.offline-timer{background:#111827;color:#fff;border-radius:14px;padding:10px 14px;text-align:center;min-width:120px}.offline-timer span{display:block;font-size:11px;text-transform:uppercase;color:#cbd5e1;font-weight:900}.offline-timer strong{display:block;font-size:22px;line-height:1.1}.offline-timer.danger{background:#991b1b}.offline-body{display:grid;grid-template-columns:250px minmax(0,1fr);gap:0;padding:0}.offline-nav{background:#f8fafc;border-right:1px solid #e5e7eb;padding:16px}.offline-nav-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.offline-qnav{height:38px;border:1px solid #dbe3ef;border-radius:10px;background:#fff;color:#475569;font-weight:900}.offline-qnav.active{background:#111827;color:#fff}.offline-qnav.done{border-color:#22c55e;color:#166534;background:#ecfdf5}.offline-content{padding:18px 20px;min-width:0}.offline-shortcuts{background:#f8fafc;border:1px solid #dbe3ef;color:#334155;border-radius:14px;padding:12px;margin-bottom:14px;font-size:13px}.offline-rules{margin:14px 0 0;padding-left:20px;color:#334155;line-height:1.65}.offline-rules li{margin-bottom:7px}.offline-group{background:#f8fafc;border:1px solid #e5e7eb;border-radius:14px;padding:14px;margin-bottom:14px}.offline-option{display:flex;gap:10px;border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin-bottom:10px}.offline-option:has(input:checked){border-color:#033987;background:#eff6ff}.offline-textarea{width:100%;min-height:120px;border:1px solid #dbe3ef;border-radius:12px;padding:12px}.offline-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}.offline-calc{position:fixed;right:24px;bottom:24px;z-index:40;width:min(340px,calc(100vw - 48px));background:#111827;color:#fff;border-radius:18px;padding:14px;box-shadow:0 24px 70px rgba(15,23,42,.34)}.offline-calc input{width:100%;border:0;border-radius:12px;padding:12px;background:#020617;color:#fff;font-size:22px;text-align:right;margin-bottom:10px}.offline-calc-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.offline-calc button{border:0;border-radius:10px;padding:10px 6px;background:#334155;color:#fff;font-weight:900}.offline-confirm{position:fixed;inset:0;background:rgba(15,23,42,.65);backdrop-filter:blur(4px);z-index:1050;display:flex;align-items:center;justify-content:center;padding:18px}.offline-confirm-card{width:min(560px,100%);background:#fff;border-radius:22px;padding:28px;box-shadow:0 24px 80px rgba(15,23,42,.35)}.cbt-html{line-height:1.6}.cbt-html table{width:100%;border-collapse:collapse;margin:10px 0}.cbt-html td,.cbt-html th{border:1px solid #cbd5e1;padding:8px}.cbt-html img{max-width:100%;height:auto;border-radius:10px;border:1px solid #e5e7eb}
         .offline-pill{display:inline-flex;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:900;background:#eef2ff;color:#1e40af}.offline-pill-danger{background:#fee2e2;color:#991b1b}
@@ -1082,32 +1087,9 @@ export default function OfflineCbtRunnerPage() {
         {/* Network Connectivity Status Monitor */}
         <CbtNetworkStatus
           pingUrl={`${apiRoot}/offline-cbt/ping`}
-          serverLabel={isServerConsole ? "Local Server Engine" : "Local CBT Server"}
-          isHostServer={isServerConsole}
+          serverLabel={isServerApp ? "Local Server Engine" : "Local CBT Server"}
+          isHostServer={isServerApp}
         />
-
-        {/* Server Console Toggle Bar (Only shown on Server Host PC) */}
-        {isServerConsole && !examPaper && (
-          <div className="cbt-top-toggle-bar">
-            <span className="text-white opacity-75 small align-self-center me-auto d-none d-sm-inline">
-              <i className="bi bi-shield-check text-success me-1" /> Host PC Invigilator Control Available
-            </span>
-            <button
-              type="button"
-              className={`btn btn-sm ${consoleView === "student" ? "btn-light fw-bold" : "btn-outline-light"}`}
-              onClick={() => setConsoleView("student")}
-            >
-              <i className="bi bi-person-workspace me-1" /> Student Portal View
-            </button>
-            <button
-              type="button"
-              className={`btn btn-sm ${consoleView === "invigilator" ? "btn-warning text-dark fw-bold" : "btn-outline-light"}`}
-              onClick={() => setConsoleView("invigilator")}
-            >
-              <i className="bi bi-hdd-network me-1" /> Server Control Room
-            </button>
-          </div>
-        )}
 
         {/* ========================================================
             VIEW 1: IN-PROGRESS EXAMINATION ENGINE (100% PRESERVED)
@@ -1357,19 +1339,16 @@ export default function OfflineCbtRunnerPage() {
               )}
             </section>
           </div>
-        ) : isServerConsole && consoleView === "invigilator" ? (
+        ) : isServerApp ? (
           /* ========================================================
-             VIEW 2: SERVER INVIGILATOR CONTROL ROOM (ON HOST PC ONLY)
+             VIEW 2: OFFLINE CBT SERVER APPLICATION
              ======================================================== */
           <div className="cbt-console-wrap">
             <div className="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
               <div>
-                <h1 className="h3 fw-bold mb-1">Offline CBT Server Control Room</h1>
+                <h1 className="h3 fw-bold mb-1">GradeQuest Offline CBT</h1>
                 <p className="text-muted mb-0">Host management console for packages, Wi-Fi connections, and cloud synchronization.</p>
               </div>
-              <button className="btn btn-outline-primary fw-bold" onClick={() => setConsoleView("student")}>
-                <i className="bi bi-box-arrow-in-left me-1" /> Return to Student Login
-              </button>
             </div>
 
             {/* Cloud Sync Section */}
@@ -1477,7 +1456,7 @@ export default function OfflineCbtRunnerPage() {
             <div className="cbt-top-bar">
               <div className="d-flex align-items-center gap-2">
                 <span className="badge bg-primary text-white" style={{ background: "#033987", fontSize: 12 }}>
-                  <i className="bi bi-shield-check me-1" /> Secure Session
+                  GradeQuest Student CBT
                 </span>
                 <span className="text-muted small fw-bold">
                   {bundle?.school_name || "Examination Center"}
@@ -1683,7 +1662,7 @@ export default function OfflineCbtRunnerPage() {
               {/* Badge */}
               <div className="text-center">
                 <div className="cbt-brand-pill">
-                  <span className="cbt-pulse-dot" /> Secure Offline CBT Portal
+                  <span className="cbt-pulse-dot" /> GradeQuest Student CBT
                 </div>
               </div>
 
@@ -1760,20 +1739,6 @@ export default function OfflineCbtRunnerPage() {
                   Need help? If your admission number is not found, raise your hand for the invigilator.
                 </div>
               </div>
-
-              {/* Switch to Server Console on Host PC */}
-              {isServerConsole && (
-                <div className="text-center mt-3 pt-2">
-                  <button
-                    type="button"
-                    className="btn btn-link btn-sm text-muted text-decoration-none"
-                    style={{ fontSize: 11 }}
-                    onClick={() => setConsoleView("invigilator")}
-                  >
-                    <i className="bi bi-gear me-1" /> Invigilator Server Control Room
-                  </button>
-                </div>
-              )}
             </div>
           </div>
         )}
