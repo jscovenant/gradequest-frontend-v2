@@ -1,5 +1,6 @@
 // src/pages/Admin/Level/LevelsPage.tsx
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import TopNav from "../../../components/LayoutComponents/TopNav";
 import Sidebar from "../../../components/LayoutComponents/Sidebar";
 import Footer from "../../../components/LayoutComponents/Footer";
@@ -99,6 +100,7 @@ function getArmBadgeColor(arm?: string | null): { bg: string; color: string; bor
    MAIN COMPONENT
 ========================= */
 export default function LevelsPage() {
+  const navigate = useNavigate();
   const { showSuccess, showError, showWarning } = useToast();
   const currentUser = useMemo(() => getUser(), []);
 

@@ -14,11 +14,17 @@ import Login from "./pages/login";
 import HomePage from "./pages/HomePage";
 import Signup from "./pages/signup";
 import Dashboard from "./pages/Dashboard";
+import PublicSchoolWebsitePage from "./pages/PublicSchoolWebsitePage";
+import SchoolBrandedLoginPage from "./pages/Auth/SchoolBrandedLoginPage";
 
 function lazyWithRetry<T extends React.ComponentType<any>>(factory: () => Promise<{ default: T }>) {
   return lazy(async () => {
     try {
-      return await factory();
+      const mod = await factory();
+      if (!mod || typeof mod !== "object" || !("default" in mod)) {
+        throw new Error("Failed to fetch dynamically imported module");
+      }
+      return mod;
     } catch (error: any) {
       console.warn("Chunk load failed, checking for new deployment...", error);
       const msg = String(error?.message || error || "");
@@ -89,6 +95,7 @@ const PromoteStudentsPage = lazyWithRetry(() => import("./pages/Admin/students/P
 const BillingPage = lazyWithRetry(() => import("./pages/Admin/Billing/BillingPage"));
 const CheckoutPage = lazyWithRetry(() => import("./pages/Admin/Billing/CheckoutPage"));
 const SchoolProfitInvoicePaymentPage = lazyWithRetry(() => import("./pages/Admin/Billing/SchoolProfitInvoicePaymentPage"));
+const BillingConfirmationPage = lazyWithRetry(() => import("./pages/Admin/Billing/BillingConfirmationPage"));
 const WalletPage = lazyWithRetry(() => import("./pages/Admin/Wallet/WalletPage"));
 const AdminUserDetailsPage = lazyWithRetry(() => import("./pages/Super-Admin/AdminUserDetailsPage"));
 const SubscribersManagementPage = lazyWithRetry(() => import("./pages/Super-Admin/SubscribersManagementPage"));
@@ -141,6 +148,7 @@ const ResultSubmissionDeadlinePage = lazyWithRetry(() => import("./pages/Admin/S
 const ResultMonitoringPage = lazyWithRetry(() => import("./pages/Admin/StudentResult/Resultmonitoringpage"));
 const ResultsHubPage = lazyWithRetry(() => import("./pages/Admin/StudentResult/ResultsHubPage"));
 const CbtExamsPage = lazyWithRetry(() => import("./pages/Admin/CBT/CbtExamsPage"));
+const ClassCbtSettingsPage = lazyWithRetry(() => import("./pages/Admin/CBT/ClassCbtSettingsPage"));
 const StudentCbtExamsPage = lazyWithRetry(() => import("./pages/Student/CBT/StudentCbtExamsPage"));
 const StudentLessonNotesPage = lazyWithRetry(() => import("./pages/Student/Lessons/StudentLessonNotesPage"));
 const WhatsAppSettingsPage = lazyWithRetry(() => import("./pages/Admin/School/WhatsAppSettingsPage"));
@@ -170,10 +178,8 @@ const NewsletterSubscribersPage = lazyWithRetry(() => import("./pages/Super-Admi
 const PublicBlogDetailPage = lazyWithRetry(() => import("./pages/PublicBlogDetailPage"));
 const DomainAndWebsitePage = lazyWithRetry(() => import("./pages/Admin/School/DomainAndWebsitePage"));
 const AdmissionsManagementPage = lazyWithRetry(() => import("./pages/Admin/Admissions/AdmissionsManagementPage"));
-const PublicSchoolWebsitePage = lazyWithRetry(() => import("./pages/PublicSchoolWebsitePage"));
 const PublicAdmissionFormPage = lazyWithRetry(() => import("./pages/PublicAdmissionFormPage"));
 const PublicAdmissionStatusPage = lazyWithRetry(() => import("./pages/PublicAdmissionStatusPage"));
-const SchoolBrandedLoginPage = lazyWithRetry(() => import("./pages/Auth/SchoolBrandedLoginPage"));
 const InvestorDashboardPage = lazyWithRetry(() => import("./pages/Investor/InvestorDashboardPage"));
 const SuperAdminInvestorsPage = lazyWithRetry(() => import("./pages/Super-Admin/SuperAdminInvestorsPage"));
 const MobileCompanionHubPage = lazyWithRetry(() => import("./pages/Mobile/MobileCompanionHubPage"));
@@ -247,6 +253,10 @@ function App() {
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/terms-and-conditions" element={<TermsAndConditionsPage />} />
           <Route path="/blog/:slug" element={<PublicBlogDetailPage />} />
+          <Route path="/billing/billing" element={<Navigate to="/billing" replace />} />
+          <Route path="/billing/confirmation" element={<BillingConfirmationPage />} />
+          <Route path="/billing/payment-confirmation" element={<BillingConfirmationPage />} />
+          <Route path="/payment/confirmed" element={<BillingConfirmationPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
 
@@ -750,6 +760,28 @@ function App() {
           />
 
           <Route
+            path="/cbt/class-settings"
+            element={
+              <RequireAuth roles={["Admin", "Operator"]}>
+                <OnboardingGuard>
+                  <ClassCbtSettingsPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/admin/levels/cbt-settings"
+            element={
+              <RequireAuth roles={["Admin", "Operator"]}>
+                <OnboardingGuard>
+                  <ClassCbtSettingsPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+
+          <Route
             path="/student/cbt/exams"
             element={
               <RequireAuth roles={["Student"]}>
@@ -929,6 +961,16 @@ function App() {
 
           <Route
             path="/fees/receipts/approval"
+            element={
+              <RequireAuth roles={["Admin", "Bursar"]}>
+                <OnboardingGuard>
+                  <ReceiptApprovalPage />
+                </OnboardingGuard>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/bursar/receipts/approval"
             element={
               <RequireAuth roles={["Admin", "Bursar"]}>
                 <OnboardingGuard>

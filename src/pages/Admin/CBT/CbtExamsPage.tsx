@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import TopNav from "../../../components/LayoutComponents/TopNav";
 import Sidebar from "../../../components/LayoutComponents/Sidebar";
@@ -317,6 +318,7 @@ const emptyQuestion = {
 const objectiveTypes = ["single_choice", "multiple_choice", "true_false"];
 
 export default function CbtExamsPage() {
+  const navigate = useNavigate();
   const { showError, showSuccess } = useToast();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -1908,7 +1910,7 @@ export default function CbtExamsPage() {
                   >
                     <i className="bi bi-copy" /> Reuse Exam
                   </button>
-                  <button className="cbt-btn cbt-gold" type="button" onClick={() => setClassCbtModalOpen(true)} title="Configure which classes participate in CBT and adjust platform fees"><i className="bi bi-sliders2 me-1" /> Class CBT & Fee Settings</button>
+                  <button className="cbt-btn cbt-gold" type="button" onClick={() => navigate("/cbt/class-settings")} title="Configure which classes participate in CBT and adjust platform fees"><i className="bi bi-sliders2 me-1" /> Class CBT & Fee Settings</button>
                   <button className="cbt-btn cbt-primary" type="button" onClick={() => setCreateModalOpen(true)}><i className="bi bi-plus-circle" /> New Exam</button>
                   <button className="cbt-btn cbt-gold" onClick={load}><i className="bi bi-arrow-repeat" /> Refresh</button>
                 </div>

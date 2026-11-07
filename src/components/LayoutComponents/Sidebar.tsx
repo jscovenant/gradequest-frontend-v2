@@ -21,6 +21,7 @@ interface MenuChild {
   featureKey?: string;
   superAdminPermission?: string;
   hideIfNoFeature?: boolean;
+  disabled?: boolean;
 }
 
 interface MenuItem {
@@ -200,6 +201,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
   const userRole = (user.normalized_role || user.role || "").toLowerCase().replace(/[\s-]/g, "_");
   const isOperator = userRole === "operator" || userRole === "registrar" || userRole === "secretary";
   const isPrincipal = userRole === "principal" || userRole === "head_teacher" || userRole === "headteacher";
+  const isSubjectTeacher = userRole === "subject_teacher";
 
   const checkRole = (roles?: string[]) => {
     if (!roles || roles.length === 0) return true;
@@ -234,6 +236,14 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       href.includes("/bursar") ||
       href.includes("/grading-scale") ||
       href.includes("/results/deadlines")
+    )) {
+      return false;
+    }
+
+    if (isSubjectTeacher && (
+      href.includes("/students/attendance") ||
+      href.includes("/results") ||
+      href.includes("/students/promote")
     )) {
       return false;
     }
@@ -411,6 +421,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       hideIfNoFeature: true,
       children: [
         { label: "CBT Exams", href: "/cbt/exams", roles: ["Admin", "Teacher", "Operator"], featureKey: "cbt_online", hideIfNoFeature: true },
+        { label: "Class CBT & Fee Settings", href: "/cbt/class-settings", roles: ["Admin", "Operator"], featureKey: "cbt_online", hideIfNoFeature: true },
         { label: "Offline CBT Runner", href: "/cbt/offline-runner", roles: ["Admin", "Operator"], featureKey: "cbt_online", hideIfNoFeature: true },
       ],
       roles: ["Admin", "Teacher", "Operator"],
@@ -479,10 +490,11 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
       featureKey: "staff_attendance",
       lockIfNoFeature: true,
       hideIfNoFeature: true,
+      disabled: true,
       children: [
-        { label: "Mark Attendance (Scan QR)", href: "/scan-qr", roles: ["Admin", "Teacher"] },
-        { label: "Staff Attendance Logs", href: "/attendance/logs", roles: ["Admin"] },
-        { label: "Attendance Settings", href: "/attendance/settings", roles: ["Admin"] },
+        { label: "Mark Attendance (Scan QR)", href: "/scan-qr", roles: ["Admin", "Teacher"], disabled: true },
+        { label: "Staff Attendance Logs", href: "/attendance/logs", roles: ["Admin"], disabled: true },
+        { label: "Attendance Settings", href: "/attendance/settings", roles: ["Admin"], disabled: true },
       ],
       roles: ["Admin", "Teacher"],
     },
@@ -946,6 +958,10 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
 
                   const isItemAllowed = checkRole(item.roles);
 
+                  if (isSubjectTeacher && (item.href === "/results" || item.href?.startsWith("/results"))) {
+                    return false;
+                  }
+
                   if (!isItemAllowed || !canUseSuperAdminArea(item.superAdminPermission) || shouldHideForPlan(item)) {
                     return false;
                   }
@@ -1013,34 +1029,61 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, isOpen, onClose }
                               <div className="mt-1 mb-2">
                                 {item.children
                                   .filter(isChildAllowedForRole)
-                                  .map((child) => (
-                                    <NavLink
-                                      key={child.label}
-                                      to={child.href}
-                                      onClick={handleLinkClick}
-                                      className={({ isActive }) =>
-                                        `gq-submenu-link nav-link ${isActive ? "active" : ""}`
-                                      }
-                                      style={({ isActive }) => ({
-                                        color: isActive ? "#B45309" : "#475569",
-                                        fontWeight: isActive ? 700 : 550,
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "8px",
-                                      })}
-                                    >
+                                  .map((child) =>
+                                    child.disabled ? (
                                       <span
+                                        key={child.label}
+                                        className="gq-submenu-link nav-link"
                                         style={{
-                                          width: "5px",
-                                          height: "5px",
-                                          borderRadius: "50%",
-                                          backgroundColor: "currentColor",
-                                          opacity: 0.7,
+                                          color: "#94A3B8",
+                                          fontWeight: 550,
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: "8px",
+                                          cursor: "not-allowed",
+                                          opacity: 0.55,
                                         }}
-                                      ></span>
-                                      {child.label}
-                                    </NavLink>
-                                  ))}
+                                      >
+                                        <span
+                                          style={{
+                                            width: "5px",
+                                            height: "5px",
+                                            borderRadius: "50%",
+                                            backgroundColor: "currentColor",
+                                            opacity: 0.7,
+                                          }}
+                                        ></span>
+                                        {child.label}
+                                      </span>
+                                    ) : (
+                                      <NavLink
+                                        key={child.label}
+                                        to={child.href}
+                                        onClick={handleLinkClick}
+                                        className={({ isActive }) =>
+                                          `gq-submenu-link nav-link ${isActive ? "active" : ""}`
+                                        }
+                                        style={({ isActive }) => ({
+                                          color: isActive ? "#B45309" : "#475569",
+                                          fontWeight: isActive ? 700 : 550,
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: "8px",
+                                        })}
+                                      >
+                                        <span
+                                          style={{
+                                            width: "5px",
+                                            height: "5px",
+                                            borderRadius: "50%",
+                                            backgroundColor: "currentColor",
+                                            opacity: 0.7,
+                                          }}
+                                        ></span>
+                                        {child.label}
+                                      </NavLink>
+                                    )
+                                  )}
                               </div>
                             </div>
                           )}
